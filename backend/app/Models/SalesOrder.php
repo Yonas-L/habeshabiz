@@ -1,0 +1,65 @@
+<?php
+
+namespace App\Models;
+
+use App\Traits\BelongsToTenant;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+class SalesOrder extends Model
+{
+    use BelongsToTenant, HasFactory, HasUuids;
+
+    protected $fillable = [
+        'tenant_id',
+        'order_number',
+        'customer_id',
+        'salesperson_id',
+        'total_amount',
+        'discount_amount',
+        'paid_amount',
+        'payment_status',
+        'payment_method',
+        'financial_account_id',
+        'notes',
+        'order_date',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'total_amount' => 'decimal:2',
+            'discount_amount' => 'decimal:2',
+            'paid_amount' => 'decimal:2',
+            'order_date' => 'datetime',
+        ];
+    }
+
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(Contact::class, 'customer_id');
+    }
+
+    public function salesperson(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'salesperson_id');
+    }
+
+    public function financialAccount(): BelongsTo
+    {
+        return $this->belongsTo(FinancialAccount::class, 'financial_account_id');
+    }
+
+    public function items(): HasMany
+    {
+        return $this->hasMany(SalesOrderItem::class, 'sales_order_id');
+    }
+
+    public function debts(): HasMany
+    {
+        return $this->hasMany(Debt::class, 'reference_id')->where('reference_type', 'sales_order');
+    }
+}
