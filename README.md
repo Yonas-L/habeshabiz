@@ -13,8 +13,8 @@ HabeshaBiz bridges the gap between fragmented manual tools (Excel, paper noteboo
 
 ## Technology Stack
 
-- **Backend**: Laravel 11/12 (PHP 8.3+) REST API, PostgreSQL 17, Redis (queues & caching), Pest testing suite, Laravel Pint, Larastan.
-- **Frontend**: React + TypeScript + Vite, Tailwind CSS, TanStack Query, Lucide Icons, responsive mobile/tablet counter design.
+- **Backend**: Laravel 13 (PHP 8.5) REST API, PostgreSQL 17, Redis 7 (queues & caching), Pest 5 testing suite, Laravel Pint 1.32, Larastan 3.12.
+- **Frontend**: React 19 + TypeScript + Vite 8, Tailwind CSS 4, TanStack Query, Lucide Icons, responsive mobile/tablet counter design.
 - **Integrations Ready**: Telegram Bot notifications, n8n webhook pipelines, NativePHP cross-platform mobile client.
 
 ## Repository Structure
