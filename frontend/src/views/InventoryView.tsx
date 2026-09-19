@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import type { InventoryUnit, Product, User } from '../api/client';
 import { api } from '../api/client';
-import { Plus, Search, Battery } from 'lucide-react';
+import { toast } from 'sonner';
+import { Plus, Search, Battery, Loader2, X } from 'lucide-react';
 
 interface InventoryViewProps {
   user: User | null;
@@ -14,7 +15,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'in_stock' | 'sold' | 'all'>('in_stock');
 
-  // Intake Drawer
+  // Intake Modal
   const [showIntakeModal, setShowIntakeModal] = useState(false);
   const [intakeVariantId, setIntakeVariantId] = useState('');
   const [intakeImei, setIntakeImei] = useState('');
@@ -29,6 +30,17 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
     loadInventory();
   }, [statusFilter]);
 
+  // Handle Esc key to close modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showIntakeModal) {
+        setShowIntakeModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showIntakeModal]);
+
   const loadInventory = async () => {
     try {
       setLoading(true);
@@ -38,8 +50,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
       ]);
       setUnits(u);
       setProducts(p);
-    } catch (err) {
-      console.error('Failed to load inventory:', err);
+    } catch (err: any) {
+      toast.error('Failed to load inventory', { description: err.message });
     } finally {
       setLoading(false);
     }
@@ -66,12 +78,16 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
         cost_basis: parseFloat(intakeCost),
       });
 
+      toast.success('Inventory unit added to stock', {
+        description: `IMEI: ${intakeImei || 'Not recorded'} • Cost: ${parseFloat(intakeCost).toLocaleString()} ETB`,
+      });
+
       setShowIntakeModal(false);
       setIntakeImei('');
       setIntakeCost('');
       loadInventory();
     } catch (err: any) {
-      alert(err.message || 'Failed to intake inventory.');
+      toast.error('Failed to intake unit', { description: err.message });
     } finally {
       setIntakeSubmitting(false);
     }
@@ -80,46 +96,53 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
   const canViewCost = user?.can_view_costs ?? false;
 
   return (
-    <div className="space-y-6">
-      {/* Top Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="font-semibold text-slate-900 text-lg">Inventory & Serialized Tracking</h2>
-          <p className="text-xs text-slate-500">Track IMEI, battery health, cycle counts, and physical phone condition</p>
+    <div className="space-y-5">
+      {/* Top Controls Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        {/* Status Filter Segmented Control */}
+        <div className="inline-flex p-0.5 bg-slate-100 rounded-md border border-slate-200/60 text-xs">
+          <button
+            onClick={() => setStatusFilter('in_stock')}
+            className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
+              statusFilter === 'in_stock' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            In Stock ({units.filter((u) => u.status === 'in_stock').length})
+          </button>
+          <button
+            onClick={() => setStatusFilter('sold')}
+            className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
+              statusFilter === 'sold' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Sold
+          </button>
+          <button
+            onClick={() => setStatusFilter('all')}
+            className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
+              statusFilter === 'all' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            All History
+          </button>
         </div>
 
+        {/* Search & Action */}
         <div className="flex items-center gap-2">
-          {/* Status filter pills */}
-          <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/60 text-xs">
-            <button
-              onClick={() => setStatusFilter('in_stock')}
-              className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
-                statusFilter === 'in_stock' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600'
-              }`}
-            >
-              In Stock ({units.filter((u) => u.status === 'in_stock').length})
-            </button>
-            <button
-              onClick={() => setStatusFilter('sold')}
-              className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
-                statusFilter === 'sold' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600'
-              }`}
-            >
-              Sold
-            </button>
-            <button
-              onClick={() => setStatusFilter('all')}
-              className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
-                statusFilter === 'all' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600'
-              }`}
-            >
-              All
-            </button>
-          </div>
+          <form onSubmit={handleSearchSubmit} className="relative w-full sm:w-64">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search Model, IMEI, condition..."
+              className="w-full h-8 pl-8 pr-3 rounded-md border border-slate-200 bg-white text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
+            />
+          </form>
 
           <button
             onClick={() => setShowIntakeModal(true)}
-            className="px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-medium hover:bg-slate-800 transition-colors shadow-xs flex items-center gap-1.5"
+            className="h-8 px-3 rounded-md bg-slate-900 text-white text-xs font-medium hover:bg-slate-800 transition-all shadow-xs flex items-center gap-1.5 shrink-0 active:scale-[0.98]"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Stock Intake</span>
@@ -127,74 +150,57 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
         </div>
       </div>
 
-      {/* Search Bar */}
-      <form onSubmit={handleSearchSubmit} className="flex gap-2">
-        <div className="relative flex-1">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by Model, IMEI, condition, or color..."
-            className="w-full h-10 pl-9 pr-4 rounded-xl border border-slate-200 bg-white text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
-          />
-        </div>
-        <button
-          type="submit"
-          className="px-4 h-10 rounded-xl bg-slate-100 text-slate-700 text-xs font-medium hover:bg-slate-200 transition-colors"
-        >
-          Search
-        </button>
-      </form>
-
-      {/* Inventory Data Table */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-xs">
+      {/* Inventory Data Table (No card in card) */}
+      <div className="bg-white rounded-lg border border-slate-200/80 overflow-hidden shadow-xs">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50/80 border-b border-slate-200/80 text-slate-500 font-medium">
+            <thead className="bg-slate-50/70 border-b border-slate-200/80 text-slate-500 font-medium">
               <tr>
-                <th className="py-3 px-4">Item & Variant</th>
-                <th className="py-3 px-4">IMEI / Serial</th>
-                <th className="py-3 px-4">Battery & Cycles</th>
-                <th className="py-3 px-4">SIM & Specs</th>
-                <th className="py-3 px-4">Condition</th>
-                {canViewCost && <th className="py-3 px-4 text-right">Cost Basis</th>}
-                <th className="py-3 px-4 text-center">Status</th>
+                <th className="py-2.5 px-4">Item Model & Variant</th>
+                <th className="py-2.5 px-4 font-mono">IMEI / Serial</th>
+                <th className="py-2.5 px-4">Battery & Health</th>
+                <th className="py-2.5 px-4">SIM Type</th>
+                <th className="py-2.5 px-4">Physical Condition</th>
+                {canViewCost && <th className="py-2.5 px-4 text-right">Cost Basis</th>}
+                <th className="py-2.5 px-4 text-center">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
-                    Loading inventory...
+                  <td colSpan={7} className="py-16 text-center text-slate-400">
+                    <div className="flex items-center justify-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin text-slate-900" />
+                      <span>Loading inventory records...</span>
+                    </div>
                   </td>
                 </tr>
               ) : units.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
-                    No serialized inventory units found. Click "+ Stock Intake" to add items.
+                  <td colSpan={7} className="py-16 text-center text-slate-400">
+                    No serialized inventory units found. Click "+ Stock Intake" to add devices.
                   </td>
                 </tr>
               ) : (
                 units.map((unit) => (
-                  <tr key={unit.id} className="hover:bg-slate-50/60 transition-colors">
-                    <td className="py-3.5 px-4">
+                  <tr key={unit.id} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="py-3 px-4">
                       <div className="font-semibold text-slate-900">
-                        {unit.variant?.product?.name || 'Electronics Unit'}
+                        {unit.variant?.product?.name || 'Device Unit'}
                       </div>
-                      <div className="text-[11px] text-slate-500">
-                        {[unit.variant?.storage, unit.variant?.color].filter(Boolean).join(' • ') || 'Standard'}
+                      <div className="text-[11px] text-slate-400">
+                        {[unit.variant?.storage, unit.variant?.color].filter(Boolean).join(' &bull; ') || 'Standard'}
                       </div>
                     </td>
 
-                    <td className="py-3.5 px-4 font-mono text-[11px] text-slate-800">
+                    <td className="py-3 px-4 font-mono text-[11px] text-slate-800">
                       {unit.imei_or_serial || <span className="text-slate-400 font-sans italic">Not recorded</span>}
                     </td>
 
-                    <td className="py-3.5 px-4">
+                    <td className="py-3 px-4">
                       <div className="flex items-center gap-1.5">
                         <Battery className="w-3.5 h-3.5 text-slate-400" />
-                        <span className="font-medium text-slate-900">
+                        <span className="font-medium text-slate-900 font-mono">
                           {unit.battery_health ? `${unit.battery_health}%` : 'N/A'}
                         </span>
                         {unit.cycle_count !== null && (
@@ -203,25 +209,25 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
                       </div>
                     </td>
 
-                    <td className="py-3.5 px-4">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-700 uppercase">
+                    <td className="py-3 px-4">
+                      <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-medium bg-slate-100 text-slate-700 uppercase font-mono">
                         {unit.sim_type}
                       </span>
                     </td>
 
-                    <td className="py-3.5 px-4 capitalize text-slate-600">
-                      {unit.condition.replace('_', ' ')}
+                    <td className="py-3 px-4 capitalize text-slate-600">
+                      {unit.condition.replace(/_/g, ' ')}
                     </td>
 
                     {canViewCost && (
-                      <td className="py-3.5 px-4 text-right font-mono font-medium text-slate-900">
+                      <td className="py-3 px-4 text-right font-mono font-medium text-slate-900">
                         {Number(unit.cost_basis).toLocaleString()} ETB
                       </td>
                     )}
 
-                    <td className="py-3.5 px-4 text-center">
+                    <td className="py-3 px-4 text-center">
                       <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                        className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${
                           unit.status === 'in_stock'
                             ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/50'
                             : 'bg-slate-100 text-slate-600'
@@ -238,27 +244,35 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
         </div>
       </div>
 
-      {/* Stock Intake Modal */}
+      {/* Tactile Premium Modal for Stock Intake */}
       {showIntakeModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 max-w-lg w-full p-6 space-y-4 shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs animate-backdrop-enter"
+            onClick={() => setShowIntakeModal(false)}
+          />
+
+          <div className="relative z-10 bg-white rounded-lg border border-slate-200 shadow-2xl ring-1 ring-black/5 max-w-lg w-full p-5 space-y-4 animate-modal-enter">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="font-semibold text-slate-900 text-sm">Stock Intake (New Serialized Unit)</h3>
+              <div>
+                <h3 className="font-semibold text-slate-900 text-sm">Stock Intake (New Device)</h3>
+                <p className="text-[11px] text-slate-400">Record serial, battery percentage, and purchase cost</p>
+              </div>
               <button
                 onClick={() => setShowIntakeModal(false)}
-                className="text-slate-400 hover:text-slate-600 text-sm"
+                className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
               >
-                ✕
+                <X className="w-3.5 h-3.5" />
               </button>
             </div>
 
-            <form onSubmit={handleIntakeSubmit} className="space-y-4">
+            <form onSubmit={handleIntakeSubmit} className="space-y-3.5">
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1">Select Variant</label>
                 <select
                   value={intakeVariantId}
                   onChange={(e) => setIntakeVariantId(e.target.value)}
-                  className="w-full h-9 px-3 rounded-xl border border-slate-200 bg-white text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
+                  className="w-full h-8 px-2.5 rounded-md border border-slate-200 bg-white text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
                   required
                 >
                   <option value="">-- Choose Product Variant --</option>
@@ -274,13 +288,13 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">IMEI or Serial</label>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">IMEI or Serial Number</label>
                   <input
                     type="text"
                     value={intakeImei}
                     onChange={(e) => setIntakeImei(e.target.value)}
                     placeholder="e.g. 354868698..."
-                    className="w-full h-9 px-3 rounded-xl border border-slate-200 text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
+                    className="w-full h-8 px-2.5 rounded-md border border-slate-200 text-xs font-mono text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
                   />
                 </div>
 
@@ -292,7 +306,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
                     value={intakeCost}
                     onChange={(e) => setIntakeCost(e.target.value)}
                     placeholder="e.g. 145000"
-                    className="w-full h-9 px-3 rounded-xl border border-slate-200 text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
+                    className="w-full h-8 px-2.5 rounded-md border border-slate-200 text-xs font-mono text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
                     required
                   />
                 </div>
@@ -307,7 +321,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
                     max="100"
                     value={intakeBattery}
                     onChange={(e) => setIntakeBattery(e.target.value)}
-                    className="w-full h-9 px-3 rounded-xl border border-slate-200 text-xs font-mono text-slate-900"
+                    className="w-full h-8 px-2.5 rounded-md border border-slate-200 text-xs font-mono text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
                   />
                 </div>
 
@@ -318,16 +332,16 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
                     min="0"
                     value={intakeCycles}
                     onChange={(e) => setIntakeCycles(e.target.value)}
-                    className="w-full h-9 px-3 rounded-xl border border-slate-200 text-xs font-mono text-slate-900"
+                    className="w-full h-8 px-2.5 rounded-md border border-slate-200 text-xs font-mono text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">SIM Type</label>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">SIM Configuration</label>
                   <select
                     value={intakeSim}
                     onChange={(e) => setIntakeSim(e.target.value as any)}
-                    className="w-full h-9 px-2 rounded-xl border border-slate-200 bg-white text-xs text-slate-900"
+                    className="w-full h-8 px-2 rounded-md border border-slate-200 bg-white text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
                   >
                     <option value="physical">Physical SIM</option>
                     <option value="esim">eSIM</option>
@@ -337,11 +351,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Condition</label>
+                <label className="block text-xs font-medium text-slate-700 mb-1">Physical Condition</label>
                 <select
                   value={intakeCondition}
                   onChange={(e) => setIntakeCondition(e.target.value)}
-                  className="w-full h-9 px-3 rounded-xl border border-slate-200 bg-white text-xs text-slate-900"
+                  className="w-full h-8 px-2.5 rounded-md border border-slate-200 bg-white text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
                 >
                   <option value="new">Brand New (Sealed)</option>
                   <option value="used_clean">Used Clean (Pristine)</option>
@@ -351,20 +365,20 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
                 </select>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setShowIntakeModal(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                  className="h-8 px-3 rounded-md border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"
                 >
-                  Cancel
+                  Cancel (Esc)
                 </button>
                 <button
                   type="submit"
                   disabled={intakeSubmitting}
-                  className="px-5 py-2 rounded-xl bg-slate-900 text-white text-xs font-medium hover:bg-slate-800 disabled:opacity-50"
+                  className="h-8 px-4 rounded-md bg-slate-900 text-white text-xs font-medium hover:bg-slate-800 disabled:opacity-50 transition-colors shadow-xs active:scale-[0.98]"
                 >
-                  {intakeSubmitting ? 'Saving...' : 'Add Unit to Stock'}
+                  {intakeSubmitting ? 'Saving...' : 'Add to Stock'}
                 </button>
               </div>
             </form>

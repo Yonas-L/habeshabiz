@@ -12,8 +12,8 @@ import {
   setAuthToken,
   removeAuthToken,
 } from './api/client';
-import { Header } from './components/Header';
-import { Navigation, type NavTab } from './components/Navigation';
+import { Sidebar, type NavTab } from './components/Sidebar';
+import { Topbar } from './components/Topbar';
 import { OverviewView } from './views/OverviewView';
 import { CounterView } from './views/CounterView';
 import { InventoryView } from './views/InventoryView';
@@ -21,6 +21,7 @@ import { SalesHistoryView } from './views/SalesHistoryView';
 import { DebtsView } from './views/DebtsView';
 import { TreasuryView } from './views/TreasuryView';
 import { ExpensesView } from './views/ExpensesView';
+import { Toaster, toast } from 'sonner';
 import { ArrowRight, Loader2 } from 'lucide-react';
 
 export default function App() {
@@ -31,6 +32,7 @@ export default function App() {
   const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
 
   // Login form state
   const [email, setEmail] = useState('yoni@boletech.et');
@@ -57,6 +59,31 @@ export default function App() {
     } catch (err) {
       console.error('Failed refreshing workspace data:', err);
     }
+  }, []);
+
+  // Keyboard navigation shortcuts (⌘1 - ⌘7)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey) {
+        const key = e.key;
+        const tabMap: Record<string, NavTab> = {
+          '1': 'overview',
+          '2': 'counter',
+          '3': 'inventory',
+          '4': 'sales',
+          '5': 'debts',
+          '6': 'treasury',
+          '7': 'expenses',
+        };
+        if (tabMap[key]) {
+          e.preventDefault();
+          setActiveTab(tabMap[key]);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   // Check existing session or perform initial login
@@ -107,8 +134,10 @@ export default function App() {
       setUser(res.user);
       setTenant(res.tenant);
       await refreshData();
+      toast.success(`Welcome back, ${res.user.name}`);
     } catch (err: any) {
       setAuthError(err.message || 'Invalid credentials. Please try again.');
+      toast.error('Sign in failed', { description: err.message });
     } finally {
       setIsSubmittingAuth(false);
     }
@@ -123,8 +152,9 @@ export default function App() {
       setUser(res.user);
       setTenant(res.tenant);
       await refreshData();
-    } catch (err) {
-      console.error('Quick switch failed:', err);
+      toast.info(`Switched view to ${res.user.name} (${res.user.role})`);
+    } catch (err: any) {
+      toast.error('Persona switch failed', { description: err.message });
     } finally {
       setLoading(false);
     }
@@ -140,69 +170,71 @@ export default function App() {
       setUser(null);
       setTenant(null);
       setDashboardData(null);
+      toast.info('Signed out');
     }
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
-        <div className="flex items-center gap-3 text-slate-700">
-          <Loader2 className="w-5 h-5 animate-spin text-slate-900" />
-          <span className="text-sm font-medium tracking-tight">Connecting to HabeshaBiz...</span>
+      <div className="min-h-screen bg-[#f6f8fa] flex flex-col items-center justify-center p-4">
+        <div className="flex items-center gap-2.5 text-slate-700 bg-white p-4 rounded-lg border border-slate-200 shadow-xs">
+          <Loader2 className="w-4 h-4 animate-spin text-slate-900" />
+          <span className="text-xs font-medium tracking-tight">Syncing HabeshaBiz workspace...</span>
         </div>
       </div>
     );
   }
 
-  // Not authenticated view
+  // Not authenticated view (Squarish, clean Apple Enterprise sign-in)
   if (!user) {
     return (
-      <div className="min-h-screen bg-[#f5f5f7] flex flex-col items-center justify-center p-4">
-        <div className="w-full max-w-md bg-white rounded-3xl border border-slate-200/80 p-8 shadow-sm">
-          <div className="text-center mb-8">
-            <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white mx-auto flex items-center justify-center font-bold text-lg mb-3 shadow-xs">
+      <div className="min-h-screen bg-[#f6f8fa] flex flex-col items-center justify-center p-4">
+        <Toaster position="bottom-right" richColors closeButton />
+        <div className="w-full max-w-sm bg-white rounded-lg border border-slate-200/90 p-6 shadow-xl">
+          <div className="text-center mb-6">
+            <div className="w-10 h-10 rounded-md bg-slate-900 text-white mx-auto flex items-center justify-center font-bold text-sm mb-2.5 shadow-xs">
               HB
             </div>
-            <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">HabeshaBiz</h1>
-            <p className="text-xs text-slate-500 mt-1">Addis Ababa Retail & Small Business OS</p>
+            <h1 className="text-lg font-semibold text-slate-900 tracking-tight">HabeshaBiz</h1>
+            <p className="text-xs text-slate-400 mt-0.5">Addis Ababa Retail & Small Business OS</p>
           </div>
 
           {authError && (
-            <div className="mb-6 p-3 rounded-xl bg-rose-50 border border-rose-200/60 text-xs text-rose-700">
+            <div className="mb-4 p-2.5 rounded-md bg-rose-50 border border-rose-200/70 text-xs text-rose-700">
               {authError}
             </div>
           )}
 
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleLogin} className="space-y-3.5">
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1.5">Email Address</label>
+              <label className="block text-xs font-medium text-slate-700 mb-1">Email Address</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                className="w-full h-8 px-2.5 rounded-md border border-slate-200 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1.5">Password</label>
+              <label className="block text-xs font-medium text-slate-700 mb-1">Password</label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                className="w-full h-8 px-2.5 rounded-md border border-slate-200 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
               />
             </div>
 
             <button
               type="submit"
               disabled={isSubmittingAuth}
-              className="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium transition-colors flex items-center justify-center gap-2 shadow-xs disabled:opacity-50"
+              className="w-full h-8 px-3 rounded-md bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium transition-all flex items-center justify-center gap-1.5 shadow-xs disabled:opacity-50 active:scale-[0.98]"
             >
               {isSubmittingAuth ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
               ) : (
                 <>
                   <span>Sign In</span>
@@ -213,21 +245,21 @@ export default function App() {
           </form>
 
           {/* Quick Demo Logins */}
-          <div className="mt-8 pt-6 border-t border-slate-100">
-            <div className="text-[11px] font-medium uppercase tracking-wider text-slate-400 mb-3 text-center">
-              Quick Switch Demo Roles
+          <div className="mt-6 pt-5 border-t border-slate-100">
+            <div className="text-[10px] font-medium uppercase tracking-wider text-slate-400 mb-2 text-center">
+              Quick Switch Demo Personas
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-1.5">
               <button
                 onClick={() => {
                   setEmail('yoni@boletech.et');
                   setPassword('password123');
                   handleQuickSwitchUser('yoni@boletech.et');
                 }}
-                className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-left transition-colors"
+                className="p-2 rounded-md border border-slate-200 hover:bg-slate-50 text-left transition-colors"
               >
-                <div className="text-xs font-medium text-slate-900">Yoni (Owner)</div>
-                <div className="text-[10px] text-slate-500">Full capital & margins</div>
+                <div className="text-xs font-semibold text-slate-900">Yoni (Owner)</div>
+                <div className="text-[10px] text-slate-400">Full capital & margins</div>
               </button>
               <button
                 onClick={() => {
@@ -235,10 +267,10 @@ export default function App() {
                   setPassword('password123');
                   handleQuickSwitchUser('husa@boletech.et');
                 }}
-                className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-left transition-colors"
+                className="p-2 rounded-md border border-slate-200 hover:bg-slate-50 text-left transition-colors"
               >
-                <div className="text-xs font-medium text-slate-900">Husa (Sales)</div>
-                <div className="text-[10px] text-slate-500">Cost-masked counter</div>
+                <div className="text-xs font-semibold text-slate-900">Husa (Sales)</div>
+                <div className="text-[10px] text-slate-400">Cost-masked counter</div>
               </button>
             </div>
           </div>
@@ -248,77 +280,75 @@ export default function App() {
   }
 
   const netCapital = dashboardData?.capital_overview?.net_capital ?? null;
-  const openReceivablesCount = dashboardData?.counts?.open_receivables ?? 0;
-  const openPayablesCount = dashboardData?.counts?.open_payables ?? 0;
+  const openDebtsCount = (dashboardData?.counts?.open_receivables ?? 0) + (dashboardData?.counts?.open_payables ?? 0);
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-slate-900 flex flex-col font-sans selection:bg-slate-900 selection:text-white">
-      {/* Header bar */}
-      <Header
+    <div className="min-h-screen bg-[#f6f8fa] text-slate-900 flex font-sans selection:bg-slate-900 selection:text-white">
+      <Toaster position="bottom-right" richColors closeButton />
+
+      {/* Sidebar (Desktop & Mobile Drawer) */}
+      <Sidebar
+        activeTab={activeTab}
+        onChangeTab={setActiveTab}
         user={user}
         tenant={tenant}
         netCapital={netCapital}
+        openDebtsCount={openDebtsCount}
         onLogout={handleLogout}
         onQuickSwitchUser={handleQuickSwitchUser}
-      />
-
-      {/* Main navigation */}
-      <Navigation
-        activeTab={activeTab}
-        onChangeTab={setActiveTab}
-        openReceivablesCount={openReceivablesCount}
-        openPayablesCount={openPayablesCount}
+        isOpenMobile={isMobileSidebarOpen}
+        onCloseMobile={() => setIsMobileSidebarOpen(false)}
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 py-6">
-        {activeTab === 'overview' && (
-          <OverviewView
-            data={dashboardData}
-            user={user}
-            onNavigateTab={setActiveTab}
-          />
-        )}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Topbar Header */}
+        <Topbar
+          activeTab={activeTab}
+          onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
+          onQuickAction={() => setActiveTab('counter')}
+        />
 
-        {activeTab === 'counter' && (
-          <CounterView
-            user={user}
-            accounts={accounts}
-            contacts={contacts}
-            onSaleSuccess={refreshData}
-          />
-        )}
+        {/* View Surface */}
+        <main className="flex-1 p-4 lg:p-8 max-w-7xl w-full mx-auto">
+          {activeTab === 'overview' && (
+            <OverviewView
+              data={dashboardData}
+              user={user}
+              onNavigateTab={setActiveTab}
+            />
+          )}
 
-        {activeTab === 'inventory' && (
-          <InventoryView user={user} />
-        )}
+          {activeTab === 'counter' && (
+            <CounterView
+              user={user}
+              accounts={accounts}
+              contacts={contacts}
+              onSaleSuccess={refreshData}
+            />
+          )}
 
-        {activeTab === 'sales' && (
-          <SalesHistoryView user={user} />
-        )}
+          {activeTab === 'inventory' && (
+            <InventoryView user={user} />
+          )}
 
-        {activeTab === 'debts' && (
-          <DebtsView accounts={accounts} />
-        )}
+          {activeTab === 'sales' && (
+            <SalesHistoryView user={user} />
+          )}
 
-        {activeTab === 'treasury' && (
-          <TreasuryView />
-        )}
+          {activeTab === 'debts' && (
+            <DebtsView accounts={accounts} />
+          )}
 
-        {activeTab === 'expenses' && (
-          <ExpensesView accounts={accounts} />
-        )}
-      </main>
+          {activeTab === 'treasury' && (
+            <TreasuryView />
+          )}
 
-      {/* Footer info */}
-      <footer className="border-t border-slate-200/80 bg-white py-4 px-4 lg:px-8 text-xs text-slate-400 text-center">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>HabeshaBiz Small Business Management OS &copy; 2026</span>
-          <span className="text-[11px] text-slate-500">
-            PostgreSQL 17 &bull; Laravel 13 &bull; React 19 &bull; Addis Ababa, Ethiopia
-          </span>
-        </div>
-      </footer>
+          {activeTab === 'expenses' && (
+            <ExpensesView accounts={accounts} />
+          )}
+        </main>
+      </div>
     </div>
   );
 }
