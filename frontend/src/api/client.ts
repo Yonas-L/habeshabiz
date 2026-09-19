@@ -42,11 +42,12 @@ export interface InventoryUnit {
   imei_or_serial: string | null;
   battery_health: number | null;
   cycle_count: number | null;
-  sim_type: 'physical' | 'esim' | 'dual';
+  sim_type: 'physical' | 'esim' | 'dual' | 'na';
   condition: string;
   cost_basis?: string | number;
   status: 'in_stock' | 'reserved' | 'sold' | 'damaged' | 'returned';
   location: string;
+  notes?: string | null;
   variant?: ProductVariant & { product?: Product };
   supplier?: Contact;
 }
@@ -217,6 +218,18 @@ export const api = {
     return request<Product[]>(`/products?${query.toString()}`);
   },
 
+  createProduct: (data: {
+    name: string;
+    brand?: string;
+    category: string;
+    has_serials?: boolean;
+    variants: Array<{ storage?: string; ram?: string; color?: string; default_selling_price?: number }>;
+  }) =>
+    request<Product>('/products', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
   getInventoryUnits: (params?: { status?: string; search?: string }) => {
     const query = new URLSearchParams();
     if (params?.status) query.set('status', params.status);
@@ -224,10 +237,15 @@ export const api = {
     return request<InventoryUnit[]>(`/inventory/units?${query.toString()}`);
   },
 
-  intakeInventoryUnit: (data: Partial<InventoryUnit> & { variant_id: string; cost_basis: number; condition: string; sim_type: string }) =>
+  intakeInventoryUnit: (data: Partial<InventoryUnit> & { variant_id: string; cost_basis: number; condition: string; sim_type?: string }) =>
     request<InventoryUnit>('/inventory/units', {
       method: 'POST',
       body: JSON.stringify(data),
+    }),
+
+  restockInventoryUnit: (id: string) =>
+    request<InventoryUnit>(`/inventory/units/${id}/restock`, {
+      method: 'POST',
     }),
 
   getSales: (params?: { payment_status?: string; search?: string }) => {

@@ -33,6 +33,25 @@ export default function App() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('habeshabiz_theme') as 'light' | 'dark') || 'light';
+    }
+    return 'light';
+  });
+
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    localStorage.setItem('habeshabiz_theme', theme);
+  }, [theme]);
+
+  const handleToggleTheme = () => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  };
 
   // Login form state
   const [email, setEmail] = useState('yoni@boletech.et');
@@ -188,67 +207,67 @@ export default function App() {
   // Not authenticated view (Elevated Apple Enterprise / Finova sign-in)
   if (!user) {
     return (
-      <div className="min-h-screen bg-[#f4f5f8] flex flex-col items-center justify-center p-4 selection:bg-slate-900 selection:text-white">
-        <Toaster position="bottom-right" richColors closeButton />
-        <div className="w-full max-w-md bg-white rounded-3xl border border-slate-100 p-8 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.06)]">
+      <div className="min-h-screen bg-[#f6f8fa] dark:bg-[#0b0f17] flex flex-col items-center justify-center p-4 selection:bg-slate-900 selection:text-white transition-colors duration-200">
+        <Toaster position="bottom-right" richColors closeButton theme={theme} />
+        <div className="w-full max-w-md bg-white dark:bg-[#131926] rounded-3xl border border-slate-200/80 dark:border-slate-800 p-8 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.06)] dark:shadow-[0_20px_60px_-15px_rgba(0,0,0,0.4)]">
           <div className="text-center mb-7">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-slate-950 via-slate-900 to-indigo-950 text-white mx-auto flex items-center justify-center font-extrabold text-base mb-3.5 shadow-md ring-4 ring-slate-50">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-slate-950 via-slate-900 to-indigo-950 text-white mx-auto flex items-center justify-center font-extrabold text-base mb-3.5 shadow-md ring-4 ring-slate-50 dark:ring-slate-800">
               HB
             </div>
-            <h1 className="text-xl font-bold text-slate-900 tracking-tight">HabeshaBiz</h1>
-            <p className="text-xs text-slate-400 mt-1 font-medium">
-              Addis Ababa Small Business & Electronics Retail OS
+            <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">HabeshaBiz</h1>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 font-medium">
+              Retail & Electronics Store Management
             </p>
           </div>
 
           {authError && (
-            <div className="mb-5 p-3 rounded-xl bg-rose-50 border border-rose-200/60 text-xs font-semibold text-rose-700">
+            <div className="mb-5 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200/60 dark:border-rose-800 text-xs font-semibold text-rose-700 dark:text-rose-400">
               {authError}
             </div>
           )}
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">Email Address</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Email Address</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full h-10 px-3.5 rounded-xl border border-slate-200 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 shadow-2xs"
+                className="w-full h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-600 shadow-2xs"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">Password</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Password</label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full h-10 px-3.5 rounded-xl border border-slate-200 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 shadow-2xs"
+                className="w-full h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-600 shadow-2xs"
               />
             </div>
 
             <button
               type="submit"
               disabled={isSubmittingAuth}
-              className="w-full h-11 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 active:scale-[0.98]"
+              className="w-full h-11 px-4 rounded-xl bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 text-white dark:text-slate-900 text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 active:scale-[0.98]"
             >
               {isSubmittingAuth ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 <>
                   <span>Sign In to Workspace</span>
-                  <ArrowRight className="w-4 h-4 text-emerald-400" />
+                  <ArrowRight className="w-4 h-4 text-emerald-400 dark:text-emerald-600" />
                 </>
               )}
             </button>
           </form>
 
           {/* Quick Demo Personas */}
-          <div className="mt-8 pt-6 border-t border-slate-100">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-3 text-center">
+          <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-3 text-center">
               Quick Switch Demo Personas
             </div>
             <div className="grid grid-cols-2 gap-2.5">
@@ -258,15 +277,15 @@ export default function App() {
                   setPassword('password123');
                   handleQuickSwitchUser('yoni@boletech.et');
                 }}
-                className="p-3 rounded-2xl border border-slate-200/80 hover:border-slate-900/20 hover:bg-slate-50/70 text-left transition-all group"
+                className="p-3 rounded-2xl border border-slate-200/80 dark:border-slate-700 hover:border-slate-900/20 dark:hover:border-slate-500 hover:bg-slate-50/70 dark:hover:bg-slate-800/50 text-left transition-all group"
               >
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-bold text-slate-900 group-hover:text-black">Yoni</span>
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-700">
+                  <span className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-black dark:group-hover:text-white">Yoni</span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-400">
                     Owner
                   </span>
                 </div>
-                <div className="text-[10px] text-slate-400 font-medium">Full capital & margins</div>
+                <div className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">Full capital & margins</div>
               </button>
 
               <button
@@ -275,15 +294,15 @@ export default function App() {
                   setPassword('password123');
                   handleQuickSwitchUser('husa@boletech.et');
                 }}
-                className="p-3 rounded-2xl border border-slate-200/80 hover:border-slate-900/20 hover:bg-slate-50/70 text-left transition-all group"
+                className="p-3 rounded-2xl border border-slate-200/80 dark:border-slate-700 hover:border-slate-900/20 dark:hover:border-slate-500 hover:bg-slate-50/70 dark:hover:bg-slate-800/50 text-left transition-all group"
               >
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-bold text-slate-900 group-hover:text-black">Husa</span>
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700">
+                  <span className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-black dark:group-hover:text-white">Husa</span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400">
                     Sales
                   </span>
                 </div>
-                <div className="text-[10px] text-slate-400 font-medium">Cost-masked counter</div>
+                <div className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">Cost-masked counter</div>
               </button>
             </div>
           </div>
@@ -296,8 +315,8 @@ export default function App() {
   const openDebtsCount = (dashboardData?.counts?.open_receivables ?? 0) + (dashboardData?.counts?.open_payables ?? 0);
 
   return (
-    <div className="min-h-screen bg-[#f4f5f8] text-slate-900 flex font-sans selection:bg-slate-900 selection:text-white">
-      <Toaster position="bottom-right" richColors closeButton />
+    <div className="min-h-screen bg-[#f6f8fa] dark:bg-[#0b0f17] text-slate-900 dark:text-slate-100 flex font-sans selection:bg-slate-900 selection:text-white transition-colors duration-200">
+      <Toaster position="bottom-right" richColors closeButton theme={theme} />
 
       {/* Sidebar (Desktop & Mobile Drawer) */}
       <Sidebar
@@ -320,6 +339,8 @@ export default function App() {
           activeTab={activeTab}
           user={user}
           netCapital={netCapital}
+          theme={theme}
+          onToggleTheme={handleToggleTheme}
           onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
           onQuickAction={() => setActiveTab('counter')}
         />

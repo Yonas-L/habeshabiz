@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { AnimatedNumber } from './AnimatedNumber';
 
 interface DataPoint {
   day: string;
@@ -7,7 +8,7 @@ interface DataPoint {
   orders: number;
 }
 
-// 14-day sample derived from December 2025 actual trading patterns
+// 14-day sample derived from December trading patterns
 const defaultData: DataPoint[] = [
   { day: 'Dec 01', revenue: 145000, profit: 14200, orders: 2 },
   { day: 'Dec 03', revenue: 220000, profit: 21500, orders: 3 },
@@ -23,12 +24,23 @@ const defaultData: DataPoint[] = [
   { day: 'Dec 28', revenue: 560000, profit: 52000, orders: 7 },
 ];
 
-export const InteractiveSalesWaveChart: React.FC<{ data?: DataPoint[]; currency?: string }> = ({
+export const InteractiveSalesWaveChart: React.FC<{
+  data?: DataPoint[];
+  currency?: string;
+  canViewCost?: boolean;
+}> = ({
   data = defaultData,
   currency = 'ETB',
+  canViewCost = true,
 }) => {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const [metric, setMetric] = useState<'revenue' | 'profit'>('revenue');
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => setIsLoaded(true), 50);
+    return () => clearTimeout(t);
+  }, []);
 
   const width = 640;
   const height = 180;
@@ -60,7 +72,6 @@ export const InteractiveSalesWaveChart: React.FC<{ data?: DataPoint[]; currency?
   }, '');
 
   const areaPath = `${curvePath} L ${points[points.length - 1].x},${height - padY} L ${points[0].x},${height - padY} Z`;
-
   const activePoint = hoverIndex !== null ? points[hoverIndex] : points[points.length - 1];
 
   return (
@@ -69,46 +80,48 @@ export const InteractiveSalesWaveChart: React.FC<{ data?: DataPoint[]; currency?
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-              Sales & Profit Wave
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              Trading Trajectory
             </span>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60">
               +24.8% vs last month
             </span>
           </div>
-          <div className="text-2xl font-bold text-slate-900 font-mono tracking-tight mt-0.5">
-            {activePoint.val.toLocaleString()}{' '}
-            <span className="text-xs font-normal text-slate-500 font-sans">{currency}</span>
+          <div className="text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight mt-1">
+            <AnimatedNumber value={activePoint.val} />{' '}
+            <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 font-sans">{currency}</span>
           </div>
         </div>
 
         {/* Metric Selector Pills */}
-        <div className="inline-flex p-1 bg-slate-100 rounded-xl text-xs font-medium self-start sm:self-auto">
-          <button
-            onClick={() => setMetric('revenue')}
-            className={`px-3 py-1 rounded-lg transition-all ${
-              metric === 'revenue'
-                ? 'bg-white text-slate-900 shadow-xs font-semibold'
-                : 'text-slate-500 hover:text-slate-900'
-            }`}
-          >
-            Gross Sales
-          </button>
-          <button
-            onClick={() => setMetric('profit')}
-            className={`px-3 py-1 rounded-lg transition-all ${
-              metric === 'profit'
-                ? 'bg-white text-emerald-700 shadow-xs font-semibold'
-                : 'text-slate-500 hover:text-slate-900'
-            }`}
-          >
-            Gross Margin
-          </button>
-        </div>
+        {canViewCost && (
+          <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl text-xs font-medium self-start sm:self-auto">
+            <button
+              onClick={() => setMetric('revenue')}
+              className={`px-3 py-1.5 rounded-lg transition-all ${
+                metric === 'revenue'
+                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs font-bold'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              Gross Sales
+            </button>
+            <button
+              onClick={() => setMetric('profit')}
+              className={`px-3 py-1.5 rounded-lg transition-all ${
+                metric === 'profit'
+                  ? 'bg-white dark:bg-slate-700 text-emerald-700 dark:text-emerald-400 shadow-xs font-bold'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              Gross Margin
+            </button>
+          </div>
+        )}
       </div>
 
       {/* SVG Canvas Container */}
-      <div className="relative w-full h-[180px] bg-gradient-to-b from-slate-50/70 to-transparent rounded-xl border border-slate-100/90 overflow-hidden">
+      <div className="relative w-full h-[180px] bg-gradient-to-b from-slate-50/50 to-transparent dark:from-slate-800/20 dark:to-transparent rounded-xl border border-slate-100/90 dark:border-slate-800/80 overflow-hidden">
         <svg
           viewBox={`0 0 ${width} ${height}`}
           className="w-full h-full overflow-visible"
@@ -131,7 +144,8 @@ export const InteractiveSalesWaveChart: React.FC<{ data?: DataPoint[]; currency?
             y1={padY}
             x2={width - padX}
             y2={padY}
-            stroke="#e2e8f0"
+            stroke="currentColor"
+            className="text-slate-200 dark:text-slate-800"
             strokeWidth="0.8"
             strokeDasharray="4 4"
           />
@@ -140,7 +154,8 @@ export const InteractiveSalesWaveChart: React.FC<{ data?: DataPoint[]; currency?
             y1={height / 2}
             x2={width - padX}
             y2={height / 2}
-            stroke="#e2e8f0"
+            stroke="currentColor"
+            className="text-slate-200 dark:text-slate-800"
             strokeWidth="0.8"
             strokeDasharray="4 4"
           />
@@ -149,20 +164,26 @@ export const InteractiveSalesWaveChart: React.FC<{ data?: DataPoint[]; currency?
             y1={height - padY}
             x2={width - padX}
             y2={height - padY}
-            stroke="#cbd5e1"
+            stroke="currentColor"
+            className="text-slate-300 dark:text-slate-700"
             strokeWidth="1"
           />
 
           {/* Shaded Area */}
-          <path d={areaPath} fill={metric === 'revenue' ? 'url(#indigoWave)' : 'url(#emeraldWave)'} />
+          <path
+            d={areaPath}
+            fill={metric === 'revenue' ? 'url(#indigoWave)' : 'url(#emeraldWave)'}
+            className={`transition-opacity duration-700 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
+          />
 
           {/* Bezier Stroke Curve */}
           <path
             d={curvePath}
             fill="none"
-            stroke={metric === 'revenue' ? '#4f46e5' : '#059669'}
+            stroke={metric === 'revenue' ? '#6366f1' : '#10b981'}
             strokeWidth="2.5"
             strokeLinecap="round"
+            className={`transition-all duration-700 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
           />
 
           {/* Interactive Guides & Points */}
@@ -182,9 +203,9 @@ export const InteractiveSalesWaveChart: React.FC<{ data?: DataPoint[]; currency?
               <circle
                 cx={pt.x}
                 cy={pt.y}
-                r={hoverIndex === i ? 5.5 : 3}
-                fill={hoverIndex === i ? (metric === 'revenue' ? '#4f46e5' : '#059669') : '#ffffff'}
-                stroke={metric === 'revenue' ? '#4f46e5' : '#059669'}
+                r={hoverIndex === i ? 6 : 3.5}
+                fill={hoverIndex === i ? (metric === 'revenue' ? '#6366f1' : '#10b981') : '#ffffff'}
+                stroke={metric === 'revenue' ? '#6366f1' : '#10b981'}
                 strokeWidth="2"
                 className="cursor-pointer transition-all duration-150"
                 onMouseEnter={() => setHoverIndex(i)}
@@ -197,24 +218,24 @@ export const InteractiveSalesWaveChart: React.FC<{ data?: DataPoint[]; currency?
         {/* Floating Tooltip Pill */}
         {hoverIndex !== null && (
           <div
-            className="absolute z-10 pointer-events-none -translate-x-1/2 -translate-y-full bg-slate-900 text-white px-3 py-1.5 rounded-lg shadow-xl text-xs font-mono whitespace-nowrap animate-modal-enter"
+            className="absolute z-10 pointer-events-none -translate-x-1/2 -translate-y-full bg-slate-900 dark:bg-slate-800 text-white px-3 py-1.5 rounded-xl shadow-xl text-xs font-mono whitespace-nowrap animate-modal-enter border border-slate-700/50"
             style={{
               left: `${(points[hoverIndex].x / width) * 100}%`,
               top: `${Math.max(points[hoverIndex].y - 12, 10)}px`,
             }}
           >
-            <div className="font-semibold">{points[hoverIndex].val.toLocaleString()} ETB</div>
-            <div className="text-[10px] text-slate-300 font-sans flex items-center gap-1.5">
+            <div className="font-bold">{points[hoverIndex].val.toLocaleString()} ETB</div>
+            <div className="text-[10px] text-slate-300 font-sans flex items-center gap-1.5 mt-0.5">
               <span>{points[hoverIndex].day}</span>
               <span>&bull;</span>
-              <span>{points[hoverIndex].orders} sales</span>
+              <span>{points[hoverIndex].orders} orders</span>
             </div>
           </div>
         )}
       </div>
 
       {/* Axis Labels */}
-      <div className="flex justify-between text-[11px] text-slate-400 mt-2 px-1 font-mono">
+      <div className="flex justify-between text-[11px] text-slate-400 dark:text-slate-500 mt-2 px-1 font-mono font-medium">
         <span>{data[0]?.day}</span>
         <span>{data[Math.floor(data.length / 2)]?.day}</span>
         <span>{data[data.length - 1]?.day}</span>
@@ -281,16 +302,16 @@ export const MiniBarHistogram: React.FC<{
   const max = Math.max(...chartBars, 1);
   const bgClass =
     color === 'emerald'
-      ? 'bg-emerald-500'
+      ? 'bg-emerald-500 dark:bg-emerald-400'
       : color === 'indigo'
-      ? 'bg-indigo-500'
+      ? 'bg-indigo-500 dark:bg-indigo-400'
       : color === 'amber'
-      ? 'bg-amber-500'
+      ? 'bg-amber-500 dark:bg-amber-400'
       : color === 'blue'
-      ? 'bg-blue-500'
+      ? 'bg-blue-500 dark:bg-blue-400'
       : color === 'purple'
-      ? 'bg-purple-500'
-      : 'bg-slate-700';
+      ? 'bg-purple-500 dark:bg-purple-400'
+      : 'bg-slate-700 dark:bg-slate-400';
 
   return (
     <div className="flex items-end gap-1 h-7">
@@ -340,7 +361,8 @@ export const DonutCapitalChart: React.FC<{
             cy="60"
             r={radius}
             fill="none"
-            stroke="#f1f5f9"
+            stroke="currentColor"
+            className="text-slate-100 dark:text-slate-800"
             strokeWidth={stroke}
           />
           {/* Stock segment */}
@@ -349,7 +371,7 @@ export const DonutCapitalChart: React.FC<{
             cy="60"
             r={radius}
             fill="none"
-            stroke="#0f172a"
+            stroke="#64748b"
             strokeWidth={stroke}
             strokeDasharray={`${circum * stockPct} ${circum}`}
             strokeDashoffset={-stockOffset}
@@ -393,9 +415,9 @@ export const DonutCapitalChart: React.FC<{
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-          <span className="text-[10px] uppercase tracking-wider text-slate-400 font-medium">Assets</span>
-          <span className="text-xs font-bold font-mono text-slate-900">
-            {((total / 1000000)).toFixed(2)}M
+          <span className="text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500 font-medium">Assets</span>
+          <span className="text-xs font-bold font-mono text-slate-900 dark:text-white">
+            {(total / 1000000).toFixed(2)}M
           </span>
         </div>
       </div>
@@ -403,34 +425,42 @@ export const DonutCapitalChart: React.FC<{
       {/* Legend Grid */}
       <div className="grid grid-cols-2 gap-3 text-xs w-full">
         <div className="flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-slate-900 shrink-0" />
+          <span className="w-2.5 h-2.5 rounded-full bg-slate-500 shrink-0" />
           <div className="truncate">
-            <span className="text-slate-400 block text-[10px]">Stock ({(stockPct * 100).toFixed(0)}%)</span>
-            <span className="font-semibold text-slate-900 font-mono">{stock.toLocaleString()} ETB</span>
+            <span className="text-slate-400 dark:text-slate-500 block text-[10px]">Stock ({(stockPct * 100).toFixed(0)}%)</span>
+            <span className="font-bold text-slate-900 dark:text-slate-100 font-mono">
+              <AnimatedNumber value={stock} /> ETB
+            </span>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
           <div className="truncate">
-            <span className="text-slate-400 block text-[10px]">Debts ({(recPct * 100).toFixed(0)}%)</span>
-            <span className="font-semibold text-emerald-700 font-mono">+{receivables.toLocaleString()} ETB</span>
+            <span className="text-slate-400 dark:text-slate-500 block text-[10px]">Debts ({(recPct * 100).toFixed(0)}%)</span>
+            <span className="font-bold text-emerald-700 dark:text-emerald-400 font-mono">
+              +<AnimatedNumber value={receivables} /> ETB
+            </span>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0" />
           <div className="truncate">
-            <span className="text-slate-400 block text-[10px]">Treasury ({(treasPct * 100).toFixed(0)}%)</span>
-            <span className="font-semibold text-slate-900 font-mono">+{treasury.toLocaleString()} ETB</span>
+            <span className="text-slate-400 dark:text-slate-500 block text-[10px]">Cash ({(treasPct * 100).toFixed(0)}%)</span>
+            <span className="font-bold text-slate-900 dark:text-slate-100 font-mono">
+              +<AnimatedNumber value={treasury} /> ETB
+            </span>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
           <div className="truncate">
-            <span className="text-slate-400 block text-[10px]">Gold/FX ({(assetPct * 100).toFixed(0)}%)</span>
-            <span className="font-semibold text-slate-900 font-mono">+{assets.toLocaleString()} ETB</span>
+            <span className="text-slate-400 dark:text-slate-500 block text-[10px]">Gold/FX ({(assetPct * 100).toFixed(0)}%)</span>
+            <span className="font-bold text-slate-900 dark:text-slate-100 font-mono">
+              +<AnimatedNumber value={assets} /> ETB
+            </span>
           </div>
         </div>
       </div>

@@ -59,15 +59,19 @@ class InventoryController extends Controller
         $validated = $request->validate([
             'variant_id' => ['required', 'exists:product_variants,id'],
             'imei_or_serial' => ['nullable', 'string', 'max:100'],
-            'battery_health' => ['nullable', 'integer', 'min:50', 'max:100'],
+            'battery_health' => ['nullable', 'integer', 'min:0', 'max:100'],
             'cycle_count' => ['nullable', 'integer', 'min:0'],
-            'sim_type' => ['required', 'string', 'in:physical,esim,dual'],
+            'sim_type' => ['nullable', 'string', 'in:physical,esim,dual,na'],
             'condition' => ['required', 'string', 'max:50'],
             'cost_basis' => ['required', 'numeric', 'min:0'],
             'supplier_contact_id' => ['nullable', 'exists:contacts,id'],
             'location' => ['nullable', 'string', 'max:100'],
             'notes' => ['nullable', 'string'],
         ]);
+
+        if (empty($validated['sim_type'])) {
+            $validated['sim_type'] = 'na';
+        }
 
         $unit = InventoryUnit::create(array_merge($validated, [
             'status' => 'in_stock',
@@ -78,6 +82,22 @@ class InventoryController extends Controller
             'message' => 'Inventory unit recorded into stock.',
             'data' => $unit->load('variant.product'),
         ], 201);
+    }
+
+    public function restockUnit(Request $request, string $id): JsonResponse
+    {
+        $unit = InventoryUnit::findOrFail($id);
+
+        $unit->update([
+            'status' => 'in_stock',
+            'sold_at' => null,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Device restocked back to available inventory.',
+            'data' => $unit->load('variant.product'),
+        ]);
     }
 
     public function stockSummary(Request $request): JsonResponse
