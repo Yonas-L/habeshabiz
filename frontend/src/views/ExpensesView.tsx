@@ -2,7 +2,21 @@ import React, { useState, useEffect } from 'react';
 import type { Expense, FinancialAccount } from '../api/client';
 import { api } from '../api/client';
 import { toast } from 'sonner';
-import { DollarSign, Plus, UserMinus, Car, Coffee, Home, Wrench, Loader2, X } from 'lucide-react';
+import {
+  DollarSign,
+  Plus,
+  UserMinus,
+  Car,
+  Coffee,
+  Home,
+  Wrench,
+  Loader2,
+  X,
+  Receipt,
+  TrendingDown,
+  Sparkles,
+} from 'lucide-react';
+import { MiniSparkline, MiniBarHistogram } from '../components/Charts';
 
 interface ExpensesViewProps {
   accounts: FinancialAccount[];
@@ -62,8 +76,8 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ accounts }) => {
         description,
       });
 
-      toast.success(isDraw ? 'Owner personal draw recorded' : 'Operating expense recorded', {
-        description: `${parseFloat(amount).toLocaleString()} ETB &bull; ${description}`,
+      toast.success(isDraw ? 'Owner Personal Draw Recorded' : 'Operating Expense Recorded', {
+        description: `${parseFloat(amount).toLocaleString()} ETB • ${description}`,
       });
 
       setShowModal(false);
@@ -88,7 +102,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ accounts }) => {
   const getCategoryIcon = (cat: string) => {
     switch (cat) {
       case 'ride':
-        return <Car className="w-3.5 h-3.5 text-slate-500" />;
+        return <Car className="w-3.5 h-3.5 text-slate-600" />;
       case 'food':
         return <Coffee className="w-3.5 h-3.5 text-amber-600" />;
       case 'rent':
@@ -98,18 +112,26 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ accounts }) => {
       case 'personal_owner_draw':
         return <UserMinus className="w-3.5 h-3.5 text-purple-600" />;
       default:
-        return <DollarSign className="w-3.5 h-3.5 text-slate-500" />;
+        return <DollarSign className="w-3.5 h-3.5 text-slate-600" />;
     }
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {/* Top Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="font-semibold text-slate-900 text-base">Operating Expenses & Owner Drawings</h2>
-          <p className="text-xs text-slate-400">
-            Strict segregation between store operational costs and owner personal withdrawals
+          <div className="flex items-center gap-2.5">
+            <h2 className="font-bold text-slate-900 text-lg tracking-tight">
+              Operating Expenses & Owner Draws
+            </h2>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200/60">
+              <Sparkles className="w-3 h-3" />
+              Uncommingled Ledgers
+            </span>
+          </div>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Strict segregation between shop operational costs and owner personal withdrawals
           </p>
         </div>
 
@@ -118,54 +140,94 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ accounts }) => {
             setShowModal(true);
             setAccountId(accounts[0]?.id || '');
           }}
-          className="h-8 px-3 rounded-md bg-slate-900 text-white text-xs font-medium hover:bg-slate-800 transition-all shadow-xs flex items-center gap-1.5 self-start sm:self-auto active:scale-[0.98]"
+          className="h-10 px-4 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition-all shadow-sm flex items-center gap-2 self-start sm:self-auto active:scale-[0.98]"
         >
-          <Plus className="w-3.5 h-3.5" />
+          <Plus className="w-4 h-4 text-emerald-400" />
           <span>Record Expense / Draw</span>
         </button>
       </div>
 
-      {/* Summary Matrix (Squarish, clean un-nested cards) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div className="bg-white rounded-lg border border-slate-200/80 p-4 shadow-xs">
-          <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
-            Shop Operating Expenses
-          </span>
-          <div className="text-2xl font-semibold text-slate-900 font-mono tracking-tight mt-0.5">
-            {operatingTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}{' '}
-            <span className="text-xs font-normal text-slate-400">ETB</span>
+      {/* Summary Matrix (3 Bold Cards with Embedded Micro-Charts) */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* 1. Operating Expenses */}
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                Shop Operating Expenses
+              </span>
+              <div className="w-8 h-8 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center">
+                <Receipt className="w-4 h-4 text-slate-700" />
+              </div>
+            </div>
+            <div className="text-2xl font-black text-slate-900 font-mono tracking-tight mt-2">
+              {operatingTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}{' '}
+              <span className="text-xs font-bold text-slate-400">ETB</span>
+            </div>
           </div>
-          <span className="text-[11px] text-slate-400 mt-1 block">
-            Deducted directly from Net Operating Profit
-          </span>
+          <div className="mt-4 pt-3 border-t border-slate-100 flex items-end justify-between">
+            <span className="text-[11px] text-slate-400 font-medium">Deducted from Net Profit</span>
+            <MiniBarHistogram values={[12, 18, 15, 24, 20, 28, 30]} color="indigo" />
+          </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-slate-200/80 p-4 shadow-xs">
-          <span className="text-[11px] font-medium uppercase tracking-wider text-purple-600">
-            Owner Personal Drawings (Draws)
-          </span>
-          <div className="text-2xl font-semibold text-purple-700 font-mono tracking-tight mt-0.5">
-            {ownerDrawsTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}{' '}
-            <span className="text-xs font-normal text-purple-400">ETB</span>
+        {/* 2. Owner Draws */}
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-purple-600">
+                Owner Personal Draws (Yoni)
+              </span>
+              <div className="w-8 h-8 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center">
+                <UserMinus className="w-4 h-4 text-purple-600" />
+              </div>
+            </div>
+            <div className="text-2xl font-black text-purple-700 font-mono tracking-tight mt-2">
+              {ownerDrawsTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}{' '}
+              <span className="text-xs font-bold text-purple-400">ETB</span>
+            </div>
           </div>
-          <span className="text-[11px] text-purple-400 mt-1 block">
-            Personal drawings that do not distort store operating margins
-          </span>
+          <div className="mt-4 pt-3 border-t border-slate-100 flex items-end justify-between">
+            <span className="text-[11px] text-purple-500 font-medium">Does not distort shop margins</span>
+            <MiniSparkline values={[20, 22, 25, 24, 30, 32, 35]} color="purple" />
+          </div>
+        </div>
+
+        {/* 3. Total Outflows Handled */}
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                Total Cash Outflows
+              </span>
+              <div className="w-8 h-8 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center">
+                <TrendingDown className="w-4 h-4 text-amber-600" />
+              </div>
+            </div>
+            <div className="text-2xl font-black text-slate-900 font-mono tracking-tight mt-2">
+              {(operatingTotal + ownerDrawsTotal).toLocaleString('en-US', { minimumFractionDigits: 2 })}{' '}
+              <span className="text-xs font-bold text-slate-400">ETB</span>
+            </div>
+          </div>
+          <div className="mt-4 pt-3 border-t border-slate-100 flex items-end justify-between">
+            <span className="text-[11px] text-slate-400 font-medium">{expenses.length} Records In Ledger</span>
+            <MiniSparkline values={[32, 40, 40, 48, 50, 60, 65]} color="amber" />
+          </div>
         </div>
       </div>
 
-      {/* Expense History Table (Clean, no card in card) */}
-      <div className="bg-white rounded-lg border border-slate-200/80 overflow-hidden shadow-xs">
+      {/* Expense History Table */}
+      <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50/70 border-b border-slate-200/80 text-slate-500 font-medium">
+            <thead className="bg-slate-50/70 border-b border-slate-100 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
               <tr>
-                <th className="py-2.5 px-4">Date</th>
-                <th className="py-2.5 px-4">Category</th>
-                <th className="py-2.5 px-4">Description / Detail</th>
-                <th className="py-2.5 px-4">Paid From Account</th>
-                <th className="py-2.5 px-4 text-right">Amount (ETB)</th>
-                <th className="py-2.5 px-4 text-center">Classification</th>
+                <th className="py-3 px-5">Date</th>
+                <th className="py-3 px-5">Category</th>
+                <th className="py-3 px-5">Description / Detail</th>
+                <th className="py-3 px-5">Paid From Account</th>
+                <th className="py-3 px-5 text-right">Amount (ETB)</th>
+                <th className="py-3 px-5 text-center">Classification</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -181,41 +243,47 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ accounts }) => {
               ) : expenses.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-16 text-center text-slate-400">
-                    No expenses recorded yet.
+                    No expense or drawing records found.
                   </td>
                 </tr>
               ) : (
                 expenses.map((exp) => (
                   <tr key={exp.id} className="hover:bg-slate-50/70 transition-colors">
-                    <td className="py-3 px-4 font-mono text-[11px] text-slate-500">
-                      {new Date(exp.date).toLocaleDateString()}
+                    <td className="py-3.5 px-5 font-mono text-[11px] text-slate-500">
+                      {new Date(exp.date).toLocaleDateString(undefined, {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })}
                     </td>
 
-                    <td className="py-3 px-4">
-                      <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium bg-slate-50 border border-slate-200/70 text-slate-800 capitalize">
+                    <td className="py-3.5 px-5">
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-50 border border-slate-200/60 text-slate-800 capitalize">
                         {getCategoryIcon(exp.category)}
                         <span>{exp.category.replace(/_/g, ' ')}</span>
                       </div>
                     </td>
 
-                    <td className="py-3 px-4 text-slate-900 font-medium">
+                    <td className="py-3.5 px-5 text-slate-900 font-bold text-sm">
                       {exp.description}
                     </td>
 
-                    <td className="py-3 px-4 text-slate-600">
-                      {exp.financial_account?.name || 'Cash'}
+                    <td className="py-3.5 px-5 text-slate-600 font-medium">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-mono text-[11px]">
+                        {exp.financial_account?.name || 'Cash Drawer'}
+                      </span>
                     </td>
 
-                    <td className="py-3 px-4 text-right font-mono font-semibold text-slate-900">
+                    <td className="py-3.5 px-5 text-right font-mono font-bold text-slate-900 text-sm">
                       {Number(exp.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} ETB
                     </td>
 
-                    <td className="py-3 px-4 text-center">
+                    <td className="py-3.5 px-5 text-center">
                       <span
-                        className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                        className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold ${
                           exp.is_owner_draw
                             ? 'bg-purple-50 text-purple-700 border border-purple-200/50'
-                            : 'bg-slate-100 text-slate-600'
+                            : 'bg-slate-100 text-slate-700'
                         }`}
                       >
                         {exp.is_owner_draw ? 'Owner Draw' : 'Business Expense'}
@@ -237,23 +305,27 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ accounts }) => {
             onClick={() => setShowModal(false)}
           />
 
-          <div className="relative z-10 bg-white rounded-lg border border-slate-200 shadow-2xl ring-1 ring-black/5 max-w-md w-full p-5 space-y-4 animate-modal-enter">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div className="relative z-10 bg-white rounded-2xl border border-slate-100 shadow-2xl ring-1 ring-black/5 max-w-lg w-full p-6 space-y-4 animate-modal-enter">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div>
-                <h3 className="font-semibold text-slate-900 text-sm">Record Expense or Personal Draw</h3>
-                <p className="text-[11px] text-slate-400">Accurately track operational outflows and owner draws</p>
+                <h3 className="font-bold text-slate-900 text-base">Record Expense or Personal Draw</h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Segregate shop overhead from personal withdrawals to preserve accurate accounting
+                </p>
               </div>
               <button
                 onClick={() => setShowModal(false)}
-                className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
               >
-                <X className="w-3.5 h-3.5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-3.5">
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Expense Category</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Expense Category
+                </label>
                 <select
                   value={category}
                   onChange={(e) => {
@@ -261,7 +333,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ accounts }) => {
                     setCategory(cat);
                     setIsOwnerDraw(cat === 'personal_owner_draw');
                   }}
-                  className="w-full h-8 px-2.5 rounded-md border border-slate-200 bg-white text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
                 >
                   <option value="ride">RIDE / Transportation & Delivery</option>
                   <option value="food">Food & Hospitality</option>
@@ -273,74 +345,84 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ accounts }) => {
                 </select>
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Amount (ETB)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder="e.g. 350"
-                  className="w-full h-8 px-2.5 rounded-md border border-slate-200 text-xs font-mono font-medium text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
-                  required
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Amount (ETB)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="e.g. 350"
+                    className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Paid From Account
+                  </label>
+                  <select
+                    value={accountId}
+                    onChange={(e) => setAccountId(e.target.value)}
+                    className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
+                    required
+                  >
+                    {accounts
+                      .filter((a) => !a.is_custom_asset)
+                      .map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.name} ({Number(a.current_balance).toLocaleString()} ETB)
+                        </option>
+                      ))}
+                  </select>
+                </div>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Paid From Account</label>
-                <select
-                  value={accountId}
-                  onChange={(e) => setAccountId(e.target.value)}
-                  className="w-full h-8 px-2 rounded-md border border-slate-200 bg-white text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
-                  required
-                >
-                  {accounts.filter((a) => !a.is_custom_asset).map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name} ({Number(a.current_balance).toLocaleString()} ETB)
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Description / Memo</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Description / Note
+                </label>
                 <input
                   type="text"
                   placeholder="e.g. Customer delivery ride to Bole Medhanialem"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="w-full h-8 px-2.5 rounded-md border border-slate-200 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
                   required
                 />
               </div>
 
-              <div className="flex items-center gap-2 p-2.5 rounded-md bg-slate-50 border border-slate-100">
+              <div className="flex items-center gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-100">
                 <input
                   type="checkbox"
                   id="isOwnerDraw"
                   checked={isOwnerDraw}
                   onChange={(e) => setIsOwnerDraw(e.target.checked)}
-                  className="rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                  className="w-4 h-4 rounded text-purple-600 focus:ring-purple-500 border-slate-300"
                 />
-                <label htmlFor="isOwnerDraw" className="text-xs text-slate-700 select-none">
+                <label htmlFor="isOwnerDraw" className="text-xs text-slate-700 font-medium select-none">
                   Mark as Owner Personal Draw (Does not reduce shop profit)
                 </label>
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+              <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="h-8 px-3 rounded-md border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+                  className="h-10 px-4 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
                 >
                   Cancel (Esc)
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="h-8 px-4 rounded-md bg-slate-900 text-white text-xs font-medium hover:bg-slate-800 disabled:opacity-50 transition-colors shadow-xs active:scale-[0.98]"
+                  className="h-10 px-5 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 disabled:opacity-50 transition-colors shadow-sm active:scale-[0.98]"
                 >
-                  {submitting ? 'Recording...' : 'Record Entry'}
+                  {submitting ? 'Recording...' : 'Record Outflow'}
                 </button>
               </div>
             </form>

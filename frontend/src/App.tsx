@@ -185,92 +185,105 @@ export default function App() {
     );
   }
 
-  // Not authenticated view (Squarish, clean Apple Enterprise sign-in)
+  // Not authenticated view (Elevated Apple Enterprise / Finova sign-in)
   if (!user) {
     return (
-      <div className="min-h-screen bg-[#f6f8fa] flex flex-col items-center justify-center p-4">
+      <div className="min-h-screen bg-[#f4f5f8] flex flex-col items-center justify-center p-4 selection:bg-slate-900 selection:text-white">
         <Toaster position="bottom-right" richColors closeButton />
-        <div className="w-full max-w-sm bg-white rounded-lg border border-slate-200/90 p-6 shadow-xl">
-          <div className="text-center mb-6">
-            <div className="w-10 h-10 rounded-md bg-slate-900 text-white mx-auto flex items-center justify-center font-bold text-sm mb-2.5 shadow-xs">
+        <div className="w-full max-w-md bg-white rounded-3xl border border-slate-100 p-8 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.06)]">
+          <div className="text-center mb-7">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-slate-950 via-slate-900 to-indigo-950 text-white mx-auto flex items-center justify-center font-extrabold text-base mb-3.5 shadow-md ring-4 ring-slate-50">
               HB
             </div>
-            <h1 className="text-lg font-semibold text-slate-900 tracking-tight">HabeshaBiz</h1>
-            <p className="text-xs text-slate-400 mt-0.5">Addis Ababa Retail & Small Business OS</p>
+            <h1 className="text-xl font-bold text-slate-900 tracking-tight">HabeshaBiz</h1>
+            <p className="text-xs text-slate-400 mt-1 font-medium">
+              Addis Ababa Small Business & Electronics Retail OS
+            </p>
           </div>
 
           {authError && (
-            <div className="mb-4 p-2.5 rounded-md bg-rose-50 border border-rose-200/70 text-xs text-rose-700">
+            <div className="mb-5 p-3 rounded-xl bg-rose-50 border border-rose-200/60 text-xs font-semibold text-rose-700">
               {authError}
             </div>
           )}
 
-          <form onSubmit={handleLogin} className="space-y-3.5">
+          <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Email Address</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">Email Address</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full h-8 px-2.5 rounded-md border border-slate-200 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
+                className="w-full h-10 px-3.5 rounded-xl border border-slate-200 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 shadow-2xs"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Password</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">Password</label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full h-8 px-2.5 rounded-md border border-slate-200 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
+                className="w-full h-10 px-3.5 rounded-xl border border-slate-200 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 shadow-2xs"
               />
             </div>
 
             <button
               type="submit"
               disabled={isSubmittingAuth}
-              className="w-full h-8 px-3 rounded-md bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium transition-all flex items-center justify-center gap-1.5 shadow-xs disabled:opacity-50 active:scale-[0.98]"
+              className="w-full h-11 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 active:scale-[0.98]"
             >
               {isSubmittingAuth ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 <>
-                  <span>Sign In</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
+                  <span>Sign In to Workspace</span>
+                  <ArrowRight className="w-4 h-4 text-emerald-400" />
                 </>
               )}
             </button>
           </form>
 
-          {/* Quick Demo Logins */}
-          <div className="mt-6 pt-5 border-t border-slate-100">
-            <div className="text-[10px] font-medium uppercase tracking-wider text-slate-400 mb-2 text-center">
+          {/* Quick Demo Personas */}
+          <div className="mt-8 pt-6 border-t border-slate-100">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-3 text-center">
               Quick Switch Demo Personas
             </div>
-            <div className="grid grid-cols-2 gap-1.5">
+            <div className="grid grid-cols-2 gap-2.5">
               <button
                 onClick={() => {
                   setEmail('yoni@boletech.et');
                   setPassword('password123');
                   handleQuickSwitchUser('yoni@boletech.et');
                 }}
-                className="p-2 rounded-md border border-slate-200 hover:bg-slate-50 text-left transition-colors"
+                className="p-3 rounded-2xl border border-slate-200/80 hover:border-slate-900/20 hover:bg-slate-50/70 text-left transition-all group"
               >
-                <div className="text-xs font-semibold text-slate-900">Yoni (Owner)</div>
-                <div className="text-[10px] text-slate-400">Full capital & margins</div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-bold text-slate-900 group-hover:text-black">Yoni</span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-700">
+                    Owner
+                  </span>
+                </div>
+                <div className="text-[10px] text-slate-400 font-medium">Full capital & margins</div>
               </button>
+
               <button
                 onClick={() => {
                   setEmail('husa@boletech.et');
                   setPassword('password123');
                   handleQuickSwitchUser('husa@boletech.et');
                 }}
-                className="p-2 rounded-md border border-slate-200 hover:bg-slate-50 text-left transition-colors"
+                className="p-3 rounded-2xl border border-slate-200/80 hover:border-slate-900/20 hover:bg-slate-50/70 text-left transition-all group"
               >
-                <div className="text-xs font-semibold text-slate-900">Husa (Sales)</div>
-                <div className="text-[10px] text-slate-400">Cost-masked counter</div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-bold text-slate-900 group-hover:text-black">Husa</span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700">
+                    Sales
+                  </span>
+                </div>
+                <div className="text-[10px] text-slate-400 font-medium">Cost-masked counter</div>
               </button>
             </div>
           </div>
@@ -283,7 +296,7 @@ export default function App() {
   const openDebtsCount = (dashboardData?.counts?.open_receivables ?? 0) + (dashboardData?.counts?.open_payables ?? 0);
 
   return (
-    <div className="min-h-screen bg-[#f6f8fa] text-slate-900 flex font-sans selection:bg-slate-900 selection:text-white">
+    <div className="min-h-screen bg-[#f4f5f8] text-slate-900 flex font-sans selection:bg-slate-900 selection:text-white">
       <Toaster position="bottom-right" richColors closeButton />
 
       {/* Sidebar (Desktop & Mobile Drawer) */}
@@ -305,6 +318,8 @@ export default function App() {
         {/* Topbar Header */}
         <Topbar
           activeTab={activeTab}
+          user={user}
+          netCapital={netCapital}
           onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
           onQuickAction={() => setActiveTab('counter')}
         />
