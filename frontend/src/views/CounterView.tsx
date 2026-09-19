@@ -56,7 +56,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
         setFinancialAccountId(defaultAcc.id);
       }
     } catch (err: any) {
-      toast.error('Failed to load inventory for counter');
+      toast.error('Failed to load inventory for sales');
       console.error(err);
     } finally {
       setLoading(false);
@@ -130,14 +130,12 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
 
       const order = await api.recordSale(salePayload);
 
-      toast.success(
-        `Sale completed! Order #${order.order_number}`,
-        {
-          description: sourcingType === 'brokered_neighbour'
-            ? 'Brokered profit booked & payable automatically generated for peer merchant.'
+      toast.success(`Sale recorded! Order #${order.order_number}`, {
+        description:
+          sourcingType === 'brokered_neighbour'
+            ? 'Brokered profit booked & payable recorded for peer merchant.'
             : 'Internal inventory deducted & ledger updated.',
-        }
-      );
+      });
 
       // Reset form
       setSelectedProductId('');
@@ -162,9 +160,9 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
 
   if (loading && products.length === 0) {
     return (
-      <div className="py-24 text-center text-slate-400 text-xs flex items-center justify-center gap-2 animate-pulse">
-        <Loader2 className="w-4 h-4 animate-spin text-slate-900" />
-        <span>Loading catalog and inventory units...</span>
+      <div className="py-24 text-center text-slate-400 dark:text-slate-500 text-xs flex items-center justify-center gap-2 animate-pulse">
+        <Loader2 className="w-4 h-4 animate-spin text-slate-900 dark:text-white" />
+        <span>Loading catalog and inventory items...</span>
       </div>
     );
   }
@@ -175,33 +173,33 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
       : null;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div className="bg-white rounded-2xl border border-slate-100 p-6 sm:p-8 shadow-[0_4px_24px_-4px_rgba(0,0,0,0.04)]">
+    <div className="max-w-4xl mx-auto space-y-6 animate-page-enter">
+      <div className="bg-white dark:bg-[#131926] rounded-3xl border border-slate-200/80 dark:border-slate-800/90 p-6 sm:p-8 shadow-[0_4px_24px_-4px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_24px_-4px_rgba(0,0,0,0.4)]">
         {/* Header & Sourcing Selector */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-100">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-100 dark:border-slate-800">
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="font-extrabold text-slate-900 text-lg tracking-tight">Point of Sale (POS)</h2>
+              <h2 className="font-black text-slate-900 dark:text-white text-lg tracking-tight">Sales Entry</h2>
               {user && (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-semibold">
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold">
                   Rep: {user.name}
                 </span>
               )}
             </div>
-            <p className="text-xs text-slate-400 mt-0.5 font-medium">
-              High-speed shop floor and mobile counter sales checkout
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5 font-medium">
+              Record sales for shop stock or brokered items
             </p>
           </div>
 
           {/* Sourcing Mode Switcher */}
-          <div className="inline-flex p-1 bg-slate-100 rounded-xl text-xs font-semibold">
+          <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl text-xs font-semibold">
             <button
               type="button"
               onClick={() => setSourcingType('internal_stock')}
               className={`px-3.5 py-1.5 rounded-lg transition-all ${
                 sourcingType === 'internal_stock'
-                  ? 'bg-white text-slate-900 shadow-xs'
-                  : 'text-slate-500 hover:text-slate-900'
+                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               Shop Inventory
@@ -212,10 +210,10 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
               className={`px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
                 sourcingType === 'brokered_neighbour'
                   ? 'bg-amber-500 text-white shadow-xs'
-                  : 'text-slate-500 hover:text-slate-900'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              <span>Brokered (Neighbour Shop)</span>
+              <span>Brokered (Peer Shop)</span>
               <span className={`w-1.5 h-1.5 rounded-full ${sourcingType === 'brokered_neighbour' ? 'bg-white' : 'bg-amber-500'}`} />
             </button>
           </div>
@@ -223,10 +221,10 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
 
         {/* Brokered Sourcing Info Notice */}
         {sourcingType === 'brokered_neighbour' && (
-          <div className="mt-5 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-950 flex items-start gap-2.5">
-            <ArrowRightLeft className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+          <div className="mt-5 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-950 dark:text-amber-200 flex items-start gap-2.5">
+            <ArrowRightLeft className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
             <div>
-              <span className="font-bold">Brokered Sourcing Active:</span> Selling a device sourced from an Addis Ababa peer shop (e.g. Mekdi, Yenus). Does not touch your internal inventory. Automatically logs a payable debt in the debts ledger.
+              <span className="font-bold">Brokered Sourcing Active:</span> Sourced from a peer shop (e.g. Mekdi, Yenus). Does not touch your internal inventory and automatically generates a payable debt in the ledger.
             </div>
           </div>
         )}
@@ -235,7 +233,9 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
           {/* 1. Product & Variant Selection */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">Product Model</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                Product Model
+              </label>
               <select
                 value={selectedProductId}
                 onChange={(e) => {
@@ -243,10 +243,10 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                   setSelectedVariantId('');
                   setSelectedUnitId('');
                 }}
-                className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700"
                 required
               >
-                <option value="">-- Select Phone / Device --</option>
+                <option value="">-- Select Device or Item --</option>
                 {products.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name} ({p.category})
@@ -256,18 +256,20 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">Storage & Color Specification</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                Specification & Color
+              </label>
               <select
                 value={selectedVariantId}
                 onChange={(e) => handleVariantChange(e.target.value)}
                 disabled={!selectedProductId}
-                className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 disabled:bg-slate-50 disabled:text-slate-400"
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700 disabled:opacity-50"
                 required
               >
                 <option value="">-- Select Variant --</option>
                 {variants.map((v) => (
                   <option key={v.id} value={v.id}>
-                    {[v.storage, v.color].filter(Boolean).join(' &bull; ') || 'Standard'}
+                    {[v.storage, v.color].filter(Boolean).join(' • ') || 'Standard'}
                   </option>
                 ))}
               </select>
@@ -278,11 +280,11 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
           {sourcingType === 'internal_stock' ? (
             selectedProduct?.has_serials && (
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Choose Available Serialized Unit (IMEI & Health)
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Choose Available Serialized Unit
                 </label>
                 {unitsForVariant.length === 0 ? (
-                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 text-xs text-slate-500">
+                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400">
                     No physical units in stock for this variant. (Toggle "Brokered" above if sourcing from a peer).
                   </div>
                 ) : (
@@ -296,20 +298,26 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                           onClick={() => setSelectedUnitId(u.id)}
                           className={`p-3 rounded-xl border text-left text-xs transition-all ${
                             isSelected
-                              ? 'border-slate-900 bg-slate-900 text-white shadow-xs'
-                              : 'border-slate-200 bg-white hover:border-slate-300 text-slate-800'
+                              ? 'border-slate-900 dark:border-white bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
+                              : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] hover:border-slate-300 dark:hover:border-slate-700 text-slate-800 dark:text-slate-200'
                           }`}
                         >
                           <div className="flex items-center justify-between font-mono font-bold">
-                            <span>IMEI: {u.imei_or_serial || 'No IMEI'}</span>
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono uppercase ${isSelected ? 'bg-slate-800 text-slate-200' : 'bg-slate-100 text-slate-600'}`}>
-                              {u.sim_type}
-                            </span>
+                            <span>{u.imei_or_serial ? `Serial: ${u.imei_or_serial}` : 'No Serial'}</span>
+                            {u.sim_type && u.sim_type !== 'na' && (
+                              <span
+                                className={`text-[10px] px-1.5 py-0.5 rounded font-mono uppercase ${
+                                  isSelected ? 'bg-slate-800 dark:bg-slate-100 text-slate-200 dark:text-slate-800' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                                }`}
+                              >
+                                {u.sim_type}
+                              </span>
+                            )}
                           </div>
                           <div className="flex items-center gap-2 mt-1 text-[11px] opacity-85">
                             {u.battery_health && <span>Battery: {u.battery_health}%</span>}
-                            {u.cycle_count && <span>&bull; {u.cycle_count}cc</span>}
-                            <span>&bull; {u.condition.replace(/_/g, ' ')}</span>
+                            {u.cycle_count !== null && <span>• {u.cycle_count}cc</span>}
+                            <span>• {u.condition.replace(/_/g, ' ')}</span>
                           </div>
                         </button>
                       );
@@ -320,15 +328,15 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
             )
           ) : (
             /* Brokered Peer Shop Details */
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl bg-slate-50 border border-slate-200/80">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Peer Sourcing Partner (Source Shop)
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Peer Sourcing Partner (Shop Name)
                 </label>
                 <select
                   value={vendorContactId}
                   onChange={(e) => setVendorContactId(e.target.value)}
-                  className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white"
                   required={sourcingType === 'brokered_neighbour'}
                 >
                   <option value="">-- Select Sourcing Partner --</option>
@@ -341,8 +349,8 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Agreed Peer Purchase Cost (ETB)
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Agreed Purchase Cost from Partner (ETB)
                 </label>
                 <input
                   type="number"
@@ -350,7 +358,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                   value={vendorCost}
                   onChange={(e) => setVendorCost(e.target.value)}
                   placeholder="e.g. 150000"
-                  className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-mono font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-medium text-slate-900 dark:text-white"
                   required={sourcingType === 'brokered_neighbour'}
                 />
               </div>
@@ -360,7 +368,9 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
           {/* 3. Pricing, Customer & Payment */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">Selling Price (ETB)</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                Selling Price (ETB)
+              </label>
               <input
                 type="number"
                 step="0.01"
@@ -370,30 +380,34 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                   setPaidAmount(e.target.value);
                 }}
                 placeholder="e.g. 165000"
-                className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] text-xs font-mono font-bold text-slate-900 dark:text-white"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">Amount Paid Now (ETB)</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                Amount Paid Now (ETB)
+              </label>
               <input
                 type="number"
                 step="0.01"
                 value={paidAmount}
                 onChange={(e) => setPaidAmount(e.target.value)}
                 placeholder="Full or partial"
-                className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-mono font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] text-xs font-mono font-medium text-slate-900 dark:text-white"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">Payment Method</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                Payment Method
+              </label>
               <select
                 value={paymentMethod}
                 onChange={(e) => setPaymentMethod(e.target.value)}
-                className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white"
               >
                 <option value="telebirr">TeleBirr Mobile Money</option>
                 <option value="cash">Cash on Hand (Drawer)</option>
@@ -406,7 +420,9 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">Discount Given (ETB)</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                Discount (ETB)
+              </label>
               <input
                 type="number"
                 step="0.01"
@@ -414,16 +430,18 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                 onChange={(e) => setDiscountAmount(e.target.value)}
                 disabled={user ? !user.can_discount : false}
                 placeholder="0"
-                className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-mono text-slate-900 disabled:bg-slate-50 disabled:text-slate-400"
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] text-xs font-mono text-slate-900 dark:text-white disabled:opacity-50"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">Receiving Account</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                Receiving Account
+              </label>
               <select
                 value={financialAccountId}
                 onChange={(e) => setFinancialAccountId(e.target.value)}
-                className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white"
               >
                 <option value="">-- Select Receiving Account --</option>
                 {accounts.filter((a) => !a.is_custom_asset).map((a) => (
@@ -435,11 +453,13 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">Customer Contact</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                Customer Contact
+              </label>
               <select
                 value={customerId}
                 onChange={(e) => setCustomerId(e.target.value)}
-                className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white"
               >
                 <option value="">-- Anonymous Walk-in Customer --</option>
                 {customerList.map((c) => (
@@ -453,7 +473,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
 
           {/* Interactive Margin Calculation Preview */}
           {brokeredProfit !== null && (
-            <div className="p-4 rounded-xl bg-slate-900 text-white flex items-center justify-between text-xs font-mono shadow-sm">
+            <div className="p-4 rounded-2xl bg-slate-900 dark:bg-slate-800 text-white flex items-center justify-between text-xs font-mono shadow-sm">
               <span className="text-slate-300">Brokered Margin Calculation:</span>
               <span className="font-bold text-emerald-400 text-sm">
                 +{brokeredProfit.toLocaleString()} ETB Profit
@@ -465,12 +485,12 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
             <button
               type="submit"
               disabled={submitting}
-              className="h-11 px-6 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 disabled:opacity-50 transition-all shadow-sm flex items-center gap-2 active:scale-[0.98]"
+              className="h-11 px-6 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 disabled:opacity-50 transition-all shadow-sm flex items-center gap-2 active:scale-[0.98]"
             >
               {submitting ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
-                <ShoppingBag className="w-4 h-4 text-emerald-400" />
+                <ShoppingBag className="w-4 h-4 text-emerald-400 dark:text-emerald-600" />
               )}
               <span>{submitting ? 'Recording Sale...' : 'Complete & Record Sale'}</span>
             </button>

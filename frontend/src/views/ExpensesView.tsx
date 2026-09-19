@@ -17,6 +17,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { MiniSparkline, MiniBarHistogram } from '../components/Charts';
+import { AnimatedNumber } from '../components/AnimatedNumber';
 
 interface ExpensesViewProps {
   accounts: FinancialAccount[];
@@ -102,30 +103,30 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ accounts }) => {
   const getCategoryIcon = (cat: string) => {
     switch (cat) {
       case 'ride':
-        return <Car className="w-3.5 h-3.5 text-slate-600" />;
+        return <Car className="w-3.5 h-3.5 text-slate-600 dark:text-slate-300" />;
       case 'food':
-        return <Coffee className="w-3.5 h-3.5 text-amber-600" />;
+        return <Coffee className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />;
       case 'rent':
-        return <Home className="w-3.5 h-3.5 text-blue-600" />;
+        return <Home className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />;
       case 'maintenance':
-        return <Wrench className="w-3.5 h-3.5 text-indigo-600" />;
+        return <Wrench className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />;
       case 'personal_owner_draw':
-        return <UserMinus className="w-3.5 h-3.5 text-purple-600" />;
+        return <UserMinus className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />;
       default:
-        return <DollarSign className="w-3.5 h-3.5 text-slate-600" />;
+        return <DollarSign className="w-3.5 h-3.5 text-slate-600 dark:text-slate-300" />;
     }
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-page-enter">
       {/* Top Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5">
-            <h2 className="font-bold text-slate-900 text-lg tracking-tight">
+            <h2 className="font-bold text-slate-900 dark:text-white text-lg tracking-tight">
               Operating Expenses & Owner Draws
             </h2>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200/60">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/60">
               <Sparkles className="w-3 h-3" />
               Uncommingled Ledgers
             </span>
@@ -140,9 +141,9 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ accounts }) => {
             setShowModal(true);
             setAccountId(accounts[0]?.id || '');
           }}
-          className="h-10 px-4 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition-all shadow-sm flex items-center gap-2 self-start sm:self-auto active:scale-[0.98]"
+          className="h-10 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs flex items-center gap-2 self-start sm:self-auto active:scale-[0.98]"
         >
-          <Plus className="w-4 h-4 text-emerald-400" />
+          <Plus className="w-4 h-4 text-emerald-400 dark:text-emerald-600" />
           <span>Record Expense / Draw</span>
         </button>
       </div>
@@ -150,66 +151,66 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ accounts }) => {
       {/* Summary Matrix (3 Bold Cards with Embedded Micro-Charts) */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {/* 1. Operating Expenses */}
-        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] flex flex-col justify-between">
+        <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-100 dark:border-slate-800/80 p-5 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
                 Shop Operating Expenses
               </span>
-              <div className="w-8 h-8 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center">
-                <Receipt className="w-4 h-4 text-slate-700" />
+              <div className="w-8 h-8 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/60 flex items-center justify-center">
+                <Receipt className="w-4 h-4 text-slate-700 dark:text-slate-300" />
               </div>
             </div>
-            <div className="text-2xl font-black text-slate-900 font-mono tracking-tight mt-2">
-              {operatingTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}{' '}
-              <span className="text-xs font-bold text-slate-400">ETB</span>
+            <div className="text-2xl font-black text-slate-900 dark:text-white font-mono tabular-nums tracking-tight mt-2">
+              <AnimatedNumber value={operatingTotal} decimals={2} />{' '}
+              <span className="text-xs font-bold text-slate-400 font-sans">ETB</span>
             </div>
           </div>
-          <div className="mt-4 pt-3 border-t border-slate-100 flex items-end justify-between">
+          <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-end justify-between">
             <span className="text-[11px] text-slate-400 font-medium">Deducted from Net Profit</span>
             <MiniBarHistogram values={[12, 18, 15, 24, 20, 28, 30]} color="indigo" />
           </div>
         </div>
 
         {/* 2. Owner Draws */}
-        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] flex flex-col justify-between">
+        <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-100 dark:border-slate-800/80 p-5 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-purple-600">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">
                 Owner Personal Draws (Yoni)
               </span>
-              <div className="w-8 h-8 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center">
-                <UserMinus className="w-4 h-4 text-purple-600" />
+              <div className="w-8 h-8 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-100 dark:border-purple-800/60 flex items-center justify-center">
+                <UserMinus className="w-4 h-4 text-purple-600 dark:text-purple-400" />
               </div>
             </div>
-            <div className="text-2xl font-black text-purple-700 font-mono tracking-tight mt-2">
-              {ownerDrawsTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}{' '}
-              <span className="text-xs font-bold text-purple-400">ETB</span>
+            <div className="text-2xl font-black text-purple-700 dark:text-purple-400 font-mono tabular-nums tracking-tight mt-2">
+              <AnimatedNumber value={ownerDrawsTotal} decimals={2} />{' '}
+              <span className="text-xs font-bold text-purple-400 font-sans">ETB</span>
             </div>
           </div>
-          <div className="mt-4 pt-3 border-t border-slate-100 flex items-end justify-between">
-            <span className="text-[11px] text-purple-500 font-medium">Does not distort shop margins</span>
+          <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-end justify-between">
+            <span className="text-[11px] text-purple-500 dark:text-purple-400 font-medium">Does not distort shop margins</span>
             <MiniSparkline values={[20, 22, 25, 24, 30, 32, 35]} color="purple" />
           </div>
         </div>
 
         {/* 3. Total Outflows Handled */}
-        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] flex flex-col justify-between">
+        <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-100 dark:border-slate-800/80 p-5 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
                 Total Cash Outflows
               </span>
-              <div className="w-8 h-8 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center">
-                <TrendingDown className="w-4 h-4 text-amber-600" />
+              <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-100 dark:border-amber-800/60 flex items-center justify-center">
+                <TrendingDown className="w-4 h-4 text-amber-600 dark:text-amber-400" />
               </div>
             </div>
-            <div className="text-2xl font-black text-slate-900 font-mono tracking-tight mt-2">
-              {(operatingTotal + ownerDrawsTotal).toLocaleString('en-US', { minimumFractionDigits: 2 })}{' '}
-              <span className="text-xs font-bold text-slate-400">ETB</span>
+            <div className="text-2xl font-black text-slate-900 dark:text-white font-mono tabular-nums tracking-tight mt-2">
+              <AnimatedNumber value={operatingTotal + ownerDrawsTotal} decimals={2} />{' '}
+              <span className="text-xs font-bold text-slate-400 font-sans">ETB</span>
             </div>
           </div>
-          <div className="mt-4 pt-3 border-t border-slate-100 flex items-end justify-between">
+          <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-end justify-between">
             <span className="text-[11px] text-slate-400 font-medium">{expenses.length} Records In Ledger</span>
             <MiniSparkline values={[32, 40, 40, 48, 50, 60, 65]} color="amber" />
           </div>
@@ -217,10 +218,10 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ accounts }) => {
       </div>
 
       {/* Expense History Table */}
-      <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
+      <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-100 dark:border-slate-800/80 overflow-hidden shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50/70 border-b border-slate-100 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+            <thead className="bg-slate-50/70 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
               <tr>
                 <th className="py-3 px-5">Date</th>
                 <th className="py-3 px-5">Category</th>
@@ -230,12 +231,12 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ accounts }) => {
                 <th className="py-3 px-5 text-center">Classification</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-700">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-slate-700 dark:text-slate-300">
               {loading ? (
                 <tr>
                   <td colSpan={6} className="py-16 text-center text-slate-400">
                     <div className="flex items-center justify-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin text-slate-900" />
+                      <Loader2 className="w-4 h-4 animate-spin text-slate-900 dark:text-white" />
                       <span>Loading expense ledger...</span>
                     </div>
                   </td>
@@ -248,8 +249,8 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ accounts }) => {
                 </tr>
               ) : (
                 expenses.map((exp) => (
-                  <tr key={exp.id} className="hover:bg-slate-50/70 transition-colors">
-                    <td className="py-3.5 px-5 font-mono text-[11px] text-slate-500">
+                  <tr key={exp.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
+                    <td className="py-3.5 px-5 font-mono text-[11px] text-slate-500 dark:text-slate-400">
                       {new Date(exp.date).toLocaleDateString(undefined, {
                         month: 'short',
                         day: 'numeric',
@@ -258,23 +259,23 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ accounts }) => {
                     </td>
 
                     <td className="py-3.5 px-5">
-                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-50 border border-slate-200/60 text-slate-800 capitalize">
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-50 dark:bg-slate-800/70 border border-slate-200/60 dark:border-slate-700 text-slate-800 dark:text-slate-200 capitalize">
                         {getCategoryIcon(exp.category)}
                         <span>{exp.category.replace(/_/g, ' ')}</span>
                       </div>
                     </td>
 
-                    <td className="py-3.5 px-5 text-slate-900 font-bold text-sm">
+                    <td className="py-3.5 px-5 text-slate-900 dark:text-white font-bold text-sm">
                       {exp.description}
                     </td>
 
-                    <td className="py-3.5 px-5 text-slate-600 font-medium">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-mono text-[11px]">
+                    <td className="py-3.5 px-5 text-slate-600 dark:text-slate-400 font-medium">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono text-[11px]">
                         {exp.financial_account?.name || 'Cash Drawer'}
                       </span>
                     </td>
 
-                    <td className="py-3.5 px-5 text-right font-mono font-bold text-slate-900 text-sm">
+                    <td className="py-3.5 px-5 text-right font-mono tabular-nums font-bold text-slate-900 dark:text-white text-sm">
                       {Number(exp.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} ETB
                     </td>
 
@@ -282,8 +283,8 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ accounts }) => {
                       <span
                         className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold ${
                           exp.is_owner_draw
-                            ? 'bg-purple-50 text-purple-700 border border-purple-200/50'
-                            : 'bg-slate-100 text-slate-700'
+                            ? 'bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200/50 dark:border-purple-800/50'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
                         }`}
                       >
                         {exp.is_owner_draw ? 'Owner Draw' : 'Business Expense'}
@@ -301,21 +302,21 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ accounts }) => {
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
-            className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs animate-backdrop-enter"
+            className="fixed inset-0 bg-slate-950/40 dark:bg-black/60 backdrop-blur-xs animate-backdrop-enter"
             onClick={() => setShowModal(false)}
           />
 
-          <div className="relative z-10 bg-white rounded-2xl border border-slate-100 shadow-2xl ring-1 ring-black/5 max-w-lg w-full p-6 space-y-4 animate-modal-enter">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+          <div className="relative z-10 bg-white dark:bg-[#131926] rounded-2xl border border-slate-100 dark:border-slate-800 shadow-2xl ring-1 ring-black/5 max-w-lg w-full p-6 space-y-4 animate-modal-enter">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
               <div>
-                <h3 className="font-bold text-slate-900 text-base">Record Expense or Personal Draw</h3>
+                <h3 className="font-bold text-slate-900 dark:text-white text-base">Record Expense or Personal Draw</h3>
                 <p className="text-xs text-slate-400 mt-0.5">
                   Segregate shop overhead from personal withdrawals to preserve accurate accounting
                 </p>
               </div>
               <button
                 onClick={() => setShowModal(false)}
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -323,7 +324,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ accounts }) => {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                   Expense Category
                 </label>
                 <select
@@ -333,7 +334,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ accounts }) => {
                     setCategory(cat);
                     setIsOwnerDraw(cat === 'personal_owner_draw');
                   }}
-                  className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 focus:border-slate-900 dark:focus:border-slate-600"
                 >
                   <option value="ride">RIDE / Transportation & Delivery</option>
                   <option value="food">Food & Hospitality</option>
@@ -347,7 +348,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ accounts }) => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     Amount (ETB)
                   </label>
                   <input
@@ -356,19 +357,19 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ accounts }) => {
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     placeholder="e.g. 350"
-                    className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
+                    className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono tabular-nums font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 focus:border-slate-900 dark:focus:border-slate-600"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     Paid From Account
                   </label>
                   <select
                     value={accountId}
                     onChange={(e) => setAccountId(e.target.value)}
-                    className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
+                    className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 focus:border-slate-900 dark:focus:border-slate-600"
                     required
                   >
                     {accounts
@@ -383,7 +384,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ accounts }) => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                   Description / Note
                 </label>
                 <input
@@ -391,36 +392,36 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ accounts }) => {
                   placeholder="e.g. Customer delivery ride to Bole Medhanialem"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 focus:border-slate-900 dark:focus:border-slate-600"
                   required
                 />
               </div>
 
-              <div className="flex items-center gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-100">
+              <div className="flex items-center gap-3 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800">
                 <input
                   type="checkbox"
                   id="isOwnerDraw"
                   checked={isOwnerDraw}
                   onChange={(e) => setIsOwnerDraw(e.target.checked)}
-                  className="w-4 h-4 rounded text-purple-600 focus:ring-purple-500 border-slate-300"
+                  className="w-4 h-4 rounded text-purple-600 focus:ring-purple-500 border-slate-300 dark:border-slate-700 dark:bg-slate-800"
                 />
-                <label htmlFor="isOwnerDraw" className="text-xs text-slate-700 font-medium select-none">
+                <label htmlFor="isOwnerDraw" className="text-xs text-slate-700 dark:text-slate-300 font-medium select-none">
                   Mark as Owner Personal Draw (Does not reduce shop profit)
                 </label>
               </div>
 
-              <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100">
+              <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="h-10 px-4 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+                  className="h-10 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                 >
                   Cancel (Esc)
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="h-10 px-5 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 disabled:opacity-50 transition-colors shadow-sm active:scale-[0.98]"
+                  className="h-10 px-5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 disabled:opacity-50 transition-colors shadow-xs active:scale-[0.98]"
                 >
                   {submitting ? 'Recording...' : 'Record Outflow'}
                 </button>
