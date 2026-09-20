@@ -125,4 +125,166 @@ class AccountController extends Controller
             'data' => $result,
         ]);
     }
+
+    public function store(Request $request): JsonResponse
+    {
+        /** @var \App\Models\User $user */
+        $user = $request->user();
+        if (! $user->isOwner()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. Creating accounts is restricted to store owners.',
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'type' => ['required', 'in:bank,mobile_money,cash,asset_gold,asset_fx,custom'],
+            'account_number' => ['nullable', 'string', 'max:100'],
+            'currency' => ['nullable', 'string', 'max:10'],
+            'opening_balance' => ['nullable', 'numeric', 'min:0'],
+            'is_custom_asset' => ['nullable', 'boolean'],
+            'asset_details' => ['nullable', 'array'],
+        ]);
+
+        $type = $validated['type'];
+        $isCustomAsset = $validated['is_custom_asset'] ?? in_array($type, ['asset_gold', 'asset_fx', 'custom']);
+
+        $account = FinancialAccount::create([
+            'tenant_id' => TenantScope::getActiveTenantId() ?? $user->tenant_id,
+            'name' => $validated['name'],
+            'type' => $type,
+            'account_number' => $validated['account_number'] ?? null,
+            'currency' => $validated['currency'] ?? 'ETB',
+            'current_balance' => $validated['opening_balance'] ?? 0,
+            'is_custom_asset' => $isCustomAsset,
+            'asset_details' => $validated['asset_details'] ?? null,
+            'is_active' => true,
+        ]);
+
+        \App\Models\AuditLog::record(
+            action: 'account_created',
+            entityType: 'FinancialAccount',
+            entityId: $account->id,
+            newValues: [
+                'name' => $account->name,
+                'type' => $account->type,
+                'currency' => $account->currency,
+                'opening_balance' => $account->current_balance,
+            ]
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => "Account {$account->name} created successfully.",
+            'data' => $account,
+        ], 201);
+    }
+
+    public function update(Request $request, string $id): JsonResponse
+    {
+        /** @var \App\Models\User $user */
+        $user = $request->user();
+        if (! $user->isOwner()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. Updating accounts is restricted to store owners.',
+            ], 403);
+        }
+
+        $account = FinancialAccount::findOrFail($id);
+
+        $validated = $request->validate([
+            'name' => ['nullable', 'string', 'max:255'],
+            'type' => ['nullable', 'in:bank,mobile_money,cash,asset_gold,asset_fx,custom'],
+            'account_number' => ['nullable', 'string', 'max:100'],
+            'currency' => ['nullable', 'string', 'max:10'],
+            'is_custom_asset' => ['nullable', 'boolean'],
+            'asset_details' => ['nullable', 'array'],
+            'is_active' => ['nullable', 'boolean'],
+            'balance_adjustment' => ['nullable', 'numeric'],
+        ]);
+
+        $oldValues = $account->only(['name', 'type', 'account_number', 'currency', 'is_custom_asset', 'asset_details', 'is_active', 'current_balance']);
+
+        if (array_key_exists('name', $validated)) $account->name = $validated['name'];
+        if (array_key_exists('type', $validated)) $account->type = $validated['type'];
+        if (array_key_exists('account_number', $validated)) $account->account_number = $validated['account_number'];
+        if (array_key_exists('currency', $validated)) $account->currency = $validated['currency'];
+        if (array_key_exists('is_custom_asset', $validated)) $account->is_custom_asset = $validated['is_custom_asset'];
+        if (array_key_exists('asset_details', $validated)) $account->asset_details = $validated['asset_details'];
+        if (array_key_exists('is_active', $validated)) $account->is_active = $validated['is_active'];
+        
+        if (isset($validated['balance_adjustment'])) {
+            $account->current_balance += (float) $validated['balance_adjustment'];
+        }
+
+        $account->save();
+
+        \App\Models\AuditLog::record(
+            action: 'account_updated',
+            entityType: 'FinancialAccount',
+            entityId: $account->id,
+            oldValues: $oldValues,
+            newValues: $account->only(['name', 'type', 'account_number', 'currency', 'is_custom_asset', 'asset_details', 'is_active', 'current_balance'])
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Account updated successfully.',
+            'data' => $account->fresh(),
+        ]);
+    }
+
+    public function destroy(Request $request, string $id): JsonResponse
+    {
+        /** @var \App\Models\User $user */
+        $user = $request->user();
+        if (! $user->isOwner()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. Deleting accounts is restricted to store owners.',
+            ], 403);
+        }
+
+        $account = FinancialAccount::withCount(['sourceTransactions', 'destinationTransactions', 'expenses', 'debtPayments'])->findOrFail($id);
+
+        $hasReferences = $account->source_transactions_count > 0 
+            || $account->destination_transactions_count > 0
+            || $account->expenses_count > 0
+            || $account->debt_payments_count > 0;
+
+        if ($hasReferences) {
+            if ($account->is_active) {
+                $account->is_active = false;
+                $account->save();
+                
+                \App\Models\AuditLog::record(
+                    action: 'account_deactivated',
+                    entityType: 'FinancialAccount',
+                    entityId: $account->id,
+                    newValues: ['is_active' => false]
+                );
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Account cannot be deleted because it has associated transactions, expenses, or debt payments. It has been deactivated instead.',
+            ], 422);
+        }
+
+        $account->delete();
+
+        \App\Models\AuditLog::record(
+            action: 'account_deleted',
+            entityType: 'FinancialAccount',
+            entityId: $id,
+            oldValues: ['name' => $account->name]
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Account deleted successfully.',
+        ]);
+    }
 }

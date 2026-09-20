@@ -145,12 +145,13 @@ export interface Debt {
 export interface FinancialAccount {
   id: string;
   name: string;
-  type: 'bank' | 'mobile_money' | 'cash' | 'asset_gold' | 'asset_fx';
+  type: 'bank' | 'mobile_money' | 'cash' | 'asset_gold' | 'asset_fx' | 'custom';
   account_number: string | null;
   currency: string;
   current_balance: string | number;
   is_custom_asset: boolean;
-  asset_details?: Record<string, any>;
+  is_active?: boolean;
+  asset_details?: Record<string, any> | null;
 }
 
 export interface Expense {
@@ -550,6 +551,40 @@ export const api = {
     request<{ source_balance: number; destination_balance: number }>('/accounts/transfer', {
       method: 'POST',
       body: JSON.stringify(data),
+    }),
+
+  createAccount: (data: {
+    name: string;
+    type: string;
+    account_number?: string;
+    currency?: string;
+    opening_balance?: number;
+    is_custom_asset?: boolean;
+    asset_details?: Record<string, any>;
+  }) =>
+    request<FinancialAccount>('/accounts', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateAccount: (id: string, data: {
+    name?: string;
+    type?: string;
+    account_number?: string | null;
+    currency?: string;
+    is_custom_asset?: boolean;
+    is_active?: boolean;
+    asset_details?: Record<string, any> | null;
+    balance_adjustment?: number;
+  }) =>
+    request<FinancialAccount>(`/accounts/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deleteAccount: (id: string) =>
+    request<{ message: string; deactivated?: boolean }>(`/accounts/${id}`, {
+      method: 'DELETE',
     }),
 
   getContacts: (params?: { role?: string; search?: string }) => {

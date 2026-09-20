@@ -13,9 +13,15 @@ import {
   Smartphone,
   ShieldCheck,
   TrendingUp,
+  Plus,
+  Pencil,
+  Trash2,
+  Power,
+  Globe,
 } from 'lucide-react';
 import { MiniSparkline, MiniBarHistogram } from '../components/Charts';
 import { AnimatedNumber } from '../components/AnimatedNumber';
+import { ManageAccountModal } from '../components/treasury/ManageAccountModal';
 
 export const TreasuryView: React.FC = () => {
   const [treasuryAccounts, setTreasuryAccounts] = useState<FinancialAccount[]>([]);
@@ -33,19 +39,28 @@ export const TreasuryView: React.FC = () => {
   const [transferDesc, setTransferDesc] = useState('');
   const [transferring, setTransferring] = useState(false);
 
+  // Account Management Modal
+  const [showAccountModal, setShowAccountModal] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<FinancialAccount | null>(null);
+
+  // Delete Confirmation
+  const [deletingAccount, setDeletingAccount] = useState<FinancialAccount | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
   useEffect(() => {
     loadAccounts();
   }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && showTransferModal) {
-        setShowTransferModal(false);
+      if (e.key === 'Escape') {
+        if (showTransferModal) setShowTransferModal(false);
+        if (deletingAccount) setDeletingAccount(null);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showTransferModal]);
+  }, [showTransferModal, deletingAccount]);
 
   const loadAccounts = async () => {
     try {
@@ -112,6 +127,34 @@ export const TreasuryView: React.FC = () => {
     }
   };
 
+  const handleOpenEdit = (acc: FinancialAccount) => {
+    setEditingAccount(acc);
+    setShowAccountModal(true);
+  };
+
+  const handleOpenCreate = () => {
+    setEditingAccount(null);
+    setShowAccountModal(true);
+  };
+
+  const handleDelete = async () => {
+    if (!deletingAccount) return;
+    try {
+      setDeleting(true);
+      const res = await api.deleteAccount(deletingAccount.id);
+      toast.success(
+        res.deactivated ? 'Account deactivated' : 'Account deleted',
+        { description: deletingAccount.name }
+      );
+      setDeletingAccount(null);
+      loadAccounts();
+    } catch (err: any) {
+      toast.error('Cannot remove account', { description: err.message });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const getAccountBadge = (acc: FinancialAccount) => {
     const lower = acc.name.toLowerCase();
     if (lower.includes('cbe') || lower.includes('commercial bank')) {
@@ -149,6 +192,13 @@ export const TreasuryView: React.FC = () => {
         tag: 'Cash Drawer',
       };
     }
+    if (acc.type === 'custom') {
+      return {
+        icon: <Globe className="w-4 h-4 text-slate-600 dark:text-slate-400" />,
+        bg: 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200/50 dark:border-slate-700',
+        tag: 'Custom',
+      };
+    }
     return {
       icon: <Landmark className="w-4 h-4 text-slate-600 dark:text-slate-400" />,
       bg: 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200/50 dark:border-slate-700',
@@ -167,6 +217,7 @@ export const TreasuryView: React.FC = () => {
 
   const selectedSource = treasuryAccounts.find((a) => a.id === sourceAccountId);
   const selectedDest = treasuryAccounts.find((a) => a.id === destAccountId);
+  const allAccounts = [...treasuryAccounts, ...assetAccounts];
 
   return (
     <div className="space-y-6 animate-page-enter">
@@ -187,13 +238,22 @@ export const TreasuryView: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={() => handleOpenTransfer()}
-          className="h-10 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-sm flex items-center gap-2 self-start sm:self-auto active:scale-[0.98]"
-        >
-          <ArrowRightLeft className="w-4 h-4 text-emerald-400 dark:text-emerald-600" />
-          <span>Inter-Account Transfer</span>
-        </button>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <button
+            onClick={handleOpenCreate}
+            className="h-10 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-sm flex items-center gap-2 active:scale-[0.98]"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add Account</span>
+          </button>
+          <button
+            onClick={() => handleOpenTransfer()}
+            className="h-10 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-sm flex items-center gap-2 active:scale-[0.98]"
+          >
+            <ArrowRightLeft className="w-4 h-4 text-emerald-500" />
+            <span>Transfer</span>
+          </button>
+        </div>
       </div>
 
       {/* Summary Matrix (3 Bold Cards with Embedded Micro-Charts) */}
@@ -239,7 +299,7 @@ export const TreasuryView: React.FC = () => {
           </div>
 
           <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-end justify-between">
-            <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">18k/21k Gold & USD/USDT</span>
+            <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">Gold & Foreign Currency</span>
             <MiniSparkline values={[110, 115, 114, 120, 125, 128, 132]} color="amber" />
           </div>
         </div>
@@ -282,10 +342,15 @@ export const TreasuryView: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {treasuryAccounts.map((acc) => {
             const badge = getAccountBadge(acc);
+            const isInactive = acc.is_active === false;
             return (
               <div
                 key={acc.id}
-                className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800/90 p-5 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_20px_-4px_rgba(0,0,0,0.4)] hover:border-slate-300 dark:hover:border-slate-700 transition-all flex flex-col justify-between"
+                className={`bg-white dark:bg-[#131926] rounded-2xl border p-5 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_20px_-4px_rgba(0,0,0,0.4)] transition-all flex flex-col justify-between ${
+                  isInactive
+                    ? 'border-slate-200/50 dark:border-slate-800/50 opacity-60'
+                    : 'border-slate-200/80 dark:border-slate-800/90 hover:border-slate-300 dark:hover:border-slate-700'
+                }`}
               >
                 <div>
                   <div className="flex items-center justify-between">
@@ -301,10 +366,19 @@ export const TreasuryView: React.FC = () => {
                       </div>
                     </div>
 
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-800/50">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      Live
-                    </span>
+                    <div className="flex items-center gap-1">
+                      {isInactive ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                          <Power className="w-3 h-3" />
+                          Inactive
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-800/50">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          Live
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {acc.account_number && (
@@ -325,13 +399,29 @@ export const TreasuryView: React.FC = () => {
                     <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 ml-1">ETB</span>
                   </div>
 
-                  <button
-                    onClick={() => handleOpenTransfer(acc.id)}
-                    className="h-8 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all flex items-center gap-1.5 active:scale-95"
-                  >
-                    <ArrowRightLeft className="w-3 h-3" />
-                    <span>Transfer</span>
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => handleOpenEdit(acc)}
+                      title="Edit account"
+                      className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setDeletingAccount(acc)}
+                      title="Remove account"
+                      className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => handleOpenTransfer(acc.id)}
+                      className="h-8 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all flex items-center gap-1.5 active:scale-95"
+                    >
+                      <ArrowRightLeft className="w-3 h-3" />
+                      <span>Transfer</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             );
@@ -350,69 +440,152 @@ export const TreasuryView: React.FC = () => {
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {assetAccounts.map((acc) => {
-            const isGold = acc.type === 'asset_gold';
-            return (
-              <div
-                key={acc.id}
-                className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800/90 p-5 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_20px_-4px_rgba(0,0,0,0.4)] hover:border-slate-300 dark:hover:border-slate-700 transition-all"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div
-                      className={`w-9 h-9 rounded-xl flex items-center justify-center border ${
-                        isGold
-                          ? 'bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 border-amber-200/60 dark:border-amber-800/60'
-                          : 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border-emerald-200/60 dark:border-emerald-800/60'
-                      }`}
-                    >
-                      {isGold ? <Coins className="w-5 h-5" /> : <DollarSign className="w-5 h-5" />}
+        {assetAccounts.length === 0 ? (
+          <div className="bg-white dark:bg-[#131926] rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 p-8 text-center">
+            <Coins className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
+            <p className="text-xs text-slate-400 font-medium">No asset reserves yet</p>
+            <p className="text-[11px] text-slate-400 mt-1">
+              Add gold, USD, USDT, or other hedge assets using the "Add Account" button above
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {assetAccounts.map((acc) => {
+              const isGold = acc.type === 'asset_gold';
+              const isInactive = acc.is_active === false;
+              return (
+                <div
+                  key={acc.id}
+                  className={`bg-white dark:bg-[#131926] rounded-2xl border p-5 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_20px_-4px_rgba(0,0,0,0.4)] transition-all ${
+                    isInactive
+                      ? 'border-slate-200/50 dark:border-slate-800/50 opacity-60'
+                      : 'border-slate-200/80 dark:border-slate-800/90 hover:border-slate-300 dark:hover:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div
+                        className={`w-9 h-9 rounded-xl flex items-center justify-center border ${
+                          isGold
+                            ? 'bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 border-amber-200/60 dark:border-amber-800/60'
+                            : 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border-emerald-200/60 dark:border-emerald-800/60'
+                        }`}
+                      >
+                        {isGold ? <Coins className="w-5 h-5" /> : acc.type === 'custom' ? <Globe className="w-5 h-5" /> : <DollarSign className="w-5 h-5" />}
+                      </div>
+                      <div>
+                        <div className="font-bold text-slate-900 dark:text-white text-sm">{acc.name}</div>
+                        <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">
+                          {isGold ? 'Physical Gold Holdings' : acc.type === 'custom' ? 'Custom Asset' : 'Foreign Currency & USDT'}
+                        </span>
+                      </div>
                     </div>
-                    <div>
-                      <div className="font-bold text-slate-900 dark:text-white text-sm">{acc.name}</div>
-                      <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">
-                        {isGold ? 'Physical Gold Holdings' : 'Foreign Currency & USDT'}
+
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => handleOpenEdit(acc)}
+                        title="Edit"
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => setDeletingAccount(acc)}
+                        title="Remove"
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                          isInactive
+                            ? 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                            : isGold
+                            ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/60 dark:border-amber-800/60'
+                            : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60'
+                        }`}
+                      >
+                        {isInactive ? 'Inactive' : 'Hedge Asset'}
                       </span>
                     </div>
                   </div>
 
-                  <span
-                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                      isGold
-                        ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/60 dark:border-amber-800/60'
-                        : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60'
-                    }`}
-                  >
-                    Hedge Asset
-                  </span>
-                </div>
+                  {acc.asset_details && (
+                    <div className="mt-4 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 text-xs font-mono text-slate-700 dark:text-slate-300 divide-y divide-slate-200/40 dark:divide-slate-700/40">
+                      {Object.entries(acc.asset_details).map(([k, v]) => (
+                        <div key={k} className="flex justify-between py-1.5 first:pt-0 last:pb-0">
+                          <span className="capitalize text-slate-400 dark:text-slate-500 font-sans font-medium text-[11px]">
+                            {k.replace(/_/g, ' ')}:
+                          </span>
+                          <span className="font-bold text-slate-900 dark:text-white">{String(v)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
-                {acc.asset_details && (
-                  <div className="mt-4 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 text-xs font-mono text-slate-700 dark:text-slate-300 divide-y divide-slate-200/40 dark:divide-slate-700/40">
-                    {Object.entries(acc.asset_details).map(([k, v]) => (
-                      <div key={k} className="flex justify-between py-1.5 first:pt-0 last:pb-0">
-                        <span className="capitalize text-slate-400 dark:text-slate-500 font-sans font-medium text-[11px]">
-                          {k.replace(/_/g, ' ')}:
-                        </span>
-                        <span className="font-bold text-slate-900 dark:text-white">{String(v)}</span>
-                      </div>
-                    ))}
+                  <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-baseline justify-between">
+                    <span className="text-xs text-slate-400 dark:text-slate-500 font-medium">Market Valuation</span>
+                    <span className="text-lg font-bold text-slate-900 dark:text-white font-mono">
+                      <AnimatedNumber value={Number(acc.current_balance)} decimals={2} />{' '}
+                      <span className="text-xs font-semibold text-slate-400 dark:text-slate-500">ETB</span>
+                    </span>
                   </div>
-                )}
-
-                <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-baseline justify-between">
-                  <span className="text-xs text-slate-400 dark:text-slate-500 font-medium">Market Valuation</span>
-                  <span className="text-lg font-bold text-slate-900 dark:text-white font-mono">
-                    <AnimatedNumber value={Number(acc.current_balance)} decimals={2} />{' '}
-                    <span className="text-xs font-semibold text-slate-400 dark:text-slate-500">ETB</span>
-                  </span>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
+
+      {/* Account Management Modal */}
+      <ManageAccountModal
+        isOpen={showAccountModal}
+        onClose={() => {
+          setShowAccountModal(false);
+          setEditingAccount(null);
+        }}
+        onSaved={loadAccounts}
+        editAccount={editingAccount}
+      />
+
+      {/* Delete Confirmation Modal */}
+      {deletingAccount && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDeletingAccount(null)} />
+          <div className="relative w-full max-w-sm mx-4 bg-white dark:bg-[#0f1522] rounded-2xl shadow-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden animate-page-enter p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/40 flex items-center justify-center">
+                <Trash2 className="w-5 h-5 text-rose-600 dark:text-rose-400" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Remove Account?</h3>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  {deletingAccount.name} — {Number(deletingAccount.current_balance).toLocaleString()} ETB
+                </p>
+              </div>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              If this account has transactions linked to it, it will be <strong>deactivated</strong> instead of deleted to preserve history.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setDeletingAccount(null)}
+                className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="h-9 px-5 rounded-xl bg-rose-600 text-white text-xs font-bold hover:bg-rose-700 transition-all disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {deleting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                <span>{deleting ? 'Removing...' : 'Remove'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tactile Elevated Transfer Modal */}
       {showTransferModal && (
@@ -427,7 +600,7 @@ export const TreasuryView: React.FC = () => {
               <div>
                 <h3 className="font-bold text-slate-900 dark:text-white text-base">Inter-Account Transfer</h3>
                 <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
-                  Shift balances between CBE, BOA, TeleBirr, and Cash Drawer without false income/expense
+                  Shift balances between accounts without false income/expense
                 </p>
               </div>
               <button
@@ -451,7 +624,7 @@ export const TreasuryView: React.FC = () => {
                     required
                   >
                     <option value="">-- Choose Source --</option>
-                    {treasuryAccounts.map((a) => (
+                    {allAccounts.map((a) => (
                       <option key={a.id} value={a.id}>
                         {a.name} ({Number(a.current_balance).toLocaleString()} ETB)
                       </option>
@@ -470,7 +643,7 @@ export const TreasuryView: React.FC = () => {
                     required
                   >
                     <option value="">-- Choose Destination --</option>
-                    {treasuryAccounts
+                    {allAccounts
                       .filter((a) => a.id !== sourceAccountId)
                       .map((a) => (
                         <option key={a.id} value={a.id}>

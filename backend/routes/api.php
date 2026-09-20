@@ -80,6 +80,9 @@ Route::prefix('v1')->group(function () {
 
         // Financial Treasury Accounts & Transfers
         Route::get('/accounts', [AccountController::class, 'index']);
+        Route::post('/accounts', [AccountController::class, 'store']);
+        Route::put('/accounts/{id}', [AccountController::class, 'update']);
+        Route::delete('/accounts/{id}', [AccountController::class, 'destroy']);
         Route::post('/accounts/transfer', [AccountController::class, 'transfer']);
 
         // Contacts & People Directory
