@@ -17,6 +17,10 @@ import {
   Copy,
   Check,
   Cpu,
+  UserCheck,
+  Undo2,
+  Wrench,
+  Clock,
 } from 'lucide-react';
 
 interface InventoryUnitDrawerProps {
@@ -26,6 +30,9 @@ interface InventoryUnitDrawerProps {
   user: User | null;
   onRestockSuccess?: () => void;
   onSelectForSale?: (unit: InventoryUnit) => void;
+  onOpenHandover?: (unit: InventoryUnit) => void;
+  onOpenCustomerReturn?: (unit: InventoryUnit) => void;
+  onOpenRepairedRestock?: (unit: InventoryUnit) => void;
 }
 
 export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
@@ -35,6 +42,9 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
   user,
   onRestockSuccess,
   onSelectForSale,
+  onOpenHandover,
+  onOpenCustomerReturn,
+  onOpenRepairedRestock,
 }) => {
   const [copiedImei, setCopiedImei] = useState(false);
   const [restocking, setRestocking] = useState(false);
@@ -43,6 +53,10 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
   if (!unit) return null;
 
   const isInStock = unit.status === 'in_stock';
+  const isOut = unit.status === 'out';
+  const isSold = unit.status === 'sold';
+  const isReturned = unit.status === 'returned';
+
   const productName = unit.variant?.product?.name || 'Electronic Item';
   const specText = [unit.variant?.storage, unit.variant?.color].filter(Boolean).join(' • ');
 
@@ -54,12 +68,12 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
     setTimeout(() => setCopiedImei(false), 2000);
   };
 
-  const handleRestock = async () => {
+  const handleRestockOut = async () => {
     try {
       setRestocking(true);
       await api.restockInventoryUnit(unit.id);
       toast.success('Item Restocked to Shelf', {
-        description: `${productName} (${unit.imei_or_serial || 'Unit'}) is now back In Stock.`,
+        description: `${productName} (${unit.imei_or_serial || 'Unit'}) is now back in stock.`,
       });
       if (onRestockSuccess) onRestockSuccess();
       onClose();
@@ -70,24 +84,53 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
     }
   };
 
+  const getStatusBadge = () => {
+    if (isInStock) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60">
+          <CheckCircle2 className="w-3 h-3" />
+          IN STOCK
+        </span>
+      );
+    }
+    if (isOut) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/60 dark:border-amber-800/60">
+          <Clock className="w-3 h-3" />
+          OUT FOR SALE
+        </span>
+      );
+    }
+    if (isSold) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/60">
+          <CheckCircle2 className="w-3 h-3" />
+          SOLD
+        </span>
+      );
+    }
+    if (isReturned) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border border-rose-200/60 dark:border-rose-800/60">
+          <AlertCircle className="w-3 h-3" />
+          CUSTOMER RETURN
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+        {unit.status.toUpperCase()}
+      </span>
+    );
+  };
+
   return (
     <SlideOverDrawer
       isOpen={isOpen}
       onClose={onClose}
       title={productName}
       subtitle={specText || 'Hardware Specification'}
-      badge={
-        <span
-          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-            isInStock
-              ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60'
-              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
-          }`}
-        >
-          {isInStock ? <CheckCircle2 className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
-          {unit.status.replace(/_/g, ' ').toUpperCase()}
-        </span>
-      }
+      badge={getStatusBadge()}
       headerActions={
         unit.imei_or_serial ? (
           <button
@@ -110,46 +153,130 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
           </button>
 
           <div className="flex items-center gap-2">
-            {!isInStock && (
+            {/* IN STOCK: Handover or Sell */}
+            {isInStock && (
+              <>
+                {onOpenHandover && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onOpenHandover(unit);
+                      onClose();
+                    }}
+                    className="h-9 px-3.5 rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50/60 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
+                  >
+                    <UserCheck className="w-3.5 h-3.5" />
+                    <span>Handover / Mark Out</span>
+                  </button>
+                )}
+
+                {onSelectForSale && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onSelectForSale(unit);
+                      onClose();
+                    }}
+                    className="h-9 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs active:scale-95 flex items-center gap-1.5"
+                  >
+                    <DollarSign className="w-3.5 h-3.5" />
+                    <span>Sell at Counter</span>
+                  </button>
+                )}
+              </>
+            )}
+
+            {/* OUT FOR SALE: Restock to Shelf (Unsold) */}
+            {isOut && (
               <button
                 type="button"
                 disabled={restocking}
-                onClick={handleRestock}
-                className="h-9 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs active:scale-95 flex items-center gap-1.5"
+                onClick={handleRestockOut}
+                className="h-9 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs active:scale-95 flex items-center gap-1.5"
               >
                 {restocking ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
-                <span>Restock to Shelf</span>
+                <span>Restock Unsold to Shelf</span>
               </button>
             )}
 
-            {isInStock && onSelectForSale && (
+            {/* SOLD: Customer Return ONLY (Never Restock Directly) */}
+            {isSold && onOpenCustomerReturn && (
               <button
                 type="button"
                 onClick={() => {
-                  onSelectForSale(unit);
+                  onOpenCustomerReturn(unit);
                   onClose();
                 }}
-                className="h-9 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs active:scale-95 flex items-center gap-1.5"
+                className="h-9 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all shadow-xs active:scale-95 flex items-center gap-1.5"
               >
-                <DollarSign className="w-3.5 h-3.5" />
-                <span>Sell Unit at Counter</span>
+                <Undo2 className="w-3.5 h-3.5" />
+                <span>Process Customer Return</span>
+              </button>
+            )}
+
+            {/* RETURNED: Repaired & Restock */}
+            {isReturned && onOpenRepairedRestock && (
+              <button
+                type="button"
+                onClick={() => {
+                  onOpenRepairedRestock(unit);
+                  onClose();
+                }}
+                className="h-9 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-xs active:scale-95 flex items-center gap-1.5"
+              >
+                <Wrench className="w-3.5 h-3.5" />
+                <span>Repaired & Restock to Shelf</span>
               </button>
             )}
           </div>
         </>
       }
     >
+      {/* Handover Notice Banner if OUT */}
+      {isOut && (
+        <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 text-xs text-amber-900 dark:text-amber-200 space-y-1">
+          <div className="font-bold flex items-center gap-1.5">
+            <Clock className="w-4 h-4 text-amber-600" />
+            <span>Currently Out with Staff / Broker</span>
+          </div>
+          <p className="text-[11px] text-amber-700 dark:text-amber-300">
+            Handed out to: <strong className="font-semibold">{unit.handover_to || 'Sales Staff'}</strong>
+            {unit.handed_out_at && ` • Since ${new Date(unit.handed_out_at).toLocaleDateString()}`}
+          </p>
+          <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1">
+            If unsold, click "Restock Unsold to Shelf" below to return it to active store stock.
+          </p>
+        </div>
+      )}
+
+      {/* Customer Return Notice Banner if RETURNED */}
+      {isReturned && (
+        <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 text-xs text-rose-900 dark:text-rose-200 space-y-1">
+          <div className="font-bold flex items-center gap-1.5">
+            <AlertCircle className="w-4 h-4 text-rose-600" />
+            <span>Customer Return Under Inspection / Repair</span>
+          </div>
+          <p className="text-[11px] text-rose-700 dark:text-rose-300">
+            Return Reason: <strong className="font-semibold">{unit.return_reason || 'Defect reported'}</strong>
+            {unit.returned_at && ` • Returned on ${new Date(unit.returned_at).toLocaleDateString()}`}
+          </p>
+          <p className="text-[11px] text-rose-600 dark:text-rose-400 mt-1">
+            Once repaired and tested, click "Repaired & Restock to Shelf" to place back into stock.
+          </p>
+        </div>
+      )}
+
       {/* Hero Serial & Valuation Strip */}
       <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between">
         <div>
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-            Serial / IMEI Number
+            Device Serial / IMEI
           </span>
-          <div className="text-xl font-black text-slate-900 dark:text-white font-mono tracking-tight mt-0.5">
-            {unit.imei_or_serial || 'Unserialized accessory'}
+          <div className="text-sm font-black font-mono tracking-tight text-slate-900 dark:text-white mt-0.5">
+            {unit.imei_or_serial || 'NO_SERIAL_RECORDED'}
           </div>
           <div className="text-xs text-slate-400 capitalize mt-1">
-            Condition: <strong className="text-slate-700 dark:text-slate-300">{unit.condition}</strong>
+            Condition: <strong className="text-slate-700 dark:text-slate-300">{unit.condition.replace(/_/g, ' ')}</strong>
           </div>
         </div>
 

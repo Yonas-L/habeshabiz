@@ -15,9 +15,9 @@ class InventoryController extends Controller
     {
         $query = InventoryUnit::with(['variant.product', 'supplier']);
 
-        if ($request->filled('status')) {
+        if ($request->filled('status') && $request->status !== 'all') {
             $query->where('status', $request->status);
-        } else {
+        } elseif (! $request->filled('status')) {
             $query->where('status', 'in_stock');
         }
 
@@ -26,6 +26,8 @@ class InventoryController extends Controller
             $query->where(function ($q) use ($search) {
                 $q->where('imei_or_serial', 'ilike', "%{$search}%")
                     ->orWhere('condition', 'ilike', "%{$search}%")
+                    ->orWhere('handover_to', 'ilike', "%{$search}%")
+                    ->orWhere('return_reason', 'ilike', "%{$search}%")
                     ->orWhereHas('variant.product', function ($pq) use ($search) {
                         $pq->where('name', 'ilike', "%{$search}%");
                     });
@@ -33,6 +35,15 @@ class InventoryController extends Controller
         }
 
         $units = $query->latest()->get();
+
+        // Calculate tab counts
+        $counts = [
+            'in_stock' => InventoryUnit::where('status', 'in_stock')->count(),
+            'out' => InventoryUnit::where('status', 'out')->count(),
+            'sold' => InventoryUnit::where('status', 'sold')->count(),
+            'returned' => InventoryUnit::where('status', 'returned')->count(),
+            'all' => InventoryUnit::count(),
+        ];
 
         // Check if user is allowed to view cost basis
         /** @var User|null $user */
@@ -51,6 +62,7 @@ class InventoryController extends Controller
         return response()->json([
             'success' => true,
             'data' => $mapped,
+            'counts' => $counts,
         ]);
     }
 
@@ -84,18 +96,154 @@ class InventoryController extends Controller
         ], 201);
     }
 
-    public function restockUnit(Request $request, string $id): JsonResponse
+    /**
+     * Mark an in-stock unit as taken out by a staff member or broker to sell.
+     */
+    public function handoverUnit(Request $request, string $id): JsonResponse
     {
         $unit = InventoryUnit::findOrFail($id);
 
+        if ($unit->status !== 'in_stock') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only in-stock items can be marked as out for sale.',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'handover_to' => ['required', 'string', 'max:100'],
+            'location' => ['nullable', 'string', 'max:100'],
+            'notes' => ['nullable', 'string'],
+        ]);
+
         $unit->update([
-            'status' => 'in_stock',
-            'sold_at' => null,
+            'status' => 'out',
+            'handover_to' => $validated['handover_to'],
+            'handed_out_at' => now(),
+            'location' => $validated['location'] ?? "Out with {$validated['handover_to']}",
+            'notes' => ! empty($validated['notes'])
+                ? ($unit->notes ? "{$unit->notes} | {$validated['notes']}" : $validated['notes'])
+                : $unit->notes,
         ]);
 
         return response()->json([
             'success' => true,
-            'message' => 'Device restocked back to available inventory.',
+            'message' => "Item handed out to {$validated['handover_to']} for sale.",
+            'data' => $unit->load('variant.product'),
+        ]);
+    }
+
+    /**
+     * Restock an unsold item that was out with staff/broker back to shop shelf.
+     * Note: Sold items are NOT restocked directly; they must go through customer return.
+     */
+    public function restockUnit(Request $request, string $id): JsonResponse
+    {
+        $unit = InventoryUnit::findOrFail($id);
+
+        if ($unit->status === 'sold') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Sold products cannot be restocked. If returned by a customer, please process as a Customer Return.',
+            ], 422);
+        }
+
+        if ($unit->status === 'in_stock') {
+            return response()->json([
+                'success' => false,
+                'message' => 'This product is already in stock on the shop shelf.',
+            ], 422);
+        }
+
+        $previousHandover = $unit->handover_to;
+
+        $unit->update([
+            'status' => 'in_stock',
+            'handover_to' => null,
+            'handed_out_at' => null,
+            'location' => 'Shop Counter',
+            'sold_at' => null,
+        ]);
+
+        $note = $previousHandover ? " (returned unsold by {$previousHandover})" : '';
+
+        return response()->json([
+            'success' => true,
+            'message' => "Device restocked back to shelf inventory{$note}.",
+            'data' => $unit->load('variant.product'),
+        ]);
+    }
+
+    /**
+     * Process a return of a sold item by a customer.
+     * Requires a reason and places unit in returned/repair tracking.
+     */
+    public function customerReturn(Request $request, string $id): JsonResponse
+    {
+        $unit = InventoryUnit::findOrFail($id);
+
+        if ($unit->status !== 'sold') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only sold products can be processed as customer returns.',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'return_reason' => ['required', 'string', 'max:500'],
+            'condition' => ['nullable', 'string', 'max:50'],
+            'notes' => ['nullable', 'string'],
+        ]);
+
+        $unit->update([
+            'status' => 'returned',
+            'return_reason' => $validated['return_reason'],
+            'returned_at' => now(),
+            'condition' => $validated['condition'] ?? $unit->condition,
+            'location' => 'Repair & Inspection Shelf',
+            'notes' => ! empty($validated['notes'])
+                ? ($unit->notes ? "{$unit->notes} | Return note: {$validated['notes']}" : "Return note: {$validated['notes']}")
+                : $unit->notes,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Device returned by customer. Moved to Repair & Inspection shelf.',
+            'data' => $unit->load('variant.product'),
+        ]);
+    }
+
+    /**
+     * Mark a returned/repaired unit as repaired and restock it to shop shelf.
+     */
+    public function repairAndRestock(Request $request, string $id): JsonResponse
+    {
+        $unit = InventoryUnit::findOrFail($id);
+
+        if ($unit->status !== 'returned') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only returned items can be processed as repaired & restocked.',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'condition' => ['nullable', 'string', 'max:50'],
+            'notes' => ['nullable', 'string'],
+        ]);
+
+        $unit->update([
+            'status' => 'in_stock',
+            'condition' => $validated['condition'] ?? $unit->condition,
+            'location' => 'Shop Counter',
+            'notes' => ! empty($validated['notes'])
+                ? ($unit->notes ? "{$unit->notes} | Repair note: {$validated['notes']}" : "Repair note: {$validated['notes']}")
+                : $unit->notes,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Device repaired and restocked back to shop shelf.',
             'data' => $unit->load('variant.product'),
         ]);
     }

@@ -45,9 +45,14 @@ export interface InventoryUnit {
   sim_type: 'physical' | 'esim' | 'dual' | 'na';
   condition: string;
   cost_basis?: string | number;
-  status: 'in_stock' | 'reserved' | 'sold' | 'damaged' | 'returned';
+  status: 'in_stock' | 'out' | 'sold' | 'returned' | 'reserved' | 'damaged';
   location: string;
+  handover_to?: string | null;
+  handed_out_at?: string | null;
   notes?: string | null;
+  return_reason?: string | null;
+  returned_at?: string | null;
+  sold_at?: string | null;
   variant?: ProductVariant & { product?: Product };
   supplier?: Contact;
 }
@@ -237,8 +242,39 @@ export const api = {
     return request<InventoryUnit[]>(`/inventory/units?${query.toString()}`);
   },
 
+  getInventoryWithCounts: async (params?: { status?: string; search?: string }) => {
+    const query = new URLSearchParams();
+    if (params?.status) query.set('status', params.status);
+    if (params?.search) query.set('search', params.search);
+    const token = getAuthToken();
+    const res = await fetch(`${API_BASE}/inventory/units?${query.toString()}`, {
+      headers: {
+        Accept: 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.message || 'API request failed');
+    return {
+      units: (json.data || []) as InventoryUnit[],
+      counts: (json.counts || { in_stock: 0, out: 0, sold: 0, returned: 0, all: 0 }) as {
+        in_stock: number;
+        out: number;
+        sold: number;
+        returned: number;
+        all: number;
+      },
+    };
+  },
+
   intakeInventoryUnit: (data: Partial<InventoryUnit> & { variant_id: string; cost_basis: number; condition: string; sim_type?: string }) =>
     request<InventoryUnit>('/inventory/units', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  handoverInventoryUnit: (id: string, data: { handover_to: string; location?: string; notes?: string }) =>
+    request<InventoryUnit>(`/inventory/units/${id}/handover`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
@@ -246,6 +282,18 @@ export const api = {
   restockInventoryUnit: (id: string) =>
     request<InventoryUnit>(`/inventory/units/${id}/restock`, {
       method: 'POST',
+    }),
+
+  customerReturnInventoryUnit: (id: string, data: { return_reason: string; condition?: string; notes?: string }) =>
+    request<InventoryUnit>(`/inventory/units/${id}/customer-return`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  repairedRestockInventoryUnit: (id: string, data?: { condition?: string; notes?: string }) =>
+    request<InventoryUnit>(`/inventory/units/${id}/repaired-restock`, {
+      method: 'POST',
+      body: JSON.stringify(data || {}),
     }),
 
   getSales: (params?: { payment_status?: string; search?: string }) => {

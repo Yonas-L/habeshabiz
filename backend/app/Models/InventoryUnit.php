@@ -26,7 +26,11 @@ class InventoryUnit extends Model
         'source_type',
         'supplier_contact_id',
         'location',
+        'handover_to',
+        'handed_out_at',
         'notes',
+        'return_reason',
+        'returned_at',
         'sold_at',
     ];
 
@@ -36,6 +40,8 @@ class InventoryUnit extends Model
             'battery_health' => 'integer',
             'cycle_count' => 'integer',
             'cost_basis' => 'decimal:2',
+            'handed_out_at' => 'datetime',
+            'returned_at' => 'datetime',
             'sold_at' => 'datetime',
         ];
     }
