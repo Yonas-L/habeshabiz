@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AccountController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\ContactController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DebtController;
@@ -42,9 +43,16 @@ Route::prefix('v1')->group(function () {
         // Dashboard & Capital Formula Overview
         Route::get('/dashboard/summary', [DashboardController::class, 'summary']);
 
+        // Categories & Taxonomy
+        Route::get('/categories', [CategoryController::class, 'index']);
+        Route::post('/categories', [CategoryController::class, 'store']);
+        Route::put('/categories/{id}', [CategoryController::class, 'update']);
+        Route::delete('/categories/{id}', [CategoryController::class, 'destroy']);
+
         // Catalog & Products
         Route::get('/products', [ProductController::class, 'index']);
         Route::post('/products', [ProductController::class, 'store']);
+        Route::post('/products/{id}/variants', [ProductController::class, 'addVariant']);
 
         // Serialized & Quantity Inventory
         Route::get('/inventory/units', [InventoryController::class, 'units']);

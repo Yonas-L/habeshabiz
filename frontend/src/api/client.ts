@@ -23,8 +23,25 @@ export interface ProductVariant {
   ram: string | null;
   color: string | null;
   default_selling_price: string | number | null;
+  specs?: Record<string, any> | null;
+  display_name?: string;
   stock?: { quantity_on_hand: number; average_cost: string | number };
   inventory_units?: InventoryUnit[];
+}
+
+export interface ProductCategory {
+  id: string;
+  name: string;
+  slug: string;
+  icon: string;
+  description?: string | null;
+  has_serials: boolean;
+  spec_fields?: string[] | null;
+  sort_order: number;
+  is_active: boolean;
+  products_count?: number;
+  in_stock_units_count?: number;
+  created_at?: string;
 }
 
 export interface Product {
@@ -32,6 +49,8 @@ export interface Product {
   name: string;
   brand: string | null;
   category: string;
+  category_id?: string | null;
+  category_rel?: ProductCategory | null;
   has_serials: boolean;
   variants: ProductVariant[];
 }
@@ -269,9 +288,39 @@ export const api = {
 
   getDashboardSummary: () => request<DashboardData>('/dashboard/summary'),
 
-  getProducts: (params?: { category?: string; search?: string }) => {
+  // Categories & Taxonomy
+  getCategories: () => request<ProductCategory[]>('/categories'),
+
+  createCategory: (data: {
+    name: string;
+    slug?: string;
+    icon?: string;
+    description?: string;
+    has_serials?: boolean;
+    spec_fields?: string[];
+    sort_order?: number;
+  }) =>
+    request<ProductCategory>('/categories', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateCategory: (id: string, data: Partial<ProductCategory>) =>
+    request<ProductCategory>(`/categories/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deleteCategory: (id: string) =>
+    request<{ message: string }>(`/categories/${id}`, {
+      method: 'DELETE',
+    }),
+
+  // Products & Variants Catalog
+  getProducts: (params?: { category?: string; category_id?: string; search?: string }) => {
     const query = new URLSearchParams();
     if (params?.category) query.set('category', params.category);
+    if (params?.category_id) query.set('category_id', params.category_id);
     if (params?.search) query.set('search', params.search);
     return request<Product[]>(`/products?${query.toString()}`);
   },
@@ -279,25 +328,52 @@ export const api = {
   createProduct: (data: {
     name: string;
     brand?: string;
-    category: string;
+    category?: string;
+    category_id?: string;
     has_serials?: boolean;
-    variants: Array<{ storage?: string; ram?: string; color?: string; default_selling_price?: number }>;
+    variants: Array<{
+      storage?: string;
+      ram?: string;
+      color?: string;
+      specs?: Record<string, any>;
+      default_selling_price?: number;
+    }>;
   }) =>
     request<Product>('/products', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
-  getInventoryUnits: (params?: { status?: string; search?: string }) => {
+  addVariant: (
+    productId: string,
+    data: {
+      storage?: string;
+      ram?: string;
+      color?: string;
+      specs?: Record<string, any>;
+      sku?: string;
+      default_selling_price?: number;
+    }
+  ) =>
+    request<ProductVariant>(`/products/${productId}/variants`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  getInventoryUnits: (params?: { status?: string; category_id?: string; category?: string; search?: string }) => {
     const query = new URLSearchParams();
     if (params?.status) query.set('status', params.status);
+    if (params?.category_id) query.set('category_id', params.category_id);
+    if (params?.category) query.set('category', params.category);
     if (params?.search) query.set('search', params.search);
     return request<InventoryUnit[]>(`/inventory/units?${query.toString()}`);
   },
 
-  getInventoryWithCounts: async (params?: { status?: string; search?: string }) => {
+  getInventoryWithCounts: async (params?: { status?: string; category_id?: string; category?: string; search?: string }) => {
     const query = new URLSearchParams();
     if (params?.status) query.set('status', params.status);
+    if (params?.category_id) query.set('category_id', params.category_id);
+    if (params?.category) query.set('category', params.category);
     if (params?.search) query.set('search', params.search);
     const token = getAuthToken();
     const res = await fetch(`${API_BASE}/inventory/units?${query.toString()}`, {
@@ -320,8 +396,22 @@ export const api = {
     };
   },
 
-  intakeInventoryUnit: (data: Partial<InventoryUnit> & { variant_id: string; cost_basis: number; condition: string; sim_type?: string }) =>
-    request<InventoryUnit>('/inventory/units', {
+  intakeInventoryUnit: (data: {
+    variant_id: string;
+    cost_basis: number;
+    condition: string;
+    quantity?: number;
+    imei_or_serial?: string | null;
+    imeis?: string[];
+    selling_price?: number;
+    supplier_contact_id?: string | null;
+    location?: string;
+    notes?: string | null;
+    battery_health?: number | null;
+    cycle_count?: number | null;
+    sim_type?: string;
+  }) =>
+    request<{ data: InventoryUnit; units_created: number }>('/inventory/units', {
       method: 'POST',
       body: JSON.stringify(data),
     }),

@@ -14,12 +14,24 @@ class InventoryController extends Controller
 {
     public function units(Request $request): JsonResponse
     {
-        $query = InventoryUnit::with(['variant.product', 'supplier']);
+        $query = InventoryUnit::with(['variant.product.categoryRel', 'supplier']);
 
         if ($request->filled('status') && $request->status !== 'all') {
             $query->where('status', $request->status);
         } elseif (! $request->filled('status')) {
             $query->where('status', 'in_stock');
+        }
+
+        if ($request->filled('category_id')) {
+            $categoryId = $request->category_id;
+            $query->whereHas('variant.product', function ($pq) use ($categoryId) {
+                $pq->where('category_id', $categoryId);
+            });
+        } elseif ($request->filled('category')) {
+            $cat = $request->category;
+            $query->whereHas('variant.product', function ($pq) use ($cat) {
+                $pq->where('category', $cat);
+            });
         }
 
         if ($request->filled('search')) {
@@ -81,11 +93,15 @@ class InventoryController extends Controller
         $validated = $request->validate([
             'variant_id' => ['required', 'exists:product_variants,id'],
             'imei_or_serial' => ['nullable', 'string', 'max:100'],
+            'imeis' => ['nullable', 'array'],
+            'imeis.*' => ['string', 'max:100'],
+            'quantity' => ['nullable', 'integer', 'min:1'],
             'battery_health' => ['nullable', 'integer', 'min:0', 'max:100'],
             'cycle_count' => ['nullable', 'integer', 'min:0'],
             'sim_type' => ['nullable', 'string', 'in:physical,esim,dual,na'],
             'condition' => ['required', 'string', 'max:50'],
             'cost_basis' => ['required', 'numeric', 'min:0'],
+            'selling_price' => ['nullable', 'numeric', 'min:0'],
             'supplier_contact_id' => ['nullable', 'exists:contacts,id'],
             'location' => ['nullable', 'string', 'max:100'],
             'notes' => ['nullable', 'string'],
@@ -95,26 +111,90 @@ class InventoryController extends Controller
             $validated['sim_type'] = 'na';
         }
 
-        $unit = InventoryUnit::create(array_merge($validated, [
-            'status' => 'in_stock',
-        ]));
+        $variant = \App\Models\ProductVariant::with('product')->findOrFail($validated['variant_id']);
 
-        AuditLog::record(
-            action: 'stock_intake',
-            entityType: 'InventoryUnit',
-            entityId: (string) $unit->id,
-            newValues: [
-                'imei_or_serial' => $unit->imei_or_serial,
-                'cost_basis' => $unit->cost_basis,
-                'condition' => $unit->condition,
-                'location' => $unit->location,
-            ]
-        );
+        // Update default selling price if provided
+        if (! empty($validated['selling_price'])) {
+            $variant->update(['default_selling_price' => $validated['selling_price']]);
+        }
+
+        $createdUnits = [];
+        $costBasis = (float) $validated['cost_basis'];
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($validated, $variant, $costBasis, &$createdUnits) {
+            $imeisList = [];
+            if (! empty($validated['imeis']) && is_array($validated['imeis'])) {
+                $imeisList = array_values(array_filter(array_map('trim', $validated['imeis'])));
+            } elseif (! empty($validated['imei_or_serial'])) {
+                // If comma/newline separated string entered in imei_or_serial
+                $parsed = preg_split('/[\r\n,]+/', trim($validated['imei_or_serial']));
+                $imeisList = array_values(array_filter(array_map('trim', $parsed)));
+            }
+
+            $countToCreate = max(count($imeisList), (int) ($validated['quantity'] ?? 1));
+
+            for ($i = 0; $i < $countToCreate; $i++) {
+                $imei = $imeisList[$i] ?? (! empty($imeisList) ? null : ($validated['imei_or_serial'] ?? null));
+
+                $unit = InventoryUnit::create([
+                    'variant_id' => $variant->id,
+                    'imei_or_serial' => $imei,
+                    'battery_health' => $validated['battery_health'] ?? null,
+                    'cycle_count' => $validated['cycle_count'] ?? null,
+                    'sim_type' => $validated['sim_type'],
+                    'condition' => $validated['condition'],
+                    'cost_basis' => $costBasis,
+                    'status' => 'in_stock',
+                    'source_type' => 'purchase',
+                    'supplier_contact_id' => $validated['supplier_contact_id'] ?? null,
+                    'location' => $validated['location'] ?? 'Shop Counter',
+                    'notes' => $validated['notes'] ?? null,
+                ]);
+
+                $createdUnits[] = $unit;
+            }
+
+            // Sync InventoryStock record
+            $stock = InventoryStock::firstOrCreate(
+                ['variant_id' => $variant->id],
+                ['quantity_on_hand' => 0, 'average_cost' => $costBasis]
+            );
+
+            $currentQty = $stock->quantity_on_hand;
+            $currentAvg = (float) $stock->average_cost;
+            $newTotalQty = $currentQty + $countToCreate;
+            $newAvgCost = $newTotalQty > 0
+                ? (($currentQty * $currentAvg) + ($countToCreate * $costBasis)) / $newTotalQty
+                : $costBasis;
+
+            $stock->update([
+                'quantity_on_hand' => $newTotalQty,
+                'average_cost' => round($newAvgCost, 2),
+            ]);
+
+            AuditLog::record(
+                action: 'stock_intake',
+                entityType: 'InventoryUnit',
+                entityId: (string) ($createdUnits[0]->id ?? $variant->id),
+                newValues: [
+                    'product' => $variant->product?->name,
+                    'variant' => $variant->display_name,
+                    'units_count' => $countToCreate,
+                    'cost_basis' => $costBasis,
+                    'condition' => $validated['condition'],
+                    'location' => $validated['location'] ?? 'Shop Counter',
+                ]
+            );
+        });
+
+        $count = count($createdUnits);
+        $unitLabel = $count === 1 ? '1 unit' : "{$count} units";
 
         return response()->json([
             'success' => true,
-            'message' => 'Inventory unit recorded into stock.',
-            'data' => $unit->load('variant.product'),
+            'message' => "Successfully recorded {$unitLabel} of {$variant->display_name} into stock.",
+            'data' => $createdUnits[0]->load('variant.product'),
+            'units_created' => $count,
         ], 201);
     }
 

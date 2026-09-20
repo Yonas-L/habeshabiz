@@ -247,11 +247,14 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                 required
               >
                 <option value="">-- Select Device or Item --</option>
-                {products.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} ({p.category})
-                  </option>
-                ))}
+                {products.map((p) => {
+                  const catLabel = p.category_rel?.name || (p.category ? p.category.charAt(0).toUpperCase() + p.category.slice(1) : '');
+                  return (
+                    <option key={p.id} value={p.id}>
+                      {p.name} {catLabel ? `(${catLabel})` : ''}
+                    </option>
+                  );
+                })}
               </select>
             </div>
 
@@ -267,11 +270,23 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                 required
               >
                 <option value="">-- Select Variant --</option>
-                {variants.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {[v.storage, v.color].filter(Boolean).join(' • ') || 'Standard'}
-                  </option>
-                ))}
+                {variants.map((v) => {
+                  const specParts = v.specs
+                    ? Object.values(v.specs).map(String)
+                    : [];
+                  const parts = [
+                    v.storage,
+                    v.ram ? `${v.ram} RAM` : null,
+                    v.color,
+                    ...specParts,
+                  ].filter(Boolean);
+                  const label = parts.length > 0 ? parts.join(' • ') : 'Standard Variant';
+                  return (
+                    <option key={v.id} value={v.id}>
+                      {label}
+                    </option>
+                  );
+                })}
               </select>
             </div>
           </div>

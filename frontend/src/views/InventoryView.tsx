@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import type { InventoryUnit, Product, User } from '../api/client';
+import type { InventoryUnit, Product, ProductCategory, Contact, User } from '../api/client';
 import { api } from '../api/client';
 import { toast } from 'sonner';
 import {
@@ -9,19 +9,23 @@ import {
   Loader2,
   X,
   RotateCcw,
-  Gamepad2,
-  Smartphone,
-  Tv,
-  Laptop,
   ChevronRight,
   UserCheck,
   Undo2,
   Wrench,
+  Layers,
+  FolderCog,
+  Smartphone,
+  Gamepad2,
+  Laptop,
+  Tv,
+  CheckCircle2,
   Clock,
   AlertCircle,
-  CheckCircle2,
 } from 'lucide-react';
 import { InventoryUnitDrawer } from '../components/drawers/InventoryUnitDrawer';
+import { StockIntakeModal } from '../components/inventory/StockIntakeModal';
+import { CategoryManagementModal, getCategoryIcon } from '../components/inventory/CategoryManagementModal';
 
 interface InventoryViewProps {
   user: User | null;
@@ -32,9 +36,12 @@ type TabType = 'in_stock' | 'out' | 'sold' | 'returned' | 'all';
 export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
   const [units, setUnits] = useState<InventoryUnit[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<TabType>('in_stock');
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
   const [selectedUnit, setSelectedUnit] = useState<InventoryUnit | null>(null);
 
   // Tab counts from server
@@ -46,26 +53,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
     all: 0,
   });
 
-  // Intake Modal State
+  // Modal States
   const [showIntakeModal, setShowIntakeModal] = useState(false);
-  const [intakeVariantId, setIntakeVariantId] = useState('');
-  const [intakeImei, setIntakeImei] = useState('');
-  const [intakeBattery, setIntakeBattery] = useState('100');
-  const [intakeCycles, setIntakeCycles] = useState('0');
-  const [intakeSim, setIntakeSim] = useState<'physical' | 'esim' | 'dual'>('physical');
-  const [intakeCondition, setIntakeCondition] = useState('new');
-  const [intakeCost, setIntakeCost] = useState('');
-  const [intakeLocation, setIntakeLocation] = useState('Shop Counter');
-  const [intakeNotes, setIntakeNotes] = useState('');
-  const [intakeSubmitting, setIntakeSubmitting] = useState(false);
-
-  // Quick New Product inside Modal
-  const [showNewProductForm, setShowNewProductForm] = useState(false);
-  const [newProdName, setNewProdName] = useState('');
-  const [newProdCategory, setNewProdCategory] = useState<'smartphone' | 'console' | 'laptop' | 'tv' | 'accessory' | 'other'>('console');
-  const [newProdStorage, setNewProdStorage] = useState('');
-  const [newProdColor, setNewProdColor] = useState('');
-  const [creatingProduct, setCreatingProduct] = useState(false);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
 
   // Handover Modal State (for in_stock -> out)
   const [handoverTargetUnit, setHandoverTargetUnit] = useState<InventoryUnit | null>(null);
@@ -89,16 +79,14 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
 
   useEffect(() => {
     loadInventory();
-  }, [statusFilter]);
+  }, [statusFilter, selectedCategoryId]);
 
   // Handle Esc key to close all modals
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (showIntakeModal) {
-          setShowIntakeModal(false);
-          setShowNewProductForm(false);
-        }
+        if (showIntakeModal) setShowIntakeModal(false);
+        if (isCategoryModalOpen) setIsCategoryModalOpen(false);
         if (handoverTargetUnit) setHandoverTargetUnit(null);
         if (returnTargetUnit) setReturnTargetUnit(null);
         if (repairedTargetUnit) setRepairedTargetUnit(null);
@@ -106,21 +94,26 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showIntakeModal, handoverTargetUnit, returnTargetUnit, repairedTargetUnit]);
+  }, [showIntakeModal, isCategoryModalOpen, handoverTargetUnit, returnTargetUnit, repairedTargetUnit]);
 
   const loadInventory = async () => {
     try {
       setLoading(true);
-      const [res, p] = await Promise.all([
+      const [res, p, cats, conts] = await Promise.all([
         api.getInventoryWithCounts({
           status: statusFilter === 'all' ? undefined : statusFilter,
+          category_id: selectedCategoryId === 'all' ? undefined : selectedCategoryId,
           search: search.trim() || undefined,
         }),
         api.getProducts(),
+        api.getCategories(),
+        api.getContacts(),
       ]);
       setUnits(res.units);
       setCounts(res.counts);
       setProducts(p);
+      setCategories(cats);
+      setContacts(conts);
     } catch (err: any) {
       toast.error('Failed to load inventory', { description: err.message });
     } finally {
@@ -133,91 +126,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
     loadInventory();
   };
 
-  // Check if selected product is an iPhone/smartphone
-  const selectedProduct = products.find((p) => p.variants.some((v) => v.id === intakeVariantId));
-  const isPhone = selectedProduct
-    ? selectedProduct.category === 'smartphone' ||
-      selectedProduct.name.toLowerCase().includes('phone') ||
-      selectedProduct.name.toLowerCase().includes('iphone') ||
-      selectedProduct.name.toLowerCase().includes('galaxy') ||
-      selectedProduct.name.toLowerCase().includes('pixel')
-    : true;
-
-  const handleCreateNewProduct = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newProdName.trim()) return;
-
-    try {
-      setCreatingProduct(true);
-      const res = await api.createProduct({
-        name: newProdName.trim(),
-        category: newProdCategory,
-        has_serials: true,
-        variants: [
-          {
-            storage: newProdStorage.trim() || undefined,
-            color: newProdColor.trim() || undefined,
-          },
-        ],
-      });
-
-      toast.success('Product model created', { description: `${res.name} added to catalog.` });
-      const updatedProducts = await api.getProducts();
-      setProducts(updatedProducts);
-
-      if (res.variants?.[0]?.id) {
-        setIntakeVariantId(res.variants[0].id);
-      }
-      setShowNewProductForm(false);
-      setNewProdName('');
-      setNewProdStorage('');
-      setNewProdColor('');
-    } catch (err: any) {
-      toast.error('Failed to create product', { description: err.message });
-    } finally {
-      setCreatingProduct(false);
-    }
-  };
-
   const isOwner = user?.role === 'owner';
-
-  const handleIntakeSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!isOwner) {
-      toast.error('Unauthorized', { description: 'Stock intake is restricted to store owners/administrators.' });
-      return;
-    }
-    if (!intakeVariantId || !intakeCost) return;
-
-    try {
-      setIntakeSubmitting(true);
-      await api.intakeInventoryUnit({
-        variant_id: intakeVariantId,
-        imei_or_serial: intakeImei || null,
-        battery_health: isPhone && intakeBattery ? parseInt(intakeBattery) : null,
-        cycle_count: isPhone && intakeCycles ? parseInt(intakeCycles) : null,
-        sim_type: isPhone ? intakeSim : 'na',
-        condition: intakeCondition,
-        cost_basis: parseFloat(intakeCost),
-        location: intakeLocation || 'Shop Counter',
-        notes: intakeNotes || null,
-      });
-
-      toast.success('Item added to available stock', {
-        description: `${selectedProduct?.name || 'Unit'} • Cost: ${parseFloat(intakeCost).toLocaleString()} ETB`,
-      });
-
-      setShowIntakeModal(false);
-      setIntakeImei('');
-      setIntakeCost('');
-      setIntakeNotes('');
-      loadInventory();
-    } catch (err: any) {
-      toast.error('Failed to intake unit', { description: err.message });
-    } finally {
-      setIntakeSubmitting(false);
-    }
-  };
 
   // Restock an unsold OUT device back to shelf
   const handleRestockOut = async (unit: InventoryUnit) => {
@@ -411,8 +320,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
           </button>
         </div>
 
-        {/* Search & Stock Intake Button */}
-        <div className="flex items-center gap-3">
+        {/* Search & Action Buttons */}
+        <div className="flex items-center gap-2.5">
           <form onSubmit={handleSearchSubmit} className="relative w-full sm:w-72">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
             <input
@@ -425,18 +334,92 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
           </form>
 
           {isOwner && (
-            <button
-              onClick={() => {
-                setShowIntakeModal(true);
-                setShowNewProductForm(false);
-              }}
-              className="h-10 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-sm flex items-center gap-2 shrink-0 active:scale-[0.98]"
-            >
-              <Plus className="w-4 h-4 text-emerald-400 dark:text-emerald-600" />
-              <span>Stock Intake</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setIsCategoryModalOpen(true)}
+                className="h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 shrink-0 active:scale-95"
+                title="Manage product categories"
+              >
+                <FolderCog className="w-4 h-4 text-indigo-500" />
+                <span className="hidden sm:inline">Categories</span>
+              </button>
+
+              <button
+                onClick={() => setShowIntakeModal(true)}
+                className="h-10 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-sm flex items-center gap-2 shrink-0 active:scale-[0.98]"
+              >
+                <Plus className="w-4 h-4 text-emerald-400 dark:text-emerald-600" />
+                <span>Stock Intake</span>
+              </button>
+            </div>
           )}
         </div>
+      </div>
+
+      {/* Category Horizontal Filter Bar */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-0.5 no-scrollbar">
+        <button
+          onClick={() => setSelectedCategoryId('all')}
+          className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-2 shrink-0 active:scale-95 ${
+            selectedCategoryId === 'all'
+              ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-sm font-bold'
+              : 'bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-slate-700'
+          }`}
+        >
+          <Layers className="w-3.5 h-3.5" />
+          <span>All Categories</span>
+          <span
+            className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
+              selectedCategoryId === 'all'
+                ? 'bg-white/20 dark:bg-slate-900/20 text-white dark:text-slate-900'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+            }`}
+          >
+            {counts.all}
+          </span>
+        </button>
+
+        {categories.map((cat) => {
+          const isSelected = selectedCategoryId === cat.id;
+          return (
+            <button
+              key={cat.id}
+              onClick={() => setSelectedCategoryId(cat.id)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-2 shrink-0 active:scale-95 ${
+                isSelected
+                  ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-sm font-bold'
+                  : 'bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-slate-700'
+              }`}
+            >
+              <span className={isSelected ? 'text-white dark:text-slate-900' : 'text-slate-500 dark:text-slate-400'}>
+                {getCategoryIcon(cat.icon, 'w-3.5 h-3.5')}
+              </span>
+              <span>{cat.name}</span>
+              {cat.in_stock_units_count !== undefined && cat.in_stock_units_count > 0 && (
+                <span
+                  className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
+                    isSelected
+                      ? 'bg-white/20 dark:bg-slate-900/20 text-white dark:text-slate-900'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                  }`}
+                >
+                  {cat.in_stock_units_count}
+                </span>
+              )}
+            </button>
+          );
+        })}
+
+        {isOwner && (
+          <button
+            onClick={() => setIsCategoryModalOpen(true)}
+            className="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 border border-dashed border-indigo-300 dark:border-indigo-800/80 flex items-center gap-1.5 shrink-0 transition-colors active:scale-95"
+            title="Configure and add new categories"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>New Category</span>
+          </button>
+        )}
       </div>
 
       {/* Inventory Data Table */}
@@ -481,11 +464,21 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
                 units.map((unit) => {
                   const pName = unit.variant?.product?.name || 'Device';
                   const pCat = unit.variant?.product?.category;
+                  const pCatRel = unit.variant?.product?.category_rel;
                   const isUnitPhone =
                     pCat === 'smartphone' ||
+                    pCatRel?.slug === 'smartphones' ||
                     pName.toLowerCase().includes('iphone') ||
                     pName.toLowerCase().includes('galaxy') ||
                     pName.toLowerCase().includes('phone');
+
+                  const specVals = unit.variant?.specs ? Object.values(unit.variant.specs).map(String) : [];
+                  const variantSubtitle = [
+                    unit.variant?.storage,
+                    unit.variant?.ram ? `${unit.variant.ram} RAM` : null,
+                    unit.variant?.color,
+                    ...specVals,
+                  ].filter(Boolean).join(' • ') || 'Standard';
 
                   return (
                     <tr
@@ -496,15 +489,22 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
                       {/* Model & Item Name */}
                       <td className="py-3.5 px-5">
                         <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                            {getItemCategoryIcon(pCat, pName)}
+                          <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform text-slate-600 dark:text-slate-300">
+                            {pCatRel?.icon
+                              ? getCategoryIcon(pCatRel.icon, 'w-4 h-4')
+                              : getItemCategoryIcon(pCat, pName)}
                           </div>
                           <div>
                             <div className="font-bold text-slate-900 dark:text-white text-sm leading-tight group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
                               {pName}
                             </div>
-                            <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
-                              {[unit.variant?.storage, unit.variant?.color].filter(Boolean).join(' • ') || 'Standard'}
+                            <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                              {pCatRel?.name && (
+                                <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                                  {pCatRel.name}
+                                </span>
+                              )}
+                              <span>{variantSubtitle}</span>
                             </div>
                           </div>
                         </div>
@@ -532,8 +532,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
                             )}
                           </div>
                         ) : (
-                          <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                            {unit.variant?.storage || 'Console / Electronics'}
+                          <span className="text-xs text-slate-600 dark:text-slate-300 font-medium">
+                            {specVals.length > 0 ? specVals.join(' • ') : unit.variant?.storage || 'Standard Specs'}
                           </span>
                         )}
                       </td>
@@ -1012,272 +1012,33 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
         </div>
       )}
 
-      {/* Dynamic Intake Modal for Phones & All Electronics */}
-      {showIntakeModal && isOwner && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs animate-backdrop-enter"
-            onClick={() => setShowIntakeModal(false)}
+      {/* Scalable Stock Intake Modal & Category Management (Owner Only) */}
+      {isOwner && (
+        <>
+          <StockIntakeModal
+            isOpen={showIntakeModal}
+            onClose={() => setShowIntakeModal(false)}
+            categories={categories}
+            products={products}
+            contacts={contacts}
+            onIntakeSuccess={() => {
+              loadInventory();
+            }}
+            onOpenCategoryManager={() => {
+              setShowIntakeModal(false);
+              setIsCategoryModalOpen(true);
+            }}
           />
 
-          <div className="relative z-10 bg-white dark:bg-[#131926] rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-2xl max-w-lg w-full p-6 space-y-4 animate-modal-enter">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
-              <div>
-                <h3 className="font-bold text-slate-900 dark:text-white text-base">
-                  Stock Intake (New Device or Item)
-                </h3>
-                <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
-                  Record phones, PlayStations, TVs, and electronics into inventory
-                </p>
-              </div>
-              <button
-                onClick={() => setShowIntakeModal(false)}
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Quick Add Product / Model Accordion */}
-            {showNewProductForm ? (
-              <form onSubmit={handleCreateNewProduct} className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-900 dark:text-white">
-                    Create New Catalog Product / Model
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setShowNewProductForm(false)}
-                    className="text-xs text-slate-400 hover:underline"
-                  >
-                    Cancel
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div className="col-span-2">
-                    <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                      Product Name (e.g. PlayStation 5 Slim, iPhone 16 Pro)
-                    </label>
-                    <input
-                      type="text"
-                      value={newProdName}
-                      onChange={(e) => setNewProdName(e.target.value)}
-                      placeholder="e.g. PlayStation 5 Pro 2TB"
-                      required
-                      className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                      Category
-                    </label>
-                    <select
-                      value={newProdCategory}
-                      onChange={(e) => setNewProdCategory(e.target.value as any)}
-                      className="w-full h-9 px-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white"
-                    >
-                      <option value="console">Gaming Console (PS5, Xbox)</option>
-                      <option value="smartphone">Smartphone / Phone</option>
-                      <option value="laptop">Laptop / MacBook</option>
-                      <option value="tv">Television / Screen</option>
-                      <option value="accessory">Accessory / Audio</option>
-                      <option value="other">Other Electronic</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                      Storage / Spec (Optional)
-                    </label>
-                    <input
-                      type="text"
-                      value={newProdStorage}
-                      onChange={(e) => setNewProdStorage(e.target.value)}
-                      placeholder="e.g. 1TB, 825GB, 256GB"
-                      className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex justify-end pt-1">
-                  <button
-                    type="submit"
-                    disabled={creatingProduct}
-                    className="h-8 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 disabled:opacity-50"
-                  >
-                    {creatingProduct ? 'Creating...' : 'Save Product'}
-                  </button>
-                </div>
-              </form>
-            ) : (
-              <div className="flex items-center justify-between">
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  Select Product & Variant
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setShowNewProductForm(true)}
-                  className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>+ New Product / Model</span>
-                </button>
-              </div>
-            )}
-
-            <form onSubmit={handleIntakeSubmit} className="space-y-4">
-              {!showNewProductForm && (
-                <div>
-                  <select
-                    value={intakeVariantId}
-                    onChange={(e) => setIntakeVariantId(e.target.value)}
-                    className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700"
-                    required
-                  >
-                    <option value="">-- Choose Product Variant --</option>
-                    {products.flatMap((p) =>
-                      p.variants.map((v) => (
-                        <option key={v.id} value={v.id}>
-                          {p.name} - {[v.storage, v.color].filter(Boolean).join(' ') || 'Standard'}
-                        </option>
-                      ))
-                    )}
-                  </select>
-                </div>
-              )}
-
-              {/* Serial & Cost Grid */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    {isPhone ? 'IMEI or Serial #' : 'Serial # or Model #'}
-                  </label>
-                  <input
-                    type="text"
-                    value={intakeImei}
-                    onChange={(e) => setIntakeImei(e.target.value)}
-                    placeholder={isPhone ? 'e.g. 354868698...' : 'e.g. S01-F329482...'}
-                    className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] text-xs font-mono font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Purchase Cost (ETB)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={intakeCost}
-                    onChange={(e) => setIntakeCost(e.target.value)}
-                    placeholder="e.g. 85000"
-                    className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700"
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Phone-Specific Fields (Battery & SIM) — Automatically hidden for PlayStation, Consoles, TVs, etc. */}
-              {isPhone && (
-                <div className="grid grid-cols-3 gap-3 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                      Battery %
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="100"
-                      value={intakeBattery}
-                      onChange={(e) => setIntakeBattery(e.target.value)}
-                      className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-bold text-slate-900 dark:text-white"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                      Cycle Count
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={intakeCycles}
-                      onChange={(e) => setIntakeCycles(e.target.value)}
-                      className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-bold text-slate-900 dark:text-white"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                      SIM Type
-                    </label>
-                    <select
-                      value={intakeSim}
-                      onChange={(e) => setIntakeSim(e.target.value as any)}
-                      className="w-full h-9 px-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-900 dark:text-white"
-                    >
-                      <option value="physical">Physical SIM</option>
-                      <option value="esim">eSIM</option>
-                      <option value="dual">Dual SIM</option>
-                    </select>
-                  </div>
-                </div>
-              )}
-
-              {/* Physical Condition */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Physical Condition
-                  </label>
-                  <select
-                    value={intakeCondition}
-                    onChange={(e) => setIntakeCondition(e.target.value)}
-                    className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white"
-                  >
-                    <option value="new">Brand New (Sealed)</option>
-                    <option value="used_clean">Used Clean (Pristine)</option>
-                    <option value="used_minor_scratches">Used Minor Scratches</option>
-                    <option value="backcrack">Back Crack</option>
-                    <option value="refurbished">Refurbished</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Storage Location
-                  </label>
-                  <input
-                    type="text"
-                    value={intakeLocation}
-                    onChange={(e) => setIntakeLocation(e.target.value)}
-                    placeholder="Shop Counter, Back Safe..."
-                    className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setShowIntakeModal(false)}
-                  className="h-10 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                >
-                  Cancel (Esc)
-                </button>
-                <button
-                  type="submit"
-                  disabled={intakeSubmitting || !intakeVariantId || !intakeCost}
-                  className="h-10 px-5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 disabled:opacity-50 transition-colors shadow-sm active:scale-[0.98]"
-                >
-                  {intakeSubmitting ? 'Recording...' : 'Add Item to Stock'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+          <CategoryManagementModal
+            isOpen={isCategoryModalOpen}
+            onClose={() => setIsCategoryModalOpen(false)}
+            categories={categories}
+            onCategoriesChanged={() => {
+              loadInventory();
+            }}
+          />
+        </>
       )}
 
       {/* Inventory Unit Workspace Drawer */}

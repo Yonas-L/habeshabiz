@@ -20,6 +20,7 @@ class ProductVariant extends Model
         'storage',
         'ram',
         'color',
+        'specs',
         'sku',
         'default_selling_price',
     ];
@@ -27,6 +28,7 @@ class ProductVariant extends Model
     protected function casts(): array
     {
         return [
+            'specs' => 'array',
             'default_selling_price' => 'decimal:2',
         ];
     }
@@ -58,6 +60,13 @@ class ProductVariant extends Model
         }
         if ($this->color) {
             $parts[] = $this->color;
+        }
+        if (! empty($this->specs) && is_array($this->specs)) {
+            foreach ($this->specs as $val) {
+                if ($val) {
+                    $parts[] = (string) $val;
+                }
+            }
         }
 
         return implode(' ', array_filter($parts));

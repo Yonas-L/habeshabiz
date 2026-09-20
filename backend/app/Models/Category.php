@@ -6,20 +6,21 @@ use App\Traits\BelongsToTenant;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Product extends Model
+class Category extends Model
 {
     use BelongsToTenant, HasFactory, HasUuids;
 
     protected $fillable = [
         'tenant_id',
-        'category_id',
         'name',
-        'brand',
-        'category',
+        'slug',
+        'icon',
+        'description',
         'has_serials',
+        'spec_fields',
+        'sort_order',
         'is_active',
     ];
 
@@ -28,16 +29,13 @@ class Product extends Model
         return [
             'has_serials' => 'boolean',
             'is_active' => 'boolean',
+            'spec_fields' => 'array',
+            'sort_order' => 'integer',
         ];
     }
 
-    public function categoryRel(): BelongsTo
+    public function products(): HasMany
     {
-        return $this->belongsTo(Category::class, 'category_id');
-    }
-
-    public function variants(): HasMany
-    {
-        return $this->hasMany(ProductVariant::class);
+        return $this->hasMany(Product::class);
     }
 }
