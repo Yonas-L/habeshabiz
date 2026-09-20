@@ -9,6 +9,8 @@ use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\SaleController;
+use App\Http\Controllers\Api\StaffController;
+use App\Http\Controllers\Api\TaskController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -20,6 +22,22 @@ Route::prefix('v1')->group(function () {
         // User Profile & Session
         Route::get('/auth/me', [AuthController::class, 'me']);
         Route::post('/auth/logout', [AuthController::class, 'logout']);
+        Route::post('/auth/change-password', [AuthController::class, 'changePassword']);
+        Route::put('/auth/profile', [AuthController::class, 'updateProfile']);
+
+        // Staff Management & Audit (Owner Only / Leaderboard for all)
+        Route::get('/staff', [StaffController::class, 'index']);
+        Route::post('/staff', [StaffController::class, 'store']);
+        Route::patch('/staff/{id}/toggle-status', [StaffController::class, 'toggleStatus']);
+        Route::post('/staff/{id}/reset-password', [StaffController::class, 'resetPassword']);
+        Route::get('/staff/leaderboard', [StaffController::class, 'leaderboard']);
+        Route::get('/staff/audit-logs', [StaffController::class, 'auditLogs']);
+
+        // Personal Staff Tasks & Targets Checklist
+        Route::get('/tasks', [TaskController::class, 'index']);
+        Route::post('/tasks', [TaskController::class, 'store']);
+        Route::patch('/tasks/{id}/toggle', [TaskController::class, 'toggle']);
+        Route::delete('/tasks/{id}', [TaskController::class, 'destroy']);
 
         // Dashboard & Capital Formula Overview
         Route::get('/dashboard/summary', [DashboardController::class, 'summary']);

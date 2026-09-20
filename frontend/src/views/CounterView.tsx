@@ -446,7 +446,9 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                 <option value="">-- Select Receiving Account --</option>
                 {accounts.filter((a) => !a.is_custom_asset).map((a) => (
                   <option key={a.id} value={a.id}>
-                    {a.name} ({Number(a.current_balance).toLocaleString()} ETB)
+                    {user?.role === 'owner' && a.current_balance !== null
+                      ? `${a.name} (${Number(a.current_balance).toLocaleString()} ETB)`
+                      : a.name}
                   </option>
                 ))}
               </select>

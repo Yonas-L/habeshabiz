@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\InventoryStock;
 use App\Models\InventoryUnit;
 use App\Models\User;
@@ -126,6 +127,17 @@ class InventoryController extends Controller
                 : $unit->notes,
         ]);
 
+        AuditLog::record(
+            action: 'unit_handover',
+            entityType: 'InventoryUnit',
+            entityId: (string) $unit->id,
+            newValues: [
+                'imei_or_serial' => $unit->imei_or_serial,
+                'handover_to' => $validated['handover_to'],
+                'location' => $unit->location,
+            ]
+        );
+
         return response()->json([
             'success' => true,
             'message' => "Item handed out to {$validated['handover_to']} for sale.",
@@ -167,6 +179,16 @@ class InventoryController extends Controller
 
         $note = $previousHandover ? " (returned unsold by {$previousHandover})" : '';
 
+        AuditLog::record(
+            action: 'unit_restocked',
+            entityType: 'InventoryUnit',
+            entityId: (string) $unit->id,
+            newValues: [
+                'imei_or_serial' => $unit->imei_or_serial,
+                'previous_handover' => $previousHandover,
+            ]
+        );
+
         return response()->json([
             'success' => true,
             'message' => "Device restocked back to shelf inventory{$note}.",
@@ -206,6 +228,16 @@ class InventoryController extends Controller
                 : $unit->notes,
         ]);
 
+        AuditLog::record(
+            action: 'customer_return',
+            entityType: 'InventoryUnit',
+            entityId: (string) $unit->id,
+            newValues: [
+                'imei_or_serial' => $unit->imei_or_serial,
+                'return_reason' => $validated['return_reason'],
+            ]
+        );
+
         return response()->json([
             'success' => true,
             'message' => 'Device returned by customer. Moved to Repair & Inspection shelf.',
@@ -240,6 +272,16 @@ class InventoryController extends Controller
                 ? ($unit->notes ? "{$unit->notes} | Repair note: {$validated['notes']}" : "Repair note: {$validated['notes']}")
                 : $unit->notes,
         ]);
+
+        AuditLog::record(
+            action: 'unit_repaired_restocked',
+            entityType: 'InventoryUnit',
+            entityId: (string) $unit->id,
+            newValues: [
+                'imei_or_serial' => $unit->imei_or_serial,
+                'condition' => $unit->condition,
+            ]
+        );
 
         return response()->json([
             'success' => true,

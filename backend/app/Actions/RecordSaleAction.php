@@ -2,6 +2,7 @@
 
 namespace App\Actions;
 
+use App\Models\AuditLog;
 use App\Models\Debt;
 use App\Models\FinancialAccount;
 use App\Models\FinancialTransaction;
@@ -175,6 +176,20 @@ class RecordSaleAction
                     'created_by' => auth()->id(),
                 ]);
             }
+
+            AuditLog::record(
+                action: 'sale_created',
+                entityType: 'SalesOrder',
+                entityId: (string) $order->id,
+                newValues: [
+                    'order_number' => $order->order_number,
+                    'total_amount' => $order->total_amount,
+                    'paid_amount' => $order->paid_amount,
+                    'payment_method' => $order->payment_method,
+                    'items_count' => count($data['items']),
+                ],
+                userId: $data['salesperson_id'] ?? auth()->id()
+            );
 
             return $order->load(['items', 'customer', 'salesperson']);
         });

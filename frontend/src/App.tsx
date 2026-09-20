@@ -21,6 +21,9 @@ import { SalesHistoryView } from './views/SalesHistoryView';
 import { DebtsView } from './views/DebtsView';
 import { TreasuryView } from './views/TreasuryView';
 import { ExpensesView } from './views/ExpensesView';
+import { StaffView } from './views/StaffView';
+import { StaffOverviewView } from './views/StaffOverviewView';
+import { ProfileSettingsModal } from './components/ProfileSettingsModal';
 import { Toaster, toast } from 'sonner';
 import { ArrowRight, Loader2 } from 'lucide-react';
 
@@ -33,6 +36,7 @@ export default function App() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     if (typeof window !== 'undefined') {
       return (localStorage.getItem('habeshabiz_theme') as 'light' | 'dark') || 'light';
@@ -93,6 +97,7 @@ export default function App() {
           '5': 'debts',
           '6': 'treasury',
           '7': 'expenses',
+          '8': 'staff',
         };
         if (tabMap[key]) {
           e.preventDefault();
@@ -330,6 +335,7 @@ export default function App() {
         onQuickSwitchUser={handleQuickSwitchUser}
         isOpenMobile={isMobileSidebarOpen}
         onCloseMobile={() => setIsMobileSidebarOpen(false)}
+        onOpenProfile={() => setIsProfileModalOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -343,18 +349,26 @@ export default function App() {
           onToggleTheme={handleToggleTheme}
           onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
           onQuickAction={() => setActiveTab('counter')}
+          onOpenProfile={() => setIsProfileModalOpen(true)}
         />
 
         {/* View Surface */}
         <main className="flex-1 p-4 lg:p-8 max-w-7xl w-full mx-auto">
           {activeTab === 'overview' && (
-            <OverviewView
-              data={dashboardData}
-              user={user}
-              accounts={accounts}
-              onNavigateTab={setActiveTab}
-              onRefreshData={refreshData}
-            />
+            user?.role === 'owner' ? (
+              <OverviewView
+                data={dashboardData}
+                user={user}
+                accounts={accounts}
+                onNavigateTab={setActiveTab}
+                onRefreshData={refreshData}
+              />
+            ) : (
+              <StaffOverviewView
+                user={user}
+                onNavigateTab={setActiveTab}
+              />
+            )
           )}
 
           {activeTab === 'counter' && (
@@ -374,19 +388,34 @@ export default function App() {
             <SalesHistoryView user={user} />
           )}
 
-          {activeTab === 'debts' && (
+          {/* Owner-only Tabs */}
+          {activeTab === 'debts' && user?.role === 'owner' && (
             <DebtsView accounts={accounts} />
           )}
 
-          {activeTab === 'treasury' && (
+          {activeTab === 'treasury' && user?.role === 'owner' && (
             <TreasuryView />
           )}
 
-          {activeTab === 'expenses' && (
+          {activeTab === 'expenses' && user?.role === 'owner' && (
             <ExpensesView accounts={accounts} />
+          )}
+
+          {activeTab === 'staff' && user?.role === 'owner' && (
+            <StaffView currentUser={user} />
           )}
         </main>
       </div>
+
+      {/* Profile & Password Management Modal */}
+      <ProfileSettingsModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        user={user}
+        onUserUpdated={(updatedUser) => {
+          setUser((prev) => (prev ? { ...prev, ...updatedUser } : updatedUser));
+        }}
+      />
     </div>
   );
 }

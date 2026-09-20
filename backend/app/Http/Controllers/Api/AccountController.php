@@ -16,7 +16,38 @@ class AccountController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
+        /** @var \App\Models\User|null $user */
+        $user = $request->user();
+        $isOwner = $user ? $user->isOwner() : false;
+
         $accounts = FinancialAccount::orderBy('name')->get();
+
+        if (! $isOwner) {
+            // Staff only see bank/cash account names and IDs to select payment destination; balances are masked
+            $sanitized = $accounts->where('is_custom_asset', false)->values()->map(function ($acc) {
+                return [
+                    'id' => $acc->id,
+                    'name' => $acc->name,
+                    'type' => $acc->type,
+                    'account_number' => $acc->account_number,
+                    'currency' => $acc->currency,
+                    'current_balance' => null, // Hidden from staff
+                    'is_custom_asset' => false,
+                    'is_active' => $acc->is_active,
+                ];
+            });
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'treasury_accounts' => $sanitized,
+                    'asset_accounts' => [],
+                    'total_treasury' => null,
+                    'total_assets' => null,
+                    'grand_total' => null,
+                ],
+            ]);
+        }
 
         $bankAndCash = $accounts->where('is_custom_asset', false)->values();
         $customAssets = $accounts->where('is_custom_asset', true)->values();
@@ -35,6 +66,15 @@ class AccountController extends Controller
 
     public function transfer(Request $request): JsonResponse
     {
+        /** @var \App\Models\User|null $user */
+        $user = $request->user();
+        if (! $user || ! $user->isOwner()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only business owners can transfer funds between accounts.',
+            ], 403);
+        }
+
         $validated = $request->validate([
             'source_account_id' => ['required', 'exists:financial_accounts,id'],
             'destination_account_id' => ['required', 'exists:financial_accounts,id', 'different:source_account_id'],

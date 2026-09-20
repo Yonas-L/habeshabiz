@@ -12,6 +12,7 @@ interface TopbarProps {
   onToggleTheme?: () => void;
   onOpenMobileSidebar: () => void;
   onQuickAction?: () => void;
+  onOpenProfile?: () => void;
 }
 
 const tabTitles: Record<NavTab, { title: string; subtitle: string }> = {
@@ -22,6 +23,7 @@ const tabTitles: Record<NavTab, { title: string; subtitle: string }> = {
   debts: { title: 'Debts & Credit', subtitle: 'Receivables & payables' },
   treasury: { title: 'Treasury', subtitle: 'Accounts & reserves' },
   expenses: { title: 'Expenses', subtitle: 'Costs & owner draws' },
+  staff: { title: 'Staff & Team', subtitle: 'Manage team, accounts & audit log' },
 };
 
 export const Topbar: React.FC<TopbarProps> = ({
@@ -32,8 +34,9 @@ export const Topbar: React.FC<TopbarProps> = ({
   onToggleTheme,
   onOpenMobileSidebar,
   onQuickAction,
+  onOpenProfile,
 }) => {
-  const current = tabTitles[activeTab];
+  const current = tabTitles[activeTab] || tabTitles.overview;
 
   return (
     <header className="h-16 px-4 lg:px-8 flex items-center justify-between transition-colors bg-transparent">
@@ -58,8 +61,8 @@ export const Topbar: React.FC<TopbarProps> = ({
 
       {/* Right Header Area */}
       <div className="flex items-center gap-3">
-        {/* Live Net Capital Readout Pill */}
-        {netCapital !== null && (
+        {/* Live Net Capital Readout Pill (Only visible to Owner) */}
+        {netCapital !== null && user?.role === 'owner' && (
           <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/90 shadow-xs text-xs">
             <span className="w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-emerald-100 dark:ring-emerald-950/60 animate-pulse" />
             <span className="text-slate-400 dark:text-slate-500 font-medium">Net Capital:</span>
@@ -69,16 +72,20 @@ export const Topbar: React.FC<TopbarProps> = ({
           </div>
         )}
 
-        {/* User Persona Pill */}
+        {/* User Persona Pill (Clickable for Account Settings) */}
         {user && (
-          <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/90 shadow-xs text-xs font-semibold text-slate-700 dark:text-slate-300">
+          <button
+            onClick={onOpenProfile}
+            title="Manage account details & password"
+            className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/90 shadow-xs text-xs font-semibold text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700 transition-colors"
+          >
             <span
               className={`w-1.5 h-1.5 rounded-full ${
                 user.role === 'owner' ? 'bg-purple-500' : 'bg-emerald-500'
               }`}
             />
             <span>{user.name} ({user.role === 'owner' ? 'Owner' : 'Sales'})</span>
-          </div>
+          </button>
         )}
 
         {/* Date Filter Pill */}

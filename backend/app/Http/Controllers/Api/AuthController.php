@@ -99,4 +99,72 @@ class AuthController extends Controller
             'message' => 'Logged out successfully.',
         ]);
     }
+
+    public function changePassword(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'current_password' => ['required', 'string'],
+            'new_password' => ['required', 'string', 'min:6', 'confirmed'],
+        ]);
+
+        if (! Hash::check($validated['current_password'], $user->password)) {
+            throw ValidationException::withMessages([
+                'current_password' => ['Current password is incorrect.'],
+            ]);
+        }
+
+        $user->update([
+            'password' => Hash::make($validated['new_password']),
+        ]);
+
+        \App\Models\AuditLog::record(
+            action: 'password_changed',
+            entityType: 'User',
+            entityId: (string) $user->id,
+            newValues: ['user' => $user->name]
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Password updated successfully.',
+        ]);
+    }
+
+    public function updateProfile(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:100'],
+            'phone' => ['nullable', 'string', 'max:25'],
+        ]);
+
+        $user->update($validated);
+
+        \App\Models\AuditLog::record(
+            action: 'profile_updated',
+            entityType: 'User',
+            entityId: (string) $user->id,
+            newValues: $validated
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Profile details updated.',
+            'data' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'phone' => $user->phone,
+                'role' => $user->role,
+                'permissions' => $user->permissions ?? [],
+                'can_view_costs' => $user->canViewCosts(),
+                'can_discount' => $user->canDiscount(),
+            ],
+        ]);
+    }
 }

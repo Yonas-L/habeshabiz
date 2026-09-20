@@ -168,6 +168,59 @@ export interface DashboardData {
   top_payables: Debt[];
 }
 
+export interface StaffMember {
+  id: number;
+  name: string;
+  email: string;
+  phone: string | null;
+  role: string;
+  is_active: boolean;
+  permissions?: Record<string, boolean>;
+  created_at: string;
+  stats: {
+    sales_count_week: number;
+    sales_volume_week: number;
+    sales_count_month: number;
+    sales_volume_month: number;
+    last_sale_at: string | null;
+  };
+}
+
+export interface LeaderboardItem {
+  rank: number;
+  user_id: number;
+  name: string;
+  email: string;
+  week_count: number;
+  week_volume: number;
+  month_count: number;
+  month_volume: number;
+  bonus_tier: string;
+  bonus_amount: number;
+}
+
+export interface AuditLogItem {
+  id: string;
+  user_id: number | null;
+  user?: { id: number; name: string; email: string };
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  old_values?: any;
+  new_values?: any;
+  ip_address?: string;
+  created_at: string;
+}
+
+export interface StaffTask {
+  id: string;
+  title: string;
+  is_completed: boolean;
+  priority: 'high' | 'normal' | 'low';
+  due_date?: string | null;
+  created_at: string;
+}
+
 const API_BASE = '/api/v1';
 
 export function getAuthToken(): string | null {
@@ -355,6 +408,62 @@ export const api = {
   recordExpense: (data: { financial_account_id: string; category: string; amount: number; is_owner_draw?: boolean; description: string }) =>
     request<Expense>('/expenses', {
       method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  // Staff Management (Owner)
+  getStaff: () => request<StaffMember[]>('/staff'),
+
+  createStaff: (data: { name: string; phone: string; email?: string; can_discount?: boolean }) =>
+    request<{ user: User; temporary_password: string }>('/staff', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  toggleStaffStatus: (id: number) =>
+    request<User>(`/staff/${id}/toggle-status`, {
+      method: 'PATCH',
+    }),
+
+  resetStaffPassword: (id: number) =>
+    request<{ temporary_password: string }>(`/staff/${id}/reset-password`, {
+      method: 'POST',
+    }),
+
+  getLeaderboard: () =>
+    request<{ leaderboard: LeaderboardItem[]; top_seller: LeaderboardItem | null }>('/staff/leaderboard'),
+
+  getAuditLogs: () => request<AuditLogItem[]>('/staff/audit-logs'),
+
+  // Staff Tasks & Targets Checklist
+  getTasks: () => request<StaffTask[]>('/tasks'),
+
+  createTask: (data: { title: string; priority?: string; due_date?: string }) =>
+    request<StaffTask>('/tasks', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  toggleTask: (id: string) =>
+    request<StaffTask>(`/tasks/${id}/toggle`, {
+      method: 'PATCH',
+    }),
+
+  deleteTask: (id: string) =>
+    request<{ message: string }>(`/tasks/${id}`, {
+      method: 'DELETE',
+    }),
+
+  // User Self-Management Profile & Password
+  changePassword: (data: { current_password: string; new_password: string; new_password_confirmation: string }) =>
+    request<{ message: string }>('/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateProfile: (data: { name: string; phone?: string }) =>
+    request<User>('/auth/profile', {
+      method: 'PUT',
       body: JSON.stringify(data),
     }),
 };

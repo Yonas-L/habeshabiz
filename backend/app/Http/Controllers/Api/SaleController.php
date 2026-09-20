@@ -22,6 +22,16 @@ class SaleController extends Controller
             'items.vendorContact',
         ]);
 
+        /** @var User|null $user */
+        $user = $request->user();
+        $isOwner = $user ? $user->isOwner() : false;
+        $canViewCost = $user ? $user->canViewCosts() : false;
+
+        // Salespeople only see and track what they sold or was sold on their behalf
+        if (! $isOwner && $user) {
+            $query->where('salesperson_id', $user->id);
+        }
+
         if ($request->filled('payment_status')) {
             $query->where('payment_status', $request->payment_status);
         }
@@ -35,10 +45,6 @@ class SaleController extends Controller
         }
 
         $sales = $query->latest('order_date')->paginate(20);
-
-        /** @var User|null $user */
-        $user = $request->user();
-        $canViewCost = $user ? $user->canViewCosts() : false;
 
         // Hide profit and unit_cost if not permitted
         if (! $canViewCost) {

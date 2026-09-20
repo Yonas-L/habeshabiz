@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import type { DashboardData, User, FinancialAccount, Debt } from '../api/client';
+import React, { useState, useEffect } from 'react';
+import type { DashboardData, User, FinancialAccount, Debt, LeaderboardItem } from '../api/client';
+import { api } from '../api/client';
 import {
   InteractiveSalesWaveChart,
   DonutCapitalChart,
@@ -13,6 +14,7 @@ import {
   ArrowRight,
   ChevronRight,
   TrendingUp,
+  Award,
 } from 'lucide-react';
 
 interface OverviewViewProps {
@@ -32,6 +34,15 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 }) => {
   const [selectedVital, setSelectedVital] = useState<VitalType | null>(null);
   const [selectedDebt, setSelectedDebt] = useState<Debt | null>(null);
+  const [topSeller, setTopSeller] = useState<LeaderboardItem | null>(null);
+
+  useEffect(() => {
+    if (user?.role === 'owner') {
+      api.getLeaderboard()
+        .then((res) => setTopSeller(res.top_seller || null))
+        .catch(() => {});
+    }
+  }, [user]);
 
   /* ─── Skeleton ─── */
   if (!data) {
@@ -201,9 +212,23 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               This Month's Performance
             </h2>
           </div>
-          <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">
-            Active Trading Period
-          </span>
+
+          <div className="flex items-center gap-3">
+            {topSeller && user?.role === 'owner' && (
+              <button
+                onClick={() => onNavigateTab('staff')}
+                title="View Staff & Team Dashboard"
+                className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-900/50 text-amber-900 dark:text-amber-300 text-[11px] font-semibold hover:border-amber-400 transition-all active:scale-[0.98]"
+              >
+                <Award className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                <span>Week's Top Seller: <span className="font-bold">{topSeller.name}</span></span>
+                <ChevronRight className="w-3 h-3 opacity-60" />
+              </button>
+            )}
+            <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">
+              Active Trading Period
+            </span>
+          </div>
         </div>
 
         <div className={`grid grid-cols-2 ${canViewCost ? 'sm:grid-cols-3 lg:grid-cols-5' : 'sm:grid-cols-3'} gap-4 sm:gap-6 pt-4`}>

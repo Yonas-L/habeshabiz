@@ -10,6 +10,8 @@ import {
   DollarSign,
   LogOut,
   Search,
+  Users,
+  Settings,
 } from 'lucide-react';
 
 export type NavTab =
@@ -19,7 +21,8 @@ export type NavTab =
   | 'sales'
   | 'debts'
   | 'treasury'
-  | 'expenses';
+  | 'expenses'
+  | 'staff';
 
 interface SidebarProps {
   activeTab: NavTab;
@@ -32,6 +35,7 @@ interface SidebarProps {
   onQuickSwitchUser: (email: string) => void;
   isOpenMobile: boolean;
   onCloseMobile: () => void;
+  onOpenProfile?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -44,7 +48,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onQuickSwitchUser,
   isOpenMobile,
   onCloseMobile,
+  onOpenProfile,
 }) => {
+  const isOwner = user?.role === 'owner';
+
   const mainNav: {
     id: NavTab;
     label: string;
@@ -56,6 +63,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'counter', label: 'Sales', icon: ShoppingCart, shortcut: '⌘2' },
     { id: 'inventory', label: 'Inventory', icon: Smartphone, shortcut: '⌘3' },
     { id: 'sales', label: 'Sales History', icon: Receipt, shortcut: '⌘4' },
+    ...(isOwner
+      ? [{ id: 'staff' as NavTab, label: 'Staff & Team', icon: Users, shortcut: '⌘8' }]
+      : []),
   ];
 
   const financeNav: {
@@ -136,52 +146,54 @@ export const Sidebar: React.FC<SidebarProps> = ({
           })}
         </div>
 
-        {/* Navigation Group 2: FINANCE & LEDGERS */}
-        <div className="space-y-0.5 mt-3 pt-3 border-t border-slate-100/80 dark:border-slate-800/80">
-          <div className="px-2.5 py-1 text-[10px] font-bold tracking-wider uppercase text-slate-400 dark:text-slate-500">
-            Treasury & Ledger
-          </div>
-          {financeNav.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => {
-                  onChangeTab(item.id);
-                  onCloseMobile();
-                }}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
-                  isActive
-                    ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800/50'
-                }`}
-              >
-                <div className="flex items-center gap-2.5">
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-emerald-400 dark:text-emerald-600' : 'text-slate-400 dark:text-slate-500'}`} />
-                  <span>{item.label}</span>
-                </div>
+        {/* Navigation Group 2: FINANCE & LEDGERS (Owner only) */}
+        {isOwner && (
+          <div className="space-y-0.5 mt-3 pt-3 border-t border-slate-100/80 dark:border-slate-800/80">
+            <div className="px-2.5 py-1 text-[10px] font-bold tracking-wider uppercase text-slate-400 dark:text-slate-500">
+              Treasury & Ledger
+            </div>
+            {financeNav.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    onChangeTab(item.id);
+                    onCloseMobile();
+                  }}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+                    isActive
+                      ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Icon className={`w-4 h-4 ${isActive ? 'text-emerald-400 dark:text-emerald-600' : 'text-slate-400 dark:text-slate-500'}`} />
+                    <span>{item.label}</span>
+                  </div>
 
-                <div className="flex items-center gap-1.5">
-                  {item.badge !== undefined && item.badge > 0 && (
-                    <span
-                      className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold leading-none ${
-                        isActive
-                          ? 'bg-emerald-500 dark:bg-emerald-600 text-white'
-                          : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-800/50'
-                      }`}
-                    >
-                      {item.badge}
+                  <div className="flex items-center gap-1.5">
+                    {item.badge !== undefined && item.badge > 0 && (
+                      <span
+                        className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold leading-none ${
+                          isActive
+                            ? 'bg-emerald-500 dark:bg-emerald-600 text-white'
+                            : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-800/50'
+                        }`}
+                      >
+                        {item.badge}
+                      </span>
+                    )}
+                    <span className={`text-[10px] font-mono ${isActive ? 'text-slate-400 dark:text-slate-600' : 'text-slate-300 dark:text-slate-600'}`}>
+                      {item.shortcut}
                     </span>
-                  )}
-                  <span className={`text-[10px] font-mono ${isActive ? 'text-slate-400 dark:text-slate-600' : 'text-slate-300 dark:text-slate-600'}`}>
-                    {item.shortcut}
-                  </span>
-                </div>
-              </button>
-            );
-          })}
-        </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Bottom Persona & Switcher */}
@@ -212,27 +224,42 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Current User Card */}
         <div className="flex items-center justify-between px-1">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-slate-900 dark:bg-slate-800 text-white flex items-center justify-center text-xs font-bold uppercase shadow-xs">
+          <div
+            onClick={onOpenProfile}
+            title="Click to manage account settings & change password"
+            className="flex items-center gap-2 cursor-pointer group flex-1 mr-2"
+          >
+            <div className="w-8 h-8 rounded-xl bg-slate-900 dark:bg-slate-800 text-white flex items-center justify-center text-xs font-bold uppercase shadow-xs group-hover:bg-slate-800 transition-colors">
               {user?.name?.slice(0, 2) || 'HB'}
             </div>
-            <div className="leading-tight">
-              <div className="text-xs font-bold text-slate-900 dark:text-white truncate max-w-[110px]">
+            <div className="leading-tight min-w-0">
+              <div className="text-xs font-bold text-slate-900 dark:text-white truncate group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
                 {user?.name}
               </div>
               <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium capitalize">
-                {user?.role}
+                {user?.role === 'owner' ? 'Owner' : 'Sales Staff'}
               </div>
             </div>
           </div>
 
-          <button
-            onClick={onLogout}
-            title="Sign out"
-            className="w-7 h-7 rounded-lg border border-slate-200/80 dark:border-slate-800 text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-center transition-colors"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-          </button>
+          <div className="flex items-center gap-1">
+            {onOpenProfile && (
+              <button
+                onClick={onOpenProfile}
+                title="Account Settings"
+                className="w-7 h-7 rounded-lg border border-slate-200/80 dark:border-slate-800 text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-center transition-colors"
+              >
+                <Settings className="w-3.5 h-3.5" />
+              </button>
+            )}
+            <button
+              onClick={onLogout}
+              title="Sign out"
+              className="w-7 h-7 rounded-lg border border-slate-200/80 dark:border-slate-800 text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-center transition-colors"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
       </div>
     </aside>
