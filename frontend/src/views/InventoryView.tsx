@@ -13,7 +13,6 @@ import {
   UserCheck,
   Undo2,
   Wrench,
-  Layers,
   FolderCog,
   Smartphone,
   Gamepad2,
@@ -22,6 +21,7 @@ import {
   CheckCircle2,
   Clock,
   AlertCircle,
+  ChevronDown,
 } from 'lucide-react';
 import { InventoryUnitDrawer } from '../components/drawers/InventoryUnitDrawer';
 import { StockIntakeModal } from '../components/inventory/StockIntakeModal';
@@ -230,13 +230,13 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
     const n = (name || '').toLowerCase();
     const c = (category || '').toLowerCase();
     if (c === 'console' || n.includes('playstation') || n.includes('ps5') || n.includes('ps4') || n.includes('xbox')) {
-      return <Gamepad2 className="w-4 h-4 text-purple-600 dark:text-purple-400" />;
+      return <Gamepad2 className="w-4 h-4 text-slate-600 dark:text-slate-400" />;
     }
     if (c === 'laptop' || n.includes('macbook') || n.includes('laptop')) {
-      return <Laptop className="w-4 h-4 text-blue-600 dark:text-blue-400" />;
+      return <Laptop className="w-4 h-4 text-slate-600 dark:text-slate-400" />;
     }
     if (c === 'tv' || n.includes('tv') || n.includes('screen')) {
-      return <Tv className="w-4 h-4 text-amber-600 dark:text-amber-400" />;
+      return <Tv className="w-4 h-4 text-slate-600 dark:text-slate-400" />;
     }
     return <Smartphone className="w-4 h-4 text-slate-600 dark:text-slate-400" />;
   };
@@ -320,106 +320,59 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
           </button>
         </div>
 
-        {/* Search & Action Buttons */}
-        <div className="flex items-center gap-2.5">
-          <form onSubmit={handleSearchSubmit} className="relative w-full sm:w-72">
+        {/* Right: Category Dropdown + Search + Action Buttons */}
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+          {/* Minimalist Category Select Dropdown */}
+          <div className="relative min-w-[130px] sm:w-44">
+            <select
+              value={selectedCategoryId}
+              onChange={(e) => setSelectedCategoryId(e.target.value)}
+              className="w-full h-10 pl-3 pr-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700 shadow-2xs appearance-none cursor-pointer"
+            >
+              <option value="all">All Categories ({counts.all})</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} {c.in_stock_units_count ? `(${c.in_stock_units_count})` : ''}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2.5 top-3 pointer-events-none" />
+          </div>
+
+          {/* Search Input */}
+          <form onSubmit={handleSearchSubmit} className="relative w-full sm:w-60">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search Model, Serial, Handover, Defect..."
-              className="w-full h-10 pl-9 pr-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700 shadow-xs"
+              placeholder="Search Model, Serial..."
+              className="w-full h-10 pl-9 pr-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700 shadow-2xs"
             />
           </form>
 
+          {/* Owner Actions */}
           {isOwner && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               <button
                 onClick={() => setIsCategoryModalOpen(true)}
-                className="h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 shrink-0 active:scale-95"
+                className="h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 active:scale-95"
                 title="Manage product categories"
               >
-                <FolderCog className="w-4 h-4 text-indigo-500" />
-                <span className="hidden sm:inline">Categories</span>
+                <FolderCog className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                <span className="hidden lg:inline">Categories</span>
               </button>
 
               <button
                 onClick={() => setShowIntakeModal(true)}
-                className="h-10 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-sm flex items-center gap-2 shrink-0 active:scale-[0.98]"
+                className="h-10 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs flex items-center gap-2 active:scale-[0.98]"
               >
-                <Plus className="w-4 h-4 text-emerald-400 dark:text-emerald-600" />
+                <Plus className="w-4 h-4 text-emerald-400 dark:text-emerald-500" />
                 <span>Stock Intake</span>
               </button>
             </div>
           )}
         </div>
-      </div>
-
-      {/* Category Horizontal Filter Bar */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-0.5 no-scrollbar">
-        <button
-          onClick={() => setSelectedCategoryId('all')}
-          className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-2 shrink-0 active:scale-95 ${
-            selectedCategoryId === 'all'
-              ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-sm font-bold'
-              : 'bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-slate-700'
-          }`}
-        >
-          <Layers className="w-3.5 h-3.5" />
-          <span>All Categories</span>
-          <span
-            className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
-              selectedCategoryId === 'all'
-                ? 'bg-white/20 dark:bg-slate-900/20 text-white dark:text-slate-900'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
-            }`}
-          >
-            {counts.all}
-          </span>
-        </button>
-
-        {categories.map((cat) => {
-          const isSelected = selectedCategoryId === cat.id;
-          return (
-            <button
-              key={cat.id}
-              onClick={() => setSelectedCategoryId(cat.id)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-2 shrink-0 active:scale-95 ${
-                isSelected
-                  ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-sm font-bold'
-                  : 'bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-slate-700'
-              }`}
-            >
-              <span className={isSelected ? 'text-white dark:text-slate-900' : 'text-slate-500 dark:text-slate-400'}>
-                {getCategoryIcon(cat.icon, 'w-3.5 h-3.5')}
-              </span>
-              <span>{cat.name}</span>
-              {cat.in_stock_units_count !== undefined && cat.in_stock_units_count > 0 && (
-                <span
-                  className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
-                    isSelected
-                      ? 'bg-white/20 dark:bg-slate-900/20 text-white dark:text-slate-900'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
-                  }`}
-                >
-                  {cat.in_stock_units_count}
-                </span>
-              )}
-            </button>
-          );
-        })}
-
-        {isOwner && (
-          <button
-            onClick={() => setIsCategoryModalOpen(true)}
-            className="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 border border-dashed border-indigo-300 dark:border-indigo-800/80 flex items-center gap-1.5 shrink-0 transition-colors active:scale-95"
-            title="Configure and add new categories"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>New Category</span>
-          </button>
-        )}
       </div>
 
       {/* Inventory Data Table */}
