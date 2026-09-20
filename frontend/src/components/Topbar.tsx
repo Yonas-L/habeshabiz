@@ -15,13 +15,13 @@ interface TopbarProps {
 }
 
 const tabTitles: Record<NavTab, { title: string; subtitle: string }> = {
-  overview: { title: 'Store Overview', subtitle: 'Capital net worth, cashflow trajectory, and business vitals' },
-  counter: { title: 'Sales', subtitle: 'Record shop stock or brokered neighbour sales' },
-  inventory: { title: 'Inventory', subtitle: 'Phones, PlayStations, consoles, and serialized electronics' },
-  sales: { title: 'Sales History', subtitle: 'Every transaction with sourcing attribution and margins' },
-  debts: { title: 'Debts & Credit', subtitle: 'Customer receivables collection and supplier payables settlement' },
-  treasury: { title: 'Treasury & Cash', subtitle: 'Bank accounts, mobile money, cash drawer, and store reserves' },
-  expenses: { title: 'Expenses & Draws', subtitle: 'Store operating costs segregated from owner personal drawings' },
+  overview: { title: 'Overview', subtitle: 'Capital, performance & obligations' },
+  counter: { title: 'Sales', subtitle: 'Record a sale' },
+  inventory: { title: 'Inventory', subtitle: 'Stock on hand' },
+  sales: { title: 'Sales History', subtitle: 'Transactions & margins' },
+  debts: { title: 'Debts & Credit', subtitle: 'Receivables & payables' },
+  treasury: { title: 'Treasury', subtitle: 'Accounts & reserves' },
+  expenses: { title: 'Expenses', subtitle: 'Costs & owner draws' },
 };
 
 export const Topbar: React.FC<TopbarProps> = ({
@@ -47,14 +47,9 @@ export const Topbar: React.FC<TopbarProps> = ({
         </button>
 
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-base font-bold text-slate-900 dark:text-white tracking-tight leading-none">
-              {current.title}
-            </h1>
-            <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-              Active
-            </span>
-          </div>
+          <h1 className="text-base font-bold text-slate-900 dark:text-white tracking-tight leading-none">
+            {current.title}
+          </h1>
           <p className="text-[11px] text-slate-400 dark:text-slate-500 hidden sm:block mt-0.5 font-medium">
             {current.subtitle}
           </p>

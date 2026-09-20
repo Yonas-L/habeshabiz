@@ -79,17 +79,12 @@ export const InteractiveSalesWaveChart: React.FC<{
       {/* Top Bar of Chart */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-              Trading Trajectory
-            </span>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60">
-              +24.8% vs last month
-            </span>
-          </div>
-          <div className="text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight mt-1">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+            Sales
+          </span>
+          <div className="text-xl font-bold text-slate-900 dark:text-white font-mono tracking-tight mt-0.5">
             <AnimatedNumber value={activePoint.val} />{' '}
-            <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 font-sans">{currency}</span>
+            <span className="text-xs font-medium text-slate-400 dark:text-slate-500 font-sans">{currency}</span>
           </div>
         </div>
 
