@@ -42,11 +42,11 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             <div key={i} className="h-16 rounded-xl bg-slate-200/60 dark:bg-slate-800/50 animate-skeleton" />
           ))}
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="lg:col-span-2 h-64 rounded-xl bg-slate-200/60 dark:bg-slate-800/50 animate-skeleton" />
-          <div className="h-64 rounded-xl bg-slate-200/60 dark:bg-slate-800/50 animate-skeleton" />
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          <div className="lg:col-span-7 h-72 rounded-xl bg-slate-200/60 dark:bg-slate-800/50 animate-skeleton" />
+          <div className="lg:col-span-5 h-72 rounded-xl bg-slate-200/60 dark:bg-slate-800/50 animate-skeleton" />
         </div>
-        <div className="h-16 rounded-xl bg-slate-200/60 dark:bg-slate-800/50 animate-skeleton" />
+        <div className="h-28 rounded-xl bg-slate-200/60 dark:bg-slate-800/50 animate-skeleton" />
       </div>
     );
   }
@@ -161,15 +161,20 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       </div>
 
       {/* ── 3. Charts — Sales trajectory + Capital allocation, side by side ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 bg-white dark:bg-[#131926] rounded-xl border border-slate-200/60 dark:border-slate-800/60 p-5">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        <div className="lg:col-span-7 bg-white dark:bg-[#131926] rounded-xl border border-slate-200/60 dark:border-slate-800/60 p-5">
           <InteractiveSalesWaveChart canViewCost={canViewCost} />
         </div>
 
-        <div className="bg-white dark:bg-[#131926] rounded-xl border border-slate-200/60 dark:border-slate-800/60 p-5 flex flex-col justify-between">
+        <div className="lg:col-span-5 bg-white dark:bg-[#131926] rounded-xl border border-slate-200/60 dark:border-slate-800/60 p-5 flex flex-col justify-between">
           <div>
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-3">
-              Asset Allocation
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800/60 mb-3.5">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                Asset Allocation
+              </span>
+              <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">
+                Portfolio Balance
+              </span>
             </div>
             <DonutCapitalChart
               stock={capital_overview.stock_value}
@@ -187,79 +192,94 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         </div>
       </div>
 
-      {/* ── 4. P&L Strip — compact inline metrics ── */}
-      {canViewCost ? (
-        <div className="bg-white dark:bg-[#131926] rounded-xl border border-slate-200/60 dark:border-slate-800/60 px-5 py-3.5">
-          <div className="flex items-center gap-6 overflow-x-auto text-xs">
-            <div className="flex items-center gap-1.5 text-slate-400 dark:text-slate-500 shrink-0">
-              <TrendingUp className="w-3.5 h-3.5" />
-              <span className="font-semibold text-[10px] uppercase tracking-wider">This Month</span>
-            </div>
+      {/* ── 4. This Month's Performance (High-Visibility Operational Metrics) ── */}
+      <div className="bg-white dark:bg-[#131926] rounded-xl border border-slate-200/60 dark:border-slate-800/60 p-5">
+        <div className="flex items-center justify-between pb-3.5 border-b border-slate-100 dark:border-slate-800/60">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white">
+              This Month's Performance
+            </h2>
+          </div>
+          <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">
+            Active Trading Period
+          </span>
+        </div>
 
-            <div className="flex items-center gap-5 shrink-0">
-              <div>
-                <span className="text-slate-400 dark:text-slate-500 text-[10px] block">Revenue</span>
-                <span className="font-semibold text-slate-900 dark:text-white font-mono">
-                  <AnimatedNumber value={monthly_performance.revenue} />
-                </span>
-              </div>
-              <div>
-                <span className="text-emerald-600/80 dark:text-emerald-500/80 text-[10px] block">Margin</span>
-                <span className="font-semibold text-emerald-700 dark:text-emerald-400 font-mono">
-                  +<AnimatedNumber value={monthly_performance.gross_profit} />
-                </span>
-              </div>
-              <div>
-                <span className="text-slate-400 dark:text-slate-500 text-[10px] block">Expenses</span>
-                <span className="font-semibold text-slate-700 dark:text-slate-300 font-mono">
-                  −<AnimatedNumber value={monthly_performance.operating_expenses} />
-                </span>
-              </div>
-              <div>
-                <span className="text-emerald-600/80 dark:text-emerald-500/80 text-[10px] block">Net Profit</span>
-                <span className="font-semibold text-emerald-700 dark:text-emerald-400 font-mono">
-                  +<AnimatedNumber value={monthly_performance.net_profit} />
-                </span>
-              </div>
-              <div>
-                <span className="text-slate-400 dark:text-slate-500 text-[10px] block">Draws</span>
-                <span className="font-semibold text-slate-700 dark:text-slate-300 font-mono">
-                  <AnimatedNumber value={monthly_performance.owner_draws} />
-                </span>
-              </div>
+        <div className={`grid grid-cols-2 ${canViewCost ? 'sm:grid-cols-3 lg:grid-cols-5' : 'sm:grid-cols-3'} gap-4 sm:gap-6 pt-4`}>
+          {/* Revenue */}
+          <div>
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 block">
+              Revenue
+            </span>
+            <div className="text-xl sm:text-2xl font-bold font-mono tracking-tight text-slate-900 dark:text-white mt-1">
+              <AnimatedNumber value={monthly_performance.revenue} />
+              <span className="text-xs font-medium text-slate-400 dark:text-slate-500 ml-1 font-sans">ETB</span>
             </div>
+            <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 block">
+              Sales volume
+            </span>
+          </div>
+
+          {canViewCost && (
+            <div>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 block">
+                Gross Margin
+              </span>
+              <div className="text-xl sm:text-2xl font-bold font-mono tracking-tight text-emerald-700 dark:text-emerald-400 mt-1">
+                +<AnimatedNumber value={monthly_performance.gross_profit} />
+                <span className="text-xs font-medium text-emerald-600/70 dark:text-emerald-400/70 ml-1 font-sans">ETB</span>
+              </div>
+              <span className="text-[10px] text-emerald-600/80 dark:text-emerald-500/80 mt-0.5 block">
+                Sales minus unit cost
+              </span>
+            </div>
+          )}
+
+          {/* Expenses */}
+          <div>
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 block">
+              Expenses
+            </span>
+            <div className="text-xl sm:text-2xl font-bold font-mono tracking-tight text-slate-800 dark:text-slate-200 mt-1">
+              −<AnimatedNumber value={monthly_performance.operating_expenses} />
+              <span className="text-xs font-medium text-slate-400 dark:text-slate-500 ml-1 font-sans">ETB</span>
+            </div>
+            <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 block">
+              Rent, delivery, staff
+            </span>
+          </div>
+
+          {canViewCost && (
+            <div>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 block">
+                Net Profit
+              </span>
+              <div className="text-xl sm:text-2xl font-bold font-mono tracking-tight text-emerald-700 dark:text-emerald-400 mt-1">
+                +<AnimatedNumber value={monthly_performance.net_profit} />
+                <span className="text-xs font-medium text-emerald-600/70 dark:text-emerald-400/70 ml-1 font-sans">ETB</span>
+              </div>
+              <span className="text-[10px] text-emerald-600/80 dark:text-emerald-500/80 mt-0.5 block">
+                Clean operating profit
+              </span>
+            </div>
+          )}
+
+          {/* Draws */}
+          <div>
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-purple-600 dark:text-purple-400 block">
+              Owner Draws
+            </span>
+            <div className="text-xl sm:text-2xl font-bold font-mono tracking-tight text-purple-700 dark:text-purple-300 mt-1">
+              <AnimatedNumber value={monthly_performance.owner_draws} />
+              <span className="text-xs font-medium text-purple-400 ml-1 font-sans">ETB</span>
+            </div>
+            <span className="text-[10px] text-purple-500/80 dark:text-purple-400/80 mt-0.5 block">
+              Personal drawings (Yoni)
+            </span>
           </div>
         </div>
-      ) : (
-        <div className="bg-white dark:bg-[#131926] rounded-xl border border-slate-200/60 dark:border-slate-800/60 px-5 py-3.5">
-          <div className="flex items-center gap-6 text-xs">
-            <div className="flex items-center gap-1.5 text-slate-400 dark:text-slate-500 shrink-0">
-              <TrendingUp className="w-3.5 h-3.5" />
-              <span className="font-semibold text-[10px] uppercase tracking-wider">This Month</span>
-            </div>
-            <div className="flex items-center gap-5">
-              <div>
-                <span className="text-slate-400 dark:text-slate-500 text-[10px] block">Revenue</span>
-                <span className="font-semibold text-slate-900 dark:text-white font-mono">
-                  <AnimatedNumber value={monthly_performance.revenue} />
-                </span>
-              </div>
-              <div>
-                <span className="text-slate-400 dark:text-slate-500 text-[10px] block">Expenses</span>
-                <span className="font-semibold text-slate-700 dark:text-slate-300 font-mono">
-                  −<AnimatedNumber value={monthly_performance.operating_expenses} />
-                </span>
-              </div>
-              <div>
-                <span className="text-slate-400 dark:text-slate-500 text-[10px] block">Draws</span>
-                <span className="font-semibold text-slate-700 dark:text-slate-300 font-mono">
-                  <AnimatedNumber value={monthly_performance.owner_draws} />
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      </div>
 
       {/* ── 5. Debt Ledgers — compact side-by-side tables ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

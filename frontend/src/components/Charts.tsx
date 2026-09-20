@@ -332,8 +332,8 @@ export const DonutCapitalChart: React.FC<{
   assets: number;
 }> = ({ stock, receivables, treasury, assets }) => {
   const total = stock + receivables + treasury + assets;
-  const radius = 42;
-  const stroke = 12;
+  const radius = 58;
+  const stroke = 15;
   const circum = 2 * Math.PI * radius;
 
   const stockPct = total > 0 ? stock / total : 0;
@@ -347,23 +347,23 @@ export const DonutCapitalChart: React.FC<{
   const assetOffset = circum * (stockPct + recPct + treasPct);
 
   return (
-    <div className="flex flex-col sm:flex-row items-center gap-6">
-      {/* SVG Ring */}
-      <div className="relative w-32 h-32 shrink-0">
-        <svg viewBox="0 0 120 120" className="w-full h-full -rotate-90">
+    <div className="flex flex-col sm:flex-row lg:flex-col xl:flex-row items-center justify-center gap-5 sm:gap-6">
+      {/* SVG Ring (Enlarged) */}
+      <div className="relative w-44 h-44 sm:w-48 sm:h-48 shrink-0">
+        <svg viewBox="0 0 160 160" className="w-full h-full -rotate-90">
           <circle
-            cx="60"
-            cy="60"
+            cx="80"
+            cy="80"
             r={radius}
             fill="none"
             stroke="currentColor"
-            className="text-slate-100 dark:text-slate-800"
+            className="text-slate-100 dark:text-slate-800/80"
             strokeWidth={stroke}
           />
           {/* Stock segment */}
           <circle
-            cx="60"
-            cy="60"
+            cx="80"
+            cy="80"
             r={radius}
             fill="none"
             stroke="#64748b"
@@ -374,8 +374,8 @@ export const DonutCapitalChart: React.FC<{
           />
           {/* Receivables segment */}
           <circle
-            cx="60"
-            cy="60"
+            cx="80"
+            cy="80"
             r={radius}
             fill="none"
             stroke="#10b981"
@@ -386,8 +386,8 @@ export const DonutCapitalChart: React.FC<{
           />
           {/* Treasury segment */}
           <circle
-            cx="60"
-            cy="60"
+            cx="80"
+            cy="80"
             r={radius}
             fill="none"
             stroke="#3b82f6"
@@ -398,8 +398,8 @@ export const DonutCapitalChart: React.FC<{
           />
           {/* Assets segment */}
           <circle
-            cx="60"
-            cy="60"
+            cx="80"
+            cy="80"
             r={radius}
             fill="none"
             stroke="#f59e0b"
@@ -409,51 +409,64 @@ export const DonutCapitalChart: React.FC<{
             className="transition-all duration-500"
           />
         </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-          <span className="text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500 font-medium">Assets</span>
-          <span className="text-xs font-bold font-mono text-slate-900 dark:text-white">
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center select-none pointer-events-none">
+          <span className="text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500 font-semibold">
+            Total Assets
+          </span>
+          <span className="text-lg sm:text-xl font-bold font-mono text-slate-900 dark:text-white tracking-tight mt-0.5">
             {(total / 1000000).toFixed(2)}M
+          </span>
+          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
+            ETB
           </span>
         </div>
       </div>
 
       {/* Legend Grid */}
-      <div className="grid grid-cols-2 gap-3 text-xs w-full">
-        <div className="flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-slate-500 shrink-0" />
-          <div className="truncate">
-            <span className="text-slate-400 dark:text-slate-500 block text-[10px]">Stock ({(stockPct * 100).toFixed(0)}%)</span>
-            <span className="font-bold text-slate-900 dark:text-slate-100 font-mono">
+      <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs w-full">
+        <div className="flex items-start gap-2">
+          <span className="w-2.5 h-2.5 rounded-full bg-slate-500 shrink-0 mt-0.5" />
+          <div className="min-w-0">
+            <span className="text-slate-400 dark:text-slate-500 block text-[10px] font-medium">
+              Stock ({(stockPct * 100).toFixed(0)}%)
+            </span>
+            <span className="font-bold text-slate-900 dark:text-slate-100 font-mono text-xs truncate block">
               <AnimatedNumber value={stock} /> ETB
             </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
-          <div className="truncate">
-            <span className="text-slate-400 dark:text-slate-500 block text-[10px]">Debts ({(recPct * 100).toFixed(0)}%)</span>
-            <span className="font-bold text-emerald-700 dark:text-emerald-400 font-mono">
+        <div className="flex items-start gap-2">
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0 mt-0.5" />
+          <div className="min-w-0">
+            <span className="text-slate-400 dark:text-slate-500 block text-[10px] font-medium">
+              Debts ({(recPct * 100).toFixed(0)}%)
+            </span>
+            <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono text-xs truncate block">
               +<AnimatedNumber value={receivables} /> ETB
             </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0" />
-          <div className="truncate">
-            <span className="text-slate-400 dark:text-slate-500 block text-[10px]">Cash ({(treasPct * 100).toFixed(0)}%)</span>
-            <span className="font-bold text-slate-900 dark:text-slate-100 font-mono">
+        <div className="flex items-start gap-2">
+          <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0 mt-0.5" />
+          <div className="min-w-0">
+            <span className="text-slate-400 dark:text-slate-500 block text-[10px] font-medium">
+              Cash ({(treasPct * 100).toFixed(0)}%)
+            </span>
+            <span className="font-bold text-slate-900 dark:text-slate-100 font-mono text-xs truncate block">
               +<AnimatedNumber value={treasury} /> ETB
             </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
-          <div className="truncate">
-            <span className="text-slate-400 dark:text-slate-500 block text-[10px]">Gold/FX ({(assetPct * 100).toFixed(0)}%)</span>
-            <span className="font-bold text-slate-900 dark:text-slate-100 font-mono">
+        <div className="flex items-start gap-2">
+          <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0 mt-0.5" />
+          <div className="min-w-0">
+            <span className="text-slate-400 dark:text-slate-500 block text-[10px] font-medium">
+              Gold/FX ({(assetPct * 100).toFixed(0)}%)
+            </span>
+            <span className="font-bold text-slate-900 dark:text-slate-100 font-mono text-xs truncate block">
               +<AnimatedNumber value={assets} /> ETB
             </span>
           </div>
