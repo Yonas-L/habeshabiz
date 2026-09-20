@@ -15,9 +15,11 @@ import {
   Receipt,
   TrendingDown,
   Sparkles,
+  ChevronRight,
 } from 'lucide-react';
 import { MiniSparkline, MiniBarHistogram } from '../components/Charts';
 import { AnimatedNumber } from '../components/AnimatedNumber';
+import { ExpenseDrawer } from '../components/drawers/ExpenseDrawer';
 
 interface ExpensesViewProps {
   accounts: FinancialAccount[];
@@ -26,6 +28,9 @@ interface ExpensesViewProps {
 export const ExpensesView: React.FC<ExpensesViewProps> = ({ accounts }) => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Selected Expense for Workspace Drawer
+  const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
 
   // Record Expense Modal
   const [showModal, setShowModal] = useState(false);
@@ -189,7 +194,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ accounts }) => {
             </div>
           </div>
           <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-end justify-between">
-            <span className="text-[11px] text-purple-500 dark:text-purple-400 font-medium">Does not distort shop margins</span>
+            <span className="text-[11px] text-purple-500 font-medium">Does not distort shop margins</span>
             <MiniSparkline values={[20, 22, 25, 24, 30, 32, 35]} color="purple" />
           </div>
         </div>
@@ -217,7 +222,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ accounts }) => {
         </div>
       </div>
 
-      {/* Expense History Table */}
+      {/* Expense History Table with Click-to-Open Drawer */}
       <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-100 dark:border-slate-800/80 overflow-hidden shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
@@ -229,12 +234,13 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ accounts }) => {
                 <th className="py-3 px-5">Paid From Account</th>
                 <th className="py-3 px-5 text-right">Amount (ETB)</th>
                 <th className="py-3 px-5 text-center">Classification</th>
+                <th className="py-3 px-3"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-slate-700 dark:text-slate-300">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="py-16 text-center text-slate-400">
+                  <td colSpan={7} className="py-16 text-center text-slate-400">
                     <div className="flex items-center justify-center gap-2">
                       <Loader2 className="w-4 h-4 animate-spin text-slate-900 dark:text-white" />
                       <span>Loading expense ledger...</span>
@@ -243,13 +249,17 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ accounts }) => {
                 </tr>
               ) : expenses.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-16 text-center text-slate-400">
+                  <td colSpan={7} className="py-16 text-center text-slate-400">
                     No expense or drawing records found.
                   </td>
                 </tr>
               ) : (
                 expenses.map((exp) => (
-                  <tr key={exp.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
+                  <tr
+                    key={exp.id}
+                    onClick={() => setSelectedExpense(exp)}
+                    className="hover:bg-slate-50/90 dark:hover:bg-slate-800/40 transition-colors cursor-pointer group"
+                  >
                     <td className="py-3.5 px-5 font-mono text-[11px] text-slate-500 dark:text-slate-400">
                       {new Date(exp.date).toLocaleDateString(undefined, {
                         month: 'short',
@@ -259,13 +269,13 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ accounts }) => {
                     </td>
 
                     <td className="py-3.5 px-5">
-                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-50 dark:bg-slate-800/70 border border-slate-200/60 dark:border-slate-700 text-slate-800 dark:text-slate-200 capitalize">
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-50 dark:bg-slate-800/70 border border-slate-200/60 dark:border-slate-700 text-slate-800 dark:text-slate-200 capitalize group-hover:scale-105 transition-transform">
                         {getCategoryIcon(exp.category)}
                         <span>{exp.category.replace(/_/g, ' ')}</span>
                       </div>
                     </td>
 
-                    <td className="py-3.5 px-5 text-slate-900 dark:text-white font-bold text-sm">
+                    <td className="py-3.5 px-5 text-slate-900 dark:text-white font-bold text-sm group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
                       {exp.description}
                     </td>
 
@@ -290,6 +300,10 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ accounts }) => {
                         {exp.is_owner_draw ? 'Owner Draw' : 'Business Expense'}
                       </span>
                     </td>
+
+                    <td className="py-3.5 px-3 text-right">
+                      <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:text-slate-700 dark:group-hover:text-slate-300 group-hover:translate-x-0.5 transition-all" />
+                    </td>
                   </tr>
                 ))
               )}
@@ -297,6 +311,13 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ accounts }) => {
           </table>
         </div>
       </div>
+
+      {/* Expense Detail Workspace Drawer */}
+      <ExpenseDrawer
+        expense={selectedExpense}
+        isOpen={selectedExpense !== null}
+        onClose={() => setSelectedExpense(null)}
+      />
 
       {/* Tactile Record Expense Modal */}
       {showModal && (

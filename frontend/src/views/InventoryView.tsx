@@ -13,7 +13,9 @@ import {
   Smartphone,
   Tv,
   Laptop,
+  ChevronRight,
 } from 'lucide-react';
+import { InventoryUnitDrawer } from '../components/drawers/InventoryUnitDrawer';
 
 interface InventoryViewProps {
   user: User | null;
@@ -25,6 +27,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'in_stock' | 'sold' | 'all'>('in_stock');
+  const [selectedUnit, setSelectedUnit] = useState<InventoryUnit | null>(null);
 
   // Intake Modal State
   const [showIntakeModal, setShowIntakeModal] = useState(false);
@@ -271,12 +274,13 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
                 {canViewCost && <th className="py-3 px-5 text-right">Cost Basis</th>}
                 <th className="py-3 px-5 text-center">Status</th>
                 <th className="py-3 px-5 text-right">Actions</th>
+                <th className="py-3 px-2"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="py-16 text-center text-slate-400 dark:text-slate-500">
+                  <td colSpan={8} className="py-16 text-center text-slate-400 dark:text-slate-500">
                     <div className="flex items-center justify-center gap-2">
                       <Loader2 className="w-4 h-4 animate-spin text-slate-900 dark:text-white" />
                       <span>Loading inventory...</span>
@@ -285,7 +289,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
                 </tr>
               ) : units.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-16 text-center text-slate-400 dark:text-slate-500">
+                  <td colSpan={8} className="py-16 text-center text-slate-400 dark:text-slate-500">
                     No inventory units found. Click "+ Stock Intake" to add phones, PlayStations, or electronics.
                   </td>
                 </tr>
@@ -300,14 +304,18 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
                     pName.toLowerCase().includes('phone');
 
                   return (
-                    <tr key={unit.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
+                    <tr
+                      key={unit.id}
+                      onClick={() => setSelectedUnit(unit)}
+                      className="hover:bg-slate-50/90 dark:hover:bg-slate-800/40 transition-colors cursor-pointer group"
+                    >
                       <td className="py-3.5 px-5">
                         <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">
+                          <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                             {getItemCategoryIcon(pCat, pName)}
                           </div>
                           <div>
-                            <div className="font-bold text-slate-900 dark:text-white text-sm leading-tight">
+                            <div className="font-bold text-slate-900 dark:text-white text-sm leading-tight group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
                               {pName}
                             </div>
                             <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
@@ -368,7 +376,10 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
                       <td className="py-3.5 px-5 text-right">
                         {unit.status !== 'in_stock' && (
                           <button
-                            onClick={() => handleRestock(unit)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRestock(unit);
+                            }}
                             className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 text-slate-700 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors shadow-2xs active:scale-95"
                             title="Restock this unsold or returned unit back to shelf"
                           >
@@ -376,6 +387,10 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
                             <span>Restock to Shelf</span>
                           </button>
                         )}
+                      </td>
+
+                      <td className="py-3.5 px-2 text-right">
+                        <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:text-slate-700 dark:group-hover:text-slate-300 group-hover:translate-x-0.5 transition-all" />
                       </td>
                     </tr>
                   );
@@ -653,6 +668,15 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
           </div>
         </div>
       )}
+
+      {/* Inventory Unit Workspace Drawer */}
+      <InventoryUnitDrawer
+        unit={selectedUnit}
+        isOpen={selectedUnit !== null}
+        onClose={() => setSelectedUnit(null)}
+        user={user}
+        onRestockSuccess={loadInventory}
+      />
     </div>
   );
 };

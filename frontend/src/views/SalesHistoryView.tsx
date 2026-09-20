@@ -12,9 +12,11 @@ import {
   Layers,
   CheckCircle2,
   Clock,
+  ChevronRight,
 } from 'lucide-react';
 import { MiniSparkline, MiniBarHistogram } from '../components/Charts';
 import { AnimatedNumber } from '../components/AnimatedNumber';
+import { SalesOrderDrawer } from '../components/drawers/SalesOrderDrawer';
 
 interface SalesHistoryViewProps {
   user: User | null;
@@ -25,6 +27,7 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({ user }) => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [selectedOrder, setSelectedOrder] = useState<SalesOrder | null>(null);
 
   useEffect(() => {
     loadSales();
@@ -215,7 +218,7 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({ user }) => {
         </form>
       </div>
 
-      {/* Orders Table */}
+      {/* Orders Table with Click-to-Open Drawer */}
       <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-100 dark:border-slate-800/80 overflow-hidden shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
@@ -228,12 +231,13 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({ user }) => {
                 <th className="py-3 px-5 text-right">Selling Price</th>
                 {canViewCost && <th className="py-3 px-5 text-right">Gross Profit</th>}
                 <th className="py-3 px-5 text-center">Status</th>
+                <th className="py-3 px-3"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-slate-700 dark:text-slate-300">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="py-16 text-center text-slate-400">
+                  <td colSpan={8} className="py-16 text-center text-slate-400">
                     <div className="flex items-center justify-center gap-2">
                       <Loader2 className="w-4 h-4 animate-spin text-slate-900 dark:text-white" />
                       <span>Loading sales history...</span>
@@ -242,7 +246,7 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({ user }) => {
                 </tr>
               ) : sales.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-16 text-center text-slate-400">
+                  <td colSpan={8} className="py-16 text-center text-slate-400">
                     No sales orders found matching criteria.
                   </td>
                 </tr>
@@ -263,9 +267,15 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({ user }) => {
                     : 'WK';
 
                   return (
-                    <tr key={order.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
+                    <tr
+                      key={order.id}
+                      onClick={() => setSelectedOrder(order)}
+                      className="hover:bg-slate-50/90 dark:hover:bg-slate-800/40 transition-colors cursor-pointer group"
+                    >
                       <td className="py-3.5 px-5 font-mono">
-                        <div className="font-bold text-slate-900 dark:text-white text-sm">{order.order_number}</div>
+                        <div className="font-bold text-slate-900 dark:text-white text-sm group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                          {order.order_number}
+                        </div>
                         <div className="text-[11px] text-slate-400 font-sans mt-0.5">
                           {new Date(order.order_date).toLocaleDateString(undefined, {
                             month: 'short',
@@ -277,7 +287,7 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({ user }) => {
 
                       <td className="py-3.5 px-5">
                         <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-[10px] flex items-center justify-center shrink-0 border border-slate-200/60 dark:border-slate-700">
+                          <div className="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-[10px] flex items-center justify-center shrink-0 border border-slate-200/60 dark:border-slate-700 group-hover:scale-105 transition-transform">
                             {customerInitials}
                           </div>
                           <div>
@@ -347,6 +357,10 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({ user }) => {
                           {order.payment_status === 'paid' ? 'Fully Paid' : 'Credit Unpaid'}
                         </span>
                       </td>
+
+                      <td className="py-3.5 px-3 text-right">
+                        <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:text-slate-700 dark:group-hover:text-slate-300 group-hover:translate-x-0.5 transition-all" />
+                      </td>
                     </tr>
                   );
                 })
@@ -355,6 +369,19 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({ user }) => {
           </table>
         </div>
       </div>
+
+      {/* Transaction Detail Workspace Drawer */}
+      <SalesOrderDrawer
+        order={selectedOrder}
+        isOpen={selectedOrder !== null}
+        onClose={() => setSelectedOrder(null)}
+        user={user}
+        onCollectPayment={(order) => {
+          toast.info('Collection Note', {
+            description: `Party ${order.customer?.name || 'Walk-in'} can be settled under Debts & Credit tab.`,
+          });
+        }}
+      />
     </div>
   );
 };

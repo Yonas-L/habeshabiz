@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import type { Debt, FinancialAccount } from '../api/client';
 import { api } from '../api/client';
 import { toast } from 'sonner';
-import { Search, Loader2, X } from 'lucide-react';
+import { Search, Loader2, ChevronRight } from 'lucide-react';
 import { AnimatedNumber } from '../components/AnimatedNumber';
+import { DebtDrawer } from '../components/drawers/DebtDrawer';
 
 interface DebtsViewProps {
   accounts: FinancialAccount[];
@@ -15,27 +16,12 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
-  // Settle Payment Modal
-  const [activeDebt, setActiveDebt] = useState<Debt | null>(null);
-  const [paymentAmount, setPaymentAmount] = useState('');
-  const [paymentAccountId, setPaymentAccountId] = useState('');
-  const [referenceNumber, setReferenceNumber] = useState('');
-  const [notes, setNotes] = useState('');
-  const [settling, setSettling] = useState(false);
+  // Selected Debt for Workspace Drawer
+  const [drawerDebt, setDrawerDebt] = useState<Debt | null>(null);
 
   useEffect(() => {
     loadDebts();
   }, [debtType]);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && activeDebt) {
-        setActiveDebt(null);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeDebt]);
 
   const loadDebts = async () => {
     try {
@@ -54,42 +40,9 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
     loadDebts();
   };
 
-  const handleOpenSettleModal = (debt: Debt) => {
-    setActiveDebt(debt);
-    setPaymentAmount(String(debt.remaining_amount));
-    const defaultAcc = accounts.find((a) => a.type === 'bank' || a.type === 'mobile_money');
-    setPaymentAccountId(defaultAcc ? defaultAcc.id : accounts[0]?.id || '');
-    setReferenceNumber('');
-    setNotes('');
-  };
-
-  const handleSettleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!activeDebt || !paymentAmount || !paymentAccountId) return;
-
-    try {
-      setSettling(true);
-      await api.settleDebtPayment(activeDebt.id, {
-        amount: parseFloat(paymentAmount),
-        financial_account_id: paymentAccountId,
-        reference_number: referenceNumber || undefined,
-        notes: notes || undefined,
-      });
-
-      toast.success(
-        activeDebt.type === 'receivable' ? 'Customer debt collected' : 'Peer payable settled',
-        {
-          description: `${parseFloat(paymentAmount).toLocaleString()} ETB processed with party ${activeDebt.contact?.name}`,
-        }
-      );
-
-      setActiveDebt(null);
-      loadDebts();
-    } catch (err: any) {
-      toast.error('Failed to settle payment', { description: err.message });
-    } finally {
-      setSettling(false);
-    }
+  const handleOpenSettleModal = (debt: Debt, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setDrawerDebt(debt);
   };
 
   const totalOutstanding = debts.reduce((sum, d) => sum + parseFloat(String(d.remaining_amount)), 0);
@@ -152,11 +105,11 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
         </div>
         <div className="text-left sm:text-right text-xs text-slate-400">
           <div className="font-bold text-slate-800 dark:text-slate-200 text-sm">{debts.length} active ledger records</div>
-          <div className="text-[11px] text-slate-400">Directly synced with cash & bank accounts</div>
+          <div className="text-[11px] text-slate-400">Click any row to open focused workspace</div>
         </div>
       </div>
 
-      {/* Debt Table */}
+      {/* Debt Table with Click-to-Open Drawer */}
       <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-100 dark:border-slate-800/80 overflow-hidden shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
@@ -169,12 +122,13 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
                 <th className="py-3 px-5">Context / Notes</th>
                 <th className="py-3 px-5 text-center">Status</th>
                 <th className="py-3 px-5 text-right">Action</th>
+                <th className="py-3 px-2"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-slate-700 dark:text-slate-300">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="py-16 text-center text-slate-400">
+                  <td colSpan={8} className="py-16 text-center text-slate-400">
                     <div className="flex items-center justify-center gap-2">
                       <Loader2 className="w-4 h-4 animate-spin text-slate-900 dark:text-white" />
                       <span>Loading ledger records...</span>
@@ -183,15 +137,21 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
                 </tr>
               ) : debts.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-16 text-center text-slate-400">
+                  <td colSpan={8} className="py-16 text-center text-slate-400">
                     No outstanding {debtType} records found.
                   </td>
                 </tr>
               ) : (
                 debts.map((debt) => (
-                  <tr key={debt.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
+                  <tr
+                    key={debt.id}
+                    onClick={() => setDrawerDebt(debt)}
+                    className="hover:bg-slate-50/90 dark:hover:bg-slate-800/40 transition-colors cursor-pointer group"
+                  >
                     <td className="py-3.5 px-5">
-                      <div className="font-bold text-slate-900 dark:text-white text-sm">{debt.contact?.name}</div>
+                      <div className="font-bold text-slate-900 dark:text-white text-sm group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                        {debt.contact?.name}
+                      </div>
                       <div className="text-[11px] text-slate-400">{debt.contact?.phone || 'No phone'}</div>
                     </td>
 
@@ -230,12 +190,16 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
                     <td className="py-3.5 px-5 text-right">
                       {parseFloat(String(debt.remaining_amount)) > 0 && (
                         <button
-                          onClick={() => handleOpenSettleModal(debt)}
+                          onClick={(e) => handleOpenSettleModal(debt, e)}
                           className="h-8 px-3 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-semibold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs active:scale-[0.98]"
                         >
                           Record Payment
                         </button>
                       )}
+                    </td>
+
+                    <td className="py-3.5 px-2 text-right">
+                      <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:text-slate-700 dark:group-hover:text-slate-300 group-hover:translate-x-0.5 transition-all" />
                     </td>
                   </tr>
                 ))
@@ -245,115 +209,14 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
         </div>
       </div>
 
-      {/* Tactile Settle Payment Modal */}
-      {activeDebt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className="fixed inset-0 bg-slate-950/40 dark:bg-black/60 backdrop-blur-xs animate-backdrop-enter"
-            onClick={() => setActiveDebt(null)}
-          />
-
-          <div className="relative z-10 bg-white dark:bg-[#131926] rounded-2xl border border-slate-100 dark:border-slate-800 shadow-2xl ring-1 ring-black/5 max-w-md w-full p-6 space-y-4 animate-modal-enter">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
-              <div>
-                <h3 className="font-bold text-slate-900 dark:text-white text-base">
-                  {activeDebt.type === 'receivable' ? 'Collect Customer Payment' : 'Pay Sourcing Partner'}
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">Party: {activeDebt.contact?.name}</p>
-              </div>
-              <button
-                onClick={() => setActiveDebt(null)}
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSettleSubmit} className="space-y-4">
-              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
-                <span className="text-slate-500 dark:text-slate-400 font-medium">Remaining Obligation:</span>
-                <span className="font-extrabold text-slate-900 dark:text-white font-mono tabular-nums text-sm">
-                  {Number(activeDebt.remaining_amount).toLocaleString()} ETB
-                </span>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Payment Amount to Process (ETB)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  max={Number(activeDebt.remaining_amount)}
-                  value={paymentAmount}
-                  onChange={(e) => setPaymentAmount(e.target.value)}
-                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono tabular-nums font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 focus:border-slate-900 dark:focus:border-slate-600"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  {activeDebt.type === 'receivable' ? 'Deposit Into Account (Money In)' : 'Debit From Account (Money Out)'}
-                </label>
-                <select
-                  value={paymentAccountId}
-                  onChange={(e) => setPaymentAccountId(e.target.value)}
-                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 focus:border-slate-900 dark:focus:border-slate-600"
-                  required
-                >
-                  {accounts.filter((a) => !a.is_custom_asset).map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name} ({Number(a.current_balance).toLocaleString()} ETB)
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Bank Reference Number / SMS Ref
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. CBE-FT-82914 or TeleBirr TxID"
-                  value={referenceNumber}
-                  onChange={(e) => setReferenceNumber(e.target.value)}
-                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 focus:border-slate-900 dark:focus:border-slate-600"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Notes / Ledger Memo</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Partial cash settlement"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 focus:border-slate-900 dark:focus:border-slate-600"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setActiveDebt(null)}
-                  className="h-10 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                >
-                  Cancel (Esc)
-                </button>
-                <button
-                  type="submit"
-                  disabled={settling}
-                  className="h-10 px-5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 disabled:opacity-50 transition-colors shadow-xs active:scale-[0.98]"
-                >
-                  {settling ? 'Updating Ledger...' : 'Confirm Payment'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Debt Detail Workspace Drawer */}
+      <DebtDrawer
+        debt={drawerDebt}
+        isOpen={drawerDebt !== null}
+        onClose={() => setDrawerDebt(null)}
+        accounts={accounts}
+        onPaymentSettled={loadDebts}
+      />
     </div>
   );
 };

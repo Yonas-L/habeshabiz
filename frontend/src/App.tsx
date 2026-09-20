@@ -351,7 +351,9 @@ export default function App() {
             <OverviewView
               data={dashboardData}
               user={user}
+              accounts={accounts}
               onNavigateTab={setActiveTab}
+              onRefreshData={refreshData}
             />
           )}
 

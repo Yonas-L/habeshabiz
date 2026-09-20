@@ -1,5 +1,5 @@
-import React from 'react';
-import type { DashboardData, User } from '../api/client';
+import React, { useState } from 'react';
+import type { DashboardData, User, FinancialAccount, Debt } from '../api/client';
 import {
   InteractiveSalesWaveChart,
   MiniSparkline,
@@ -7,6 +7,8 @@ import {
   DonutCapitalChart,
 } from '../components/Charts';
 import { AnimatedNumber } from '../components/AnimatedNumber';
+import { VitalBreakdownDrawer, type VitalType } from '../components/drawers/VitalBreakdownDrawer';
+import { DebtDrawer } from '../components/drawers/DebtDrawer';
 import {
   Smartphone,
   CreditCard,
@@ -17,15 +19,27 @@ import {
   AlertCircle,
   Clock,
   ArrowRight,
+  ChevronRight,
 } from 'lucide-react';
 
 interface OverviewViewProps {
   data: DashboardData | null;
   user: User | null;
+  accounts?: FinancialAccount[];
   onNavigateTab: (tab: any) => void;
+  onRefreshData?: () => void;
 }
 
-export const OverviewView: React.FC<OverviewViewProps> = ({ data, user, onNavigateTab }) => {
+export const OverviewView: React.FC<OverviewViewProps> = ({
+  data,
+  user,
+  accounts = [],
+  onNavigateTab,
+  onRefreshData,
+}) => {
+  const [selectedVital, setSelectedVital] = useState<VitalType | null>(null);
+  const [selectedDebt, setSelectedDebt] = useState<Debt | null>(null);
+
   // 1. Premium Layout-Preserving Skeleton Loading State
   if (!data) {
     return (
@@ -82,10 +96,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({ data, user, onNaviga
                 </div>
               </div>
               <button
-                onClick={() => onNavigateTab('debts')}
+                onClick={() => setSelectedVital('receivables')}
                 className="h-8 px-3 rounded-xl bg-amber-600 dark:bg-amber-500 text-white font-bold text-xs hover:bg-amber-700 transition-all shadow-xs flex items-center gap-1 shrink-0 ml-2 active:scale-95"
               >
-                <span>Collect</span>
+                <span>View Debts</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -157,17 +171,20 @@ export const OverviewView: React.FC<OverviewViewProps> = ({ data, user, onNaviga
               <span>+ Record Sale</span>
             </button>
             <button
-              onClick={() => onNavigateTab('debts')}
+              onClick={() => setSelectedVital('receivables')}
               className="h-11 px-4 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs transition-all active:scale-[0.98] flex items-center gap-1.5"
             >
-              <span>Collect Debts</span>
+              <span>Inspect Credit</span>
             </button>
           </div>
         </div>
 
-        {/* Linear Capital Breakdown Strip */}
+        {/* Linear Capital Breakdown Strip (Interactive shortcuts to drawers) */}
         <div className="mt-7 pt-6 border-t border-slate-100 dark:border-slate-800/80 grid grid-cols-2 sm:grid-cols-5 gap-4 text-xs">
-          <div>
+          <div
+            onClick={() => setSelectedVital('inventory')}
+            className="cursor-pointer hover:opacity-80 transition-opacity p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/40"
+          >
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block">
               Stock Value
             </span>
@@ -176,7 +193,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({ data, user, onNaviga
             </span>
           </div>
 
-          <div>
+          <div
+            onClick={() => setSelectedVital('receivables')}
+            className="cursor-pointer hover:opacity-80 transition-opacity p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/40"
+          >
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 block">
               Customer Debts
             </span>
@@ -185,7 +205,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({ data, user, onNaviga
             </span>
           </div>
 
-          <div>
+          <div
+            onClick={() => setSelectedVital('cash')}
+            className="cursor-pointer hover:opacity-80 transition-opacity p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/40"
+          >
             <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 block">
               Cash & Banks
             </span>
@@ -194,7 +217,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({ data, user, onNaviga
             </span>
           </div>
 
-          <div>
+          <div
+            onClick={() => setSelectedVital('reserves')}
+            className="cursor-pointer hover:opacity-80 transition-opacity p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/40"
+          >
             <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 block">
               Gold & FX
             </span>
@@ -203,7 +229,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({ data, user, onNaviga
             </span>
           </div>
 
-          <div>
+          <div
+            onClick={() => onNavigateTab('debts')}
+            className="cursor-pointer hover:opacity-80 transition-opacity p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/40"
+          >
             <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 block">
               Owed to Suppliers
             </span>
@@ -214,19 +243,22 @@ export const OverviewView: React.FC<OverviewViewProps> = ({ data, user, onNaviga
         </div>
       </section>
 
-      {/* 3. The 4 Essential Business Vitals (4 Independent, Un-nested Cards) */}
+      {/* 3. The 4 Essential Business Vitals (Interactive Cards that open drawer workspace) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Vital 1: Liquid Available Cash */}
         <div
+          role="button"
+          tabIndex={0}
+          onClick={() => setSelectedVital('cash')}
           style={{ animationDelay: '50ms' }}
-          className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800/90 p-5 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_20px_-4px_rgba(0,0,0,0.4)] flex flex-col justify-between transition-all hover:border-slate-300 dark:hover:border-slate-700 animate-card-enter"
+          className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800/90 p-5 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_20px_-4px_rgba(0,0,0,0.4)] flex flex-col justify-between transition-all hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-md cursor-pointer active:scale-[0.99] animate-card-enter group"
         >
           <div>
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                 Available Cash
               </span>
-              <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center group-hover:scale-110 transition-transform">
                 <Landmark className="w-4 h-4" />
               </div>
             </div>
@@ -236,22 +268,28 @@ export const OverviewView: React.FC<OverviewViewProps> = ({ data, user, onNaviga
             </div>
           </div>
           <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-end justify-between">
-            <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">Bank & Cash Drawer</span>
+            <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium flex items-center gap-1">
+              <span>View accounts</span>
+              <ChevronRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+            </span>
             <MiniBarHistogram bars={[30, 45, 60, 50, 75, 80, 95]} color="indigo" />
           </div>
         </div>
 
         {/* Vital 2: Money Owed to You (Receivables) */}
         <div
+          role="button"
+          tabIndex={0}
+          onClick={() => setSelectedVital('receivables')}
           style={{ animationDelay: '100ms' }}
-          className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800/90 p-5 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_20px_-4px_rgba(0,0,0,0.4)] flex flex-col justify-between transition-all hover:border-slate-300 dark:hover:border-slate-700 animate-card-enter"
+          className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800/90 p-5 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_20px_-4px_rgba(0,0,0,0.4)] flex flex-col justify-between transition-all hover:border-emerald-300 dark:hover:border-emerald-700 hover:shadow-md cursor-pointer active:scale-[0.99] animate-card-enter group"
         >
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
                 Money Owed to You
               </span>
-              <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center group-hover:scale-110 transition-transform">
                 <CreditCard className="w-4 h-4" />
               </div>
             </div>
@@ -261,8 +299,9 @@ export const OverviewView: React.FC<OverviewViewProps> = ({ data, user, onNaviga
             </div>
           </div>
           <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-end justify-between">
-            <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">
-              {counts.open_receivables} customers pending
+            <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium flex items-center gap-1">
+              <span>{counts.open_receivables} customers pending</span>
+              <ChevronRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
             </span>
             <MiniSparkline data={[140, 180, 160, 220, 260, 310, 370]} color="emerald" />
           </div>
@@ -270,15 +309,18 @@ export const OverviewView: React.FC<OverviewViewProps> = ({ data, user, onNaviga
 
         {/* Vital 3: Physical Shop Inventory */}
         <div
+          role="button"
+          tabIndex={0}
+          onClick={() => setSelectedVital('inventory')}
           style={{ animationDelay: '150ms' }}
-          className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800/90 p-5 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_20px_-4px_rgba(0,0,0,0.4)] flex flex-col justify-between transition-all hover:border-slate-300 dark:hover:border-slate-700 animate-card-enter"
+          className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800/90 p-5 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_20px_-4px_rgba(0,0,0,0.4)] flex flex-col justify-between transition-all hover:border-slate-400 dark:hover:border-slate-600 hover:shadow-md cursor-pointer active:scale-[0.99] animate-card-enter group"
         >
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                 Shop Inventory
               </span>
-              <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center group-hover:scale-110 transition-transform">
                 <Smartphone className="w-4 h-4" />
               </div>
             </div>
@@ -288,8 +330,9 @@ export const OverviewView: React.FC<OverviewViewProps> = ({ data, user, onNaviga
             </div>
           </div>
           <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-end justify-between">
-            <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">
-              {counts.in_stock_phones} devices on shelf
+            <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium flex items-center gap-1">
+              <span>{counts.in_stock_phones} devices on shelf</span>
+              <ChevronRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
             </span>
             <MiniBarHistogram bars={[12, 18, 15, 24, 28, 35, 47]} color="slate" />
           </div>
@@ -297,15 +340,18 @@ export const OverviewView: React.FC<OverviewViewProps> = ({ data, user, onNaviga
 
         {/* Vital 4: Store Gold & FX Reserves */}
         <div
+          role="button"
+          tabIndex={0}
+          onClick={() => setSelectedVital('reserves')}
           style={{ animationDelay: '200ms' }}
-          className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800/90 p-5 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_20px_-4px_rgba(0,0,0,0.4)] flex flex-col justify-between transition-all hover:border-slate-300 dark:hover:border-slate-700 animate-card-enter"
+          className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800/90 p-5 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_20px_-4px_rgba(0,0,0,0.4)] flex flex-col justify-between transition-all hover:border-amber-300 dark:hover:border-amber-700 hover:shadow-md cursor-pointer active:scale-[0.99] animate-card-enter group"
         >
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                 Store Reserves
               </span>
-              <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center group-hover:scale-110 transition-transform">
                 <Coins className="w-4 h-4" />
               </div>
             </div>
@@ -315,7 +361,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({ data, user, onNaviga
             </div>
           </div>
           <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-end justify-between">
-            <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">Gold & USDT hedge</span>
+            <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium flex items-center gap-1">
+              <span>Gold & USDT hedge</span>
+              <ChevronRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+            </span>
             <MiniSparkline data={[200, 210, 230, 240, 280, 310, 350]} color="amber" />
           </div>
         </div>
@@ -420,7 +469,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({ data, user, onNaviga
         </div>
       </div>
 
-      {/* 6. Actionable Debts & Payables Ledgers (2 Distinct Standalone Cards) */}
+      {/* 6. Actionable Debts & Payables Ledgers (Interactive rows that open Debt Drawer) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Customer Receivables Card */}
         <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800/90 p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_20px_-4px_rgba(0,0,0,0.4)]">
@@ -429,7 +478,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({ data, user, onNaviga
               <h2 className="font-bold text-slate-900 dark:text-white text-sm tracking-tight">
                 Top Customer Receivables
               </h2>
-              <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">Uncollected credit sales</p>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">Click any record to inspect or collect</p>
             </div>
             <button
               onClick={() => onNavigateTab('debts')}
@@ -446,23 +495,32 @@ export const OverviewView: React.FC<OverviewViewProps> = ({ data, user, onNaviga
               </div>
             ) : (
               top_receivables.map((debt) => (
-                <div key={debt.id} className="py-3 flex items-center justify-between text-xs">
+                <div
+                  key={debt.id}
+                  onClick={() => setSelectedDebt(debt)}
+                  className="py-3 px-2 -mx-2 rounded-xl flex items-center justify-between text-xs cursor-pointer hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors group"
+                >
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 font-bold flex items-center justify-center text-xs uppercase border border-emerald-200/50 dark:border-emerald-800/50">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 font-bold flex items-center justify-center text-xs uppercase border border-emerald-200/50 dark:border-emerald-800/50 group-hover:scale-105 transition-transform">
                       {debt.contact?.name?.slice(0, 2) || 'CU'}
                     </div>
                     <div>
-                      <div className="font-bold text-slate-900 dark:text-slate-100">{debt.contact?.name}</div>
+                      <div className="font-bold text-slate-900 dark:text-slate-100 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                        {debt.contact?.name}
+                      </div>
                       <div className="text-[11px] text-slate-400 dark:text-slate-500">{debt.notes || 'Credit purchase'}</div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="font-bold text-emerald-700 dark:text-emerald-400 font-mono">
-                      +{Number(debt.remaining_amount).toLocaleString()} ETB
+                  <div className="text-right flex items-center gap-2">
+                    <div>
+                      <div className="font-bold text-emerald-700 dark:text-emerald-400 font-mono">
+                        +{Number(debt.remaining_amount).toLocaleString()} ETB
+                      </div>
+                      <span className="text-[10px] px-1.5 py-0.2 rounded font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400">
+                        Open
+                      </span>
                     </div>
-                    <span className="text-[10px] px-1.5 py-0.2 rounded font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400">
-                      Open
-                    </span>
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-600 dark:group-hover:text-slate-300 group-hover:translate-x-0.5 transition-all" />
                   </div>
                 </div>
               ))
@@ -477,7 +535,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({ data, user, onNaviga
               <h2 className="font-bold text-slate-900 dark:text-white text-sm tracking-tight">
                 Peer Sourcing Payables
               </h2>
-              <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">Debts owed to peer shops (Mekdi, Yenus)</p>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">Click any record to inspect or settle</p>
             </div>
             <button
               onClick={() => onNavigateTab('debts')}
@@ -494,23 +552,32 @@ export const OverviewView: React.FC<OverviewViewProps> = ({ data, user, onNaviga
               </div>
             ) : (
               top_payables.map((debt) => (
-                <div key={debt.id} className="py-3 flex items-center justify-between text-xs">
+                <div
+                  key={debt.id}
+                  onClick={() => setSelectedDebt(debt)}
+                  className="py-3 px-2 -mx-2 rounded-xl flex items-center justify-between text-xs cursor-pointer hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors group"
+                >
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-400 font-bold flex items-center justify-center text-xs uppercase border border-rose-200/50 dark:border-rose-800/50">
+                    <div className="w-8 h-8 rounded-xl bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-400 font-bold flex items-center justify-center text-xs uppercase border border-rose-200/50 dark:border-rose-800/50 group-hover:scale-105 transition-transform">
                       {debt.contact?.name?.slice(0, 2) || 'PR'}
                     </div>
                     <div>
-                      <div className="font-bold text-slate-900 dark:text-slate-100">{debt.contact?.name}</div>
+                      <div className="font-bold text-slate-900 dark:text-slate-100 group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors">
+                        {debt.contact?.name}
+                      </div>
                       <div className="text-[11px] text-slate-400 dark:text-slate-500">{debt.notes || 'Sourced stock'}</div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="font-bold text-rose-600 dark:text-rose-400 font-mono">
-                      -{Number(debt.remaining_amount).toLocaleString()} ETB
+                  <div className="text-right flex items-center gap-2">
+                    <div>
+                      <div className="font-bold text-rose-600 dark:text-rose-400 font-mono">
+                        -{Number(debt.remaining_amount).toLocaleString()} ETB
+                      </div>
+                      <span className="text-[10px] px-1.5 py-0.2 rounded font-semibold bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400">
+                        Due
+                      </span>
                     </div>
-                    <span className="text-[10px] px-1.5 py-0.2 rounded font-semibold bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400">
-                      Due
-                    </span>
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-600 dark:group-hover:text-slate-300 group-hover:translate-x-0.5 transition-all" />
                   </div>
                 </div>
               ))
@@ -518,6 +585,31 @@ export const OverviewView: React.FC<OverviewViewProps> = ({ data, user, onNaviga
           </div>
         </div>
       </div>
+
+      {/* Vital Breakdown Drawer */}
+      <VitalBreakdownDrawer
+        vitalType={selectedVital}
+        isOpen={selectedVital !== null}
+        onClose={() => setSelectedVital(null)}
+        data={data}
+        accounts={accounts}
+        onNavigateTab={onNavigateTab}
+        onSelectDebt={(debt) => {
+          setSelectedVital(null);
+          setSelectedDebt(debt);
+        }}
+      />
+
+      {/* Debt Detail Workspace Drawer */}
+      <DebtDrawer
+        debt={selectedDebt}
+        isOpen={selectedDebt !== null}
+        onClose={() => setSelectedDebt(null)}
+        accounts={accounts}
+        onPaymentSettled={() => {
+          if (onRefreshData) onRefreshData();
+        }}
+      />
     </div>
   );
 };

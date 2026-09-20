@@ -106,6 +106,65 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   }
 }
 
+@keyframes drawerSlideIn {
+  from {
+    transform: translateX(100%);
+    box-shadow: none;
+  }
+  to {
+    transform: translateX(0);
+    box-shadow: -10px 0 35px -5px rgba(0, 0, 0, 0.15);
+  }
+}
+
+@keyframes drawerSlideOut {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes collapseOpen {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes receiptUnroll {
+  from {
+    opacity: 0;
+    transform: scaleY(0.95) translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: scaleY(1) translateY(0);
+  }
+}
+
+.animate-drawer-enter {
+  animation: drawerSlideIn 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-drawer-exit {
+  animation: drawerSlideOut 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-collapse-open {
+  animation: collapseOpen 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-receipt {
+  animation: receiptUnroll 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform-origin: top;
+}
+
 .animate-card-enter {
   animation: cardEnter 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
@@ -119,9 +178,10 @@ html.dark ::-webkit-scrollbar-thumb:hover {
 }
 
 .animate-backdrop-enter {
-  animation: backdropEnter 0.15s ease-out forwards;
+  animation: backdropEnter 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .animate-skeleton {
   animation: skeletonPulse 1.8s ease-in-out infinite;
 }
+
