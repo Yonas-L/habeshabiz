@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import type { InventoryUnit, Product, ProductCategory, Contact, User } from '../api/client';
 import { api } from '../api/client';
 import { toast } from 'sonner';
@@ -22,10 +22,16 @@ import {
   Clock,
   AlertCircle,
   ChevronDown,
+  Edit3,
+  Layers,
+  Package,
+  ChevronsDown,
+  ChevronsUp,
 } from 'lucide-react';
 import { InventoryUnitDrawer } from '../components/drawers/InventoryUnitDrawer';
 import { StockIntakeModal } from '../components/inventory/StockIntakeModal';
 import { CategoryManagementModal, getCategoryIcon } from '../components/inventory/CategoryManagementModal';
+import { EditProductModal } from '../components/inventory/EditProductModal';
 
 interface InventoryViewProps {
   user: User | null;
@@ -55,7 +61,13 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
 
   // Modal States
   const [showIntakeModal, setShowIntakeModal] = useState(false);
+  const [intakeInitialProductId, setIntakeInitialProductId] = useState<string | undefined>(undefined);
+  const [intakeInitialVariantId, setIntakeInitialVariantId] = useState<string | undefined>(undefined);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+
+  // Collapsible state for in_stock grouped products
+  const [expandedProductIds, setExpandedProductIds] = useState<Set<string>>(new Set());
 
   // Handover Modal State (for in_stock -> out)
   const [handoverTargetUnit, setHandoverTargetUnit] = useState<InventoryUnit | null>(null);
@@ -87,6 +99,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
       if (e.key === 'Escape') {
         if (showIntakeModal) setShowIntakeModal(false);
         if (isCategoryModalOpen) setIsCategoryModalOpen(false);
+        if (editingProduct) setEditingProduct(null);
         if (handoverTargetUnit) setHandoverTargetUnit(null);
         if (returnTargetUnit) setReturnTargetUnit(null);
         if (repairedTargetUnit) setRepairedTargetUnit(null);
@@ -94,7 +107,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showIntakeModal, isCategoryModalOpen, handoverTargetUnit, returnTargetUnit, repairedTargetUnit]);
+  }, [showIntakeModal, isCategoryModalOpen, editingProduct, handoverTargetUnit, returnTargetUnit, repairedTargetUnit]);
 
   const loadInventory = async () => {
     try {
@@ -127,6 +140,101 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
   };
 
   const isOwner = user?.role === 'owner';
+
+  // Toggle expand / collapse for product model row in In Stock tab
+  const toggleExpand = (productId: string) => {
+    setExpandedProductIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(productId)) {
+        next.delete(productId);
+      } else {
+        next.add(productId);
+      }
+      return next;
+    });
+  };
+
+  const expandAll = () => {
+    setExpandedProductIds(new Set(inStockProducts.map((p) => p.product.id)));
+  };
+
+  const collapseAll = () => {
+    setExpandedProductIds(new Set());
+  };
+
+  // Group in-stock units by product model for clean collapsible hierarchy
+  const inStockProducts = useMemo(() => {
+    if (statusFilter !== 'in_stock') return [];
+
+    const unitsByProductId: Record<string, InventoryUnit[]> = {};
+    for (const unit of units) {
+      const pid = unit.variant?.product_id || unit.variant?.product?.id;
+      if (pid) {
+        if (!unitsByProductId[pid]) unitsByProductId[pid] = [];
+        unitsByProductId[pid].push(unit);
+      }
+    }
+
+    const items = products.map((prod) => {
+      const prodUnits = unitsByProductId[prod.id] || [];
+
+      const variantBreakdowns = (prod.variants || []).map((variant) => {
+        const vUnits = prodUnits.filter((u) => u.variant_id === variant.id);
+        return {
+          variant,
+          units: vUnits,
+          count: vUnits.length,
+        };
+      });
+
+      const totalInStock = prodUnits.length;
+      const totalCost = prodUnits.reduce((sum, u) => sum + (Number(u.cost_basis) || 0), 0);
+
+      const prices = (prod.variants || [])
+        .map((v) => Number(v.default_selling_price))
+        .filter((pr) => !isNaN(pr) && pr > 0);
+      const minPrice = prices.length > 0 ? Math.min(...prices) : null;
+      const maxPrice = prices.length > 0 ? Math.max(...prices) : null;
+
+      return {
+        product: prod,
+        units: prodUnits,
+        variantBreakdowns,
+        totalInStock,
+        totalCost,
+        minPrice,
+        maxPrice,
+      };
+    });
+
+    return items.filter((item) => {
+      // Category filter check
+      if (selectedCategoryId !== 'all') {
+        const matchCat =
+          item.product.category_id === selectedCategoryId ||
+          item.product.category_rel?.id === selectedCategoryId ||
+          categories.find((c) => c.id === selectedCategoryId)?.slug === item.product.category;
+        if (!matchCat) return false;
+      }
+
+      if (search.trim()) {
+        const q = search.toLowerCase().trim();
+        const nameMatch = item.product.name.toLowerCase().includes(q);
+        const brandMatch = (item.product.brand || '').toLowerCase().includes(q);
+        const unitMatch = item.units.some((u) => (u.imei_or_serial || '').toLowerCase().includes(q));
+        const variantMatch = item.product.variants.some(
+          (v) =>
+            (v.storage || '').toLowerCase().includes(q) ||
+            (v.color || '').toLowerCase().includes(q) ||
+            (v.sku || '').toLowerCase().includes(q)
+        );
+        return nameMatch || brandMatch || unitMatch || variantMatch;
+      }
+
+      // Default: show products that have in-stock units on shelf
+      return item.totalInStock > 0;
+    });
+  }, [statusFilter, units, products, selectedCategoryId, categories, search]);
 
   // Restock an unsold OUT device back to shelf
   const handleRestockOut = async (unit: InventoryUnit) => {
@@ -364,7 +472,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
               </button>
 
               <button
-                onClick={() => setShowIntakeModal(true)}
+                onClick={() => {
+                  setIntakeInitialProductId(undefined);
+                  setIntakeInitialVariantId(undefined);
+                  setShowIntakeModal(true);
+                }}
                 className="h-10 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs flex items-center gap-2 active:scale-[0.98]"
               >
                 <Plus className="w-4 h-4 text-emerald-400 dark:text-emerald-500" />
@@ -375,267 +487,656 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
         </div>
       </div>
 
-      {/* Inventory Data Table */}
-      <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800/90 overflow-hidden shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_20px_-4px_rgba(0,0,0,0.4)]">
+      {/* Inventory Data Table Container */}
+      <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-100 dark:border-slate-800/80 overflow-hidden shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
+        {/* Sub-header Controls for In Stock Grouped View */}
+        {statusFilter === 'in_stock' && (
+          <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-900/30 flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                Grouped Catalog Models ({inStockProducts.length})
+              </span>
+              <span className="text-[11px] text-slate-400">
+                • {counts.in_stock} total active units on shelf
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={expandAll}
+                className="h-7 px-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-[11px] font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors flex items-center gap-1 shadow-2xs"
+              >
+                <ChevronsDown className="w-3.5 h-3.5" />
+                <span>Expand All</span>
+              </button>
+              <button
+                onClick={collapseAll}
+                className="h-7 px-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-[11px] font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors flex items-center gap-1 shadow-2xs"
+              >
+                <ChevronsUp className="w-3.5 h-3.5" />
+                <span>Collapse All</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50/70 dark:bg-slate-800/40 border-b border-slate-100 dark:border-slate-800 text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider text-[10px]">
-              <tr>
-                <th className="py-3 px-5">Item & Model</th>
-                <th className="py-3 px-5 font-mono">IMEI / Serial</th>
-                <th className="py-3 px-5">Specs / Battery</th>
-                <th className="py-3 px-5">Condition</th>
-                <th className="py-3 px-5 text-center">Status & Location</th>
-                {canViewCost && <th className="py-3 px-5 text-right">Cost Basis</th>}
-                <th className="py-3 px-5 text-right">Flow Action</th>
-                <th className="py-3 px-2"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
-              {loading ? (
+          {statusFilter === 'in_stock' ? (
+            /* COLLAPSIBLE GROUPED IN-STOCK TABLE */
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50/70 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
                 <tr>
-                  <td colSpan={8} className="py-16 text-center text-slate-400 dark:text-slate-500">
-                    <div className="flex items-center justify-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin text-slate-900 dark:text-white" />
-                      <span>Loading inventory units...</span>
-                    </div>
-                  </td>
+                  <th className="py-3 px-5">Product Model</th>
+                  <th className="py-3 px-5 text-center">Total In Stock</th>
+                  <th className="py-3 px-5">Specifications / Variants</th>
+                  <th className="py-3 px-5 text-right">Benchmark Price</th>
+                  {canViewCost && <th className="py-3 px-5 text-right">Total Cost Basis</th>}
+                  <th className="py-3 px-5 text-right">Actions</th>
+                  <th className="py-3 px-3"></th>
                 </tr>
-              ) : units.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="py-16 text-center text-slate-400 dark:text-slate-500">
-                    {statusFilter === 'out'
-                      ? 'No items are currently out with staff or brokers.'
-                      : statusFilter === 'sold'
-                      ? 'No sold items found.'
-                      : statusFilter === 'returned'
-                      ? 'No devices under return/repair inspection.'
-                      : 'No inventory units found in this category.'}
-                  </td>
-                </tr>
-              ) : (
-                units.map((unit) => {
-                  const pName = unit.variant?.product?.name || 'Device';
-                  const pCat = unit.variant?.product?.category;
-                  const pCatRel = unit.variant?.product?.category_rel;
-                  const isUnitPhone =
-                    pCat === 'smartphone' ||
-                    pCatRel?.slug === 'smartphones' ||
-                    pName.toLowerCase().includes('iphone') ||
-                    pName.toLowerCase().includes('galaxy') ||
-                    pName.toLowerCase().includes('phone');
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-slate-700 dark:text-slate-300">
+                {loading ? (
+                  <tr>
+                    <td colSpan={canViewCost ? 7 : 6} className="py-16 text-center text-slate-400">
+                      <div className="flex items-center justify-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin text-slate-900 dark:text-white" />
+                        <span>Loading inventory models...</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : inStockProducts.length === 0 ? (
+                  <tr>
+                    <td colSpan={canViewCost ? 7 : 6} className="py-16 text-center text-slate-400">
+                      <Package className="w-8 h-8 mx-auto mb-2 text-slate-300 dark:text-slate-600" />
+                      <p className="font-semibold text-slate-600 dark:text-slate-400">No products currently in stock</p>
+                      <p className="text-xs text-slate-400 mt-0.5">Use the "+ Stock Intake" button to receive new items into counter inventory.</p>
+                    </td>
+                  </tr>
+                ) : (
+                  inStockProducts.map((item) => {
+                    const isExpanded = expandedProductIds.has(item.product.id);
+                    const pCat = item.product.category;
+                    const pCatRel = item.product.category_rel;
+                    const specSummary = item.variantBreakdowns
+                      .map((vb) => [vb.variant.storage, vb.variant.ram ? `${vb.variant.ram} RAM` : null, vb.variant.color].filter(Boolean).join(' '))
+                      .filter(Boolean)
+                      .join(' • ');
 
-                  const specVals = unit.variant?.specs ? Object.values(unit.variant.specs).map(String) : [];
-                  const variantSubtitle = [
-                    unit.variant?.storage,
-                    unit.variant?.ram ? `${unit.variant.ram} RAM` : null,
-                    unit.variant?.color,
-                    ...specVals,
-                  ].filter(Boolean).join(' • ') || 'Standard';
+                    return (
+                      <React.Fragment key={item.product.id}>
+                        {/* Collapsed / Base Product Row */}
+                        <tr
+                          onClick={() => toggleExpand(item.product.id)}
+                          className={`hover:bg-slate-50/90 dark:hover:bg-slate-800/40 transition-colors cursor-pointer group ${
+                            isExpanded ? 'bg-slate-50/50 dark:bg-slate-900/30' : ''
+                          }`}
+                        >
+                          {/* Col 1: Product Model & Badges */}
+                          <td className="py-3.5 px-5">
+                            <div className="flex items-center gap-3">
+                              <div className="w-6 h-6 rounded-md flex items-center justify-center text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200 group-hover:bg-slate-200/50 dark:group-hover:bg-slate-800 transition-all shrink-0">
+                                {isExpanded ? (
+                                  <ChevronDown className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                                ) : (
+                                  <ChevronRight className="w-4 h-4" />
+                                )}
+                              </div>
 
-                  return (
-                    <tr
-                      key={unit.id}
-                      onClick={() => setSelectedUnit(unit)}
-                      className="hover:bg-slate-50/90 dark:hover:bg-slate-800/40 transition-colors cursor-pointer group"
-                    >
-                      {/* Model & Item Name */}
-                      <td className="py-3.5 px-5">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform text-slate-600 dark:text-slate-300">
-                            {pCatRel?.icon
-                              ? getCategoryIcon(pCatRel.icon, 'w-4 h-4')
-                              : getItemCategoryIcon(pCat, pName)}
-                          </div>
-                          <div>
-                            <div className="font-bold text-slate-900 dark:text-white text-sm leading-tight group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                              {pName}
+                              <div className="w-8 h-8 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/60 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform text-slate-700 dark:text-slate-300">
+                                {pCatRel?.icon
+                                  ? getCategoryIcon(pCatRel.icon, 'w-4 h-4')
+                                  : getItemCategoryIcon(pCat, item.product.name)}
+                              </div>
+
+                              <div>
+                                <div className="font-bold text-slate-900 dark:text-white text-sm leading-tight group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors flex items-center gap-2">
+                                  <span>{item.product.name}</span>
+                                  {item.product.brand && (
+                                    <span className="text-[10px] font-semibold text-slate-400 font-sans">
+                                      ({item.product.brand})
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                                  <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                                    {pCatRel?.name || item.product.category}
+                                  </span>
+                                  <span className="text-[10px] text-slate-400">
+                                    {item.product.has_serials ? 'Serialized' : 'Bulk Batch'}
+                                  </span>
+                                </div>
+                              </div>
                             </div>
-                            <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
-                              {pCatRel?.name && (
-                                <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                                  {pCatRel.name}
+                          </td>
+
+                          {/* Col 2: Summed Stock Badge */}
+                          <td className="py-3.5 px-5 text-center">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/60 font-mono">
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>{item.totalInStock} In Stock</span>
+                            </span>
+                          </td>
+
+                          {/* Col 3: Variants / Specs Summary */}
+                          <td className="py-3.5 px-5">
+                            <div className="font-semibold text-slate-800 dark:text-slate-200 text-xs">
+                              {item.variantBreakdowns.length}{' '}
+                              {item.variantBreakdowns.length === 1 ? 'Specification' : 'Specifications'}
+                            </div>
+                            <div className="text-[11px] text-slate-400 truncate max-w-xs mt-0.5">
+                              {specSummary || 'Standard'}
+                            </div>
+                          </td>
+
+                          {/* Col 4: Benchmark Selling Price */}
+                          <td className="py-3.5 px-5 text-right font-mono font-bold text-slate-900 dark:text-white text-xs">
+                            {item.minPrice !== null && item.maxPrice !== null ? (
+                              item.minPrice === item.maxPrice ? (
+                                `${item.minPrice.toLocaleString()} ETB`
+                              ) : (
+                                `${item.minPrice.toLocaleString()} – ${item.maxPrice.toLocaleString()} ETB`
+                              )
+                            ) : (
+                              <span className="text-slate-400 font-sans italic text-[11px]">No default</span>
+                            )}
+                          </td>
+
+                          {/* Col 5: Total Cost Basis (Owner Only) */}
+                          {canViewCost && (
+                            <td className="py-3.5 px-5 text-right font-mono font-bold text-slate-900 dark:text-white text-xs">
+                              {item.totalCost > 0 ? `${item.totalCost.toLocaleString()} ETB` : '—'}
+                            </td>
+                          )}
+
+                          {/* Col 6: Quick Action Buttons */}
+                          <td className="py-3.5 px-5 text-right">
+                            <div className="inline-flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                              <button
+                                onClick={() => {
+                                  setIntakeInitialProductId(item.product.id);
+                                  setIntakeInitialVariantId(undefined);
+                                  setShowIntakeModal(true);
+                                }}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-700 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors shadow-2xs active:scale-95"
+                                title={`Intake stock for ${item.product.name}`}
+                              >
+                                <Plus className="w-3 h-3" />
+                                <span>Intake</span>
+                              </button>
+
+                              {isOwner && (
+                                <button
+                                  onClick={() => setEditingProduct(item.product)}
+                                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shadow-2xs"
+                                  title="Edit product details, manage variants, or remove"
+                                >
+                                  <Edit3 className="w-3 h-3" />
+                                  <span>Edit</span>
+                                </button>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Col 7: Chevron */}
+                          <td className="py-3.5 px-3 text-right">
+                            {isExpanded ? (
+                              <ChevronDown className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                            ) : (
+                              <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:text-slate-700 dark:group-hover:text-slate-300 group-hover:translate-x-0.5 transition-all" />
+                            )}
+                          </td>
+                        </tr>
+
+                        {/* Uncollapsed Sub-row: Variants Breakdown & Physical Units Table */}
+                        {isExpanded && (
+                          <tr className="bg-slate-50/40 dark:bg-slate-900/20">
+                            <td colSpan={canViewCost ? 7 : 6} className="p-0">
+                              <div className="p-5 border-y border-slate-100 dark:border-slate-800 space-y-4">
+                                {/* Strip 1: Variants Stock Grid */}
+                                <div className="space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-1.5 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+                                      <Layers className="w-3.5 h-3.5 text-slate-400" />
+                                      <span>Available Variant Specifications ({item.variantBreakdowns.length})</span>
+                                    </div>
+                                    <span className="text-[11px] text-slate-400">
+                                      Specific stock counts per configuration
+                                    </span>
+                                  </div>
+
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                                    {item.variantBreakdowns.map((vb) => {
+                                      const specLabel = [
+                                        vb.variant.storage,
+                                        vb.variant.ram ? `${vb.variant.ram} RAM` : null,
+                                        vb.variant.color,
+                                      ].filter(Boolean).join(' • ') || 'Standard Specification';
+
+                                      return (
+                                        <div
+                                          key={vb.variant.id}
+                                          className="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800 shadow-2xs"
+                                        >
+                                          <div>
+                                            <div className="font-bold text-slate-900 dark:text-white text-xs">
+                                              {specLabel}
+                                            </div>
+                                            <div className="text-[11px] text-slate-400 font-mono mt-0.5">
+                                              {vb.variant.default_selling_price ? (
+                                                <span>Selling: {Number(vb.variant.default_selling_price).toLocaleString()} ETB</span>
+                                              ) : (
+                                                <span>No benchmark price</span>
+                                              )}
+                                            </div>
+                                          </div>
+
+                                          <div className="flex items-center gap-2">
+                                            <span
+                                              className={`px-2.5 py-1 rounded-full text-xs font-bold font-mono ${
+                                                vb.count > 0
+                                                  ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/50'
+                                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
+                                              }`}
+                                            >
+                                              {vb.count} in stock
+                                            </span>
+
+                                            {isOwner && (
+                                              <button
+                                                onClick={() => {
+                                                  setIntakeInitialProductId(item.product.id);
+                                                  setIntakeInitialVariantId(vb.variant.id);
+                                                  setShowIntakeModal(true);
+                                                }}
+                                                className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors"
+                                                title={`Intake more ${specLabel}`}
+                                              >
+                                                <Plus className="w-3.5 h-3.5" />
+                                              </button>
+                                            )}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+
+                                {/* Strip 2: Individual Physical Units Table */}
+                                {item.units.length > 0 ? (
+                                  <div className="rounded-xl border border-slate-200/80 dark:border-slate-800 overflow-hidden bg-white dark:bg-[#131926]">
+                                    <div className="px-4 py-2.5 bg-slate-50/70 dark:bg-slate-900/60 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                                        Tracked Serial Stock Units ({item.units.length})
+                                      </span>
+                                      <span className="text-[10px] text-slate-400">
+                                        Click any row to open device history drawer
+                                      </span>
+                                    </div>
+
+                                    <div className="overflow-x-auto">
+                                      <table className="w-full text-left text-xs">
+                                        <thead className="bg-slate-50/40 dark:bg-slate-900/30 text-slate-400 font-bold uppercase tracking-wider text-[9px] border-b border-slate-100 dark:border-slate-800">
+                                          <tr>
+                                            <th className="py-2.5 px-4 font-mono">IMEI / Serial</th>
+                                            <th className="py-2.5 px-4">Spec</th>
+                                            <th className="py-2.5 px-4">Battery / SIM</th>
+                                            <th className="py-2.5 px-4">Condition</th>
+                                            <th className="py-2.5 px-4">Location</th>
+                                            {canViewCost && <th className="py-2.5 px-4 text-right">Cost</th>}
+                                            <th className="py-2.5 px-4 text-right">Flow Action</th>
+                                            <th className="py-2.5 px-2"></th>
+                                          </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                                          {item.units.map((unit) => {
+                                            const unitSpec = [
+                                              unit.variant?.storage,
+                                              unit.variant?.ram ? `${unit.variant.ram} RAM` : null,
+                                              unit.variant?.color,
+                                            ].filter(Boolean).join(' • ') || 'Standard';
+
+                                            return (
+                                              <tr
+                                                key={unit.id}
+                                                onClick={() => setSelectedUnit(unit)}
+                                                className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors cursor-pointer group"
+                                              >
+                                                <td className="py-2.5 px-4 font-mono font-semibold text-slate-900 dark:text-white">
+                                                  {unit.imei_or_serial || (
+                                                    <span className="text-slate-400 font-sans italic text-[11px]">
+                                                      Bulk Unit
+                                                    </span>
+                                                  )}
+                                                </td>
+                                                <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">
+                                                  {unitSpec}
+                                                </td>
+                                                <td className="py-2.5 px-4">
+                                                  {unit.battery_health ? (
+                                                    <div className="flex items-center gap-1.5">
+                                                      <Battery className="w-3.5 h-3.5 text-slate-400" />
+                                                      <span className="font-mono font-bold text-slate-900 dark:text-white text-xs">
+                                                        {unit.battery_health}%
+                                                      </span>
+                                                      {unit.sim_type && unit.sim_type !== 'na' && (
+                                                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 uppercase font-mono">
+                                                          {unit.sim_type}
+                                                        </span>
+                                                      )}
+                                                    </div>
+                                                  ) : (
+                                                    <span className="text-slate-400 text-[11px]">N/A</span>
+                                                  )}
+                                                </td>
+                                                <td className="py-2.5 px-4 capitalize text-slate-600 dark:text-slate-400 font-medium">
+                                                  {unit.condition.replace(/_/g, ' ')}
+                                                </td>
+                                                <td className="py-2.5 px-4 text-slate-500 dark:text-slate-400">
+                                                  {unit.location || 'Shop Counter'}
+                                                </td>
+                                                {canViewCost && (
+                                                  <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-900 dark:text-white">
+                                                    {unit.cost_basis ? `${Number(unit.cost_basis).toLocaleString()} ETB` : '—'}
+                                                  </td>
+                                                )}
+                                                <td className="py-2.5 px-4 text-right">
+                                                  <button
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      setHandoverTargetUnit(unit);
+                                                      setHandoverTo('');
+                                                      setHandoverLocation('');
+                                                      setHandoverNotes('');
+                                                    }}
+                                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-amber-950/50 text-slate-700 dark:text-slate-300 hover:text-amber-700 dark:hover:text-amber-400 transition-colors shadow-2xs active:scale-95"
+                                                    title="Handover device to staff or broker to sell"
+                                                  >
+                                                    <UserCheck className="w-3 h-3" />
+                                                    <span>Handover / Out</span>
+                                                  </button>
+                                                </td>
+                                                <td className="py-2.5 px-2 text-right">
+                                                  <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-700 dark:group-hover:text-slate-300 group-hover:translate-x-0.5 transition-all" />
+                                                </td>
+                                              </tr>
+                                            );
+                                          })}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="p-4 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 text-center text-xs text-slate-400">
+                                    No physical units in stock for this model currently.
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          ) : (
+            /* FLAT TABLE FOR OTHER TABS (OUT, SOLD, RETURNED, ALL) */
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50/70 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                <tr>
+                  <th className="py-3 px-5">Item & Model</th>
+                  <th className="py-3 px-5 font-mono">IMEI / Serial</th>
+                  <th className="py-3 px-5">Specs / Battery</th>
+                  <th className="py-3 px-5">Condition</th>
+                  <th className="py-3 px-5 text-center">Status & Location</th>
+                  {canViewCost && <th className="py-3 px-5 text-right">Cost Basis</th>}
+                  <th className="py-3 px-5 text-right">Flow Action</th>
+                  <th className="py-3 px-2"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-slate-700 dark:text-slate-300">
+                {loading ? (
+                  <tr>
+                    <td colSpan={canViewCost ? 8 : 7} className="py-16 text-center text-slate-400">
+                      <div className="flex items-center justify-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin text-slate-900 dark:text-white" />
+                        <span>Loading inventory units...</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : units.length === 0 ? (
+                  <tr>
+                    <td colSpan={canViewCost ? 8 : 7} className="py-16 text-center text-slate-400">
+                      {statusFilter === 'out'
+                        ? 'No items are currently out with staff or brokers.'
+                        : statusFilter === 'sold'
+                        ? 'No sold items found.'
+                        : statusFilter === 'returned'
+                        ? 'No devices under return/repair inspection.'
+                        : 'No inventory units found in this category.'}
+                    </td>
+                  </tr>
+                ) : (
+                  units.map((unit) => {
+                    const pName = unit.variant?.product?.name || 'Device';
+                    const pCat = unit.variant?.product?.category;
+                    const pCatRel = unit.variant?.product?.category_rel;
+                    const isUnitPhone =
+                      pCat === 'smartphone' ||
+                      pCatRel?.slug === 'smartphones' ||
+                      pName.toLowerCase().includes('iphone') ||
+                      pName.toLowerCase().includes('galaxy') ||
+                      pName.toLowerCase().includes('phone');
+
+                    const specVals = unit.variant?.specs ? Object.values(unit.variant.specs).map(String) : [];
+                    const variantSubtitle = [
+                      unit.variant?.storage,
+                      unit.variant?.ram ? `${unit.variant.ram} RAM` : null,
+                      unit.variant?.color,
+                      ...specVals,
+                    ].filter(Boolean).join(' • ') || 'Standard';
+
+                    return (
+                      <tr
+                        key={unit.id}
+                        onClick={() => setSelectedUnit(unit)}
+                        className="hover:bg-slate-50/90 dark:hover:bg-slate-800/40 transition-colors cursor-pointer group"
+                      >
+                        {/* Model & Item Name */}
+                        <td className="py-3.5 px-5">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/60 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform text-slate-700 dark:text-slate-300">
+                              {pCatRel?.icon
+                                ? getCategoryIcon(pCatRel.icon, 'w-4 h-4')
+                                : getItemCategoryIcon(pCat, pName)}
+                            </div>
+                            <div>
+                              <div className="font-bold text-slate-900 dark:text-white text-sm leading-tight group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                                {pName}
+                              </div>
+                              <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                                {pCatRel?.name && (
+                                  <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                                    {pCatRel.name}
+                                  </span>
+                                )}
+                                <span>{variantSubtitle}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Serial / IMEI */}
+                        <td className="py-3.5 px-5 font-mono text-slate-800 dark:text-slate-200 font-medium">
+                          {unit.imei_or_serial || <span className="text-slate-400 font-sans italic">Not recorded</span>}
+                        </td>
+
+                        {/* Specs / Battery */}
+                        <td className="py-3.5 px-5">
+                          {isUnitPhone ? (
+                            <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-1">
+                                <Battery className="w-3.5 h-3.5 text-slate-400" />
+                                <span className="font-bold text-slate-900 dark:text-slate-100 font-mono">
+                                  {unit.battery_health ? `${unit.battery_health}%` : 'N/A'}
+                                </span>
+                              </div>
+                              {unit.sim_type && unit.sim_type !== 'na' && (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 uppercase font-mono">
+                                  {unit.sim_type}
                                 </span>
                               )}
-                              <span>{variantSubtitle}</span>
                             </div>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Serial / IMEI */}
-                      <td className="py-3.5 px-5 font-mono text-slate-800 dark:text-slate-200 font-medium">
-                        {unit.imei_or_serial || <span className="text-slate-400 dark:text-slate-500 font-sans italic">Not recorded</span>}
-                      </td>
-
-                      {/* Specs / Battery */}
-                      <td className="py-3.5 px-5">
-                        {isUnitPhone ? (
-                          <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-1">
-                              <Battery className="w-3.5 h-3.5 text-slate-400" />
-                              <span className="font-bold text-slate-900 dark:text-slate-100 font-mono">
-                                {unit.battery_health ? `${unit.battery_health}%` : 'N/A'}
-                              </span>
-                            </div>
-                            {unit.sim_type && unit.sim_type !== 'na' && (
-                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 uppercase font-mono">
-                                {unit.sim_type}
-                              </span>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-xs text-slate-600 dark:text-slate-300 font-medium">
-                            {specVals.length > 0 ? specVals.join(' • ') : unit.variant?.storage || 'Standard Specs'}
-                          </span>
-                        )}
-                      </td>
-
-                      {/* Condition */}
-                      <td className="py-3.5 px-5 capitalize text-slate-600 dark:text-slate-400 font-medium">
-                        {unit.condition.replace(/_/g, ' ')}
-                      </td>
-
-                      {/* Status & Location / Handover info */}
-                      <td className="py-3.5 px-5 text-center">
-                        {unit.status === 'in_stock' && (
-                          <div>
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-800/50">
-                              <CheckCircle2 className="w-3 h-3" />
-                              In Stock
+                          ) : (
+                            <span className="text-xs text-slate-600 dark:text-slate-300 font-medium">
+                              {specVals.length > 0 ? specVals.join(' • ') : unit.variant?.storage || 'Standard Specs'}
                             </span>
-                            <div className="text-[10px] text-slate-400 mt-0.5">{unit.location || 'Shop Counter'}</div>
-                          </div>
-                        )}
-
-                        {unit.status === 'out' && (
-                          <div>
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50 dark:border-amber-800/50">
-                              <Clock className="w-3 h-3" />
-                              Out for Sale
-                            </span>
-                            <div className="text-[10px] text-amber-700 dark:text-amber-400 font-medium mt-0.5 truncate max-w-[140px] mx-auto">
-                              With: {unit.handover_to || 'Staff'}
-                            </div>
-                          </div>
-                        )}
-
-                        {unit.status === 'sold' && (
-                          <div>
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/50 dark:border-purple-800/50">
-                              <CheckCircle2 className="w-3 h-3" />
-                              Sold
-                            </span>
-                            {unit.sold_at && (
-                              <div className="text-[10px] text-slate-400 mt-0.5">
-                                {new Date(unit.sold_at).toLocaleDateString()}
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {unit.status === 'returned' && (
-                          <div>
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border border-rose-200/50 dark:border-rose-800/50">
-                              <AlertCircle className="w-3 h-3" />
-                              Returned
-                            </span>
-                            {unit.return_reason && (
-                              <div className="text-[10px] text-rose-600 dark:text-rose-400 mt-0.5 truncate max-w-[140px] mx-auto" title={unit.return_reason}>
-                                {unit.return_reason}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Cost basis (owner only) */}
-                      {canViewCost && (
-                        <td className="py-3.5 px-5 text-right font-mono font-bold text-slate-900 dark:text-white text-sm">
-                          {unit.cost_basis ? `${Number(unit.cost_basis).toLocaleString()} ETB` : '—'}
+                          )}
                         </td>
-                      )}
 
-                      {/* Contextual Action Button (Strictly enforces business rules) */}
-                      <td className="py-3.5 px-5 text-right">
-                        {/* 1. IN STOCK -> Handover Out */}
-                        {unit.status === 'in_stock' && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setHandoverTargetUnit(unit);
-                              setHandoverTo('');
-                              setHandoverLocation('');
-                              setHandoverNotes('');
-                            }}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-amber-950/50 text-slate-700 dark:text-slate-300 hover:text-amber-700 dark:hover:text-amber-400 transition-colors shadow-2xs active:scale-95"
-                            title="Handover this device to a staff member or broker to sell"
-                          >
-                            <UserCheck className="w-3 h-3" />
-                            <span>Handover / Out</span>
-                          </button>
+                        {/* Condition */}
+                        <td className="py-3.5 px-5 capitalize text-slate-600 dark:text-slate-400 font-medium">
+                          {unit.condition.replace(/_/g, ' ')}
+                        </td>
+
+                        {/* Status & Location / Handover info */}
+                        <td className="py-3.5 px-5 text-center">
+                          {unit.status === 'in_stock' && (
+                            <div>
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-800/50">
+                                <CheckCircle2 className="w-3 h-3" />
+                                In Stock
+                              </span>
+                              <div className="text-[10px] text-slate-400 mt-0.5">{unit.location || 'Shop Counter'}</div>
+                            </div>
+                          )}
+
+                          {unit.status === 'out' && (
+                            <div>
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50 dark:border-amber-800/50">
+                                <Clock className="w-3 h-3" />
+                                Out for Sale
+                              </span>
+                              <div className="text-[10px] text-amber-700 dark:text-amber-400 font-medium mt-0.5 truncate max-w-[140px] mx-auto">
+                                With: {unit.handover_to || 'Staff'}
+                              </div>
+                            </div>
+                          )}
+
+                          {unit.status === 'sold' && (
+                            <div>
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/50 dark:border-purple-800/50">
+                                <CheckCircle2 className="w-3 h-3" />
+                                Sold
+                              </span>
+                              {unit.sold_at && (
+                                <div className="text-[10px] text-slate-400 mt-0.5">
+                                  {new Date(unit.sold_at).toLocaleDateString()}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {unit.status === 'returned' && (
+                            <div>
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border border-rose-200/50 dark:border-rose-800/50">
+                                <AlertCircle className="w-3 h-3" />
+                                Returned
+                              </span>
+                              {unit.return_reason && (
+                                <div className="text-[10px] text-rose-600 dark:text-rose-400 mt-0.5 truncate max-w-[140px] mx-auto" title={unit.return_reason}>
+                                  {unit.return_reason}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Cost basis (owner only) */}
+                        {canViewCost && (
+                          <td className="py-3.5 px-5 text-right font-mono font-bold text-slate-900 dark:text-white text-sm">
+                            {unit.cost_basis ? `${Number(unit.cost_basis).toLocaleString()} ETB` : '—'}
+                          </td>
                         )}
 
-                        {/* 2. OUT -> Restock Unsold to Shelf */}
-                        {unit.status === 'out' && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRestockOut(unit);
-                            }}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200/60 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 transition-colors shadow-2xs active:scale-95"
-                            title="Restock this unsold unit back to shop shelf"
-                          >
-                            <RotateCcw className="w-3 h-3" />
-                            <span>Restock to Shelf</span>
-                          </button>
-                        )}
+                        {/* Contextual Action Button */}
+                        <td className="py-3.5 px-5 text-right">
+                          {unit.status === 'in_stock' && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setHandoverTargetUnit(unit);
+                                setHandoverTo('');
+                                setHandoverLocation('');
+                                setHandoverNotes('');
+                              }}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-amber-950/50 text-slate-700 dark:text-slate-300 hover:text-amber-700 dark:hover:text-amber-400 transition-colors shadow-2xs active:scale-95"
+                              title="Handover this device to a staff member or broker to sell"
+                            >
+                              <UserCheck className="w-3 h-3" />
+                              <span>Handover / Out</span>
+                            </button>
+                          )}
 
-                        {/* 3. SOLD -> Customer Return (NO RESTOCK BUTTON!) */}
-                        {unit.status === 'sold' && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setReturnTargetUnit(unit);
-                              setReturnReason('');
-                              setReturnCondition('inspection_needed');
-                              setReturnNotes('');
-                            }}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-rose-50 dark:bg-rose-950/50 border border-rose-200/60 dark:border-rose-800/60 text-rose-700 dark:text-rose-400 hover:bg-rose-100 transition-colors shadow-2xs active:scale-95"
-                            title="Customer returned this sold device"
-                          >
-                            <Undo2 className="w-3 h-3" />
-                            <span>Customer Return</span>
-                          </button>
-                        )}
+                          {unit.status === 'out' && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRestockOut(unit);
+                              }}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200/60 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 transition-colors shadow-2xs active:scale-95"
+                              title="Restock this unsold unit back to shop shelf"
+                            >
+                              <RotateCcw className="w-3 h-3" />
+                              <span>Restock to Shelf</span>
+                            </button>
+                          )}
 
-                        {/* 4. RETURNED -> Repaired & Restock */}
-                        {unit.status === 'returned' && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setRepairedTargetUnit(unit);
-                              setRepairedCondition('refurbished');
-                              setRepairedNotes('');
-                            }}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-50 dark:bg-blue-950/50 border border-blue-200/60 dark:border-blue-800/60 text-blue-700 dark:text-blue-400 hover:bg-blue-100 transition-colors shadow-2xs active:scale-95"
-                            title="Device repaired and ready to place back in stock"
-                          >
-                            <Wrench className="w-3 h-3" />
-                            <span>Repaired & Restock</span>
-                          </button>
-                        )}
-                      </td>
+                          {unit.status === 'sold' && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setReturnTargetUnit(unit);
+                                setReturnReason('');
+                                setReturnCondition('inspection_needed');
+                                setReturnNotes('');
+                              }}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-rose-50 dark:bg-rose-950/50 border border-rose-200/60 dark:border-rose-800/60 text-rose-700 dark:text-rose-400 hover:bg-rose-100 transition-colors shadow-2xs active:scale-95"
+                              title="Customer returned this sold device"
+                            >
+                              <Undo2 className="w-3 h-3" />
+                              <span>Customer Return</span>
+                            </button>
+                          )}
 
-                      <td className="py-3.5 px-2 text-right">
-                        <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:text-slate-700 dark:group-hover:text-slate-300 group-hover:translate-x-0.5 transition-all" />
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                          {unit.status === 'returned' && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setRepairedTargetUnit(unit);
+                                setRepairedCondition('refurbished');
+                                setRepairedNotes('');
+                              }}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-50 dark:bg-blue-950/50 border border-blue-200/60 dark:border-blue-800/60 text-blue-700 dark:text-blue-400 hover:bg-blue-100 transition-colors shadow-2xs active:scale-95"
+                              title="Device repaired and ready to place back in stock"
+                            >
+                              <Wrench className="w-3 h-3" />
+                              <span>Repaired & Restock</span>
+                            </button>
+                          )}
+                        </td>
+
+                        <td className="py-3.5 px-3 text-right">
+                          <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:text-slate-700 dark:group-hover:text-slate-300 group-hover:translate-x-0.5 transition-all" />
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
 
@@ -965,15 +1466,21 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
         </div>
       )}
 
-      {/* Scalable Stock Intake Modal & Category Management (Owner Only) */}
+      {/* Scalable Stock Intake Modal, Category Management & Edit Product Modal (Owner Only) */}
       {isOwner && (
         <>
           <StockIntakeModal
             isOpen={showIntakeModal}
-            onClose={() => setShowIntakeModal(false)}
+            onClose={() => {
+              setShowIntakeModal(false);
+              setIntakeInitialProductId(undefined);
+              setIntakeInitialVariantId(undefined);
+            }}
             categories={categories}
             products={products}
             contacts={contacts}
+            initialProductId={intakeInitialProductId}
+            initialVariantId={intakeInitialVariantId}
             onIntakeSuccess={() => {
               loadInventory();
             }}
@@ -988,6 +1495,20 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
             onClose={() => setIsCategoryModalOpen(false)}
             categories={categories}
             onCategoriesChanged={() => {
+              loadInventory();
+            }}
+          />
+
+          <EditProductModal
+            isOpen={editingProduct !== null}
+            onClose={() => setEditingProduct(null)}
+            product={editingProduct}
+            categories={categories}
+            onProductUpdated={() => {
+              loadInventory();
+            }}
+            onProductDeleted={() => {
+              setEditingProduct(null);
               loadInventory();
             }}
           />

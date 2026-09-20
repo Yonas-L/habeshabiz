@@ -52,7 +52,11 @@ Route::prefix('v1')->group(function () {
         // Catalog & Products
         Route::get('/products', [ProductController::class, 'index']);
         Route::post('/products', [ProductController::class, 'store']);
+        Route::put('/products/{id}', [ProductController::class, 'update']);
+        Route::delete('/products/{id}', [ProductController::class, 'destroy']);
         Route::post('/products/{id}/variants', [ProductController::class, 'addVariant']);
+        Route::put('/variants/{id}', [ProductController::class, 'updateVariant']);
+        Route::delete('/variants/{id}', [ProductController::class, 'destroyVariant']);
 
         // Serialized & Quantity Inventory
         Route::get('/inventory/units', [InventoryController::class, 'units']);

@@ -19,6 +19,8 @@ interface StockIntakeModalProps {
   contacts: Contact[];
   onIntakeSuccess: () => void;
   onOpenCategoryManager?: () => void;
+  initialProductId?: string;
+  initialVariantId?: string;
 }
 
 export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
@@ -28,6 +30,9 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
   products,
   contacts,
   onIntakeSuccess,
+  onOpenCategoryManager,
+  initialProductId,
+  initialVariantId,
 }) => {
   // Category & Product Selection
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
@@ -57,12 +62,28 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
   const [notes, setNotes] = useState('');
   const [isSubmittingIntake, setIsSubmittingIntake] = useState(false);
 
-  // Initialize selected category
+  // Initialize selected category or preselected product
   useEffect(() => {
-    if (categories.length > 0 && !selectedCategoryId) {
+    if (isOpen && initialProductId) {
+      const prod = products.find((p) => p.id === initialProductId);
+      if (prod) {
+        setSelectedProductId(prod.id);
+        if (prod.category_id) {
+          setSelectedCategoryId(prod.category_id);
+        } else {
+          const matchCat = categories.find((c) => c.slug === prod.category);
+          if (matchCat) setSelectedCategoryId(matchCat.id);
+        }
+        if (initialVariantId && prod.variants.some((v) => v.id === initialVariantId)) {
+          setSelectedVariantId(initialVariantId);
+        } else if (prod.variants && prod.variants.length > 0) {
+          setSelectedVariantId(prod.variants[0].id);
+        }
+      }
+    } else if (categories.length > 0 && !selectedCategoryId) {
       setSelectedCategoryId(categories[0].id);
     }
-  }, [categories, selectedCategoryId]);
+  }, [isOpen, initialProductId, initialVariantId, products, categories, selectedCategoryId]);
 
   const activeCategory = useMemo(() => {
     return categories.find((c) => c.id === selectedCategoryId) || categories[0];
@@ -364,9 +385,20 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                 {/* Category Dropdown */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                      Category
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+                        Category
+                      </label>
+                      {onOpenCategoryManager && (
+                        <button
+                          type="button"
+                          onClick={onOpenCategoryManager}
+                          className="text-[10px] font-bold text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                        >
+                          Manage
+                        </button>
+                      )}
+                    </div>
                     <div className="relative">
                       <select
                         value={selectedCategoryId}

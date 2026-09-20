@@ -37,11 +37,175 @@ class ProductController extends Controller
             });
         }
 
+        if (! $request->boolean('include_inactive')) {
+            $query->where('is_active', true);
+        }
+
         $products = $query->orderBy('name')->get();
 
         return response()->json([
             'success' => true,
             'data' => $products,
+        ]);
+    }
+
+    public function update(Request $request, string $id): JsonResponse
+    {
+        /** @var \App\Models\User $user */
+        $user = $request->user();
+        if (! $user->isOwner()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. Product catalog editing is restricted to store owners.',
+            ], 403);
+        }
+
+        $product = Product::findOrFail($id);
+
+        $validated = $request->validate([
+            'name' => ['sometimes', 'required', 'string', 'max:255'],
+            'brand' => ['nullable', 'string', 'max:100'],
+            'category_id' => ['nullable', 'exists:categories,id'],
+            'category' => ['nullable', 'string', 'max:50'],
+            'has_serials' => ['nullable', 'boolean'],
+            'is_active' => ['nullable', 'boolean'],
+        ]);
+
+        if (! empty($validated['category_id'])) {
+            $cat = \App\Models\Category::find($validated['category_id']);
+            if ($cat) {
+                $validated['category'] = $cat->slug;
+            }
+        }
+
+        $product->update($validated);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Product '{$product->name}' updated successfully.",
+            'data' => $product->fresh(['categoryRel', 'variants.stock', 'variants.inventoryUnits' => fn ($q) => $q->where('status', 'in_stock')]),
+        ]);
+    }
+
+    public function destroy(Request $request, string $id): JsonResponse
+    {
+        /** @var \App\Models\User $user */
+        $user = $request->user();
+        if (! $user->isOwner()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. Product catalog deletion is restricted to store owners.',
+            ], 403);
+        }
+
+        $product = Product::with(['variants'])->findOrFail($id);
+        $variantIds = $product->variants->pluck('id')->toArray();
+
+        // Check for active units in stock or out
+        $activeUnitsCount = \App\Models\InventoryUnit::whereIn('variant_id', $variantIds)
+            ->whereIn('status', ['in_stock', 'out'])
+            ->count();
+
+        if ($activeUnitsCount > 0) {
+            return response()->json([
+                'success' => false,
+                'message' => "Cannot delete '{$product->name}' because it currently has {$activeUnitsCount} unit(s) in stock or out for sale. Transfer, sell, or mark them returned first.",
+            ], 422);
+        }
+
+        // Check for historical sales or units
+        $hasHistoricalSales = \App\Models\SalesOrderItem::whereIn('variant_id', $variantIds)->exists();
+        $hasHistoricalUnits = \App\Models\InventoryUnit::whereIn('variant_id', $variantIds)->exists();
+
+        if ($hasHistoricalSales || $hasHistoricalUnits) {
+            $product->update(['is_active' => false]);
+            return response()->json([
+                'success' => true,
+                'message' => "Product '{$product->name}' has historical sales records. It has been deactivated and archived from active stock.",
+                'deactivated' => true,
+            ]);
+        }
+
+        DB::transaction(function () use ($product) {
+            $product->variants()->delete();
+            $product->delete();
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => "Product '{$product->name}' and its variants were permanently deleted.",
+            'deleted' => true,
+        ]);
+    }
+
+    public function updateVariant(Request $request, string $id): JsonResponse
+    {
+        /** @var \App\Models\User $user */
+        $user = $request->user();
+        if (! $user->isOwner()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. Editing product variants is restricted to store owners.',
+            ], 403);
+        }
+
+        $variant = ProductVariant::findOrFail($id);
+
+        $validated = $request->validate([
+            'storage' => ['nullable', 'string', 'max:50'],
+            'ram' => ['nullable', 'string', 'max:50'],
+            'color' => ['nullable', 'string', 'max:50'],
+            'specs' => ['nullable', 'array'],
+            'sku' => ['nullable', 'string', 'max:100'],
+            'default_selling_price' => ['nullable', 'numeric', 'min:0'],
+        ]);
+
+        $variant->update($validated);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Variant updated successfully.",
+            'data' => $variant->fresh(['product']),
+        ]);
+    }
+
+    public function destroyVariant(Request $request, string $id): JsonResponse
+    {
+        /** @var \App\Models\User $user */
+        $user = $request->user();
+        if (! $user->isOwner()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. Deleting product variants is restricted to store owners.',
+            ], 403);
+        }
+
+        $variant = ProductVariant::findOrFail($id);
+
+        $activeUnits = \App\Models\InventoryUnit::where('variant_id', $variant->id)
+            ->whereIn('status', ['in_stock', 'out'])
+            ->count();
+
+        if ($activeUnits > 0) {
+            return response()->json([
+                'success' => false,
+                'message' => "Cannot delete variant because it has {$activeUnits} active unit(s) in inventory.",
+            ], 422);
+        }
+
+        $hasSales = \App\Models\SalesOrderItem::where('variant_id', $variant->id)->exists();
+        if ($hasSales) {
+            return response()->json([
+                'success' => false,
+                'message' => "Cannot delete variant with historical sales records.",
+            ], 422);
+        }
+
+        $variant->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => "Variant deleted successfully.",
         ]);
     }
 

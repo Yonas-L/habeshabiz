@@ -22,6 +22,7 @@ export interface ProductVariant {
   storage: string | null;
   ram: string | null;
   color: string | null;
+  sku?: string | null;
   default_selling_price: string | number | null;
   specs?: Record<string, any> | null;
   display_name?: string;
@@ -52,6 +53,7 @@ export interface Product {
   category_id?: string | null;
   category_rel?: ProductCategory | null;
   has_serials: boolean;
+  is_active?: boolean;
   variants: ProductVariant[];
 }
 
@@ -358,6 +360,48 @@ export const api = {
     request<ProductVariant>(`/products/${productId}/variants`, {
       method: 'POST',
       body: JSON.stringify(data),
+    }),
+
+  updateProduct: (
+    id: string,
+    data: {
+      name?: string;
+      brand?: string;
+      category_id?: string;
+      category?: string;
+      has_serials?: boolean;
+      is_active?: boolean;
+    }
+  ) =>
+    request<{ success: boolean; message: string; data: Product }>(`/products/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deleteProduct: (id: string) =>
+    request<{ success: boolean; message: string; deleted?: boolean; deactivated?: boolean }>(`/products/${id}`, {
+      method: 'DELETE',
+    }),
+
+  updateVariant: (
+    id: string,
+    data: {
+      storage?: string;
+      ram?: string;
+      color?: string;
+      specs?: Record<string, any>;
+      sku?: string;
+      default_selling_price?: number;
+    }
+  ) =>
+    request<{ success: boolean; message: string; data: ProductVariant }>(`/variants/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deleteVariant: (id: string) =>
+    request<{ success: boolean; message: string }>(`/variants/${id}`, {
+      method: 'DELETE',
     }),
 
   getInventoryUnits: (params?: { status?: string; category_id?: string; category?: string; search?: string }) => {

@@ -249,3 +249,169 @@ test('batch intake for non-serialized items creates quantity units and tracks st
     expect((float) $stock->average_cost)->toBe(300.0);
     expect((float) $variant->fresh()->default_selling_price)->toBe(850.0);
 });
+
+test('owner can update product name, brand, category, and is_active flag', function () {
+    $product = Product::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'iPhone 13 Standard',
+        'brand' => 'Apple',
+        'category' => 'smartphones',
+        'has_serials' => true,
+    ]);
+
+    $response = $this->actingAs($this->owner)->putJson("/api/v1/products/{$product->id}", [
+        'name' => 'iPhone 13 (A2633)',
+        'brand' => 'Apple Inc',
+    ]);
+
+    $response->assertStatus(200)
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.name', 'iPhone 13 (A2633)')
+        ->assertJsonPath('data.brand', 'Apple Inc');
+
+    expect($product->fresh()->name)->toBe('iPhone 13 (A2633)');
+});
+
+test('salesperson is forbidden from updating or deleting products (403)', function () {
+    $product = Product::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Galaxy S23',
+        'category' => 'smartphones',
+    ]);
+
+    $this->actingAs($this->seller)
+        ->putJson("/api/v1/products/{$product->id}", ['name' => 'Hacked S23'])
+        ->assertStatus(403);
+
+    $this->actingAs($this->seller)
+        ->deleteJson("/api/v1/products/{$product->id}")
+        ->assertStatus(403);
+});
+
+test('owner cannot delete product with active units in stock (422)', function () {
+    $product = Product::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'iPhone 14 Pro',
+        'category' => 'smartphones',
+        'has_serials' => true,
+    ]);
+
+    $variant = ProductVariant::create([
+        'tenant_id' => $this->tenant->id,
+        'product_id' => $product->id,
+        'storage' => '128GB',
+        'color' => 'Space Black',
+    ]);
+
+    InventoryUnit::create([
+        'tenant_id' => $this->tenant->id,
+        'variant_id' => $variant->id,
+        'imei_or_serial' => '358123456789012',
+        'condition' => 'new',
+        'cost_basis' => 95000.00,
+        'status' => 'in_stock',
+    ]);
+
+    $response = $this->actingAs($this->owner)->deleteJson("/api/v1/products/{$product->id}");
+
+    $response->assertStatus(422)
+        ->assertJsonPath('success', false);
+
+    expect(Product::find($product->id))->not->toBeNull();
+});
+
+test('owner deleting product with historical sales archives it instead of deleting', function () {
+    $product = Product::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'MacBook Pro M1 (Old Batch)',
+        'category' => 'laptops',
+        'has_serials' => true,
+        'is_active' => true,
+    ]);
+
+    $variant = ProductVariant::create([
+        'tenant_id' => $this->tenant->id,
+        'product_id' => $product->id,
+        'storage' => '512GB',
+        'ram' => '16GB',
+    ]);
+
+    // Create a historical sold unit
+    InventoryUnit::create([
+        'tenant_id' => $this->tenant->id,
+        'variant_id' => $variant->id,
+        'imei_or_serial' => 'C02D1234MD6R',
+        'condition' => 'new',
+        'cost_basis' => 110000.00,
+        'status' => 'sold',
+        'sold_at' => now()->subDays(5),
+    ]);
+
+    $response = $this->actingAs($this->owner)->deleteJson("/api/v1/products/{$product->id}");
+
+    $response->assertStatus(200)
+        ->assertJsonPath('deactivated', true);
+
+    $fresh = Product::find($product->id);
+    expect($fresh)->not->toBeNull();
+    expect($fresh->is_active)->toBeFalse();
+});
+
+test('owner can permanently delete an unused product with no stock and no history', function () {
+    $product = Product::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Accidental Product Entry',
+        'category' => 'gadgets',
+        'is_active' => true,
+    ]);
+
+    $variant = ProductVariant::create([
+        'tenant_id' => $this->tenant->id,
+        'product_id' => $product->id,
+        'storage' => 'N/A',
+    ]);
+
+    $response = $this->actingAs($this->owner)->deleteJson("/api/v1/products/{$product->id}");
+
+    $response->assertStatus(200)
+        ->assertJsonPath('deleted', true);
+
+    expect(Product::find($product->id))->toBeNull();
+    expect(ProductVariant::find($variant->id))->toBeNull();
+});
+
+test('owner can update and delete product variants', function () {
+    $product = Product::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'PlayStation 5 Slim',
+        'category' => 'consoles',
+    ]);
+
+    $variant = ProductVariant::create([
+        'tenant_id' => $this->tenant->id,
+        'product_id' => $product->id,
+        'storage' => '1TB',
+        'color' => 'White',
+        'default_selling_price' => 75000.00,
+    ]);
+
+    // Update variant
+    $updateRes = $this->actingAs($this->owner)->putJson("/api/v1/variants/{$variant->id}", [
+        'default_selling_price' => 79000.00,
+        'color' => 'Midnight Black',
+    ]);
+
+    $updateRes->assertStatus(200)
+        ->assertJsonPath('success', true);
+
+    expect((float) $variant->fresh()->default_selling_price)->toBe(79000.0);
+    expect($variant->fresh()->color)->toBe('Midnight Black');
+
+    // Delete unused variant
+    $deleteRes = $this->actingAs($this->owner)->deleteJson("/api/v1/variants/{$variant->id}");
+    $deleteRes->assertStatus(200)
+        ->assertJsonPath('success', true);
+
+    expect(ProductVariant::find($variant->id))->toBeNull();
+});
+
