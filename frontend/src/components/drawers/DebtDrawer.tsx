@@ -14,6 +14,7 @@ import {
   Clock,
   Send,
   History,
+  Trash2,
 } from 'lucide-react';
 
 interface DebtDrawerProps {
@@ -22,6 +23,7 @@ interface DebtDrawerProps {
   onClose: () => void;
   accounts: FinancialAccount[];
   onPaymentSettled?: () => void;
+  onDebtUpdated?: () => void;
 }
 
 export const DebtDrawer: React.FC<DebtDrawerProps> = ({
@@ -30,6 +32,7 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
   onClose,
   accounts,
   onPaymentSettled,
+  onDebtUpdated,
 }) => {
   const [showPayForm, setShowPayForm] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
@@ -37,6 +40,22 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
   const [referenceNumber, setReferenceNumber] = useState('');
   const [notes, setNotes] = useState('');
   const [settling, setSettling] = useState(false);
+  const [deletingDrawer, setDeletingDrawer] = useState(false);
+
+  const handleDrawerDelete = async () => {
+    if (!debt) return;
+    try {
+      setDeletingDrawer(true);
+      await api.deleteDebt(debt.id);
+      toast.success('Debt record deleted');
+      if (onDebtUpdated) onDebtUpdated();
+      onClose();
+    } catch (err: any) {
+      toast.error('Cannot delete', { description: err.message });
+    } finally {
+      setDeletingDrawer(false);
+    }
+  };
 
   // Initialize payment form when opened
   React.useEffect(() => {
@@ -121,6 +140,19 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
           >
             Close (Esc)
           </button>
+
+          {/* Delete — only for manual debts with no payments */}
+          {debt.reference_type === 'direct_credit' && paid === 0 && (
+            <button
+              type="button"
+              onClick={handleDrawerDelete}
+              disabled={deletingDrawer}
+              className="h-9 px-3 rounded-xl border border-rose-200 dark:border-rose-800/60 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors flex items-center gap-1.5 disabled:opacity-50"
+            >
+              {deletingDrawer ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+              <span>Delete</span>
+            </button>
+          )}
 
           {remaining > 0 && !showPayForm && (
             <button
@@ -299,9 +331,26 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
             </p>
           </div>
 
-          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-between text-[11px] text-slate-400">
-            <span>Reference Type: {debt.reference_type}</span>
-            <span>Date: {new Date(debt.created_at).toLocaleDateString()}</span>
+          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5 text-[11px] text-slate-400">
+            <div className="flex justify-between">
+              <span>Reference Type: {debt.reference_type}</span>
+              <span>Created: {new Date(debt.created_at).toLocaleDateString()}</span>
+            </div>
+            {debt.due_date && (
+              <div className="flex justify-between">
+                <span>Due Date:</span>
+                <span
+                  className={
+                    new Date(debt.due_date) < new Date()
+                      ? 'text-rose-600 dark:text-rose-400 font-bold'
+                      : 'text-slate-600 dark:text-slate-300 font-semibold'
+                  }
+                >
+                  {new Date(debt.due_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  {new Date(debt.due_date) < new Date() && ' (Overdue)'}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </ProgressiveSection>

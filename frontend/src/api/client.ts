@@ -136,6 +136,7 @@ export interface Debt {
   paid_amount: string | number;
   remaining_amount: string | number;
   status: 'open' | 'partially_paid' | 'settled' | 'disputed_loss';
+  due_date: string | null;
   notes: string | null;
   created_at: string;
   payments?: DebtPayment[];
@@ -508,6 +509,32 @@ export const api = {
     request<{ debt: Debt; payment: DebtPayment }>(`/debts/${debtId}/payments`, {
       method: 'POST',
       body: JSON.stringify(data),
+    }),
+
+  createDebt: (data: {
+    type: 'receivable' | 'payable';
+    contact_id?: string;
+    contact_name?: string;
+    contact_phone?: string;
+    amount: number;
+    due_date?: string;
+    notes?: string;
+    disburse_account_id?: string;
+  }) =>
+    request<Debt>('/debts', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateDebt: (id: string, data: { amount?: number; due_date?: string | null; notes?: string | null }) =>
+    request<Debt>(`/debts/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deleteDebt: (id: string) =>
+    request<{ message: string }>(`/debts/${id}`, {
+      method: 'DELETE',
     }),
 
   getAccounts: () =>

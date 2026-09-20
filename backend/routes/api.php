@@ -73,6 +73,9 @@ Route::prefix('v1')->group(function () {
 
         // Debts: Receivables & Payables Ledger
         Route::get('/debts', [DebtController::class, 'index']);
+        Route::post('/debts', [DebtController::class, 'store']);
+        Route::put('/debts/{id}', [DebtController::class, 'update']);
+        Route::delete('/debts/{id}', [DebtController::class, 'destroy']);
         Route::post('/debts/{id}/payments', [DebtController::class, 'settlePayment']);
 
         // Financial Treasury Accounts & Transfers
