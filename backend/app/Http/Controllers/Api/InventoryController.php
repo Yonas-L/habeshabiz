@@ -69,6 +69,15 @@ class InventoryController extends Controller
 
     public function intakeUnit(Request $request): JsonResponse
     {
+        /** @var User $user */
+        $user = $request->user();
+        if (! $user->isOwner()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. Stock intake is restricted to store owners/administrators.',
+            ], 403);
+        }
+
         $validated = $request->validate([
             'variant_id' => ['required', 'exists:product_variants,id'],
             'imei_or_serial' => ['nullable', 'string', 'max:100'],
@@ -89,6 +98,18 @@ class InventoryController extends Controller
         $unit = InventoryUnit::create(array_merge($validated, [
             'status' => 'in_stock',
         ]));
+
+        AuditLog::record(
+            action: 'stock_intake',
+            entityType: 'InventoryUnit',
+            entityId: (string) $unit->id,
+            newValues: [
+                'imei_or_serial' => $unit->imei_or_serial,
+                'cost_basis' => $unit->cost_basis,
+                'condition' => $unit->condition,
+                'location' => $unit->location,
+            ]
+        );
 
         return response()->json([
             'success' => true,

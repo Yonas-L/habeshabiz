@@ -37,6 +37,15 @@ class ProductController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        /** @var \App\Models\User $user */
+        $user = $request->user();
+        if (! $user->isOwner()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. Product catalog creation is restricted to store owners/administrators.',
+            ], 403);
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'brand' => ['nullable', 'string', 'max:100'],

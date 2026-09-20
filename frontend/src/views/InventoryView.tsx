@@ -179,8 +179,14 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
     }
   };
 
+  const isOwner = user?.role === 'owner';
+
   const handleIntakeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isOwner) {
+      toast.error('Unauthorized', { description: 'Stock intake is restricted to store owners/administrators.' });
+      return;
+    }
     if (!intakeVariantId || !intakeCost) return;
 
     try {
@@ -418,16 +424,18 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
             />
           </form>
 
-          <button
-            onClick={() => {
-              setShowIntakeModal(true);
-              setShowNewProductForm(false);
-            }}
-            className="h-10 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-sm flex items-center gap-2 shrink-0 active:scale-[0.98]"
-          >
-            <Plus className="w-4 h-4 text-emerald-400 dark:text-emerald-600" />
-            <span>Stock Intake</span>
-          </button>
+          {isOwner && (
+            <button
+              onClick={() => {
+                setShowIntakeModal(true);
+                setShowNewProductForm(false);
+              }}
+              className="h-10 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-sm flex items-center gap-2 shrink-0 active:scale-[0.98]"
+            >
+              <Plus className="w-4 h-4 text-emerald-400 dark:text-emerald-600" />
+              <span>Stock Intake</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -1005,7 +1013,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
       )}
 
       {/* Dynamic Intake Modal for Phones & All Electronics */}
-      {showIntakeModal && (
+      {showIntakeModal && isOwner && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
             className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs animate-backdrop-enter"

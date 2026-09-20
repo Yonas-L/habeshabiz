@@ -150,3 +150,45 @@ test('returned unit can be repaired and restocked back to shelf', function () {
     expect($fresh->status)->toBe('in_stock');
     expect($fresh->condition)->toBe('refurbished');
 });
+
+test('seller CANNOT intake stock into inventory (403 forbidden)', function () {
+    $seller = User::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Husa Salesperson',
+        'email' => 'husa.seller@example.com',
+        'password' => Hash::make('password123'),
+        'role' => 'salesperson',
+    ]);
+
+    $response = $this->actingAs($seller)
+        ->postJson('/api/v1/inventory/units', [
+            'variant_id' => $this->variant->id,
+            'imei_or_serial' => '359871109988999',
+            'battery_health' => 98,
+            'condition' => 'used',
+            'cost_basis' => 140000.00,
+        ]);
+
+    $response->assertStatus(403)
+        ->assertJsonPath('success', false)
+        ->assertJsonPath('message', 'Unauthorized. Stock intake is restricted to store owners/administrators.');
+});
+
+test('owner can intake stock and audit log is recorded', function () {
+    $response = $this->actingAs($this->user)
+        ->postJson('/api/v1/inventory/units', [
+            'variant_id' => $this->variant->id,
+            'imei_or_serial' => '359871109988999',
+            'battery_health' => 100,
+            'condition' => 'new',
+            'cost_basis' => 145000.00,
+            'location' => 'Shop Counter',
+        ]);
+
+    $response->assertStatus(201)
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.status', 'in_stock');
+
+    expect(\App\Models\AuditLog::where('action', 'stock_intake')->exists())->toBeTrue();
+});
+
