@@ -19,7 +19,6 @@ import {
   Receipt,
   User as UserIcon,
   Tag,
-  Percent,
   AlertTriangle,
   Zap,
   Plus,
@@ -66,9 +65,10 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
   const [vendorContactId, setVendorContactId] = useState<string>('');
   const [vendorCost, setVendorCost] = useState<string>('');
 
-  // Pricing & Payment
+  // Pricing & Discount
   const [unitSellingPrice, setUnitSellingPrice] = useState<string>('');
-  const [discountAmount, setDiscountAmount] = useState<string>('0');
+  const [discountType, setDiscountType] = useState<'percent' | 'fixed'>('percent');
+  const [discountValue, setDiscountValue] = useState<string>('');
   const [paidAmount, setPaidAmount] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<string>('telebirr');
   const [financialAccountId, setFinancialAccountId] = useState<string>('');
@@ -160,11 +160,21 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
       });
   }, [products, productSearch, availableUnits]);
 
-  // Pricing calculations
+  // Pricing & Discount calculations
   const unitPriceNum = parseFloat(unitSellingPrice) || 0;
   const grossSubtotal = unitPriceNum * quantity;
-  const discountNum = parseFloat(discountAmount) || 0;
-  const totalAfterDiscount = Math.max(0, grossSubtotal - discountNum);
+  const rawDiscountVal = parseFloat(discountValue) || 0;
+
+  const calculatedDiscountAmount = useMemo(() => {
+    if (rawDiscountVal <= 0 || grossSubtotal <= 0) return 0;
+    if (discountType === 'percent') {
+      const pct = Math.min(100, Math.max(0, rawDiscountVal));
+      return (grossSubtotal * pct) / 100;
+    }
+    return Math.min(grossSubtotal, Math.max(0, rawDiscountVal));
+  }, [discountType, rawDiscountVal, grossSubtotal]);
+
+  const totalAfterDiscount = Math.max(0, grossSubtotal - calculatedDiscountAmount);
   const paidNum = parseFloat(paidAmount) || 0;
   const balanceDue = Math.max(0, totalAfterDiscount - paidNum);
   const isCredit = balanceDue > 0;
@@ -186,6 +196,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
     setSelectedUnitIds([]);
     setQuantity(1);
     setUnitSellingPrice('');
+    setDiscountValue('');
     setPaidAmount('');
     setProductSearch('');
   };
@@ -212,8 +223,12 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
       const newQty = next.length > 0 ? next.length : 1;
       setQuantity(newQty);
       if (unitPriceNum > 0) {
-        const newTotal = unitPriceNum * newQty - discountNum;
-        setPaidAmount(String(Math.max(0, newTotal)));
+        const newGross = unitPriceNum * newQty;
+        const discountAmt = discountType === 'percent'
+          ? (newGross * Math.min(100, rawDiscountVal)) / 100
+          : Math.min(newGross, rawDiscountVal);
+        const newTotal = Math.max(0, newGross - discountAmt);
+        setPaidAmount(String(newTotal));
       }
       return next;
     });
@@ -234,16 +249,43 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
     const validQty = Math.max(1, newQty);
     setQuantity(validQty);
     if (unitPriceNum > 0) {
-      const newTotal = unitPriceNum * validQty - discountNum;
-      setPaidAmount(String(Math.max(0, newTotal)));
+      const newGross = unitPriceNum * validQty;
+      const discountAmt = discountType === 'percent'
+        ? (newGross * Math.min(100, rawDiscountVal)) / 100
+        : Math.min(newGross, rawDiscountVal);
+      const newTotal = Math.max(0, newGross - discountAmt);
+      setPaidAmount(String(newTotal));
     }
   };
 
   const handleUnitPriceChange = (val: string) => {
     setUnitSellingPrice(val);
     const p = parseFloat(val) || 0;
-    const newTotal = p * quantity - discountNum;
-    setPaidAmount(String(Math.max(0, newTotal)));
+    const newGross = p * quantity;
+    const discountAmt = discountType === 'percent'
+      ? (newGross * Math.min(100, rawDiscountVal)) / 100
+      : Math.min(newGross, rawDiscountVal);
+    const newTotal = Math.max(0, newGross - discountAmt);
+    setPaidAmount(String(newTotal));
+  };
+
+  const handleDiscountChange = (val: string, type: 'percent' | 'fixed') => {
+    let d = parseFloat(val) || 0;
+    if (d < 0) d = 0;
+    if (type === 'percent' && d > 100) {
+      d = 100;
+      toast.warning('Percentage discount cannot exceed 100%.');
+    } else if (type === 'fixed' && grossSubtotal > 0 && d > grossSubtotal) {
+      d = grossSubtotal;
+      toast.warning(`Fixed discount cannot exceed subtotal (${grossSubtotal.toLocaleString()} ETB).`);
+    }
+
+    setDiscountValue(val === '' ? '' : String(d));
+    const discountAmt = type === 'percent'
+      ? (grossSubtotal * Math.min(100, d)) / 100
+      : Math.min(grossSubtotal, d);
+    const newTotal = Math.max(0, grossSubtotal - discountAmt);
+    setPaidAmount(String(newTotal));
   };
 
   const resetForm = () => {
@@ -252,8 +294,8 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
     setSelectedUnitIds([]);
     setQuantity(1);
     setUnitSellingPrice('');
+    setDiscountValue('');
     setPaidAmount('');
-    setDiscountAmount('0');
     setVendorCost('');
     setVendorContactId('');
     setCustomerId('');
@@ -337,7 +379,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
 
       const salePayload = {
         customer_id: customerId || null,
-        discount_amount: discountNum,
+        discount_amount: calculatedDiscountAmount,
         paid_amount: paidNum,
         payment_method: paymentMethod,
         financial_account_id: paidNum > 0 ? financialAccountId : null,
@@ -391,7 +433,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
             <h2 className="font-black text-slate-900 dark:text-white text-base tracking-tight">Point of Sale</h2>
             <p className="text-[11px] text-slate-400 font-medium">
               {user && <span className="text-slate-600 dark:text-slate-300 font-bold">{user.name}</span>}
-              {user && ' — '}Quick sale entry with stock limit protection
+              {user && ' — '}Quick sale entry with percentage (%) and fixed discount modes
             </p>
           </div>
         </div>
@@ -790,8 +832,9 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                 </div>
               </div>
 
-              {/* ── Price Inputs ── */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {/* ── Price & Discount Inputs ── */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* 1. Unit Price */}
                 <div>
                   <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
                     <Tag className="w-3 h-3 inline mr-0.5" />
@@ -812,33 +855,72 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                     </span>
                   )}
                 </div>
+
+                {/* 2. Discount with % vs ETB Mode Switcher */}
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                    <Percent className="w-3 h-3 inline mr-0.5" />
-                    Discount (Total)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    max={grossSubtotal > 0 ? grossSubtotal : undefined}
-                    value={discountAmount}
-                    onChange={(e) => {
-                      let d = parseFloat(e.target.value) || 0;
-                      if (d < 0) d = 0;
-                      if (grossSubtotal > 0 && d > grossSubtotal) {
-                        d = grossSubtotal;
-                        toast.warning(`Discount cannot exceed the subtotal (${grossSubtotal.toLocaleString()} ETB).`);
-                      }
-                      setDiscountAmount(e.target.value === '' ? '' : String(d));
-                      const newTotal = grossSubtotal - d;
-                      setPaidAmount(String(Math.max(0, newTotal)));
-                    }}
-                    disabled={user ? !user.can_discount : false}
-                    placeholder="0"
-                    className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-sm font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 disabled:opacity-40"
-                  />
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Discount
+                    </label>
+                    <div className="inline-flex rounded-lg bg-slate-100 dark:bg-slate-800 p-0.5 text-[10px] font-bold">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDiscountType('percent');
+                          handleDiscountChange(discountValue, 'percent');
+                        }}
+                        className={`px-2 py-0.5 rounded-md transition-all ${
+                          discountType === 'percent'
+                            ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs'
+                            : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                        }`}
+                      >
+                        % Percent
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDiscountType('fixed');
+                          handleDiscountChange(discountValue, 'fixed');
+                        }}
+                        className={`px-2 py-0.5 rounded-md transition-all ${
+                          discountType === 'fixed'
+                            ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs'
+                            : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                        }`}
+                      >
+                        ETB Fixed
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step={discountType === 'percent' ? '1' : '0.01'}
+                      min="0"
+                      max={discountType === 'percent' ? 100 : (grossSubtotal > 0 ? grossSubtotal : undefined)}
+                      value={discountValue}
+                      onChange={(e) => handleDiscountChange(e.target.value, discountType)}
+                      disabled={user ? !user.can_discount : false}
+                      placeholder={discountType === 'percent' ? 'e.g. 20 (for 20%)' : 'e.g. 5000 (flat)'}
+                      className="w-full h-10 pl-3 pr-10 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-sm font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 disabled:opacity-40"
+                    />
+                    <div className="absolute right-3 top-2.5 text-xs font-mono font-bold text-slate-400 pointer-events-none">
+                      {discountType === 'percent' ? '%' : 'ETB'}
+                    </div>
+                  </div>
+
+                  {calculatedDiscountAmount > 0 && (
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-1 block font-mono font-bold">
+                      {discountType === 'percent'
+                        ? `= -${calculatedDiscountAmount.toLocaleString()} ETB off (${rawDiscountVal}% of ${grossSubtotal.toLocaleString()} ETB)`
+                        : `= -${calculatedDiscountAmount.toLocaleString()} ETB off (${((calculatedDiscountAmount / (grossSubtotal || 1)) * 100).toFixed(1)}%)`}
+                    </span>
+                  )}
                 </div>
+
+                {/* 3. Paid Now */}
                 <div>
                   <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
                     Paid Now (ETB)
@@ -852,6 +934,15 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                     className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-sm font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10"
                     required
                   />
+                  {totalAfterDiscount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setPaidAmount(String(totalAfterDiscount))}
+                      className="text-[10px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 mt-1 block font-medium underline"
+                    >
+                      Fill full net amount ({totalAfterDiscount.toLocaleString()} ETB)
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -1039,10 +1130,14 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                       </div>
                     )}
 
-                    {discountNum > 0 && (
+                    {calculatedDiscountAmount > 0 && (
                       <div className="flex justify-between text-rose-600 dark:text-rose-400">
-                        <span>Discount</span>
-                        <span className="font-mono font-bold">-{discountNum.toLocaleString()} ETB</span>
+                        <span>
+                          Discount {discountType === 'percent' ? `(${rawDiscountVal}%)` : '(Fixed)'}
+                        </span>
+                        <span className="font-mono font-bold">
+                          -{calculatedDiscountAmount.toLocaleString()} ETB
+                        </span>
                       </div>
                     )}
 
