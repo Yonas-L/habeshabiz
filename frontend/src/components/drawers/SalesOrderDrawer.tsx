@@ -45,11 +45,13 @@ export const SalesOrderDrawer: React.FC<SalesOrderDrawerProps> = ({
     (sum, i) => sum + parseFloat(String(i.profit || '0')),
     0
   );
-  const isPaid = order.payment_status === 'paid';
-  const remainingDebt = Math.max(
-    0,
-    parseFloat(String(order.total_amount)) - parseFloat(String(order.paid_amount))
-  );
+
+  const grossAmount = parseFloat(String(order.total_amount)) || 0;
+  const discountAmount = parseFloat(String(order.discount_amount || '0')) || 0;
+  const netPayable = Math.max(0, grossAmount - discountAmount);
+  const paidAmount = parseFloat(String(order.paid_amount)) || 0;
+  const remainingDebt = Math.max(0, netPayable - paidAmount);
+  const isPaid = order.payment_status === 'paid' || remainingDebt === 0;
 
   const handleCopyOrderNumber = () => {
     navigator.clipboard.writeText(order.order_number);
@@ -70,8 +72,8 @@ Customer: ${order.customer?.name || 'Walk-in Customer'}
 ----------------------
 ${itemsText}
 ----------------------
-Total: ${Number(order.total_amount).toLocaleString()} ETB
-Paid: ${Number(order.paid_amount).toLocaleString()} ETB
+Subtotal: ${grossAmount.toLocaleString()} ETB
+${discountAmount > 0 ? `Discount: -${discountAmount.toLocaleString()} ETB\nNet Total: ${netPayable.toLocaleString()} ETB\n` : ''}Paid: ${paidAmount.toLocaleString()} ETB
 ${remainingDebt > 0 ? `Remaining Due: ${remainingDebt.toLocaleString()} ETB\n` : ''}Payment Method: ${order.payment_method.toUpperCase()}
 Status: ${isPaid ? 'PAID IN FULL' : 'CREDIT / UNPAID'}
 Thank you for your business!`;
@@ -165,12 +167,17 @@ Thank you for your business!`;
       <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between">
         <div>
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-            Total Selling Value
+            {discountAmount > 0 ? 'Net Selling Total' : 'Total Selling Value'}
           </span>
           <div className="text-3xl font-black text-slate-900 dark:text-white font-mono tabular-nums tracking-tight mt-1">
-            <AnimatedNumber value={parseFloat(String(order.total_amount))} />{' '}
+            <AnimatedNumber value={netPayable} />{' '}
             <span className="text-sm font-bold text-slate-400 font-sans">ETB</span>
           </div>
+          {discountAmount > 0 && (
+            <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-1">
+              Subtotal: {grossAmount.toLocaleString()} ETB · Discount: -{discountAmount.toLocaleString()} ETB
+            </div>
+          )}
         </div>
 
         <div className="text-right">
@@ -282,12 +289,23 @@ Thank you for your business!`;
 
           <div className="p-3 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/70 dark:border-slate-800/90">
             <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 block">
-              Amount Paid Upfront
+              Amount Paid
             </span>
             <span className="font-bold font-mono text-slate-900 dark:text-white mt-0.5 block">
-              {Number(order.paid_amount).toLocaleString()} ETB
+              {paidAmount.toLocaleString()} ETB
             </span>
           </div>
+
+          {discountAmount > 0 && (
+            <div className="p-3 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-800/50 col-span-2 sm:col-span-1">
+              <span className="text-[10px] uppercase font-bold text-emerald-700 dark:text-emerald-400 block">
+                Discount Given
+              </span>
+              <span className="font-bold font-mono text-emerald-800 dark:text-emerald-300 mt-0.5 block">
+                -{discountAmount.toLocaleString()} ETB
+              </span>
+            </div>
+          )}
 
           <div className="p-3 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/70 dark:border-slate-800/90">
             <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 block">
@@ -349,13 +367,23 @@ Thank you for your business!`;
           </div>
 
           <div className="border-t border-dashed border-slate-200 dark:border-slate-700 pt-2 space-y-1 text-[11px]">
-            <div className="flex justify-between font-bold">
+            <div className="flex justify-between text-slate-500">
+              <span>SUBTOTAL</span>
+              <span>{grossAmount.toLocaleString()} ETB</span>
+            </div>
+            {discountAmount > 0 && (
+              <div className="flex justify-between text-rose-600 font-medium">
+                <span>DISCOUNT</span>
+                <span>-{discountAmount.toLocaleString()} ETB</span>
+              </div>
+            )}
+            <div className="flex justify-between font-bold text-slate-900 dark:text-white">
               <span>TOTAL</span>
-              <span>{Number(order.total_amount).toLocaleString()} ETB</span>
+              <span>{netPayable.toLocaleString()} ETB</span>
             </div>
             <div className="flex justify-between text-slate-500">
               <span>PAID</span>
-              <span>{Number(order.paid_amount).toLocaleString()} ETB</span>
+              <span>{paidAmount.toLocaleString()} ETB</span>
             </div>
             {remainingDebt > 0 && (
               <div className="flex justify-between text-rose-600 font-bold">

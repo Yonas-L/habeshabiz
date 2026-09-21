@@ -52,7 +52,11 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({ user }) => {
 
   const canViewCost = user?.can_view_costs ?? false;
 
-  const totalVolume = sales.reduce((sum, s) => sum + parseFloat(String(s.total_amount)), 0);
+  const totalVolume = sales.reduce((sum, s) => {
+    const gross = parseFloat(String(s.total_amount)) || 0;
+    const disc = parseFloat(String(s.discount_amount || '0')) || 0;
+    return sum + Math.max(0, gross - disc);
+  }, 0);
   const totalProfit = sales.reduce((sum, s) => {
     const orderProfit = s.items.reduce((pSum, i) => pSum + parseFloat(String(i.profit || '0')), 0);
     return sum + orderProfit;
@@ -332,7 +336,21 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({ user }) => {
                       </td>
 
                       <td className="py-3.5 px-5 text-right font-mono tabular-nums font-bold text-slate-900 dark:text-white text-sm">
-                        {Number(order.total_amount).toLocaleString()} ETB
+                        {(() => {
+                          const gross = Number(order.total_amount) || 0;
+                          const disc = Number(order.discount_amount) || 0;
+                          const net = Math.max(0, gross - disc);
+                          return (
+                            <div>
+                              <div>{net.toLocaleString()} ETB</div>
+                              {disc > 0 && (
+                                <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-sans font-medium">
+                                  -{disc.toLocaleString()} ETB discount
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       {canViewCost && (
