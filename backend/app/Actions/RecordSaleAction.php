@@ -108,7 +108,14 @@ class RecordSaleAction
                 } else {
                     // Internal Stock
                     if (! empty($itemData['inventory_unit_id'])) {
-                        $unit = InventoryUnit::findOrFail($itemData['inventory_unit_id']);
+                        $unit = InventoryUnit::where('id', $itemData['inventory_unit_id'])
+                            ->where('status', 'in_stock')
+                            ->first();
+
+                        if (! $unit) {
+                            throw new InvalidArgumentException("Selected inventory unit is not available in stock.");
+                        }
+
                         $unitCost = (float) $unit->cost_basis;
                         $unit->update([
                             'status' => 'sold',
@@ -119,6 +126,9 @@ class RecordSaleAction
                         $stock = InventoryStock::where('variant_id', $itemData['variant_id'])->first();
                         $unitCost = $stock ? (float) $stock->average_cost : 0.0;
                         if ($stock) {
+                            if ($stock->quantity_on_hand < $qty) {
+                                throw new InvalidArgumentException("Requested quantity ({$qty}) exceeds available stock ({$stock->quantity_on_hand}).");
+                            }
                             $stock->decrement('quantity_on_hand', $qty);
                         }
                     }

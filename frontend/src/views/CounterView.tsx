@@ -117,6 +117,25 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
   const selectedVariant = variants.find((v) => v.id === selectedVariantId);
   const unitsForVariant = availableUnits.filter((u) => u.variant_id === selectedVariantId);
 
+  // Calculate maximum available stock for internal inventory
+  const maxAvailableStock = useMemo(() => {
+    if (sourcingType === 'brokered_neighbour') {
+      return 9999; // Brokered items are sourced externally from peer merchant
+    }
+    if (!selectedVariant) return 0;
+
+    const inStockUnitsCount = unitsForVariant.length;
+    const quantityOnHand = selectedVariant.stock?.quantity_on_hand ?? 0;
+
+    // Serialized products: strictly the count of physical in-stock units
+    if (selectedProduct?.has_serials) {
+      return inStockUnitsCount;
+    }
+
+    // Non-serialized items: check quantity_on_hand or in-stock unit count
+    return Math.max(quantityOnHand, inStockUnitsCount);
+  }, [sourcingType, selectedVariant, selectedProduct, unitsForVariant]);
+
   const peerMerchants = contacts.filter((c) => c.roles.includes('peer_vendor') || c.roles.includes('supplier'));
   const customerList = contacts.filter((c) => c.roles.includes('customer') || c.roles.includes('debtor'));
   const treasuryAccounts = accounts.filter((a) => !a.is_custom_asset);
@@ -158,7 +177,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
   // Step progress
   const step1Done = !!selectedProductId;
   const step2Done = !!selectedVariantId;
-  const step3Done = unitPriceNum > 0 && quantity > 0;
+  const step3Done = unitPriceNum > 0 && quantity > 0 && (sourcingType === 'brokered_neighbour' || maxAvailableStock > 0);
   const currentStep = !step1Done ? 1 : !step2Done ? 2 : !step3Done ? 3 : 4;
 
   const handleSelectProduct = (productId: string) => {
@@ -184,7 +203,12 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
 
   const handleToggleUnit = (unitId: string) => {
     setSelectedUnitIds((prev) => {
-      const next = prev.includes(unitId) ? prev.filter((id) => id !== unitId) : [...prev, unitId];
+      const isRemoving = prev.includes(unitId);
+      if (!isRemoving && maxAvailableStock > 0 && prev.length >= maxAvailableStock) {
+        toast.warning(`All ${maxAvailableStock} available unit(s) are already selected.`);
+        return prev;
+      }
+      const next = isRemoving ? prev.filter((id) => id !== unitId) : [...prev, unitId];
       const newQty = next.length > 0 ? next.length : 1;
       setQuantity(newQty);
       if (unitPriceNum > 0) {
@@ -196,6 +220,17 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
   };
 
   const handleQuantityChange = (newQty: number) => {
+    if (sourcingType === 'internal_stock') {
+      if (maxAvailableStock <= 0) {
+        toast.error('Item is out of stock in shop inventory. Switch to "Brokered" to source from a peer.');
+        setQuantity(1);
+        return;
+      }
+      if (newQty > maxAvailableStock) {
+        toast.warning(`Cannot exceed available inventory (${maxAvailableStock} in stock).`);
+        newQty = maxAvailableStock;
+      }
+    }
     const validQty = Math.max(1, newQty);
     setQuantity(validQty);
     if (unitPriceNum > 0) {
@@ -238,6 +273,16 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
     if (quantity <= 0) {
       toast.error('Quantity must be at least 1');
       return;
+    }
+    if (sourcingType === 'internal_stock') {
+      if (maxAvailableStock <= 0) {
+        toast.error('Cannot record sale: Item is out of stock in shop inventory.');
+        return;
+      }
+      if (quantity > maxAvailableStock) {
+        toast.error(`Sale quantity (${quantity}) exceeds available stock (${maxAvailableStock}).`);
+        return;
+      }
     }
     if (sourcingType === 'brokered_neighbour') {
       if (!vendorContactId) {
@@ -346,7 +391,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
             <h2 className="font-black text-slate-900 dark:text-white text-base tracking-tight">Point of Sale</h2>
             <p className="text-[11px] text-slate-400 font-medium">
               {user && <span className="text-slate-600 dark:text-slate-300 font-bold">{user.name}</span>}
-              {user && ' — '}Quick sale entry with quantity &amp; serial tracking
+              {user && ' — '}Quick sale entry with stock limit protection
             </p>
           </div>
         </div>
@@ -503,6 +548,8 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                     {variants.map((v) => {
                       const isSelected = selectedVariantId === v.id;
                       const vUnits = availableUnits.filter((u) => u.variant_id === v.id);
+                      const vQtyOnHand = v.stock?.quantity_on_hand ?? 0;
+                      const vStock = selectedProduct.has_serials ? vUnits.length : Math.max(vQtyOnHand, vUnits.length);
                       return (
                         <button
                           key={v.id}
@@ -515,10 +562,10 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                         >
                           <span>{variantLabel(v)}</span>
                           {sourcingType === 'internal_stock' && (
-                            <span className={`ml-1.5 text-[10px] ${
-                              vUnits.length > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'
+                            <span className={`ml-1.5 text-[10px] font-bold ${
+                              vStock > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500 dark:text-rose-400'
                             }`}>
-                              ({vUnits.length})
+                              ({vStock > 0 ? `${vStock} in stock` : '0 in stock'})
                             </span>
                           )}
                         </button>
@@ -539,7 +586,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                 </span>
                 {selectedUnitIds.length > 0 && (
                   <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-                    {selectedUnitIds.length} unit(s) selected
+                    {selectedUnitIds.length} / {maxAvailableStock} unit(s) selected
                   </span>
                 )}
               </div>
@@ -547,7 +594,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
               {unitsForVariant.length === 0 ? (
                 <div className="p-4 rounded-xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-800/50 text-xs text-amber-700 dark:text-amber-400 flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 shrink-0" />
-                  <span>No physical units in stock for this variant. You can specify quantity directly below or toggle "Brokered" to source from a peer shop.</span>
+                  <span>Out of stock in shop inventory. You can switch to "Brokered" above to source from a peer merchant without inventory limit.</span>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -660,12 +707,25 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
               <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                      Quantity / Number of Units
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Quantity / Number of Units
+                      </span>
+                      {sourcingType === 'internal_stock' && (
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          maxAvailableStock > 0
+                            ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60'
+                            : 'bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-400 border border-rose-200/60 dark:border-rose-800/60'
+                        }`}>
+                          {maxAvailableStock > 0 ? `${maxAvailableStock} Available` : 'Out of Stock'}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">
                       {selectedUnitIds.length > 0
                         ? `${selectedUnitIds.length} specific serial unit(s) selected above`
+                        : sourcingType === 'internal_stock'
+                        ? `Max ${maxAvailableStock} unit(s) can be sold from inventory`
                         : 'Specify how many units to sell'}
                     </p>
                   </div>
@@ -676,7 +736,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                       <button
                         type="button"
                         onClick={() => handleQuantityChange(quantity - 1)}
-                        disabled={quantity <= 1}
+                        disabled={quantity <= 1 || (sourcingType === 'internal_stock' && maxAvailableStock <= 0)}
                         className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-30 transition-colors"
                       >
                         <Minus className="w-3.5 h-3.5" />
@@ -685,36 +745,46 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                       <input
                         type="number"
                         min="1"
+                        max={sourcingType === 'internal_stock' ? (maxAvailableStock > 0 ? maxAvailableStock : 1) : undefined}
                         value={quantity}
                         onChange={(e) => handleQuantityChange(parseInt(e.target.value) || 1)}
-                        className="w-12 text-center font-mono font-black text-sm text-slate-900 dark:text-white bg-transparent focus:outline-none"
+                        disabled={sourcingType === 'internal_stock' && maxAvailableStock <= 0}
+                        className="w-12 text-center font-mono font-black text-sm text-slate-900 dark:text-white bg-transparent focus:outline-none disabled:opacity-30"
                       />
 
                       <button
                         type="button"
                         onClick={() => handleQuantityChange(quantity + 1)}
-                        className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                        disabled={sourcingType === 'internal_stock' && quantity >= maxAvailableStock}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-30 transition-colors"
                       >
                         <Plus className="w-3.5 h-3.5" />
                       </button>
                     </div>
 
-                    {/* Quick Count Preset Chips */}
+                    {/* Quick Count Preset Chips (only enabled if <= maxAvailableStock) */}
                     <div className="hidden sm:flex items-center gap-1">
-                      {[1, 2, 3, 5, 10].map((count) => (
-                        <button
-                          key={count}
-                          type="button"
-                          onClick={() => handleQuantityChange(count)}
-                          className={`h-8 px-2 rounded-lg text-xs font-mono font-bold transition-all ${
-                            quantity === count
-                              ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-2xs'
-                              : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-400'
-                          }`}
-                        >
-                          {count}
-                        </button>
-                      ))}
+                      {[1, 2, 3, 5, 10].map((count) => {
+                        const isOverStock = sourcingType === 'internal_stock' && count > maxAvailableStock;
+                        return (
+                          <button
+                            key={count}
+                            type="button"
+                            onClick={() => handleQuantityChange(count)}
+                            disabled={isOverStock}
+                            title={isOverStock ? `Only ${maxAvailableStock} in stock` : undefined}
+                            className={`h-8 px-2 rounded-lg text-xs font-mono font-bold transition-all ${
+                              quantity === count
+                                ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-2xs'
+                                : isOverStock
+                                ? 'bg-slate-100 dark:bg-slate-900 text-slate-300 dark:text-slate-600 cursor-not-allowed opacity-40'
+                                : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-400'
+                            }`}
+                          >
+                            {count}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
@@ -936,6 +1006,14 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                     </div>
                   </div>
 
+                  {/* Out of Stock Warning Banner */}
+                  {sourcingType === 'internal_stock' && maxAvailableStock <= 0 && (
+                    <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 text-xs text-rose-700 dark:text-rose-300 flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 shrink-0" />
+                      <span>Item is out of stock in shop inventory. Switch to "Brokered" to source from a peer.</span>
+                    </div>
+                  )}
+
                   {/* Price Breakdown */}
                   <div className="space-y-2 text-xs">
                     <div className="flex justify-between text-slate-600 dark:text-slate-400">
@@ -1013,7 +1091,13 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
             <div className="p-4 border-t border-slate-100 dark:border-slate-800">
               <button
                 onClick={handleSubmitSale}
-                disabled={submitting || !selectedVariantId || unitPriceNum <= 0 || quantity <= 0}
+                disabled={
+                  submitting ||
+                  !selectedVariantId ||
+                  unitPriceNum <= 0 ||
+                  quantity <= 0 ||
+                  (sourcingType === 'internal_stock' && (maxAvailableStock <= 0 || quantity > maxAvailableStock))
+                }
                 className="w-full h-11 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 dark:disabled:bg-slate-800 text-white disabled:text-slate-400 text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2 active:scale-[0.98] disabled:cursor-not-allowed"
               >
                 {submitting ? (
@@ -1026,6 +1110,8 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                     ? 'Recording...'
                     : !selectedVariantId
                     ? 'Select a Product'
+                    : sourcingType === 'internal_stock' && maxAvailableStock <= 0
+                    ? 'Out of Stock in Inventory'
                     : unitPriceNum <= 0
                     ? 'Enter Unit Price'
                     : `Complete Sale (${quantity}x) — ${totalAfterDiscount.toLocaleString()} ETB`}
