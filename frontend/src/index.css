@@ -195,3 +195,54 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   animation: skeletonPulse 1.8s ease-in-out infinite;
 }
 
+/* Dedicated Print Stylesheet for Professional Invoices */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    overflow: visible !important;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  #printable-invoice,
+  #printable-invoice * {
+    visibility: visible;
+  }
+
+  #printable-invoice {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 28px !important;
+    border: none !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  /* Force optimal ink contrast and remove dark backgrounds in print */
+  #printable-invoice .text-white,
+  #printable-invoice [class*="dark:text-white"] {
+    color: #0f172a !important;
+  }
+
+  #printable-invoice [class*="dark:bg-"] {
+    background-color: transparent !important;
+  }
+
+  #printable-invoice [class*="dark:border-"] {
+    border-color: #e2e8f0 !important;
+  }
+}
+
