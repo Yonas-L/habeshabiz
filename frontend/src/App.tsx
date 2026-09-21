@@ -85,21 +85,26 @@ export default function App() {
     }
   }, []);
 
-  // Keyboard navigation shortcuts (⌘1 - ⌘7)
+  // Keyboard navigation shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey) {
         const key = e.key;
+        const isOwner = user?.role === 'owner';
         const tabMap: Record<string, NavTab> = {
           '1': 'overview',
           '2': 'counter',
           '3': 'inventory',
           '4': 'sales',
-          '5': 'partners',
-          '6': 'debts',
-          '7': 'treasury',
-          '8': 'expenses',
-          '9': 'staff',
+          ...(isOwner
+            ? {
+                '5': 'partners',
+                '6': 'debts',
+                '7': 'treasury',
+                '8': 'expenses',
+                '9': 'staff',
+              }
+            : {}),
         };
         if (tabMap[key]) {
           e.preventDefault();
@@ -110,7 +115,17 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [user]);
+
+  // Fallback to overview if active tab is restricted for non-owner role
+  useEffect(() => {
+    if (user && user.role !== 'owner') {
+      const ownerOnlyTabs: NavTab[] = ['partners', 'debts', 'treasury', 'expenses', 'staff'];
+      if (ownerOnlyTabs.includes(activeTab)) {
+        setActiveTab('overview');
+      }
+    }
+  }, [user, activeTab]);
 
   // Check existing session or perform initial login
   useEffect(() => {
@@ -390,15 +405,14 @@ export default function App() {
             <SalesHistoryView user={user} />
           )}
 
-          {activeTab === 'partners' && (
+          {/* Owner-only Tabs */}
+          {activeTab === 'partners' && user?.role === 'owner' && (
             <PartnersView
               user={user}
               onNavigateTab={setActiveTab}
               onRefreshContacts={refreshData}
             />
           )}
-
-          {/* Owner-only Tabs */}
           {activeTab === 'debts' && user?.role === 'owner' && (
             <DebtsView accounts={accounts} />
           )}

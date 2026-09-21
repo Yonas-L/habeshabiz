@@ -229,6 +229,15 @@ class InventoryController extends Controller
      */
     public function handoverUnit(Request $request, string $id): JsonResponse
     {
+        /** @var User $user */
+        $user = $request->user();
+        if (! $user->isOwner()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. Device handover and flow actions are restricted to store owners/administrators.',
+            ], 403);
+        }
+
         $unit = InventoryUnit::findOrFail($id);
 
         if ($unit->status !== 'in_stock') {
@@ -278,6 +287,15 @@ class InventoryController extends Controller
      */
     public function restockUnit(Request $request, string $id): JsonResponse
     {
+        /** @var User $user */
+        $user = $request->user();
+        if (! $user->isOwner()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. Restocking units is restricted to store owners/administrators.',
+            ], 403);
+        }
+
         $unit = InventoryUnit::findOrFail($id);
 
         if ($unit->status === 'sold') {
@@ -329,6 +347,15 @@ class InventoryController extends Controller
      */
     public function customerReturn(Request $request, string $id): JsonResponse
     {
+        /** @var User $user */
+        $user = $request->user();
+        if (! $user->isOwner()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. Processing customer returns is restricted to store owners/administrators.',
+            ], 403);
+        }
+
         $unit = InventoryUnit::findOrFail($id);
 
         if ($unit->status !== 'sold') {
@@ -377,6 +404,15 @@ class InventoryController extends Controller
      */
     public function repairAndRestock(Request $request, string $id): JsonResponse
     {
+        /** @var User $user */
+        $user = $request->user();
+        if (! $user->isOwner()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. Repair and restock is restricted to store owners/administrators.',
+            ], 403);
+        }
+
         $unit = InventoryUnit::findOrFail($id);
 
         if ($unit->status !== 'returned') {
@@ -423,6 +459,15 @@ class InventoryController extends Controller
      */
     public function returnToVendor(Request $request, string $id): JsonResponse
     {
+        /** @var User $user */
+        $user = $request->user();
+        if (! $user->isOwner()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. Returning units to vendor is restricted to store owners/administrators.',
+            ], 403);
+        }
+
         $unit = InventoryUnit::with(['variant.product', 'supplier'])->findOrFail($id);
 
         if ($unit->status === 'sold') {

@@ -192,3 +192,34 @@ test('owner can intake stock and audit log is recorded', function () {
     expect(\App\Models\AuditLog::where('action', 'stock_intake')->exists())->toBeTrue();
 });
 
+test('salesperson is forbidden from handover and stock flow actions (403)', function () {
+    $seller = User::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Husa Salesperson',
+        'email' => 'husa.flow@example.com',
+        'password' => Hash::make('password123'),
+        'role' => 'salesperson',
+    ]);
+
+    // Handover attempt
+    $this->actingAs($seller)
+        ->postJson("/api/v1/inventory/units/{$this->unit->id}/handover", [
+            'handover_to' => 'Another Staff',
+        ])
+        ->assertStatus(403)
+        ->assertJsonPath('success', false);
+
+    // Restock attempt
+    $this->actingAs($seller)
+        ->postJson("/api/v1/inventory/units/{$this->unit->id}/restock")
+        ->assertStatus(403)
+        ->assertJsonPath('success', false);
+
+    // Return to vendor attempt
+    $this->actingAs($seller)
+        ->postJson("/api/v1/inventory/units/{$this->unit->id}/return-to-vendor")
+        ->assertStatus(403)
+        ->assertJsonPath('success', false);
+});
+
+

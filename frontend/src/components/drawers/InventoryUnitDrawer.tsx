@@ -50,6 +50,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
   const [copiedImei, setCopiedImei] = useState(false);
   const [restocking, setRestocking] = useState(false);
   const canViewCost = user?.can_view_costs ?? false;
+  const isOwner = user?.role === 'owner';
 
   if (!unit) return null;
 
@@ -170,10 +171,10 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
           </button>
 
           <div className="flex items-center gap-2">
-            {/* IN STOCK: Handover or Sell */}
+            {/* IN STOCK: Handover (Owner Only) or Sell (Everyone) */}
             {isInStock && (
               <>
-                {onOpenHandover && (
+                {isOwner && onOpenHandover && (
                   <button
                     type="button"
                     onClick={() => {
@@ -203,8 +204,8 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
               </>
             )}
 
-            {/* OUT FOR SALE: Restock to Shelf (Unsold) */}
-            {isOut && (
+            {/* OUT FOR SALE: Restock to Shelf (Owner Only) */}
+            {isOut && isOwner && (
               <button
                 type="button"
                 disabled={restocking}
@@ -216,8 +217,8 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
               </button>
             )}
 
-            {/* SOLD: Customer Return ONLY (Never Restock Directly) */}
-            {isSold && onOpenCustomerReturn && (
+            {/* SOLD: Customer Return ONLY (Owner Only) */}
+            {isSold && isOwner && onOpenCustomerReturn && (
               <button
                 type="button"
                 onClick={() => {
@@ -231,8 +232,8 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
               </button>
             )}
 
-            {/* RETURNED: Repaired & Restock */}
-            {isReturned && onOpenRepairedRestock && (
+            {/* RETURNED: Repaired & Restock (Owner Only) */}
+            {isReturned && isOwner && onOpenRepairedRestock && (
               <button
                 type="button"
                 onClick={() => {

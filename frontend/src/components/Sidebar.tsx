@@ -65,9 +65,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'counter', label: 'Sales', icon: ShoppingCart, shortcut: '⌘2' },
     { id: 'inventory', label: 'Inventory', icon: Smartphone, shortcut: '⌘3' },
     { id: 'sales', label: 'Sales History', icon: Receipt, shortcut: '⌘4' },
-    { id: 'partners', label: 'Partners & Brokers', icon: Handshake, shortcut: '⌘5' },
     ...(isOwner
-      ? [{ id: 'staff' as NavTab, label: 'Staff & Team', icon: Users, shortcut: '⌘9' }]
+      ? [
+          { id: 'partners' as NavTab, label: 'Partners & Brokers', icon: Handshake, shortcut: '⌘5' },
+          { id: 'staff' as NavTab, label: 'Staff & Team', icon: Users, shortcut: '⌘9' },
+        ]
       : []),
   ];
 
