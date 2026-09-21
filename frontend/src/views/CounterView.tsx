@@ -115,7 +115,12 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
   const selectedProduct = products.find((p) => p.id === selectedProductId);
   const variants = selectedProduct?.variants || [];
   const selectedVariant = variants.find((v) => v.id === selectedVariantId);
-  const unitsForVariant = availableUnits.filter((u) => u.variant_id === selectedVariantId);
+  const unitsForVariant = useMemo(() => {
+    if (!selectedVariantId) return [];
+    const fromAvailable = availableUnits.filter((u) => u.variant_id === selectedVariantId);
+    if (fromAvailable.length > 0) return fromAvailable;
+    return (selectedVariant?.inventory_units || []).filter((u) => u.status === 'in_stock');
+  }, [availableUnits, selectedVariantId, selectedVariant]);
 
   // Calculate maximum available stock for internal inventory
   const maxAvailableStock = useMemo(() => {
@@ -153,7 +158,9 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
       })
       .map((p) => {
         const variantIds = p.variants.map((v) => v.id);
-        const stockCount = availableUnits.filter((u) => variantIds.includes(u.variant_id)).length;
+        const serialUnitsCount = availableUnits.filter((u) => variantIds.includes(u.variant_id)).length;
+        const nonSerialCount = p.variants.reduce((sum, v) => sum + (v.stock?.quantity_on_hand ?? 0), 0);
+        const stockCount = p.has_serials ? serialUnitsCount : Math.max(serialUnitsCount, nonSerialCount);
         return { ...p, stockCount };
       });
   }, [products, productSearch, availableUnits]);
@@ -194,12 +201,26 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
 
   const handleSelectProduct = (productId: string) => {
     setSelectedProductId(productId);
-    setSelectedVariantId('');
-    setSelectedUnitIds([]);
-    setQuantity(1);
-    setUnitSellingPrice('');
-    setDiscountValue('');
-    setPaidAmount('');
+    const prod = products.find((p) => p.id === productId);
+    const vList = prod?.variants || [];
+
+    // Auto-select the first in-stock variant, or the first variant if available
+    const preferredVariant = vList.find((v) => {
+      const uCount = availableUnits.filter((u) => u.variant_id === v.id).length || (v.inventory_units || []).filter((u) => u.status === 'in_stock').length;
+      const qOnHand = v.stock?.quantity_on_hand ?? 0;
+      return prod?.has_serials ? uCount > 0 : Math.max(uCount, qOnHand) > 0;
+    }) || (vList.length > 0 ? vList[0] : undefined);
+
+    if (preferredVariant) {
+      handleSelectVariant(preferredVariant);
+    } else {
+      setSelectedVariantId('');
+      setSelectedUnitIds([]);
+      setQuantity(1);
+      setUnitSellingPrice('');
+      setDiscountValue('');
+      setPaidAmount('');
+    }
     setProductSearch('');
   };
 
@@ -1098,7 +1119,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                   </div>
 
                   {/* Out of Stock Warning Banner */}
-                  {sourcingType === 'internal_stock' && maxAvailableStock <= 0 && (
+                  {selectedVariant && sourcingType === 'internal_stock' && maxAvailableStock <= 0 && (
                     <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 text-xs text-rose-700 dark:text-rose-300 flex items-center gap-2">
                       <AlertTriangle className="w-4 h-4 shrink-0" />
                       <span>Item is out of stock in shop inventory.</span>
@@ -1203,12 +1224,12 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                     ? 'Select Product'
                     : !selectedVariantId
                     ? 'Select Variant'
+                    : sourcingType === 'internal_stock' && maxAvailableStock <= 0
+                    ? 'Out of Stock'
                     : isSerialRequired && !hasSelectedSerials
                     ? 'Select IMEI / Serial Unit'
                     : isSerialRequired && selectedUnitIds.length < quantity
                     ? `Select ${quantity - selectedUnitIds.length} More Serial(s)`
-                    : sourcingType === 'internal_stock' && maxAvailableStock <= 0
-                    ? 'Out of Stock'
                     : unitPriceNum <= 0
                     ? 'Enter Unit Price'
                     : sourcingType === 'brokered_neighbour' && (!vendorContactId || vendorCostNum <= 0)
