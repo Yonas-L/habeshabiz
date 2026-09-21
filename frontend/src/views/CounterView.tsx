@@ -182,9 +182,13 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
     ? (unitPriceNum - vendorCostNum) * quantity
     : null;
 
+  const isSerialRequired = !!selectedProduct?.has_serials && sourcingType === 'internal_stock';
+  const hasSelectedSerials = selectedUnitIds.length > 0;
+  const isSerialComplete = !isSerialRequired || (hasSelectedSerials && selectedUnitIds.length === quantity);
+
   // Step progress
   const step1Done = !!selectedProductId;
-  const step2Done = !!selectedVariantId;
+  const step2Done = !!selectedVariantId && (!isSerialRequired || isSerialComplete);
   const step3Done = unitPriceNum > 0 && quantity > 0 && (sourcingType === 'brokered_neighbour' || maxAvailableStock > 0);
   const currentStep = !step1Done ? 1 : !step2Done ? 2 : !step3Done ? 3 : 4;
 
@@ -302,8 +306,20 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
   };
 
   const handleSubmitSale = async () => {
+    if (!selectedProductId) {
+      toast.error('Please select a product');
+      return;
+    }
     if (!selectedVariantId) {
-      toast.error('Please select a product and variant');
+      toast.error('Please select a product variant');
+      return;
+    }
+    if (isSerialRequired && !isSerialComplete) {
+      toast.error(
+        selectedUnitIds.length === 0
+          ? 'Please select the IMEI / serial unit before completing the sale.'
+          : `Please select all ${quantity} serial unit(s) before completing the sale.`
+      );
       return;
     }
     if (unitPriceNum <= 0) {
@@ -1165,10 +1181,13 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                 onClick={handleSubmitSale}
                 disabled={
                   submitting ||
+                  !selectedProductId ||
                   !selectedVariantId ||
+                  !isSerialComplete ||
                   unitPriceNum <= 0 ||
                   quantity <= 0 ||
-                  (sourcingType === 'internal_stock' && (maxAvailableStock <= 0 || quantity > maxAvailableStock))
+                  (sourcingType === 'internal_stock' && (maxAvailableStock <= 0 || quantity > maxAvailableStock)) ||
+                  (sourcingType === 'brokered_neighbour' && (!vendorContactId || vendorCostNum <= 0))
                 }
                 className="w-full h-11 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 dark:disabled:bg-slate-800 text-white disabled:text-slate-400 text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2 active:scale-[0.98] disabled:cursor-not-allowed"
               >
@@ -1180,12 +1199,20 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                 <span>
                   {submitting
                     ? 'Processing...'
-                    : !selectedVariantId
+                    : !selectedProductId
                     ? 'Select Product'
+                    : !selectedVariantId
+                    ? 'Select Variant'
+                    : isSerialRequired && !hasSelectedSerials
+                    ? 'Select IMEI / Serial Unit'
+                    : isSerialRequired && selectedUnitIds.length < quantity
+                    ? `Select ${quantity - selectedUnitIds.length} More Serial(s)`
                     : sourcingType === 'internal_stock' && maxAvailableStock <= 0
                     ? 'Out of Stock'
                     : unitPriceNum <= 0
                     ? 'Enter Unit Price'
+                    : sourcingType === 'brokered_neighbour' && (!vendorContactId || vendorCostNum <= 0)
+                    ? 'Enter Brokered Details'
                     : `Complete Sale (${quantity}x) — ${totalAfterDiscount.toLocaleString()} ETB`}
                 </span>
               </button>
