@@ -121,15 +121,49 @@ class RecordSaleAction
                             'status' => 'sold',
                             'sold_at' => now(),
                         ]);
-                    } else {
-                        // Quantity stock
+
+                        // Keep aggregated stock in sync
                         $stock = InventoryStock::where('variant_id', $itemData['variant_id'])->first();
-                        $unitCost = $stock ? (float) $stock->average_cost : 0.0;
+                        if ($stock && $stock->quantity_on_hand > 0) {
+                            $stock->decrement('quantity_on_hand', 1);
+                        }
+                    } else {
+                        // Quantity stock (non-serialized or bulk units)
+                        $stock = InventoryStock::where('variant_id', $itemData['variant_id'])->first();
+                        $inStockUnits = InventoryUnit::where('variant_id', $itemData['variant_id'])
+                            ->where('status', 'in_stock')
+                            ->orderBy('created_at')
+                            ->get();
+
+                        $availableCount = max($stock?->quantity_on_hand ?? 0, $inStockUnits->count());
+                        if ($availableCount < $qty) {
+                            throw new InvalidArgumentException("Requested quantity ({$qty}) exceeds available stock ({$availableCount}).");
+                        }
+
+                        // Determine unit cost
+                        if ($stock && (float) $stock->average_cost > 0) {
+                            $unitCost = (float) $stock->average_cost;
+                        } elseif ($inStockUnits->isNotEmpty()) {
+                            $unitCost = (float) $inStockUnits->avg('cost_basis');
+                        } else {
+                            $unitCost = 0.0;
+                        }
+
+                        // Decrement InventoryStock
                         if ($stock) {
-                            if ($stock->quantity_on_hand < $qty) {
-                                throw new InvalidArgumentException("Requested quantity ({$qty}) exceeds available stock ({$stock->quantity_on_hand}).");
+                            $newQty = max(0, $stock->quantity_on_hand - $qty);
+                            $stock->update(['quantity_on_hand' => $newQty]);
+                        }
+
+                        // Also mark matching InventoryUnit records as sold if any exist
+                        if ($inStockUnits->isNotEmpty()) {
+                            $unitsToMarkSold = $inStockUnits->take($qty);
+                            foreach ($unitsToMarkSold as $u) {
+                                $u->update([
+                                    'status' => 'sold',
+                                    'sold_at' => now(),
+                                ]);
                             }
-                            $stock->decrement('quantity_on_hand', $qty);
                         }
                     }
                 }

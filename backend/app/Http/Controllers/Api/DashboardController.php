@@ -19,7 +19,10 @@ class DashboardController extends Controller
     {
         // 1. Inventory Valuation
         $serializedStockValue = (float) InventoryUnit::where('status', 'in_stock')->sum('cost_basis');
-        $quantityStockValue = (float) InventoryStock::all()->sum(fn ($s) => $s->quantity_on_hand * (float) $s->average_cost);
+        $quantityStockValue = (float) InventoryStock::whereHas('variant.product', fn ($q) => $q->where('has_serials', false))
+            ->whereDoesntHave('variant.inventoryUnits', fn ($q) => $q->where('status', 'in_stock'))
+            ->get()
+            ->sum(fn ($s) => $s->quantity_on_hand * (float) $s->average_cost);
         $totalStockValue = $serializedStockValue + $quantityStockValue;
 
         // 2. Debts: Receivables vs Payables

@@ -50,12 +50,17 @@ class InventoryController extends Controller
         $units = $query->latest()->get();
 
         // Calculate tab counts
+        $serializedInStock = InventoryUnit::where('status', 'in_stock')->count();
+        $nonSerializedInStock = (int) InventoryStock::whereHas('variant.product', fn ($q) => $q->where('has_serials', false))
+            ->whereDoesntHave('variant.inventoryUnits', fn ($q) => $q->where('status', 'in_stock'))
+            ->sum('quantity_on_hand');
+
         $counts = [
-            'in_stock' => InventoryUnit::where('status', 'in_stock')->count(),
+            'in_stock' => $serializedInStock + $nonSerializedInStock,
             'out' => InventoryUnit::where('status', 'out')->count(),
             'sold' => InventoryUnit::where('status', 'sold')->count(),
             'returned' => InventoryUnit::where('status', 'returned')->count(),
-            'all' => InventoryUnit::count(),
+            'all' => InventoryUnit::count() + $nonSerializedInStock,
         ];
 
         // Check if user is allowed to view cost basis

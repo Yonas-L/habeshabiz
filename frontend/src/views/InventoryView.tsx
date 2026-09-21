@@ -180,15 +180,22 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
 
       const variantBreakdowns = (prod.variants || []).map((variant) => {
         const vUnits = prodUnits.filter((u) => u.variant_id === variant.id);
+        const qtyOnHand = variant.stock?.quantity_on_hand ?? 0;
+        const count = prod.has_serials ? vUnits.length : (vUnits.length > 0 ? vUnits.length : qtyOnHand);
+        const costBasis = vUnits.length > 0
+          ? vUnits.reduce((sum, u) => sum + (Number(u.cost_basis) || 0), 0)
+          : qtyOnHand * (Number(variant.stock?.average_cost) || 0);
+
         return {
           variant,
           units: vUnits,
-          count: vUnits.length,
+          count,
+          costBasis,
         };
       });
 
-      const totalInStock = prodUnits.length;
-      const totalCost = prodUnits.reduce((sum, u) => sum + (Number(u.cost_basis) || 0), 0);
+      const totalInStock = variantBreakdowns.reduce((sum, vb) => sum + vb.count, 0);
+      const totalCost = variantBreakdowns.reduce((sum, vb) => sum + vb.costBasis, 0);
 
       const prices = (prod.variants || [])
         .map((v) => Number(v.default_selling_price))
