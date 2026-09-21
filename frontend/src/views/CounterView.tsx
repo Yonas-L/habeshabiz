@@ -1,8 +1,28 @@
-import React, { useState, useEffect } from 'react';
-import type { Product, InventoryUnit, Contact, FinancialAccount, User } from '../api/client';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import type { Product, ProductVariant, InventoryUnit, Contact, FinancialAccount, User } from '../api/client';
 import { api } from '../api/client';
 import { toast } from 'sonner';
-import { ShoppingBag, ArrowRightLeft, Loader2 } from 'lucide-react';
+import {
+  ShoppingBag,
+  ArrowRightLeft,
+  Loader2,
+  Search,
+  X,
+  Check,
+  ChevronRight,
+  Package,
+  Smartphone,
+  Battery,
+  CreditCard,
+  Wallet,
+  Banknote,
+  Receipt,
+  User as UserIcon,
+  Tag,
+  Percent,
+  AlertTriangle,
+  Zap,
+} from 'lucide-react';
 
 interface CounterViewProps {
   user: User | null;
@@ -10,6 +30,22 @@ interface CounterViewProps {
   contacts: Contact[];
   onSaleSuccess: () => void;
 }
+
+/* ─── Step Indicator ─── */
+const StepBadge: React.FC<{ num: number; label: string; active: boolean; done: boolean }> = ({
+  num, label, active, done,
+}) => (
+  <div className={`flex items-center gap-2 ${active ? '' : 'opacity-40'}`}>
+    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black transition-all ${
+      done ? 'bg-emerald-500 text-white' : active ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
+    }`}>
+      {done ? <Check className="w-3 h-3" /> : num}
+    </div>
+    <span className={`text-[11px] font-bold hidden sm:inline ${active ? 'text-slate-900 dark:text-white' : 'text-slate-400'}`}>
+      {label}
+    </span>
+  </div>
+);
 
 export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contacts, onSaleSuccess }) => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -21,6 +57,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
   const [selectedProductId, setSelectedProductId] = useState<string>('');
   const [selectedVariantId, setSelectedVariantId] = useState<string>('');
   const [selectedUnitId, setSelectedUnitId] = useState<string>('');
+  const [productSearch, setProductSearch] = useState('');
 
   // Brokered details
   const [vendorContactId, setVendorContactId] = useState<string>('');
@@ -36,10 +73,18 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
   const [notes, setNotes] = useState<string>('');
 
   const [submitting, setSubmitting] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadData();
   }, []);
+
+  // Auto-focus search on mount
+  useEffect(() => {
+    if (!loading && searchRef.current) {
+      searchRef.current.focus();
+    }
+  }, [loading]);
 
   const loadData = async () => {
     try {
@@ -63,51 +108,109 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
     }
   };
 
+  // ─── Derived State ───
   const selectedProduct = products.find((p) => p.id === selectedProductId);
   const variants = selectedProduct?.variants || [];
+  const selectedVariant = variants.find((v) => v.id === selectedVariantId);
   const unitsForVariant = availableUnits.filter((u) => u.variant_id === selectedVariantId);
 
-  const handleVariantChange = (variantId: string) => {
-    setSelectedVariantId(variantId);
+  const peerMerchants = contacts.filter((c) => c.roles.includes('peer_vendor') || c.roles.includes('supplier'));
+  const customerList = contacts.filter((c) => c.roles.includes('customer') || c.roles.includes('debtor'));
+  const treasuryAccounts = accounts.filter((a) => !a.is_custom_asset);
+
+  // Products filtered by search, with in-stock count
+  const filteredProducts = useMemo(() => {
+    const q = productSearch.toLowerCase().trim();
+    return products
+      .filter((p) => {
+        if (!q) return true;
+        const cat = p.category_rel?.name || p.category || '';
+        return (
+          p.name.toLowerCase().includes(q) ||
+          (p.brand || '').toLowerCase().includes(q) ||
+          cat.toLowerCase().includes(q)
+        );
+      })
+      .map((p) => {
+        const variantIds = p.variants.map((v) => v.id);
+        const stockCount = availableUnits.filter((u) => variantIds.includes(u.variant_id)).length;
+        return { ...p, stockCount };
+      });
+  }, [products, productSearch, availableUnits]);
+
+  // Pricing calculations
+  const priceNum = parseFloat(sellingPrice) || 0;
+  const discountNum = parseFloat(discountAmount) || 0;
+  const paidNum = parseFloat(paidAmount) || 0;
+  const totalAfterDiscount = Math.max(0, priceNum - discountNum);
+  const balanceDue = Math.max(0, totalAfterDiscount - paidNum);
+  const isCredit = balanceDue > 0;
+  const brokeredProfit = sourcingType === 'brokered_neighbour' && sellingPrice && vendorCost
+    ? priceNum - parseFloat(vendorCost)
+    : null;
+
+  // Step progress
+  const step1Done = !!selectedProductId;
+  const step2Done = !!selectedVariantId;
+  const step3Done = !!sellingPrice && priceNum > 0;
+  const currentStep = !step1Done ? 1 : !step2Done ? 2 : !step3Done ? 3 : 4;
+
+  const handleSelectProduct = (productId: string) => {
+    setSelectedProductId(productId);
+    setSelectedVariantId('');
     setSelectedUnitId('');
-    const v = variants.find((item) => item.id === variantId);
-    if (v?.default_selling_price) {
-      const priceStr = String(v.default_selling_price);
+    setSellingPrice('');
+    setPaidAmount('');
+    setProductSearch('');
+  };
+
+  const handleSelectVariant = (variant: ProductVariant) => {
+    setSelectedVariantId(variant.id);
+    setSelectedUnitId('');
+    if (variant.default_selling_price) {
+      const priceStr = String(variant.default_selling_price);
       setSellingPrice(priceStr);
       setPaidAmount(priceStr);
     }
   };
 
-  const handleSubmitSale = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const resetForm = () => {
+    setSelectedProductId('');
+    setSelectedVariantId('');
+    setSelectedUnitId('');
+    setSellingPrice('');
+    setPaidAmount('');
+    setDiscountAmount('0');
+    setVendorCost('');
+    setVendorContactId('');
+    setCustomerId('');
+    setNotes('');
+    setProductSearch('');
+  };
+
+  const handleSubmitSale = async () => {
     if (!selectedVariantId) {
       toast.error('Please select a product and variant');
       return;
     }
-
-    const priceNum = parseFloat(sellingPrice);
-    if (isNaN(priceNum) || priceNum <= 0) {
-      toast.error('Please enter a valid customer selling price');
+    if (priceNum <= 0) {
+      toast.error('Please enter a valid selling price');
       return;
     }
-
     if (sourcingType === 'brokered_neighbour') {
       if (!vendorContactId) {
-        toast.error('Please select the peer merchant where device is sourced');
+        toast.error('Please select the peer merchant');
         return;
       }
       const costNum = parseFloat(vendorCost);
       if (isNaN(costNum) || costNum <= 0) {
-        toast.error('Please enter the agreed peer merchant purchase cost');
+        toast.error('Please enter the agreed peer purchase cost');
         return;
       }
     }
 
     try {
       setSubmitting(true);
-      const paidNum = parseFloat(paidAmount || '0');
-      const discountNum = parseFloat(discountAmount || '0');
-
       const salePayload = {
         customer_id: customerId || null,
         discount_amount: discountNum,
@@ -131,21 +234,12 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
       const order = await api.recordSale(salePayload);
 
       toast.success(`Sale recorded! Order #${order.order_number}`, {
-        description:
-          sourcingType === 'brokered_neighbour'
-            ? 'Brokered profit booked & payable recorded for peer merchant.'
-            : 'Internal inventory deducted & ledger updated.',
+        description: sourcingType === 'brokered_neighbour'
+          ? 'Brokered profit booked & payable recorded for peer.'
+          : 'Inventory deducted & ledger updated.',
       });
 
-      // Reset form
-      setSelectedProductId('');
-      setSelectedVariantId('');
-      setSelectedUnitId('');
-      setSellingPrice('');
-      setPaidAmount('');
-      setDiscountAmount('0');
-      setVendorCost('');
-      setNotes('');
+      resetForm();
       loadData();
       onSaleSuccess();
     } catch (err: any) {
@@ -155,8 +249,12 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
     }
   };
 
-  const peerMerchants = contacts.filter((c) => c.roles.includes('peer_vendor') || c.roles.includes('supplier'));
-  const customerList = contacts.filter((c) => c.roles.includes('customer') || c.roles.includes('debtor'));
+  // ─── Variant display label ───
+  const variantLabel = (v: ProductVariant) => {
+    const specParts = v.specs ? Object.values(v.specs).map(String) : [];
+    const parts = [v.storage, v.ram ? `${v.ram} RAM` : null, v.color, ...specParts].filter(Boolean);
+    return parts.length > 0 ? parts.join(' · ') : 'Standard';
+  };
 
   if (loading && products.length === 0) {
     return (
@@ -167,172 +265,126 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
     );
   }
 
-  const brokeredProfit =
-    sourcingType === 'brokered_neighbour' && sellingPrice && vendorCost
-      ? parseFloat(sellingPrice) - parseFloat(vendorCost)
-      : null;
-
   return (
-    <div className="max-w-4xl mx-auto space-y-6 animate-page-enter">
-      <div className="bg-white dark:bg-[#131926] rounded-3xl border border-slate-200/80 dark:border-slate-800/90 p-6 sm:p-8 shadow-[0_4px_24px_-4px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_24px_-4px_rgba(0,0,0,0.4)]">
-        {/* Header & Sourcing Selector */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-100 dark:border-slate-800">
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="font-black text-slate-900 dark:text-white text-lg tracking-tight">Sales Entry</h2>
-              {user && (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold">
-                  Rep: {user.name}
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5 font-medium">
-              Record sales for shop stock or brokered items
-            </p>
+    <div className="animate-page-enter">
+      {/* ─── Top Bar ─── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200/60 dark:border-emerald-800/60 flex items-center justify-center">
+            <ShoppingBag className="w-4.5 h-4.5 text-emerald-600 dark:text-emerald-400" />
           </div>
-
-          {/* Sourcing Mode Switcher */}
-          <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl text-xs font-semibold">
-            <button
-              type="button"
-              onClick={() => setSourcingType('internal_stock')}
-              className={`px-3.5 py-1.5 rounded-lg transition-all ${
-                sourcingType === 'internal_stock'
-                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              Shop Inventory
-            </button>
-            <button
-              type="button"
-              onClick={() => setSourcingType('brokered_neighbour')}
-              className={`px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
-                sourcingType === 'brokered_neighbour'
-                  ? 'bg-amber-500 text-white shadow-xs'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <span>Brokered (Peer Shop)</span>
-              <span className={`w-1.5 h-1.5 rounded-full ${sourcingType === 'brokered_neighbour' ? 'bg-white' : 'bg-amber-500'}`} />
-            </button>
+          <div>
+            <h2 className="font-black text-slate-900 dark:text-white text-base tracking-tight">Point of Sale</h2>
+            <p className="text-[11px] text-slate-400 font-medium">
+              {user && <span className="text-slate-600 dark:text-slate-300 font-bold">{user.name}</span>}
+              {user && ' — '}Quick sale entry
+            </p>
           </div>
         </div>
 
-        {/* Brokered Sourcing Info Notice */}
-        {sourcingType === 'brokered_neighbour' && (
-          <div className="mt-5 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-950 dark:text-amber-200 flex items-start gap-2.5">
-            <ArrowRightLeft className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-            <div>
-              <span className="font-bold">Brokered Sourcing Active:</span> Sourced from a peer shop (e.g. Mekdi, Yenus). Does not touch your internal inventory and automatically generates a payable debt in the ledger.
-            </div>
-          </div>
-        )}
+        {/* Step Progress */}
+        <div className="flex items-center gap-3 sm:gap-4">
+          <StepBadge num={1} label="Product" active={currentStep >= 1} done={step1Done} />
+          <ChevronRight className="w-3 h-3 text-slate-300 dark:text-slate-600" />
+          <StepBadge num={2} label="Variant" active={currentStep >= 2} done={step2Done} />
+          <ChevronRight className="w-3 h-3 text-slate-300 dark:text-slate-600" />
+          <StepBadge num={3} label="Price" active={currentStep >= 3} done={step3Done} />
+          <ChevronRight className="w-3 h-3 text-slate-300 dark:text-slate-600" />
+          <StepBadge num={4} label="Confirm" active={currentStep >= 4} done={false} />
+        </div>
+      </div>
 
-        <form onSubmit={handleSubmitSale} className="space-y-5 pt-6">
-          {/* 1. Product & Variant Selection */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                Product Model
-              </label>
-              <select
-                value={selectedProductId}
-                onChange={(e) => {
-                  setSelectedProductId(e.target.value);
-                  setSelectedVariantId('');
-                  setSelectedUnitId('');
-                }}
-                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700"
-                required
-              >
-                <option value="">-- Select Device or Item --</option>
-                {products.map((p) => {
-                  const catLabel = p.category_rel?.name || (p.category ? p.category.charAt(0).toUpperCase() + p.category.slice(1) : '');
-                  return (
-                    <option key={p.id} value={p.id}>
-                      {p.name} {catLabel ? `(${catLabel})` : ''}
-                    </option>
-                  );
-                })}
-              </select>
+      {/* ─── Sourcing Mode Toggle ─── */}
+      <div className="mb-5">
+        <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl text-xs font-semibold">
+          <button
+            type="button"
+            onClick={() => setSourcingType('internal_stock')}
+            className={`px-4 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
+              sourcingType === 'internal_stock'
+                ? 'bg-white dark:bg-[#131926] text-slate-900 dark:text-white shadow-xs'
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <Package className="w-3.5 h-3.5" />
+            From Our Stock
+          </button>
+          <button
+            type="button"
+            onClick={() => setSourcingType('brokered_neighbour')}
+            className={`px-4 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
+              sourcingType === 'brokered_neighbour'
+                ? 'bg-amber-500 text-white shadow-xs'
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <ArrowRightLeft className="w-3.5 h-3.5" />
+            Brokered (Peer Shop)
+          </button>
+        </div>
+      </div>
+
+      {/* ─── Main Two-Column Layout ─── */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+        {/* ═══ LEFT: Selection Area (3 cols) ═══ */}
+        <div className="lg:col-span-3 space-y-5">
+
+          {/* ── STEP 1: Product Search & Selection ── */}
+          <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800/90 overflow-hidden shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
+            <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-3">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                <input
+                  ref={searchRef}
+                  type="text"
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                  placeholder="Search products by name, brand, or category..."
+                  className="w-full h-9 pl-9 pr-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+                />
+              </div>
+              {selectedProductId && (
+                <button
+                  onClick={resetForm}
+                  className="h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 text-[11px] font-semibold text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-1"
+                >
+                  <X className="w-3 h-3" />
+                  Clear
+                </button>
+              )}
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                Specification & Color
-              </label>
-              <select
-                value={selectedVariantId}
-                onChange={(e) => handleVariantChange(e.target.value)}
-                disabled={!selectedProductId}
-                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700 disabled:opacity-50"
-                required
-              >
-                <option value="">-- Select Variant --</option>
-                {variants.map((v) => {
-                  const specParts = v.specs
-                    ? Object.values(v.specs).map(String)
-                    : [];
-                  const parts = [
-                    v.storage,
-                    v.ram ? `${v.ram} RAM` : null,
-                    v.color,
-                    ...specParts,
-                  ].filter(Boolean);
-                  const label = parts.length > 0 ? parts.join(' • ') : 'Standard Variant';
-                  return (
-                    <option key={v.id} value={v.id}>
-                      {label}
-                    </option>
-                  );
-                })}
-              </select>
-            </div>
-          </div>
-
-          {/* 2. Sourcing Context Specifics */}
-          {sourcingType === 'internal_stock' ? (
-            selectedProduct?.has_serials && (
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Choose Available Serialized Unit
-                </label>
-                {unitsForVariant.length === 0 ? (
-                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400">
-                    No physical units in stock for this variant. (Toggle "Brokered" above if sourcing from a peer).
+            {/* Product Grid */}
+            {!selectedProductId && (
+              <div className="p-3 max-h-[320px] overflow-y-auto">
+                {filteredProducts.length === 0 ? (
+                  <div className="py-8 text-center text-xs text-slate-400">
+                    No products match "{productSearch}"
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    {unitsForVariant.map((u) => {
-                      const isSelected = selectedUnitId === u.id;
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {filteredProducts.map((p) => {
+                      const cat = p.category_rel?.name || p.category || '';
                       return (
                         <button
-                          type="button"
-                          key={u.id}
-                          onClick={() => setSelectedUnitId(u.id)}
-                          className={`p-3 rounded-xl border text-left text-xs transition-all ${
-                            isSelected
-                              ? 'border-slate-900 dark:border-white bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
-                              : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] hover:border-slate-300 dark:hover:border-slate-700 text-slate-800 dark:text-slate-200'
-                          }`}
+                          key={p.id}
+                          onClick={() => handleSelectProduct(p.id)}
+                          className="p-3 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900/50 hover:border-slate-400 dark:hover:border-slate-600 hover:shadow-sm transition-all text-left group"
                         >
-                          <div className="flex items-center justify-between font-mono font-bold">
-                            <span>{u.imei_or_serial ? `Serial: ${u.imei_or_serial}` : 'No Serial'}</span>
-                            {u.sim_type && u.sim_type !== 'na' && (
-                              <span
-                                className={`text-[10px] px-1.5 py-0.5 rounded font-mono uppercase ${
-                                  isSelected ? 'bg-slate-800 dark:bg-slate-100 text-slate-200 dark:text-slate-800' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
-                                }`}
-                              >
-                                {u.sim_type}
-                              </span>
-                            )}
+                          <div className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors leading-tight">
+                            {p.name}
                           </div>
-                          <div className="flex items-center gap-2 mt-1 text-[11px] opacity-85">
-                            {u.battery_health && <span>Battery: {u.battery_health}%</span>}
-                            {u.cycle_count !== null && <span>• {u.cycle_count}cc</span>}
-                            <span>• {u.condition.replace(/_/g, ' ')}</span>
+                          <div className="flex items-center justify-between mt-1.5">
+                            <span className="text-[10px] text-slate-400 font-medium truncate">
+                              {p.brand || cat}
+                            </span>
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+                              p.stockCount > 0
+                                ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400'
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
+                            }`}>
+                              {p.stockCount} in stock
+                            </span>
                           </div>
                         </button>
                       );
@@ -340,179 +392,473 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                   </div>
                 )}
               </div>
-            )
-          ) : (
-            /* Brokered Peer Shop Details */
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Peer Sourcing Partner (Shop Name)
-                </label>
-                <select
-                  value={vendorContactId}
-                  onChange={(e) => setVendorContactId(e.target.value)}
-                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white"
-                  required={sourcingType === 'brokered_neighbour'}
-                >
-                  <option value="">-- Select Sourcing Partner --</option>
-                  {peerMerchants.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name} {m.phone ? `(${m.phone})` : ''}
-                    </option>
-                  ))}
-                </select>
+            )}
+
+            {/* Selected product header */}
+            {selectedProduct && (
+              <div className="p-4">
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2">
+                    <Smartphone className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    <span className="text-sm font-bold text-slate-900 dark:text-white">{selectedProduct.name}</span>
+                    {selectedProduct.brand && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-medium">
+                        {selectedProduct.brand}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => { setSelectedProductId(''); setSelectedVariantId(''); setSelectedUnitId(''); }}
+                    className="text-[11px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 font-semibold"
+                  >
+                    Change
+                  </button>
+                </div>
+
+                {/* ── STEP 2: Variant Chips ── */}
+                <div className="mt-3">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2 block">
+                    Select Variant
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {variants.map((v) => {
+                      const isSelected = selectedVariantId === v.id;
+                      const vUnits = availableUnits.filter((u) => u.variant_id === v.id);
+                      return (
+                        <button
+                          key={v.id}
+                          onClick={() => handleSelectVariant(v)}
+                          className={`px-3 py-2 rounded-xl border-2 text-xs font-semibold transition-all ${
+                            isSelected
+                              ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400'
+                              : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-400 dark:hover:border-slate-500'
+                          }`}
+                        >
+                          <span>{variantLabel(v)}</span>
+                          {sourcingType === 'internal_stock' && (
+                            <span className={`ml-1.5 text-[10px] ${
+                              vUnits.length > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'
+                            }`}>
+                              ({vUnits.length})
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Agreed Purchase Cost from Partner (ETB)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={vendorCost}
-                  onChange={(e) => setVendorCost(e.target.value)}
-                  placeholder="e.g. 150000"
-                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-medium text-slate-900 dark:text-white"
-                  required={sourcingType === 'brokered_neighbour'}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* 3. Pricing, Customer & Payment */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                Selling Price (ETB)
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                value={sellingPrice}
-                onChange={(e) => {
-                  setSellingPrice(e.target.value);
-                  setPaidAmount(e.target.value);
-                }}
-                placeholder="e.g. 165000"
-                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] text-xs font-mono font-bold text-slate-900 dark:text-white"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                Amount Paid Now (ETB)
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                value={paidAmount}
-                onChange={(e) => setPaidAmount(e.target.value)}
-                placeholder="Full or partial"
-                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] text-xs font-mono font-medium text-slate-900 dark:text-white"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                Payment Method
-              </label>
-              <select
-                value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value)}
-                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white"
-              >
-                <option value="telebirr">TeleBirr Mobile Money</option>
-                <option value="cash">Cash on Hand (Drawer)</option>
-                <option value="cbe">CBE Bank Transfer</option>
-                <option value="bank_transfer">Other Bank Transfer</option>
-                <option value="credit">Credit Sale (Unpaid)</option>
-              </select>
-            </div>
+            )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                Discount (ETB)
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                value={discountAmount}
-                onChange={(e) => setDiscountAmount(e.target.value)}
-                disabled={user ? !user.can_discount : false}
-                placeholder="0"
-                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] text-xs font-mono text-slate-900 dark:text-white disabled:opacity-50"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                Receiving Account
-              </label>
-              <select
-                value={financialAccountId}
-                onChange={(e) => setFinancialAccountId(e.target.value)}
-                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white"
-              >
-                <option value="">-- Select Receiving Account --</option>
-                {accounts.filter((a) => !a.is_custom_asset).map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {user?.role === 'owner' && a.current_balance !== null
-                      ? `${a.name} (${Number(a.current_balance).toLocaleString()} ETB)`
-                      : a.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                Customer Contact
-              </label>
-              <select
-                value={customerId}
-                onChange={(e) => setCustomerId(e.target.value)}
-                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white"
-              >
-                <option value="">-- Anonymous Walk-in Customer --</option>
-                {customerList.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name} {c.phone ? `(${c.phone})` : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Interactive Margin Calculation Preview */}
-          {brokeredProfit !== null && (
-            <div className="p-4 rounded-2xl bg-slate-900 dark:bg-slate-800 text-white flex items-center justify-between text-xs font-mono shadow-sm">
-              <span className="text-slate-300">Brokered Margin Calculation:</span>
-              <span className="font-bold text-emerald-400 text-sm">
-                +{brokeredProfit.toLocaleString()} ETB Profit
+          {/* ── Serial Unit Selection (for internal stock with serials) ── */}
+          {selectedVariant && sourcingType === 'internal_stock' && selectedProduct?.has_serials && (
+            <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800/90 p-4 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-3 block">
+                Pick Serial Unit ({unitsForVariant.length} available)
               </span>
+              {unitsForVariant.length === 0 ? (
+                <div className="p-4 rounded-xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-800/50 text-xs text-amber-700 dark:text-amber-400 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span>No units in stock for this variant. Switch to "Brokered" if sourcing from a peer shop.</span>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {unitsForVariant.map((u) => {
+                    const isSelected = selectedUnitId === u.id;
+                    return (
+                      <button
+                        key={u.id}
+                        type="button"
+                        onClick={() => setSelectedUnitId(u.id)}
+                        className={`p-3 rounded-xl border-2 text-left text-xs transition-all ${
+                          isSelected
+                            ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/20 shadow-sm'
+                            : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono font-bold text-slate-900 dark:text-white text-[11px]">
+                            {u.imei_or_serial || 'No Serial'}
+                          </span>
+                          {isSelected && (
+                            <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center">
+                              <Check className="w-3 h-3 text-white" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-1.5 text-[10px] text-slate-500 dark:text-slate-400">
+                          {u.battery_health && (
+                            <span className="inline-flex items-center gap-0.5">
+                              <Battery className="w-3 h-3" />
+                              {u.battery_health}%
+                            </span>
+                          )}
+                          {u.cycle_count !== null && <span>{u.cycle_count} cc</span>}
+                          <span className="capitalize">{u.condition.replace(/_/g, ' ')}</span>
+                          {u.sim_type && u.sim_type !== 'na' && (
+                            <span className="px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-800 font-mono uppercase text-[9px] font-bold">
+                              {u.sim_type}
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
-          <div className="pt-2 flex justify-end">
-            <button
-              type="submit"
-              disabled={submitting}
-              className="h-11 px-6 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 disabled:opacity-50 transition-all shadow-sm flex items-center gap-2 active:scale-[0.98]"
-            >
-              {submitting ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <ShoppingBag className="w-4 h-4 text-emerald-400 dark:text-emerald-600" />
+          {/* ── Brokered Sourcing Info ── */}
+          {selectedVariant && sourcingType === 'brokered_neighbour' && (
+            <div className="bg-white dark:bg-[#131926] rounded-2xl border border-amber-200/60 dark:border-amber-800/40 p-4 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
+              <div className="flex items-center gap-2 mb-3">
+                <Zap className="w-4 h-4 text-amber-500" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                  Brokered Source Details
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                    Peer Merchant
+                  </label>
+                  <select
+                    value={vendorContactId}
+                    onChange={(e) => setVendorContactId(e.target.value)}
+                    className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+                    required
+                  >
+                    <option value="">— Select Sourcing Partner —</option>
+                    {peerMerchants.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name} {m.phone ? `(${m.phone})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                    Peer Cost (ETB)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={vendorCost}
+                    onChange={(e) => setVendorCost(e.target.value)}
+                    placeholder="What you pay the peer"
+                    className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+                    required
+                  />
+                </div>
+              </div>
+              {brokeredProfit !== null && (
+                <div className={`mt-3 p-2.5 rounded-xl text-xs font-bold font-mono text-center ${
+                  brokeredProfit > 0
+                    ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-800/50'
+                    : 'bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-400 border border-rose-200/50 dark:border-rose-800/50'
+                }`}>
+                  {brokeredProfit > 0 ? '+' : ''}{brokeredProfit.toLocaleString()} ETB margin
+                </div>
               )}
-              <span>{submitting ? 'Recording Sale...' : 'Complete & Record Sale'}</span>
-            </button>
+            </div>
+          )}
+
+          {/* ── STEP 3: Pricing & Payment ── */}
+          {selectedVariant && (
+            <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800/90 p-4 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] space-y-4">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                Pricing & Payment
+              </span>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                    <Tag className="w-3 h-3 inline mr-0.5" />
+                    Selling Price *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={sellingPrice}
+                    onChange={(e) => {
+                      setSellingPrice(e.target.value);
+                      setPaidAmount(e.target.value);
+                    }}
+                    placeholder="0"
+                    className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-sm font-mono font-black text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                    <Percent className="w-3 h-3 inline mr-0.5" />
+                    Discount
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={discountAmount}
+                    onChange={(e) => setDiscountAmount(e.target.value)}
+                    disabled={user ? !user.can_discount : false}
+                    placeholder="0"
+                    className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-sm font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 disabled:opacity-40"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                    Paid Now
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={paidAmount}
+                    onChange={(e) => setPaidAmount(e.target.value)}
+                    placeholder="Full or partial"
+                    className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-sm font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Payment Method Quick Selector */}
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                  Payment Method
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { value: 'telebirr', label: 'TeleBirr', icon: Smartphone },
+                    { value: 'cash', label: 'Cash', icon: Banknote },
+                    { value: 'cbe', label: 'CBE Transfer', icon: CreditCard },
+                    { value: 'bank_transfer', label: 'Other Bank', icon: Wallet },
+                    { value: 'credit', label: 'Credit Sale', icon: Receipt },
+                  ].map((m) => {
+                    const Icon = m.icon;
+                    const isSelected = paymentMethod === m.value;
+                    return (
+                      <button
+                        key={m.value}
+                        type="button"
+                        onClick={() => {
+                          setPaymentMethod(m.value);
+                          if (m.value === 'credit') {
+                            setPaidAmount('0');
+                          }
+                        }}
+                        className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border-2 text-[11px] font-semibold transition-all ${
+                          isSelected
+                            ? m.value === 'credit'
+                              ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400'
+                              : 'border-slate-900 dark:border-white bg-slate-900 dark:bg-white text-white dark:text-slate-900'
+                            : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-400 dark:hover:border-slate-500'
+                        }`}
+                      >
+                        <Icon className="w-3.5 h-3.5" />
+                        {m.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Account & Customer Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                    Receiving Account
+                  </label>
+                  <select
+                    value={financialAccountId}
+                    onChange={(e) => setFinancialAccountId(e.target.value)}
+                    className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+                  >
+                    <option value="">— Select Account —</option>
+                    {treasuryAccounts.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {user?.role === 'owner' && a.current_balance !== null
+                          ? `${a.name} (${Number(a.current_balance).toLocaleString()} ETB)`
+                          : a.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                    <UserIcon className="w-3 h-3 inline mr-0.5" />
+                    Customer
+                  </label>
+                  <select
+                    value={customerId}
+                    onChange={(e) => setCustomerId(e.target.value)}
+                    className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+                  >
+                    <option value="">Walk-in Customer</option>
+                    {customerList.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} {c.phone ? `(${c.phone})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Notes */}
+              <input
+                type="text"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Sale notes (optional)..."
+                className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+              />
+            </div>
+          )}
+        </div>
+
+        {/* ═══ RIGHT: Order Summary / Receipt (2 cols) ═══ */}
+        <div className="lg:col-span-2">
+          <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800/90 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] sticky top-4 overflow-hidden">
+            {/* Receipt Header */}
+            <div className="p-4 bg-slate-50/70 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <Receipt className="w-4 h-4 text-slate-400" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Sale Summary
+                </span>
+              </div>
+            </div>
+
+            <div className="p-4 space-y-4">
+              {/* Empty State */}
+              {!selectedProduct ? (
+                <div className="py-8 text-center">
+                  <ShoppingBag className="w-8 h-8 text-slate-200 dark:text-slate-700 mx-auto mb-3" />
+                  <p className="text-xs text-slate-400 font-medium">Search and select a product to begin</p>
+                </div>
+              ) : (
+                <>
+                  {/* Product Line Item */}
+                  <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                          {selectedProduct.name}
+                        </div>
+                        {selectedVariant && (
+                          <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                            {variantLabel(selectedVariant)}
+                          </div>
+                        )}
+                        {selectedUnitId && (
+                          <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                            SN: {availableUnits.find((u) => u.id === selectedUnitId)?.imei_or_serial || '—'}
+                          </div>
+                        )}
+                        {sourcingType === 'brokered_neighbour' && (
+                          <div className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/30 text-[10px] font-bold text-amber-700 dark:text-amber-400">
+                            <ArrowRightLeft className="w-2.5 h-2.5" />
+                            Brokered
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-right ml-3">
+                        <span className="text-xs font-mono font-bold text-slate-900 dark:text-white">
+                          × 1
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Price Breakdown */}
+                  <div className="space-y-2 text-xs">
+                    <div className="flex justify-between text-slate-600 dark:text-slate-400">
+                      <span>Subtotal</span>
+                      <span className="font-mono font-bold text-slate-900 dark:text-white">
+                        {priceNum > 0 ? priceNum.toLocaleString() : '—'} ETB
+                      </span>
+                    </div>
+
+                    {discountNum > 0 && (
+                      <div className="flex justify-between text-rose-600 dark:text-rose-400">
+                        <span>Discount</span>
+                        <span className="font-mono font-bold">-{discountNum.toLocaleString()} ETB</span>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between pt-2 border-t border-dashed border-slate-200 dark:border-slate-700">
+                      <span className="font-bold text-slate-900 dark:text-white">Total</span>
+                      <span className="font-mono font-black text-base text-slate-900 dark:text-white">
+                        {totalAfterDiscount > 0 ? totalAfterDiscount.toLocaleString() : '—'} ETB
+                      </span>
+                    </div>
+
+                    {priceNum > 0 && (
+                      <>
+                        <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
+                          <span>Paid</span>
+                          <span className="font-mono font-bold">{paidNum.toLocaleString()} ETB</span>
+                        </div>
+
+                        {isCredit && (
+                          <div className="flex justify-between text-amber-600 dark:text-amber-400 font-bold">
+                            <span className="flex items-center gap-1">
+                              <AlertTriangle className="w-3 h-3" />
+                              Balance Due
+                            </span>
+                            <span className="font-mono">{balanceDue.toLocaleString()} ETB</span>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  {/* Credit Warning */}
+                  {isCredit && priceNum > 0 && (
+                    <div className="p-2.5 rounded-xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-800/50 text-[11px] text-amber-700 dark:text-amber-400 font-medium">
+                      A receivable of {balanceDue.toLocaleString()} ETB will be created for this customer.
+                    </div>
+                  )}
+
+                  {/* Brokered Margin */}
+                  {brokeredProfit !== null && (
+                    <div className={`p-2.5 rounded-xl text-[11px] font-bold text-center ${
+                      brokeredProfit > 0
+                        ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-800/50'
+                        : 'bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-400 border border-rose-200/50 dark:border-rose-800/50'
+                    }`}>
+                      Your margin: {brokeredProfit > 0 ? '+' : ''}{brokeredProfit.toLocaleString()} ETB
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Submit Button */}
+            <div className="p-4 border-t border-slate-100 dark:border-slate-800">
+              <button
+                onClick={handleSubmitSale}
+                disabled={submitting || !selectedVariantId || priceNum <= 0}
+                className="w-full h-11 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 dark:disabled:bg-slate-800 text-white disabled:text-slate-400 text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2 active:scale-[0.98] disabled:cursor-not-allowed"
+              >
+                {submitting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <ShoppingBag className="w-4 h-4" />
+                )}
+                <span>
+                  {submitting
+                    ? 'Recording...'
+                    : !selectedVariantId
+                    ? 'Select a Product'
+                    : priceNum <= 0
+                    ? 'Enter Selling Price'
+                    : `Complete Sale — ${totalAfterDiscount.toLocaleString()} ETB`}
+                </span>
+              </button>
+            </div>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );
