@@ -39,7 +39,7 @@ export const Topbar: React.FC<TopbarProps> = ({
   const current = tabTitles[activeTab] || tabTitles.overview;
 
   return (
-    <header className="h-16 px-4 lg:px-8 flex items-center justify-between transition-colors bg-transparent">
+    <header className="h-16 px-4 lg:px-8 flex items-center justify-between bg-[#f6f8fa] dark:bg-[#0b0f17] relative z-10 transition-colors">
       <div className="flex items-center gap-3">
         {/* Mobile Hamburger */}
         <button
@@ -116,7 +116,7 @@ export const Topbar: React.FC<TopbarProps> = ({
             className="h-9 px-3.5 rounded-xl bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 text-white dark:text-slate-900 text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 active:scale-[0.98]"
           >
             <Plus className="w-3.5 h-3.5 text-emerald-400 dark:text-emerald-600" />
-            <span>+ Record Sale</span>
+            <span>Record Sale</span>
           </button>
         )}
       </div>
