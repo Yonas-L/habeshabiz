@@ -36,11 +36,12 @@ import { EditProductModal } from '../components/inventory/EditProductModal';
 
 interface InventoryViewProps {
   user: User | null;
+  onInventoryChange?: () => void;
 }
 
 type TabType = 'in_stock' | 'vendor_stock' | 'out' | 'sold' | 'returned' | 'all';
 
-export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
+export const InventoryView: React.FC<InventoryViewProps> = ({ user, onInventoryChange }) => {
   const [units, setUnits] = useState<InventoryUnit[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
@@ -262,6 +263,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
         description: `${unit.variant?.product?.name || 'Device'} is now back in stock.`,
       });
       loadInventory();
+      onInventoryChange?.();
     } catch (err: any) {
       toast.error('Failed to restock item', { description: err.message });
     }
@@ -293,6 +295,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
       setHandoverReturnDeadline('');
       setHandoverPayout('');
       loadInventory();
+      onInventoryChange?.();
     } catch (err: any) {
       toast.error('Failed to handover unit', { description: err.message });
     } finally {
@@ -321,6 +324,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
       setReturnReason('');
       setReturnNotes('');
       loadInventory();
+      onInventoryChange?.();
     } catch (err: any) {
       toast.error('Failed to record customer return', { description: err.message });
     } finally {
@@ -347,6 +351,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
       setRepairedTargetUnit(null);
       setRepairedNotes('');
       loadInventory();
+      onInventoryChange?.();
     } catch (err: any) {
       toast.error('Failed to restock repaired unit', { description: err.message });
     } finally {
@@ -372,6 +377,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
       setReturnToVendorUnit(null);
       setReturnToVendorReason('');
       loadInventory();
+      onInventoryChange?.();
     } catch (err: any) {
       toast.error('Failed to return unit to vendor', { description: err.message });
     } finally {
@@ -1795,6 +1801,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
             initialVariantId={intakeInitialVariantId}
             onIntakeSuccess={() => {
               loadInventory();
+              onInventoryChange?.();
             }}
             onOpenCategoryManager={() => {
               setShowIntakeModal(false);

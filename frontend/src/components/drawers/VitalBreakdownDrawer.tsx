@@ -56,8 +56,8 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
       actionLabel: 'Open Treasury Workspace',
     },
     receivables: {
-      title: 'Money Owed to You',
-      subtitle: 'Customer Credit & Outstanding Debts',
+      title: 'Money Owed to You (Receivables)',
+      subtitle: 'Customer Credit, Vendor Handover Holdings & Inflows',
       amount: capital_overview.receivables,
       icon: CreditCard,
       targetTab: 'debts',
@@ -175,7 +175,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
 
       {vitalType === 'receivables' && (
         <ProgressiveSection
-          title={`Customer Debts (${counts.open_receivables} pending)`}
+          title={`Receivables & Handover Holdings (${counts.open_receivables} pending)`}
           icon={<CreditCard className="w-4 h-4" />}
           defaultOpen={true}
         >
@@ -192,8 +192,19 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                 className="p-3.5 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/70 dark:border-slate-800/90 flex items-center justify-between text-xs cursor-pointer hover:border-slate-300 dark:hover:border-slate-700 transition-colors"
               >
                 <div>
-                  <div className="font-bold text-slate-900 dark:text-white">{debt.contact?.name}</div>
-                  <div className="text-[11px] text-slate-400">{debt.notes || 'Credit purchase'}</div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-bold text-slate-900 dark:text-white">{debt.contact?.name}</span>
+                    {debt.reference_type === 'handover_holding' && (
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300">
+                        Handover Holding
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">
+                    {debt.reference_type === 'handover_holding'
+                      ? 'Vendor holding · Owes upon sale or returns device'
+                      : (debt.notes || 'Customer credit balance')}
+                  </div>
                 </div>
 
                 <div className="text-right">
@@ -201,7 +212,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                     +{Number(debt.remaining_amount).toLocaleString()} ETB
                   </div>
                   <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
-                    Click for details &rarr;
+                    Click to collect &rarr;
                   </span>
                 </div>
               </div>

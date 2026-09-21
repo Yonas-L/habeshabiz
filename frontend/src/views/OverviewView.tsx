@@ -86,15 +86,15 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     },
     {
       key: 'receivables',
-      label: 'Receivables',
+      label: 'Owed to You',
       value: capital_overview.receivables,
       prefix: '+',
-      accent: 'text-emerald-600 dark:text-emerald-500',
+      accent: 'text-emerald-600 dark:text-emerald-400',
       onClick: () => setSelectedVital('receivables'),
     },
     {
       key: 'cash',
-      label: 'Cash',
+      label: 'Cash & Bank',
       value: capital_overview.cash_and_banks,
       prefix: '',
       onClick: () => setSelectedVital('cash'),
@@ -108,7 +108,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     },
     {
       key: 'payables',
-      label: 'Payables',
+      label: 'You Owe',
       value: capital_overview.payables,
       prefix: '−',
       accent: 'text-rose-600/80 dark:text-rose-400/80',
@@ -125,12 +125,13 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           {hasReceivablesAlert && (
             <button
               onClick={() => setSelectedVital('receivables')}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-800/40 text-amber-800 dark:text-amber-300 text-xs font-medium hover:border-amber-300 dark:hover:border-amber-700 transition-colors active:scale-[0.99]"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-200/70 dark:border-emerald-800/50 text-emerald-900 dark:text-emerald-200 text-xs font-medium hover:border-emerald-300 dark:hover:border-emerald-600 transition-colors active:scale-[0.99]"
             >
-              <AlertCircle className="w-3.5 h-3.5 shrink-0 opacity-70" />
+              <AlertCircle className="w-3.5 h-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
               <span>
-                <span className="font-semibold">{counts.open_receivables}</span> owe{' '}
-                <span className="font-mono font-semibold">{capital_overview.receivables.toLocaleString()}</span> ETB
+                <span className="font-bold text-emerald-800 dark:text-emerald-300">Owed to you:</span>{' '}
+                <span className="font-semibold">{counts.open_receivables}</span> {counts.open_receivables === 1 ? 'party owes' : 'parties owe'}{' '}
+                <span className="font-mono font-bold text-emerald-950 dark:text-emerald-100">{capital_overview.receivables.toLocaleString()}</span> ETB
               </span>
               <ArrowRight className="w-3 h-3 opacity-50" />
             </button>
@@ -143,8 +144,9 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             >
               <Clock className="w-3.5 h-3.5 shrink-0 opacity-70" />
               <span>
-                <span className="font-semibold">{counts.open_payables}</span> due{' '}
-                <span className="font-mono font-semibold">{capital_overview.payables.toLocaleString()}</span> ETB
+                <span className="font-bold text-rose-800 dark:text-rose-300">You owe:</span>{' '}
+                <span className="font-semibold">{counts.open_payables}</span> {counts.open_payables === 1 ? 'payable due' : 'payables due'}{' '}
+                <span className="font-mono font-bold text-rose-900 dark:text-rose-200">{capital_overview.payables.toLocaleString()}</span> ETB
               </span>
               <ArrowRight className="w-3 h-3 opacity-50" />
             </button>
@@ -310,22 +312,27 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Receivables */}
         <div className="bg-white dark:bg-[#131926] rounded-xl border border-slate-200/60 dark:border-slate-800/60 p-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-slate-900 dark:text-white">Receivables</span>
+          <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100 dark:border-slate-800/60">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-900 dark:text-white">Owed to You (Inflow)</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-800/50">
+                +{capital_overview.receivables.toLocaleString()} ETB
+              </span>
+            </div>
             <button
               onClick={() => onNavigateTab('debts')}
               className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
             >
-              View all →
+              View all ({counts.open_receivables}) →
             </button>
           </div>
 
           {top_receivables.length === 0 ? (
             <div className="py-6 text-center text-xs text-slate-400 dark:text-slate-500">
-              No open receivables
+              No outstanding receivables
             </div>
           ) : (
-            <div className="space-y-0.5">
+            <div className="space-y-1">
               {top_receivables.map((debt) => (
                 <button
                   key={debt.id}
@@ -333,15 +340,33 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   className="w-full flex items-center justify-between py-2 px-2 -mx-2 rounded-lg text-xs hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors group text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-inset"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold flex items-center justify-center text-[10px] uppercase shrink-0">
-                      {debt.contact?.name?.slice(0, 2) || 'CU'}
+                    <div className={`w-7 h-7 rounded-lg font-semibold flex items-center justify-center text-[10px] uppercase shrink-0 border ${
+                      debt.reference_type === 'handover_holding'
+                        ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border-amber-200/60 dark:border-amber-800/50'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-transparent'
+                    }`}>
+                      {debt.reference_type === 'handover_holding' ? 'HH' : (debt.contact?.name?.slice(0, 2) || 'CU')}
                     </div>
-                    <span className="font-medium text-slate-700 dark:text-slate-300 truncate">
-                      {debt.contact?.name}
-                    </span>
+                    <div className="truncate">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-semibold text-slate-900 dark:text-white truncate">
+                          {debt.contact?.name}
+                        </span>
+                        {debt.reference_type === 'handover_holding' && (
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300">
+                            Handover
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
+                        {debt.reference_type === 'handover_holding'
+                          ? 'Vendor holding · Owes upon sale or returns device'
+                          : (debt.notes || 'Customer credit balance')}
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <span className="font-semibold text-emerald-600 dark:text-emerald-500 font-mono">
+                  <div className="flex items-center gap-1.5 shrink-0 pl-2">
+                    <span className="font-semibold text-emerald-600 dark:text-emerald-400 font-mono">
                       +{Number(debt.remaining_amount).toLocaleString()}
                     </span>
                     <ChevronRight className="w-3 h-3 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all" />
@@ -354,13 +379,18 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
         {/* Payables */}
         <div className="bg-white dark:bg-[#131926] rounded-xl border border-slate-200/60 dark:border-slate-800/60 p-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-slate-900 dark:text-white">Payables</span>
+          <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100 dark:border-slate-800/60">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-900 dark:text-white">You Owe (Outflow)</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-bold bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-200/50 dark:border-rose-800/50">
+                −{capital_overview.payables.toLocaleString()} ETB
+              </span>
+            </div>
             <button
               onClick={() => onNavigateTab('debts')}
               className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"
             >
-              View all →
+              View all ({counts.open_payables}) →
             </button>
           </div>
 

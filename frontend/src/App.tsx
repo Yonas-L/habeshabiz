@@ -127,6 +127,13 @@ export default function App() {
     }
   }, [user, activeTab]);
 
+  // Refresh dashboard whenever overview tab becomes active
+  useEffect(() => {
+    if (activeTab === 'overview' && user) {
+      refreshData();
+    }
+  }, [activeTab, user, refreshData]);
+
   // Check existing session or perform initial login
   useEffect(() => {
     const initSession = async () => {
@@ -398,7 +405,7 @@ export default function App() {
           )}
 
           {activeTab === 'inventory' && (
-            <InventoryView user={user} />
+            <InventoryView user={user} onInventoryChange={refreshData} />
           )}
 
           {activeTab === 'sales' && (
