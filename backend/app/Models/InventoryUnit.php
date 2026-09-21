@@ -32,6 +32,7 @@ class InventoryUnit extends Model
         'return_reason',
         'returned_at',
         'return_deadline',
+        'handover_payout',
         'sold_at',
     ];
 
@@ -41,6 +42,7 @@ class InventoryUnit extends Model
             'battery_health' => 'integer',
             'cycle_count' => 'integer',
             'cost_basis' => 'decimal:2',
+            'handover_payout' => 'decimal:2',
             'handed_out_at' => 'datetime',
             'returned_at' => 'datetime',
             'return_deadline' => 'date',

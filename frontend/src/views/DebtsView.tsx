@@ -240,8 +240,15 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
                       className="hover:bg-slate-50/90 dark:hover:bg-slate-800/40 transition-colors cursor-pointer group"
                     >
                       <td className="py-3.5 px-5">
-                        <div className="font-bold text-slate-900 dark:text-white text-sm group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                          {debt.contact?.name}
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-slate-900 dark:text-white text-sm group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                            {debt.contact?.name}
+                          </span>
+                          {debt.reference_type === 'handover_holding' && (
+                            <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50 dark:border-amber-800/50">
+                              Handover Holding
+                            </span>
+                          )}
                         </div>
                         <div className="text-[11px] text-slate-400">{debt.contact?.phone || 'No phone'}</div>
                       </td>

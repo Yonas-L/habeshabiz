@@ -77,6 +77,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
   const [handoverTo, setHandoverTo] = useState('');
   const [handoverLocation, setHandoverLocation] = useState('');
   const [handoverNotes, setHandoverNotes] = useState('');
+  const [handoverReturnDeadline, setHandoverReturnDeadline] = useState('');
+  const [handoverPayout, setHandoverPayout] = useState('');
   const [handoverSubmitting, setHandoverSubmitting] = useState(false);
 
   // Customer Return Modal State (for sold -> returned)
@@ -276,16 +278,20 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
         handover_to: handoverTo.trim(),
         location: handoverLocation.trim() || undefined,
         notes: handoverNotes.trim() || undefined,
+        return_deadline: handoverReturnDeadline || undefined,
+        handover_payout: handoverPayout ? parseFloat(handoverPayout) : undefined,
       });
 
       toast.success('Item marked as out for sale', {
-        description: `Handed out to ${handoverTo.trim()} for customer demo/sale.`,
+        description: `Handed out to ${handoverTo.trim()} for sale.${handoverPayout ? ` Receivable: ${Number(handoverPayout).toLocaleString()} ETB` : ''}`,
       });
 
       setHandoverTargetUnit(null);
       setHandoverTo('');
       setHandoverLocation('');
       setHandoverNotes('');
+      setHandoverReturnDeadline('');
+      setHandoverPayout('');
       loadInventory();
     } catch (err: any) {
       toast.error('Failed to handover unit', { description: err.message });
@@ -932,6 +938,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
                                                           setHandoverTo('');
                                                           setHandoverLocation('');
                                                           setHandoverNotes('');
+                                                          setHandoverReturnDeadline('');
+                                                          setHandoverPayout('');
                                                         }}
                                                         className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-amber-950/50 text-slate-700 dark:text-slate-300 hover:text-amber-700 dark:hover:text-amber-400 transition-colors shadow-2xs active:scale-95"
                                                         title="Handover device to staff or broker to sell"
@@ -1136,6 +1144,22 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
                               <div className="text-[10px] text-amber-700 dark:text-amber-400 font-medium mt-0.5 truncate max-w-[140px] mx-auto">
                                 With: {unit.handover_to || 'Staff'}
                               </div>
+                              {unit.handover_payout && (
+                                <div className="text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                                  {Number(unit.handover_payout).toLocaleString()} ETB
+                                </div>
+                              )}
+                              {unit.return_deadline && (
+                                <div className="text-[10px] mt-0.5">
+                                  {new Date(unit.return_deadline) < new Date() ? (
+                                    <span className="text-rose-600 dark:text-rose-400 font-bold">Return Overdue</span>
+                                  ) : (
+                                    <span className="text-slate-400">
+                                      Due {new Date(unit.return_deadline).toLocaleDateString()}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           )}
 
@@ -1216,6 +1240,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
                                   setHandoverTo('');
                                   setHandoverLocation('');
                                   setHandoverNotes('');
+                                  setHandoverReturnDeadline('');
+                                  setHandoverPayout('');
                                 }}
                                 className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-amber-950/50 text-slate-700 dark:text-slate-300 hover:text-amber-700 dark:hover:text-amber-400 transition-colors shadow-2xs active:scale-95"
                                 title="Handover this device to a staff member or broker to sell"
@@ -1367,6 +1393,44 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
                   className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700"
                 />
               </div>
+
+              {/* Agreed Return Window & Payout */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Agreed Return Window
+                  </label>
+                  <input
+                    type="date"
+                    value={handoverReturnDeadline}
+                    onChange={(e) => setHandoverReturnDeadline(e.target.value)}
+                    min={new Date().toISOString().split('T')[0]}
+                    className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-0.5">Return if unsold by this date</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Agreed Vendor Payout (ETB)
+                  </label>
+                  <input
+                    type="number"
+                    value={handoverPayout}
+                    onChange={(e) => setHandoverPayout(e.target.value)}
+                    placeholder="e.g. 25000"
+                    min="0"
+                    step="0.01"
+                    className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-0.5">Amount vendor owes on sale</p>
+                </div>
+              </div>
+
+              {handoverPayout && parseFloat(handoverPayout) > 0 && (
+                <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-800/50 text-[11px] text-emerald-700 dark:text-emerald-400 font-medium">
+                  💰 A receivable of <span className="font-bold">{Number(handoverPayout).toLocaleString()} ETB</span> will be recorded. The vendor must pay this or return the device{handoverReturnDeadline ? ` by ${new Date(handoverReturnDeadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}.
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
@@ -1775,6 +1839,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
           setHandoverTo('');
           setHandoverLocation('');
           setHandoverNotes('');
+          setHandoverReturnDeadline('');
+          setHandoverPayout('');
         }}
         onOpenCustomerReturn={(unit) => {
           setReturnTargetUnit(unit);

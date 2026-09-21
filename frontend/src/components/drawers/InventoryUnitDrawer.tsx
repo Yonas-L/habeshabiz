@@ -252,17 +252,55 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
     >
       {/* Handover Notice Banner if OUT */}
       {isOut && (
-        <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 text-xs text-amber-900 dark:text-amber-200 space-y-1">
-          <div className="font-bold flex items-center gap-1.5">
-            <Clock className="w-4 h-4 text-amber-600" />
-            <span>Currently Out with Staff / Broker</span>
+        <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 text-xs text-amber-900 dark:text-amber-200 space-y-2">
+          <div className="font-bold flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+              <span>Currently Out with Staff / Broker</span>
+            </div>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-200/60 dark:bg-amber-800/50 text-amber-800 dark:text-amber-300 font-semibold">
+              Handover Agreement
+            </span>
           </div>
+
           <p className="text-[11px] text-amber-700 dark:text-amber-300">
             Handed out to: <strong className="font-semibold">{unit.handover_to || 'Sales Staff'}</strong>
             {unit.handed_out_at && ` • Since ${new Date(unit.handed_out_at).toLocaleDateString()}`}
           </p>
-          <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1">
-            If unsold, click "Restock Unsold to Shelf" below to return it to active store stock.
+
+          <div className="grid grid-cols-2 gap-2.5 text-[11px] pt-1">
+            {unit.handover_payout && (
+              <div className="p-2 rounded-xl bg-white/70 dark:bg-slate-900/60 border border-amber-200/50 dark:border-amber-800/30">
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 block">Agreed Vendor Payout:</span>
+                <div className="font-mono font-bold text-emerald-700 dark:text-emerald-400 text-xs mt-0.5">
+                  {Number(unit.handover_payout).toLocaleString()} ETB
+                </div>
+                <span className="text-[9px] text-slate-400 block mt-0.5">Receivable holding in Debt Collector</span>
+              </div>
+            )}
+            {unit.return_deadline && (
+              <div className="p-2 rounded-xl bg-white/70 dark:bg-slate-900/60 border border-amber-200/50 dark:border-amber-800/30">
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 block">Return Window:</span>
+                <div className="text-xs font-bold mt-0.5">
+                  {new Date(unit.return_deadline) < new Date() ? (
+                    <span className="text-rose-600 dark:text-rose-400">Return Overdue</span>
+                  ) : (
+                    <span className="text-amber-800 dark:text-amber-300">
+                      By {new Date(unit.return_deadline).toLocaleDateString()}
+                    </span>
+                  )}
+                </div>
+                <span className="text-[9px] text-slate-400 block mt-0.5">
+                  {new Date(unit.return_deadline) < new Date()
+                    ? 'Expired deadline'
+                    : `${Math.max(0, Math.ceil((new Date(unit.return_deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))} days left`}
+                </span>
+              </div>
+            )}
+          </div>
+
+          <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight pt-1">
+            When the vendor sells and pays you, settle the payment through Debt Collector to automatically mark this device as sold. If returned unsold, restock below to cancel the holding.
           </p>
         </div>
       )}

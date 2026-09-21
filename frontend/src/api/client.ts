@@ -70,6 +70,7 @@ export interface InventoryUnit {
   source_type?: 'purchase' | 'consignment';
   supplier_contact_id?: string | null;
   return_deadline?: string | null;
+  handover_payout?: string | number | null;
   location: string;
   handover_to?: string | null;
   handed_out_at?: string | null;
@@ -479,7 +480,7 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
-  handoverInventoryUnit: (id: string, data: { handover_to: string; location?: string; notes?: string }) =>
+  handoverInventoryUnit: (id: string, data: { handover_to: string; location?: string; notes?: string; return_deadline?: string; handover_payout?: number }) =>
     request<InventoryUnit>(`/inventory/units/${id}/handover`, {
       method: 'POST',
       body: JSON.stringify(data),

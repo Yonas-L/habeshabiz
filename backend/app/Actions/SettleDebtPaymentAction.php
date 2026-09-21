@@ -2,11 +2,14 @@
 
 namespace App\Actions;
 
+use App\Models\AuditLog;
 use App\Models\Contact;
 use App\Models\Debt;
 use App\Models\DebtPayment;
 use App\Models\FinancialAccount;
 use App\Models\FinancialTransaction;
+use App\Models\InventoryStock;
+use App\Models\InventoryUnit;
 use App\Scopes\TenantScope;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -60,6 +63,33 @@ class SettleDebtPaymentAction
                 'remaining_amount' => max(0, $newRemaining),
                 'status' => $status,
             ]);
+
+            // If this was a handover holding debt and now fully settled, auto-mark unit as sold
+            if ($debt->reference_type === 'handover_holding' && $status === 'settled' && ! empty($debt->reference_id)) {
+                $unit = InventoryUnit::find($debt->reference_id);
+                if ($unit && $unit->status === 'out') {
+                    $unit->update([
+                        'status' => 'sold',
+                        'sold_at' => now(),
+                    ]);
+
+                    $stock = InventoryStock::where('variant_id', $unit->variant_id)->first();
+                    if ($stock && $stock->quantity_on_hand > 0) {
+                        $stock->decrement('quantity_on_hand', 1);
+                    }
+
+                    AuditLog::record(
+                        action: 'unit_sold_via_debt_collection',
+                        entityType: 'InventoryUnit',
+                        entityId: (string) $unit->id,
+                        newValues: [
+                            'imei_or_serial' => $unit->imei_or_serial,
+                            'handover_to' => $unit->handover_to,
+                            'settled_amount' => $newPaid,
+                        ]
+                    );
+                }
+            }
 
             $contactName = $debt->contact instanceof Contact ? $debt->contact->name : 'Contact';
 

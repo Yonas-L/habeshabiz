@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Models\Contact;
+use App\Models\Debt;
 use App\Models\InventoryStock;
 use App\Models\InventoryUnit;
 use App\Models\User;
@@ -251,6 +253,8 @@ class InventoryController extends Controller
             'handover_to' => ['required', 'string', 'max:100'],
             'location' => ['nullable', 'string', 'max:100'],
             'notes' => ['nullable', 'string'],
+            'return_deadline' => ['nullable', 'date', 'after_or_equal:today'],
+            'handover_payout' => ['nullable', 'numeric', 'min:0'],
         ]);
 
         $unit->update([
@@ -258,10 +262,47 @@ class InventoryController extends Controller
             'handover_to' => $validated['handover_to'],
             'handed_out_at' => now(),
             'location' => $validated['location'] ?? "Out with {$validated['handover_to']}",
+            'return_deadline' => $validated['return_deadline'] ?? null,
+            'handover_payout' => $validated['handover_payout'] ?? null,
             'notes' => ! empty($validated['notes'])
                 ? ($unit->notes ? "{$unit->notes} | {$validated['notes']}" : $validated['notes'])
                 : $unit->notes,
         ]);
+
+        // Create a receivable debt (vendor owes you this amount) when a payout is agreed
+        $debtCreated = false;
+        if (! empty($validated['handover_payout']) && (float) $validated['handover_payout'] > 0) {
+            $payoutAmount = (float) $validated['handover_payout'];
+
+            // Try to find a matching contact for the handover person
+            $contact = Contact::where('name', 'ilike', $validated['handover_to'])->first();
+
+            if (! $contact) {
+                $contact = Contact::create([
+                    'tenant_id' => $unit->tenant_id,
+                    'name' => $validated['handover_to'],
+                    'roles' => ['vendor', 'partner'],
+                    'is_active' => true,
+                ]);
+            }
+
+            if ($contact) {
+                Debt::create([
+                    'tenant_id' => $unit->tenant_id,
+                    'contact_id' => $contact->id,
+                    'type' => 'receivable',
+                    'reference_type' => 'handover_holding',
+                    'reference_id' => $unit->id,
+                    'original_amount' => $payoutAmount,
+                    'paid_amount' => 0.0,
+                    'remaining_amount' => $payoutAmount,
+                    'due_date' => $validated['return_deadline'] ?? now()->addDays(7),
+                    'status' => 'open',
+                    'notes' => "Handover payout for {$unit->imei_or_serial} to {$validated['handover_to']}. Vendor must pay this amount on sale or return the device.",
+                ]);
+                $debtCreated = true;
+            }
+        }
 
         AuditLog::record(
             action: 'unit_handover',
@@ -271,12 +312,20 @@ class InventoryController extends Controller
                 'imei_or_serial' => $unit->imei_or_serial,
                 'handover_to' => $validated['handover_to'],
                 'location' => $unit->location,
+                'return_deadline' => $validated['return_deadline'] ?? null,
+                'handover_payout' => $validated['handover_payout'] ?? null,
+                'debt_created' => $debtCreated,
             ]
         );
 
+        $message = "Item handed out to {$validated['handover_to']} for sale.";
+        if ($debtCreated) {
+            $message .= " Receivable of " . number_format((float) $validated['handover_payout'], 2) . " ETB recorded.";
+        }
+
         return response()->json([
             'success' => true,
-            'message' => "Item handed out to {$validated['handover_to']} for sale.",
+            'message' => $message,
             'data' => $unit->load('variant.product'),
         ]);
     }
@@ -318,9 +367,25 @@ class InventoryController extends Controller
             'status' => 'in_stock',
             'handover_to' => null,
             'handed_out_at' => null,
+            'handover_payout' => null,
+            'return_deadline' => null,
             'location' => 'Shop Counter',
             'sold_at' => null,
         ]);
+
+        // Cancel any open handover_holding receivable debt for this unit
+        $cancelledDebt = Debt::where('reference_type', 'handover_holding')
+            ->where('reference_id', $unit->id)
+            ->where('status', 'open')
+            ->first();
+
+        if ($cancelledDebt) {
+            $cancelledDebt->update([
+                'status' => 'settled',
+                'remaining_amount' => 0,
+                'notes' => $cancelledDebt->notes . ' | CANCELLED — device returned unsold by ' . ($previousHandover ?? 'vendor') . '.',
+            ]);
+        }
 
         $note = $previousHandover ? " (returned unsold by {$previousHandover})" : '';
 
@@ -331,6 +396,7 @@ class InventoryController extends Controller
             newValues: [
                 'imei_or_serial' => $unit->imei_or_serial,
                 'previous_handover' => $previousHandover,
+                'debt_cancelled' => $cancelledDebt !== null,
             ]
         );
 
