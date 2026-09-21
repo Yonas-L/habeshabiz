@@ -820,10 +820,17 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                   <input
                     type="number"
                     step="0.01"
+                    min="0"
+                    max={grossSubtotal > 0 ? grossSubtotal : undefined}
                     value={discountAmount}
                     onChange={(e) => {
-                      setDiscountAmount(e.target.value);
-                      const d = parseFloat(e.target.value) || 0;
+                      let d = parseFloat(e.target.value) || 0;
+                      if (d < 0) d = 0;
+                      if (grossSubtotal > 0 && d > grossSubtotal) {
+                        d = grossSubtotal;
+                        toast.warning(`Discount cannot exceed the subtotal (${grossSubtotal.toLocaleString()} ETB).`);
+                      }
+                      setDiscountAmount(e.target.value === '' ? '' : String(d));
                       const newTotal = grossSubtotal - d;
                       setPaidAmount(String(Math.max(0, newTotal)));
                     }}
