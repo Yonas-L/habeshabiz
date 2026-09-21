@@ -22,6 +22,8 @@ import {
   Percent,
   AlertTriangle,
   Zap,
+  Plus,
+  Minus,
 } from 'lucide-react';
 
 interface CounterViewProps {
@@ -56,7 +58,8 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
   const [sourcingType, setSourcingType] = useState<'internal_stock' | 'brokered_neighbour'>('internal_stock');
   const [selectedProductId, setSelectedProductId] = useState<string>('');
   const [selectedVariantId, setSelectedVariantId] = useState<string>('');
-  const [selectedUnitId, setSelectedUnitId] = useState<string>('');
+  const [selectedUnitIds, setSelectedUnitIds] = useState<string[]>([]);
+  const [quantity, setQuantity] = useState<number>(1);
   const [productSearch, setProductSearch] = useState('');
 
   // Brokered details
@@ -64,7 +67,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
   const [vendorCost, setVendorCost] = useState<string>('');
 
   // Pricing & Payment
-  const [sellingPrice, setSellingPrice] = useState<string>('');
+  const [unitSellingPrice, setUnitSellingPrice] = useState<string>('');
   const [discountAmount, setDiscountAmount] = useState<string>('0');
   const [paidAmount, setPaidAmount] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<string>('telebirr');
@@ -139,46 +142,81 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
   }, [products, productSearch, availableUnits]);
 
   // Pricing calculations
-  const priceNum = parseFloat(sellingPrice) || 0;
+  const unitPriceNum = parseFloat(unitSellingPrice) || 0;
+  const grossSubtotal = unitPriceNum * quantity;
   const discountNum = parseFloat(discountAmount) || 0;
+  const totalAfterDiscount = Math.max(0, grossSubtotal - discountNum);
   const paidNum = parseFloat(paidAmount) || 0;
-  const totalAfterDiscount = Math.max(0, priceNum - discountNum);
   const balanceDue = Math.max(0, totalAfterDiscount - paidNum);
   const isCredit = balanceDue > 0;
-  const brokeredProfit = sourcingType === 'brokered_neighbour' && sellingPrice && vendorCost
-    ? priceNum - parseFloat(vendorCost)
+
+  const vendorCostNum = parseFloat(vendorCost) || 0;
+  const brokeredProfit = sourcingType === 'brokered_neighbour' && unitSellingPrice && vendorCost
+    ? (unitPriceNum - vendorCostNum) * quantity
     : null;
 
   // Step progress
   const step1Done = !!selectedProductId;
   const step2Done = !!selectedVariantId;
-  const step3Done = !!sellingPrice && priceNum > 0;
+  const step3Done = unitPriceNum > 0 && quantity > 0;
   const currentStep = !step1Done ? 1 : !step2Done ? 2 : !step3Done ? 3 : 4;
 
   const handleSelectProduct = (productId: string) => {
     setSelectedProductId(productId);
     setSelectedVariantId('');
-    setSelectedUnitId('');
-    setSellingPrice('');
+    setSelectedUnitIds([]);
+    setQuantity(1);
+    setUnitSellingPrice('');
     setPaidAmount('');
     setProductSearch('');
   };
 
   const handleSelectVariant = (variant: ProductVariant) => {
     setSelectedVariantId(variant.id);
-    setSelectedUnitId('');
+    setSelectedUnitIds([]);
+    setQuantity(1);
     if (variant.default_selling_price) {
       const priceStr = String(variant.default_selling_price);
-      setSellingPrice(priceStr);
+      setUnitSellingPrice(priceStr);
       setPaidAmount(priceStr);
     }
+  };
+
+  const handleToggleUnit = (unitId: string) => {
+    setSelectedUnitIds((prev) => {
+      const next = prev.includes(unitId) ? prev.filter((id) => id !== unitId) : [...prev, unitId];
+      const newQty = next.length > 0 ? next.length : 1;
+      setQuantity(newQty);
+      if (unitPriceNum > 0) {
+        const newTotal = unitPriceNum * newQty - discountNum;
+        setPaidAmount(String(Math.max(0, newTotal)));
+      }
+      return next;
+    });
+  };
+
+  const handleQuantityChange = (newQty: number) => {
+    const validQty = Math.max(1, newQty);
+    setQuantity(validQty);
+    if (unitPriceNum > 0) {
+      const newTotal = unitPriceNum * validQty - discountNum;
+      setPaidAmount(String(Math.max(0, newTotal)));
+    }
+  };
+
+  const handleUnitPriceChange = (val: string) => {
+    setUnitSellingPrice(val);
+    const p = parseFloat(val) || 0;
+    const newTotal = p * quantity - discountNum;
+    setPaidAmount(String(Math.max(0, newTotal)));
   };
 
   const resetForm = () => {
     setSelectedProductId('');
     setSelectedVariantId('');
-    setSelectedUnitId('');
-    setSellingPrice('');
+    setSelectedUnitIds([]);
+    setQuantity(1);
+    setUnitSellingPrice('');
     setPaidAmount('');
     setDiscountAmount('0');
     setVendorCost('');
@@ -193,8 +231,12 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
       toast.error('Please select a product and variant');
       return;
     }
-    if (priceNum <= 0) {
+    if (unitPriceNum <= 0) {
       toast.error('Please enter a valid selling price');
+      return;
+    }
+    if (quantity <= 0) {
+      toast.error('Quantity must be at least 1');
       return;
     }
     if (sourcingType === 'brokered_neighbour') {
@@ -202,8 +244,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
         toast.error('Please select the peer merchant');
         return;
       }
-      const costNum = parseFloat(vendorCost);
-      if (isNaN(costNum) || costNum <= 0) {
+      if (isNaN(vendorCostNum) || vendorCostNum <= 0) {
         toast.error('Please enter the agreed peer purchase cost');
         return;
       }
@@ -211,6 +252,44 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
 
     try {
       setSubmitting(true);
+
+      // Build items array
+      let itemsPayload: Array<{
+        variant_id: string;
+        inventory_unit_id: string | null;
+        quantity: number;
+        unit_price: number;
+        sourcing_type: 'internal_stock' | 'brokered_neighbour';
+        vendor_contact_id: string | null;
+        vendor_cost: number | null;
+      }> = [];
+
+      if (sourcingType === 'internal_stock' && selectedUnitIds.length > 0) {
+        // Multiple or single serialized units
+        itemsPayload = selectedUnitIds.map((uId) => ({
+          variant_id: selectedVariantId,
+          inventory_unit_id: uId,
+          quantity: 1,
+          unit_price: unitPriceNum,
+          sourcing_type: 'internal_stock',
+          vendor_contact_id: null,
+          vendor_cost: null,
+        }));
+      } else {
+        // Quantity-based sale (non-serialized or without specific serial unit)
+        itemsPayload = [
+          {
+            variant_id: selectedVariantId,
+            inventory_unit_id: null,
+            quantity: quantity,
+            unit_price: unitPriceNum,
+            sourcing_type: sourcingType,
+            vendor_contact_id: sourcingType === 'brokered_neighbour' ? vendorContactId : null,
+            vendor_cost: sourcingType === 'brokered_neighbour' ? vendorCostNum : null,
+          },
+        ];
+      }
+
       const salePayload = {
         customer_id: customerId || null,
         discount_amount: discountNum,
@@ -218,25 +297,15 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
         payment_method: paymentMethod,
         financial_account_id: paidNum > 0 ? financialAccountId : null,
         notes: notes || null,
-        items: [
-          {
-            variant_id: selectedVariantId,
-            inventory_unit_id: sourcingType === 'internal_stock' ? (selectedUnitId || null) : null,
-            quantity: 1,
-            unit_price: priceNum,
-            sourcing_type: sourcingType,
-            vendor_contact_id: sourcingType === 'brokered_neighbour' ? vendorContactId : null,
-            vendor_cost: sourcingType === 'brokered_neighbour' ? parseFloat(vendorCost) : null,
-          },
-        ],
+        items: itemsPayload,
       };
 
       const order = await api.recordSale(salePayload);
 
       toast.success(`Sale recorded! Order #${order.order_number}`, {
         description: sourcingType === 'brokered_neighbour'
-          ? 'Brokered profit booked & payable recorded for peer.'
-          : 'Inventory deducted & ledger updated.',
+          ? `Brokered sale of ${quantity} unit(s) booked & payable recorded.`
+          : `Sold ${quantity} unit(s) — Inventory deducted & ledger updated.`,
       });
 
       resetForm();
@@ -277,7 +346,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
             <h2 className="font-black text-slate-900 dark:text-white text-base tracking-tight">Point of Sale</h2>
             <p className="text-[11px] text-slate-400 font-medium">
               {user && <span className="text-slate-600 dark:text-slate-300 font-bold">{user.name}</span>}
-              {user && ' — '}Quick sale entry
+              {user && ' — '}Quick sale entry with quantity &amp; serial tracking
             </p>
           </div>
         </div>
@@ -288,7 +357,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
           <ChevronRight className="w-3 h-3 text-slate-300 dark:text-slate-600" />
           <StepBadge num={2} label="Variant" active={currentStep >= 2} done={step2Done} />
           <ChevronRight className="w-3 h-3 text-slate-300 dark:text-slate-600" />
-          <StepBadge num={3} label="Price" active={currentStep >= 3} done={step3Done} />
+          <StepBadge num={3} label="Qty & Price" active={currentStep >= 3} done={step3Done} />
           <ChevronRight className="w-3 h-3 text-slate-300 dark:text-slate-600" />
           <StepBadge num={4} label="Confirm" active={currentStep >= 4} done={false} />
         </div>
@@ -299,7 +368,10 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
         <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl text-xs font-semibold">
           <button
             type="button"
-            onClick={() => setSourcingType('internal_stock')}
+            onClick={() => {
+              setSourcingType('internal_stock');
+              setSelectedUnitIds([]);
+            }}
             className={`px-4 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
               sourcingType === 'internal_stock'
                 ? 'bg-white dark:bg-[#131926] text-slate-900 dark:text-white shadow-xs'
@@ -311,7 +383,10 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
           </button>
           <button
             type="button"
-            onClick={() => setSourcingType('brokered_neighbour')}
+            onClick={() => {
+              setSourcingType('brokered_neighbour');
+              setSelectedUnitIds([]);
+            }}
             className={`px-4 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
               sourcingType === 'brokered_neighbour'
                 ? 'bg-amber-500 text-white shadow-xs'
@@ -408,7 +483,11 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                     )}
                   </div>
                   <button
-                    onClick={() => { setSelectedProductId(''); setSelectedVariantId(''); setSelectedUnitId(''); }}
+                    onClick={() => {
+                      setSelectedProductId('');
+                      setSelectedVariantId('');
+                      setSelectedUnitIds([]);
+                    }}
                     className="text-[11px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 font-semibold"
                   >
                     Change
@@ -454,23 +533,31 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
           {/* ── Serial Unit Selection (for internal stock with serials) ── */}
           {selectedVariant && sourcingType === 'internal_stock' && selectedProduct?.has_serials && (
             <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800/90 p-4 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-3 block">
-                Pick Serial Unit ({unitsForVariant.length} available)
-              </span>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                  Pick Serialized Units ({unitsForVariant.length} in stock)
+                </span>
+                {selectedUnitIds.length > 0 && (
+                  <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                    {selectedUnitIds.length} unit(s) selected
+                  </span>
+                )}
+              </div>
+
               {unitsForVariant.length === 0 ? (
                 <div className="p-4 rounded-xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-800/50 text-xs text-amber-700 dark:text-amber-400 flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 shrink-0" />
-                  <span>No units in stock for this variant. Switch to "Brokered" if sourcing from a peer shop.</span>
+                  <span>No physical units in stock for this variant. You can specify quantity directly below or toggle "Brokered" to source from a peer shop.</span>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {unitsForVariant.map((u) => {
-                    const isSelected = selectedUnitId === u.id;
+                    const isSelected = selectedUnitIds.includes(u.id);
                     return (
                       <button
                         key={u.id}
                         type="button"
-                        onClick={() => setSelectedUnitId(u.id)}
+                        onClick={() => handleToggleUnit(u.id)}
                         className={`p-3 rounded-xl border-2 text-left text-xs transition-all ${
                           isSelected
                             ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/20 shadow-sm'
@@ -481,11 +568,11 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                           <span className="font-mono font-bold text-slate-900 dark:text-white text-[11px]">
                             {u.imei_or_serial || 'No Serial'}
                           </span>
-                          {isSelected && (
-                            <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center">
-                              <Check className="w-3 h-3 text-white" />
-                            </div>
-                          )}
+                          <div className={`w-5 h-5 rounded-full flex items-center justify-center ${
+                            isSelected ? 'bg-emerald-500 text-white' : 'border border-slate-300 dark:border-slate-700'
+                          }`}>
+                            {isSelected && <Check className="w-3 h-3" />}
+                          </div>
                         </div>
                         <div className="flex items-center gap-2 mt-1.5 text-[10px] text-slate-500 dark:text-slate-400">
                           {u.battery_health && (
@@ -540,14 +627,14 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                    Peer Cost (ETB)
+                    Peer Unit Cost (ETB)
                   </label>
                   <input
                     type="number"
                     step="0.01"
                     value={vendorCost}
                     onChange={(e) => setVendorCost(e.target.value)}
-                    placeholder="What you pay the peer"
+                    placeholder="Agreed cost per unit"
                     className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
                     required
                   />
@@ -559,48 +646,117 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                     ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-800/50'
                     : 'bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-400 border border-rose-200/50 dark:border-rose-800/50'
                 }`}>
-                  {brokeredProfit > 0 ? '+' : ''}{brokeredProfit.toLocaleString()} ETB margin
+                  {brokeredProfit > 0 ? '+' : ''}{brokeredProfit.toLocaleString()} ETB total margin ({quantity} × {(unitPriceNum - vendorCostNum).toLocaleString()} ETB)
                 </div>
               )}
             </div>
           )}
 
-          {/* ── STEP 3: Pricing & Payment ── */}
+          {/* ── STEP 3: Quantity, Pricing & Payment ── */}
           {selectedVariant && (
             <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800/90 p-4 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] space-y-4">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                Pricing & Payment
-              </span>
+              
+              {/* ── Quantity Stepper Section ── */}
+              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                      Quantity / Number of Units
+                    </span>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+                      {selectedUnitIds.length > 0
+                        ? `${selectedUnitIds.length} specific serial unit(s) selected above`
+                        : 'Specify how many units to sell'}
+                    </p>
+                  </div>
 
+                  {/* Stepper + Quick count chips */}
+                  <div className="flex items-center gap-2">
+                    <div className="inline-flex items-center rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-1 shadow-2xs">
+                      <button
+                        type="button"
+                        onClick={() => handleQuantityChange(quantity - 1)}
+                        disabled={quantity <= 1}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-30 transition-colors"
+                      >
+                        <Minus className="w-3.5 h-3.5" />
+                      </button>
+
+                      <input
+                        type="number"
+                        min="1"
+                        value={quantity}
+                        onChange={(e) => handleQuantityChange(parseInt(e.target.value) || 1)}
+                        className="w-12 text-center font-mono font-black text-sm text-slate-900 dark:text-white bg-transparent focus:outline-none"
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() => handleQuantityChange(quantity + 1)}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    {/* Quick Count Preset Chips */}
+                    <div className="hidden sm:flex items-center gap-1">
+                      {[1, 2, 3, 5, 10].map((count) => (
+                        <button
+                          key={count}
+                          type="button"
+                          onClick={() => handleQuantityChange(count)}
+                          className={`h-8 px-2 rounded-lg text-xs font-mono font-bold transition-all ${
+                            quantity === count
+                              ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-2xs'
+                              : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-400'
+                          }`}
+                        >
+                          {count}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Price Inputs ── */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
                     <Tag className="w-3 h-3 inline mr-0.5" />
-                    Selling Price *
+                    Unit Price (ETB) *
                   </label>
                   <input
                     type="number"
                     step="0.01"
-                    value={sellingPrice}
-                    onChange={(e) => {
-                      setSellingPrice(e.target.value);
-                      setPaidAmount(e.target.value);
-                    }}
-                    placeholder="0"
+                    value={unitSellingPrice}
+                    onChange={(e) => handleUnitPriceChange(e.target.value)}
+                    placeholder="Price per unit"
                     className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-sm font-mono font-black text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
                     required
                   />
+                  {quantity > 1 && unitPriceNum > 0 && (
+                    <span className="text-[10px] text-slate-400 mt-1 block font-mono">
+                      = {grossSubtotal.toLocaleString()} ETB subtotal
+                    </span>
+                  )}
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
                     <Percent className="w-3 h-3 inline mr-0.5" />
-                    Discount
+                    Discount (Total)
                   </label>
                   <input
                     type="number"
                     step="0.01"
                     value={discountAmount}
-                    onChange={(e) => setDiscountAmount(e.target.value)}
+                    onChange={(e) => {
+                      setDiscountAmount(e.target.value);
+                      const d = parseFloat(e.target.value) || 0;
+                      const newTotal = grossSubtotal - d;
+                      setPaidAmount(String(Math.max(0, newTotal)));
+                    }}
                     disabled={user ? !user.can_discount : false}
                     placeholder="0"
                     className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-sm font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 disabled:opacity-40"
@@ -608,7 +764,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                    Paid Now
+                    Paid Now (ETB)
                   </label>
                   <input
                     type="number"
@@ -645,6 +801,8 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                           setPaymentMethod(m.value);
                           if (m.value === 'credit') {
                             setPaidAmount('0');
+                          } else {
+                            setPaidAmount(String(totalAfterDiscount));
                           }
                         }}
                         className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border-2 text-[11px] font-semibold transition-all ${
@@ -739,7 +897,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
               ) : (
                 <>
                   {/* Product Line Item */}
-                  <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800">
+                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800">
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
                         <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
@@ -750,21 +908,29 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                             {variantLabel(selectedVariant)}
                           </div>
                         )}
-                        {selectedUnitId && (
-                          <div className="text-[10px] text-slate-400 font-mono mt-0.5">
-                            SN: {availableUnits.find((u) => u.id === selectedUnitId)?.imei_or_serial || '—'}
+                        {selectedUnitIds.length > 0 && (
+                          <div className="text-[10px] text-slate-400 font-mono mt-1 space-y-0.5">
+                            {selectedUnitIds.map((uId) => {
+                              const u = availableUnits.find((unit) => unit.id === uId);
+                              return (
+                                <div key={uId} className="flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                  <span>SN: {u?.imei_or_serial || 'Unknown'}</span>
+                                </div>
+                              );
+                            })}
                           </div>
                         )}
                         {sourcingType === 'brokered_neighbour' && (
-                          <div className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/30 text-[10px] font-bold text-amber-700 dark:text-amber-400">
+                          <div className="inline-flex items-center gap-1 mt-1.5 px-1.5 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/30 text-[10px] font-bold text-amber-700 dark:text-amber-400">
                             <ArrowRightLeft className="w-2.5 h-2.5" />
                             Brokered
                           </div>
                         )}
                       </div>
-                      <div className="text-right ml-3">
-                        <span className="text-xs font-mono font-bold text-slate-900 dark:text-white">
-                          × 1
+                      <div className="text-right ml-3 shrink-0">
+                        <span className="text-xs font-mono font-bold text-slate-900 dark:text-white px-2 py-0.5 rounded-md bg-slate-200/70 dark:bg-slate-700">
+                          × {quantity}
                         </span>
                       </div>
                     </div>
@@ -773,11 +939,20 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                   {/* Price Breakdown */}
                   <div className="space-y-2 text-xs">
                     <div className="flex justify-between text-slate-600 dark:text-slate-400">
-                      <span>Subtotal</span>
+                      <span>Unit Price</span>
                       <span className="font-mono font-bold text-slate-900 dark:text-white">
-                        {priceNum > 0 ? priceNum.toLocaleString() : '—'} ETB
+                        {unitPriceNum > 0 ? unitPriceNum.toLocaleString() : '—'} ETB
                       </span>
                     </div>
+
+                    {quantity > 1 && (
+                      <div className="flex justify-between text-slate-600 dark:text-slate-400">
+                        <span>Gross Subtotal ({quantity} × {unitPriceNum.toLocaleString()})</span>
+                        <span className="font-mono font-bold text-slate-900 dark:text-white">
+                          {grossSubtotal > 0 ? grossSubtotal.toLocaleString() : '—'} ETB
+                        </span>
+                      </div>
+                    )}
 
                     {discountNum > 0 && (
                       <div className="flex justify-between text-rose-600 dark:text-rose-400">
@@ -787,16 +962,16 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                     )}
 
                     <div className="flex justify-between pt-2 border-t border-dashed border-slate-200 dark:border-slate-700">
-                      <span className="font-bold text-slate-900 dark:text-white">Total</span>
+                      <span className="font-bold text-slate-900 dark:text-white">Total Net Payable</span>
                       <span className="font-mono font-black text-base text-slate-900 dark:text-white">
                         {totalAfterDiscount > 0 ? totalAfterDiscount.toLocaleString() : '—'} ETB
                       </span>
                     </div>
 
-                    {priceNum > 0 && (
+                    {unitPriceNum > 0 && (
                       <>
                         <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
-                          <span>Paid</span>
+                          <span>Amount Paid</span>
                           <span className="font-mono font-bold">{paidNum.toLocaleString()} ETB</span>
                         </div>
 
@@ -804,7 +979,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                           <div className="flex justify-between text-amber-600 dark:text-amber-400 font-bold">
                             <span className="flex items-center gap-1">
                               <AlertTriangle className="w-3 h-3" />
-                              Balance Due
+                              Balance Due (Credit)
                             </span>
                             <span className="font-mono">{balanceDue.toLocaleString()} ETB</span>
                           </div>
@@ -814,9 +989,9 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                   </div>
 
                   {/* Credit Warning */}
-                  {isCredit && priceNum > 0 && (
+                  {isCredit && unitPriceNum > 0 && (
                     <div className="p-2.5 rounded-xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-800/50 text-[11px] text-amber-700 dark:text-amber-400 font-medium">
-                      A receivable of {balanceDue.toLocaleString()} ETB will be created for this customer.
+                      A receivable debt of {balanceDue.toLocaleString()} ETB will be created for {customerId ? 'this customer' : 'anonymous debtor'}.
                     </div>
                   )}
 
@@ -827,7 +1002,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                         ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-800/50'
                         : 'bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-400 border border-rose-200/50 dark:border-rose-800/50'
                     }`}>
-                      Your margin: {brokeredProfit > 0 ? '+' : ''}{brokeredProfit.toLocaleString()} ETB
+                      Total margin: {brokeredProfit > 0 ? '+' : ''}{brokeredProfit.toLocaleString()} ETB ({quantity} units)
                     </div>
                   )}
                 </>
@@ -838,7 +1013,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
             <div className="p-4 border-t border-slate-100 dark:border-slate-800">
               <button
                 onClick={handleSubmitSale}
-                disabled={submitting || !selectedVariantId || priceNum <= 0}
+                disabled={submitting || !selectedVariantId || unitPriceNum <= 0 || quantity <= 0}
                 className="w-full h-11 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 dark:disabled:bg-slate-800 text-white disabled:text-slate-400 text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2 active:scale-[0.98] disabled:cursor-not-allowed"
               >
                 {submitting ? (
@@ -851,9 +1026,9 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                     ? 'Recording...'
                     : !selectedVariantId
                     ? 'Select a Product'
-                    : priceNum <= 0
-                    ? 'Enter Selling Price'
-                    : `Complete Sale — ${totalAfterDiscount.toLocaleString()} ETB`}
+                    : unitPriceNum <= 0
+                    ? 'Enter Unit Price'
+                    : `Complete Sale (${quantity}x) — ${totalAfterDiscount.toLocaleString()} ETB`}
                 </span>
               </button>
             </div>
