@@ -331,11 +331,9 @@ export const DonutCapitalChart: React.FC<{
   treasury: number;
   assets: number;
   payables?: number;
-  netCapital?: number;
   netProfit?: number;
-}> = ({ stock, receivables, treasury, assets, payables = 0, netCapital, netProfit }) => {
+}> = ({ stock, receivables, treasury, assets, payables = 0, netProfit }) => {
   const grossAssets = stock + receivables + treasury + assets;
-  const effectiveNetCapital = netCapital !== undefined ? netCapital : Math.max(0, grossAssets - payables);
   const total = grossAssets + payables;
   const radius = 58;
   const stroke = 15;
@@ -431,27 +429,20 @@ export const DonutCapitalChart: React.FC<{
           )}
         </svg>
 
-        {/* Center Readout: Net Capital & Net Profit */}
+        {/* Center Readout: Net Profit */}
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center select-none pointer-events-none px-2">
-          <span className="text-[9px] uppercase tracking-wider text-slate-400 dark:text-slate-500 font-bold">
-            Net Capital
+          <span className="text-[10px] uppercase tracking-wider text-emerald-600 dark:text-emerald-400 font-bold">
+            Net Profit
           </span>
-          <span className="text-base sm:text-lg font-black font-mono text-slate-900 dark:text-white tracking-tight mt-0.5">
-            {effectiveNetCapital >= 1000000
-              ? `${(effectiveNetCapital / 1000000).toFixed(2)}M`
-              : effectiveNetCapital.toLocaleString()}{' '}
-            <span className="text-[10px] font-sans font-bold text-slate-400">ETB</span>
+          <span className="text-xl sm:text-2xl font-black font-mono text-slate-900 dark:text-white tracking-tight mt-0.5">
+            +{(netProfit ?? 0) >= 1000000
+              ? `${((netProfit ?? 0) / 1000000).toFixed(2)}M`
+              : (netProfit ?? 0).toLocaleString()}{' '}
+            <span className="text-xs font-sans font-bold text-slate-400">ETB</span>
           </span>
-          {netProfit !== undefined && (
-            <div className="mt-1 pt-1 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-center gap-1">
-              <span className="text-[9px] uppercase font-bold text-emerald-600 dark:text-emerald-400">
-                Net Profit:
-              </span>
-              <span className="text-[10px] font-bold font-mono text-emerald-700 dark:text-emerald-300">
-                +{netProfit >= 1000000 ? `${(netProfit / 1000000).toFixed(2)}M` : `${netProfit.toLocaleString()}`} ETB
-              </span>
-            </div>
-          )}
+          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium mt-0.5">
+            Active Period
+          </span>
         </div>
       </div>
 
@@ -505,7 +496,7 @@ export const DonutCapitalChart: React.FC<{
           </div>
         </div>
 
-        <div className="flex items-start gap-2">
+        <div className="flex items-start gap-2 col-span-2 sm:col-span-1">
           <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0 mt-0.5" />
           <div className="min-w-0">
             <span className="text-slate-400 dark:text-slate-500 block text-[10px] font-medium">
@@ -516,20 +507,6 @@ export const DonutCapitalChart: React.FC<{
             </span>
           </div>
         </div>
-
-        {netProfit !== undefined && (
-          <div className="flex items-start gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 shrink-0 mt-0.5 ring-2 ring-emerald-200 dark:ring-emerald-950" />
-            <div className="min-w-0">
-              <span className="text-emerald-600 dark:text-emerald-400 block text-[10px] font-bold uppercase tracking-wider">
-                Net Profit
-              </span>
-              <span className="font-bold text-emerald-700 dark:text-emerald-300 font-mono text-xs truncate block">
-                +<AnimatedNumber value={netProfit} /> ETB
-              </span>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

@@ -184,20 +184,15 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800/60 mb-3.5">
               <div>
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 block">
-                  Asset & Capital Allocation
+                  Asset Allocation
                 </span>
                 <span className="text-xs font-bold text-slate-900 dark:text-white">
                   Portfolio Balance & Debts
                 </span>
               </div>
-              <div className="text-right">
-                <span className="text-[10px] uppercase font-bold text-emerald-600 dark:text-emerald-400 block">
-                  Month Net Profit
-                </span>
-                <span className="text-xs font-bold font-mono text-emerald-700 dark:text-emerald-400">
-                  +<AnimatedNumber value={monthly_performance.net_profit} /> ETB
-                </span>
-              </div>
+              <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 font-medium">
+                Live Valuation
+              </span>
             </div>
             <DonutCapitalChart
               stock={capital_overview.stock_value}
@@ -205,7 +200,6 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               treasury={capital_overview.cash_and_banks}
               assets={capital_overview.custom_assets}
               payables={capital_overview.payables}
-              netCapital={capital_overview.net_capital}
               netProfit={monthly_performance.net_profit}
             />
           </div>
@@ -217,9 +211,9 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               </span>
             </div>
             <div className="flex items-center justify-between pl-1">
-              <span className="text-slate-400 dark:text-slate-500 text-[11px]">Payables Owed</span>
-              <span className="font-semibold text-rose-600 dark:text-rose-400 font-mono text-[11px]">
-                −{capital_overview.payables.toLocaleString()} ETB
+              <span className="text-slate-400 dark:text-slate-500 text-[11px]">Net Capital</span>
+              <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono text-[11px]">
+                {capital_overview.net_capital.toLocaleString()} ETB
               </span>
             </div>
           </div>
