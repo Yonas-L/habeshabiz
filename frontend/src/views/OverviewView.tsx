@@ -182,25 +182,46 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         <div className="lg:col-span-5 bg-white dark:bg-[#131926] rounded-xl border border-slate-200/60 dark:border-slate-800/60 p-5 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800/60 mb-3.5">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                Asset Allocation
-              </span>
-              <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">
-                Portfolio Balance
-              </span>
+              <div>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 block">
+                  Asset & Capital Allocation
+                </span>
+                <span className="text-xs font-bold text-slate-900 dark:text-white">
+                  Portfolio Balance & Debts
+                </span>
+              </div>
+              <div className="text-right">
+                <span className="text-[10px] uppercase font-bold text-emerald-600 dark:text-emerald-400 block">
+                  Month Net Profit
+                </span>
+                <span className="text-xs font-bold font-mono text-emerald-700 dark:text-emerald-400">
+                  +<AnimatedNumber value={monthly_performance.net_profit} /> ETB
+                </span>
+              </div>
             </div>
             <DonutCapitalChart
               stock={capital_overview.stock_value}
               receivables={capital_overview.receivables}
               treasury={capital_overview.cash_and_banks}
               assets={capital_overview.custom_assets}
+              payables={capital_overview.payables}
+              netCapital={capital_overview.net_capital}
+              netProfit={monthly_performance.net_profit}
             />
           </div>
-          <div className="pt-3 mt-3 border-t border-slate-100 dark:border-slate-800/60 flex items-center justify-between text-xs">
-            <span className="text-slate-400 dark:text-slate-500">Supplier debt</span>
-            <span className="font-semibold text-rose-600/80 dark:text-rose-400/70 font-mono">
-              −{capital_overview.payables.toLocaleString()} ETB
-            </span>
+          <div className="pt-3 mt-3 border-t border-slate-100 dark:border-slate-800/60 grid grid-cols-2 gap-2 text-xs">
+            <div className="flex items-center justify-between pr-3 border-r border-slate-100 dark:border-slate-800/60">
+              <span className="text-slate-400 dark:text-slate-500 text-[11px]">Gross Assets</span>
+              <span className="font-semibold text-slate-800 dark:text-slate-200 font-mono text-[11px]">
+                {(capital_overview.stock_value + capital_overview.receivables + capital_overview.cash_and_banks + capital_overview.custom_assets).toLocaleString()} ETB
+              </span>
+            </div>
+            <div className="flex items-center justify-between pl-1">
+              <span className="text-slate-400 dark:text-slate-500 text-[11px]">Payables Owed</span>
+              <span className="font-semibold text-rose-600 dark:text-rose-400 font-mono text-[11px]">
+                −{capital_overview.payables.toLocaleString()} ETB
+              </span>
+            </div>
           </div>
         </div>
       </div>

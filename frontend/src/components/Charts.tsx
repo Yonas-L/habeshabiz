@@ -324,14 +324,19 @@ export const MiniBarHistogram: React.FC<{
   );
 };
 
-// Donut Chart for Capital Composition
+// Donut Chart for Capital Composition & Asset Allocation
 export const DonutCapitalChart: React.FC<{
   stock: number;
   receivables: number;
   treasury: number;
   assets: number;
-}> = ({ stock, receivables, treasury, assets }) => {
-  const total = stock + receivables + treasury + assets;
+  payables?: number;
+  netCapital?: number;
+  netProfit?: number;
+}> = ({ stock, receivables, treasury, assets, payables = 0, netCapital, netProfit }) => {
+  const grossAssets = stock + receivables + treasury + assets;
+  const effectiveNetCapital = netCapital !== undefined ? netCapital : Math.max(0, grossAssets - payables);
+  const total = grossAssets + payables;
   const radius = 58;
   const stroke = 15;
   const circum = 2 * Math.PI * radius;
@@ -340,11 +345,13 @@ export const DonutCapitalChart: React.FC<{
   const recPct = total > 0 ? receivables / total : 0;
   const treasPct = total > 0 ? treasury / total : 0;
   const assetPct = total > 0 ? assets / total : 0;
+  const payablePct = total > 0 ? payables / total : 0;
 
   const stockOffset = 0;
   const recOffset = circum * stockPct;
   const treasOffset = circum * (stockPct + recPct);
   const assetOffset = circum * (stockPct + recPct + treasPct);
+  const payableOffset = circum * (stockPct + recPct + treasPct + assetPct);
 
   return (
     <div className="flex flex-col sm:flex-row lg:flex-col xl:flex-row items-center justify-center gap-5 sm:gap-6">
@@ -408,17 +415,43 @@ export const DonutCapitalChart: React.FC<{
             strokeDashoffset={-assetOffset}
             className="transition-all duration-500"
           />
+          {/* Payables segment */}
+          {payables > 0 && (
+            <circle
+              cx="80"
+              cy="80"
+              r={radius}
+              fill="none"
+              stroke="#f43f5e"
+              strokeWidth={stroke}
+              strokeDasharray={`${circum * payablePct} ${circum}`}
+              strokeDashoffset={-payableOffset}
+              className="transition-all duration-500"
+            />
+          )}
         </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center select-none pointer-events-none">
-          <span className="text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500 font-semibold">
-            Total Assets
+
+        {/* Center Readout: Net Capital & Net Profit */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center select-none pointer-events-none px-2">
+          <span className="text-[9px] uppercase tracking-wider text-slate-400 dark:text-slate-500 font-bold">
+            Net Capital
           </span>
-          <span className="text-lg sm:text-xl font-bold font-mono text-slate-900 dark:text-white tracking-tight mt-0.5">
-            {(total / 1000000).toFixed(2)}M
+          <span className="text-base sm:text-lg font-black font-mono text-slate-900 dark:text-white tracking-tight mt-0.5">
+            {effectiveNetCapital >= 1000000
+              ? `${(effectiveNetCapital / 1000000).toFixed(2)}M`
+              : effectiveNetCapital.toLocaleString()}{' '}
+            <span className="text-[10px] font-sans font-bold text-slate-400">ETB</span>
           </span>
-          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
-            ETB
-          </span>
+          {netProfit !== undefined && (
+            <div className="mt-1 pt-1 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-center gap-1">
+              <span className="text-[9px] uppercase font-bold text-emerald-600 dark:text-emerald-400">
+                Net Profit:
+              </span>
+              <span className="text-[10px] font-bold font-mono text-emerald-700 dark:text-emerald-300">
+                +{netProfit >= 1000000 ? `${(netProfit / 1000000).toFixed(2)}M` : `${netProfit.toLocaleString()}`} ETB
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -471,6 +504,32 @@ export const DonutCapitalChart: React.FC<{
             </span>
           </div>
         </div>
+
+        <div className="flex items-start gap-2">
+          <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0 mt-0.5" />
+          <div className="min-w-0">
+            <span className="text-slate-400 dark:text-slate-500 block text-[10px] font-medium">
+              Payables ({payables > 0 ? (payablePct * 100).toFixed(0) : '0'}%)
+            </span>
+            <span className="font-bold text-rose-600 dark:text-rose-400 font-mono text-xs truncate block">
+              −<AnimatedNumber value={payables} /> ETB
+            </span>
+          </div>
+        </div>
+
+        {netProfit !== undefined && (
+          <div className="flex items-start gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 shrink-0 mt-0.5 ring-2 ring-emerald-200 dark:ring-emerald-950" />
+            <div className="min-w-0">
+              <span className="text-emerald-600 dark:text-emerald-400 block text-[10px] font-bold uppercase tracking-wider">
+                Net Profit
+              </span>
+              <span className="font-bold text-emerald-700 dark:text-emerald-300 font-mono text-xs truncate block">
+                +<AnimatedNumber value={netProfit} /> ETB
+              </span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

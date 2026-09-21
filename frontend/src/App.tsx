@@ -368,7 +368,6 @@ export default function App() {
         <Topbar
           activeTab={activeTab}
           user={user}
-          netCapital={netCapital}
           theme={theme}
           onToggleTheme={handleToggleTheme}
           onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}

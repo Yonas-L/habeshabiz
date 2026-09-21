@@ -45,9 +45,11 @@ class DashboardController extends Controller
         // 5. Monthly Performance (Current Calendar Month)
         $startOfMonth = now()->startOfMonth();
         $monthlyRevenue = (float) SalesOrder::where('order_date', '>=', $startOfMonth)->sum('total_amount');
-        $monthlyGrossProfit = (float) SalesOrderItem::whereHas('salesOrder', function ($q) use ($startOfMonth) {
+        $monthlyDiscounts = (float) SalesOrder::where('order_date', '>=', $startOfMonth)->sum('discount_amount');
+        $itemProfits = (float) SalesOrderItem::whereHas('salesOrder', function ($q) use ($startOfMonth) {
             $q->where('order_date', '>=', $startOfMonth);
         })->sum('profit');
+        $monthlyGrossProfit = max(0.0, $itemProfits - $monthlyDiscounts);
 
         $monthlyExpenses = (float) Expense::where('date', '>=', $startOfMonth)
             ->where('is_owner_draw', false)

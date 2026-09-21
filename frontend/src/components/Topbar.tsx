@@ -2,12 +2,10 @@ import React from 'react';
 import type { NavTab } from './Sidebar';
 import type { User } from '../api/client';
 import { Menu, Plus, Calendar, Sun, Moon } from 'lucide-react';
-import { AnimatedNumber } from './AnimatedNumber';
-
+ 
 interface TopbarProps {
   activeTab: NavTab;
   user: User | null;
-  netCapital: number | null;
   theme?: 'light' | 'dark';
   onToggleTheme?: () => void;
   onOpenMobileSidebar: () => void;
@@ -30,7 +28,6 @@ const tabTitles: Record<NavTab, { title: string; subtitle: string }> = {
 export const Topbar: React.FC<TopbarProps> = ({
   activeTab,
   user,
-  netCapital,
   theme = 'light',
   onToggleTheme,
   onOpenMobileSidebar,
@@ -63,17 +60,6 @@ export const Topbar: React.FC<TopbarProps> = ({
 
       {/* Right Header Area */}
       <div className="flex items-center gap-3">
-        {/* Live Net Capital Readout Pill (Only visible to Owner) */}
-        {netCapital !== null && user?.role === 'owner' && (
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/90 shadow-xs text-xs">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-emerald-100 dark:ring-emerald-950/60 animate-pulse" />
-            <span className="text-slate-400 dark:text-slate-500 font-medium">Net Capital:</span>
-            <span className="font-bold text-slate-900 dark:text-white font-mono">
-              <AnimatedNumber value={netCapital} /> ETB
-            </span>
-          </div>
-        )}
-
         {/* User Persona Pill (Clickable for Account Settings) */}
         {user && (
           <button
