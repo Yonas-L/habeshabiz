@@ -9,9 +9,10 @@ import {
   Smartphone,
   Coins,
   ArrowRight,
+  Clock,
 } from 'lucide-react';
 
-export type VitalType = 'cash' | 'receivables' | 'inventory' | 'reserves';
+export type VitalType = 'cash' | 'receivables' | 'inventory' | 'reserves' | 'payables';
 
 interface VitalBreakdownDrawerProps {
   vitalType: VitalType | null;
@@ -34,7 +35,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
 }) => {
   if (!vitalType || !data) return null;
 
-  const { capital_overview, counts, top_receivables } = data;
+  const { capital_overview, counts, top_receivables, top_payables } = data;
 
   const vitalConfig: Record<
     VitalType,
@@ -60,6 +61,14 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
       subtitle: 'Customer Credit, Vendor Handover Holdings & Inflows',
       amount: capital_overview.receivables,
       icon: CreditCard,
+      targetTab: 'debts',
+      actionLabel: 'Open Receivable & Payable Ledger',
+    },
+    payables: {
+      title: 'Money You Owe (Payables)',
+      subtitle: 'Supplier Debts, Broker Cuts & Consignment Payouts',
+      amount: capital_overview.payables,
+      icon: Clock,
       targetTab: 'debts',
       actionLabel: 'Open Receivable & Payable Ledger',
     },
@@ -213,6 +222,61 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                   </div>
                   <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
                     Click to collect &rarr;
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </ProgressiveSection>
+      )}
+
+      {vitalType === 'payables' && (
+        <ProgressiveSection
+          title={`Outstanding Payables (${counts.open_payables} pending)`}
+          icon={<Clock className="w-4 h-4" />}
+          defaultOpen={true}
+        >
+          <div className="space-y-2">
+            {top_payables.map((debt) => (
+              <div
+                key={debt.id}
+                onClick={() => {
+                  if (onSelectDebt) {
+                    onClose();
+                    onSelectDebt(debt);
+                  }
+                }}
+                className="p-3.5 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/70 dark:border-slate-800/90 flex items-center justify-between text-xs cursor-pointer hover:border-slate-300 dark:hover:border-slate-700 transition-colors"
+              >
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-bold text-slate-900 dark:text-white">{debt.contact?.name}</span>
+                    {debt.reference_type === 'consignment_sale' && (
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300">
+                        Consignment Cut
+                      </span>
+                    )}
+                    {debt.reference_type === 'brokered_sourcing' && (
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-300">
+                        Peer Sourcing
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">
+                    {debt.reference_type === 'consignment_sale'
+                      ? 'Agreed vendor payout for sold consignment device'
+                      : debt.reference_type === 'brokered_sourcing'
+                      ? 'Peer shop sourced phone balance'
+                      : (debt.notes || 'Supplier payable obligation')}
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <div className="font-mono font-bold text-rose-600 dark:text-rose-400 text-sm">
+                    −{Number(debt.remaining_amount).toLocaleString()} ETB
+                  </div>
+                  <span className="text-[10px] text-rose-600 dark:text-rose-400 font-semibold">
+                    Click to settle &rarr;
                   </span>
                 </div>
               </div>

@@ -70,7 +70,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
   /* ─── Capital metrics for the unified strip ─── */
   const capitalMetrics: {
-    key: VitalType | 'payables';
+    key: VitalType;
     label: string;
     value: number;
     prefix: string;
@@ -112,7 +112,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       value: capital_overview.payables,
       prefix: '−',
       accent: 'text-rose-600/80 dark:text-rose-400/80',
-      onClick: () => onNavigateTab('debts'),
+      onClick: () => setSelectedVital('payables'),
     },
   ];
 
@@ -139,7 +139,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
           {hasPayablesAlert && (
             <button
-              onClick={() => onNavigateTab('debts')}
+              onClick={() => setSelectedVital('payables')}
               className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-rose-50/70 dark:bg-rose-950/20 border border-rose-200/50 dark:border-rose-800/40 text-rose-800 dark:text-rose-300 text-xs font-medium hover:border-rose-300 dark:hover:border-rose-700 transition-colors active:scale-[0.99]"
             >
               <Clock className="w-3.5 h-3.5 shrink-0 opacity-70" />
