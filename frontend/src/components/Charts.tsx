@@ -331,8 +331,8 @@ export const DonutCapitalChart: React.FC<{
   treasury: number;
   assets: number;
   payables?: number;
-  netProfit?: number;
-}> = ({ stock, receivables, treasury, assets, payables = 0, netProfit }) => {
+  netCapital: number;
+}> = ({ stock, receivables, treasury, assets, payables = 0, netCapital }) => {
   const grossAssets = stock + receivables + treasury + assets;
   const total = grossAssets + payables;
   const radius = 58;
@@ -429,19 +429,16 @@ export const DonutCapitalChart: React.FC<{
           )}
         </svg>
 
-        {/* Center Readout: Net Profit */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center select-none pointer-events-none px-2">
-          <span className="text-[10px] uppercase tracking-wider text-emerald-600 dark:text-emerald-400 font-bold">
-            Net Profit
+        {/* Center Readout: Net Capital (as before) */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center select-none pointer-events-none">
+          <span className="text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500 font-semibold">
+            Net Capital
           </span>
-          <span className="text-xl sm:text-2xl font-black font-mono text-slate-900 dark:text-white tracking-tight mt-0.5">
-            +{(netProfit ?? 0) >= 1000000
-              ? `${((netProfit ?? 0) / 1000000).toFixed(2)}M`
-              : (netProfit ?? 0).toLocaleString()}{' '}
-            <span className="text-xs font-sans font-bold text-slate-400">ETB</span>
+          <span className="text-lg sm:text-xl font-bold font-mono text-slate-900 dark:text-white tracking-tight mt-0.5">
+            {(netCapital / 1000000).toFixed(2)}M
           </span>
-          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium mt-0.5">
-            Active Period
+          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
+            ETB
           </span>
         </div>
       </div>
