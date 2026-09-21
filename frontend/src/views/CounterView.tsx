@@ -24,6 +24,7 @@ import {
   Plus,
   Minus,
 } from 'lucide-react';
+import { PartnerFormModal } from '../components/partners/PartnerFormModal';
 
 interface CounterViewProps {
   user: User | null;
@@ -64,6 +65,12 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
   // Brokered details
   const [vendorContactId, setVendorContactId] = useState<string>('');
   const [vendorCost, setVendorCost] = useState<string>('');
+  const [isAddPartnerModalOpen, setIsAddPartnerModalOpen] = useState(false);
+  const [liveContacts, setLiveContacts] = useState<Contact[]>(contacts);
+
+  useEffect(() => {
+    setLiveContacts(contacts);
+  }, [contacts]);
 
   // Pricing & Discount
   const [unitSellingPrice, setUnitSellingPrice] = useState<string>('');
@@ -139,8 +146,8 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
     return Math.max(quantityOnHand, inStockUnitsCount);
   }, [sourcingType, selectedVariant, selectedProduct, unitsForVariant]);
 
-  const peerMerchants = contacts.filter((c) => c.roles.includes('peer_vendor') || c.roles.includes('supplier'));
-  const customerList = contacts.filter((c) => c.roles.includes('customer') || c.roles.includes('debtor'));
+  const peerMerchants = liveContacts.filter((c) => c.roles.includes('peer_vendor') || c.roles.includes('supplier') || c.roles.includes('partner'));
+  const customerList = liveContacts.filter((c) => c.roles.includes('customer') || c.roles.includes('debtor'));
   const treasuryAccounts = accounts.filter((a) => !a.is_custom_asset);
 
   // Products filtered by search, with in-stock count
@@ -721,9 +728,19 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                    Peer Merchant
-                  </label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Peer Merchant
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setIsAddPartnerModalOpen(true)}
+                      className="text-[10px] font-bold text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 flex items-center gap-0.5 transition-colors"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>New Partner</span>
+                    </button>
+                  </div>
                   <select
                     value={vendorContactId}
                     onChange={(e) => setVendorContactId(e.target.value)}
@@ -1241,6 +1258,18 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
           </div>
         </div>
       </div>
+
+      {/* Quick Add Partner Modal */}
+      <PartnerFormModal
+        isOpen={isAddPartnerModalOpen}
+        onClose={() => setIsAddPartnerModalOpen(false)}
+        defaultRole="peer_vendor"
+        onSuccess={(saved) => {
+          setLiveContacts((prev) => [...prev.filter((c) => c.id !== saved.id), saved]);
+          setVendorContactId(saved.id);
+          onSaleSuccess();
+        }}
+      />
     </div>
   );
 };

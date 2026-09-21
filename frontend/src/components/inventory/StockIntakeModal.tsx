@@ -10,6 +10,7 @@ import {
   Loader2,
   ChevronDown,
 } from 'lucide-react';
+import { PartnerFormModal } from '../partners/PartnerFormModal';
 
 interface StockIntakeModalProps {
   isOpen: boolean;
@@ -58,9 +59,15 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
   const [costBasis, setCostBasis] = useState('');
   const [sellingPrice, setSellingPrice] = useState('');
   const [supplierId, setSupplierId] = useState('');
+  const [isAddSupplierOpen, setIsAddSupplierOpen] = useState(false);
+  const [liveContacts, setLiveContacts] = useState<Contact[]>(contacts);
   const [location, setLocation] = useState('Shop Counter');
   const [notes, setNotes] = useState('');
   const [isSubmittingIntake, setIsSubmittingIntake] = useState(false);
+
+  useEffect(() => {
+    setLiveContacts(contacts);
+  }, [contacts]);
 
   // Initialize selected category or preselected product
   useEffect(() => {
@@ -700,16 +707,26 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <div>
-                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Supplier / Sourced From (Optional)
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                    Supplier / Sourced From (Optional)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setIsAddSupplierOpen(true)}
+                    className="text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5 transition-colors"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>New Supplier</span>
+                  </button>
+                </div>
                 <select
                   value={supplierId}
                   onChange={(e) => setSupplierId(e.target.value)}
                   className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
                 >
                   <option value="">-- Direct / Walk-in / Self --</option>
-                  {contacts.map((c) => (
+                  {liveContacts.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name} {c.phone ? `(${c.phone})` : ''}
                     </option>
@@ -773,6 +790,18 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Quick Add Supplier Modal */}
+      <PartnerFormModal
+        isOpen={isAddSupplierOpen}
+        onClose={() => setIsAddSupplierOpen(false)}
+        defaultRole="supplier"
+        onSuccess={(saved) => {
+          setLiveContacts((prev) => [...prev.filter((c) => c.id !== saved.id), saved]);
+          setSupplierId(saved.id);
+          onIntakeSuccess();
+        }}
+      />
     </div>
   );
 };

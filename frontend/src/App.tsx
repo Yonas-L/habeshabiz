@@ -23,6 +23,7 @@ import { TreasuryView } from './views/TreasuryView';
 import { ExpensesView } from './views/ExpensesView';
 import { StaffView } from './views/StaffView';
 import { StaffOverviewView } from './views/StaffOverviewView';
+import { PartnersView } from './views/PartnersView';
 import { ProfileSettingsModal } from './components/ProfileSettingsModal';
 import { Toaster, toast } from 'sonner';
 import { ArrowRight, Loader2 } from 'lucide-react';
@@ -94,10 +95,11 @@ export default function App() {
           '2': 'counter',
           '3': 'inventory',
           '4': 'sales',
-          '5': 'debts',
-          '6': 'treasury',
-          '7': 'expenses',
-          '8': 'staff',
+          '5': 'partners',
+          '6': 'debts',
+          '7': 'treasury',
+          '8': 'expenses',
+          '9': 'staff',
         };
         if (tabMap[key]) {
           e.preventDefault();
@@ -386,6 +388,14 @@ export default function App() {
 
           {activeTab === 'sales' && (
             <SalesHistoryView user={user} />
+          )}
+
+          {activeTab === 'partners' && (
+            <PartnersView
+              user={user}
+              onNavigateTab={setActiveTab}
+              onRefreshContacts={refreshData}
+            />
           )}
 
           {/* Owner-only Tabs */}

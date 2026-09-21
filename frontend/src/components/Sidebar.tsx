@@ -12,6 +12,7 @@ import {
   Search,
   Users,
   Settings,
+  Handshake,
 } from 'lucide-react';
 
 export type NavTab =
@@ -19,6 +20,7 @@ export type NavTab =
   | 'counter'
   | 'inventory'
   | 'sales'
+  | 'partners'
   | 'debts'
   | 'treasury'
   | 'expenses'
@@ -63,8 +65,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'counter', label: 'Sales', icon: ShoppingCart, shortcut: '⌘2' },
     { id: 'inventory', label: 'Inventory', icon: Smartphone, shortcut: '⌘3' },
     { id: 'sales', label: 'Sales History', icon: Receipt, shortcut: '⌘4' },
+    { id: 'partners', label: 'Partners & Brokers', icon: Handshake, shortcut: '⌘5' },
     ...(isOwner
-      ? [{ id: 'staff' as NavTab, label: 'Staff & Team', icon: Users, shortcut: '⌘8' }]
+      ? [{ id: 'staff' as NavTab, label: 'Staff & Team', icon: Users, shortcut: '⌘9' }]
       : []),
   ];
 
@@ -75,9 +78,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     badge?: number;
     shortcut?: string;
   }[] = [
-    { id: 'debts', label: 'Debts & Credit', icon: CreditCard, badge: openDebtsCount, shortcut: '⌘5' },
-    { id: 'treasury', label: 'Treasury & Cash', icon: Landmark, shortcut: '⌘6' },
-    { id: 'expenses', label: 'Expenses & Draws', icon: DollarSign, shortcut: '⌘7' },
+    { id: 'debts', label: 'Debts & Credit', icon: CreditCard, badge: openDebtsCount, shortcut: '⌘6' },
+    { id: 'treasury', label: 'Treasury & Cash', icon: Landmark, shortcut: '⌘7' },
+    { id: 'expenses', label: 'Expenses & Draws', icon: DollarSign, shortcut: '⌘8' },
   ];
 
   const sidebarInner = (

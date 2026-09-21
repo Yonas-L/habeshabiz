@@ -20,6 +20,7 @@ const tabTitles: Record<NavTab, { title: string; subtitle: string }> = {
   counter: { title: 'Sales', subtitle: 'Record a sale' },
   inventory: { title: 'Inventory', subtitle: 'Stock on hand' },
   sales: { title: 'Sales History', subtitle: 'Transactions & margins' },
+  partners: { title: 'Partners & Brokers', subtitle: 'Peer shops, sourcing network & suppliers' },
   debts: { title: 'Debts & Credit', subtitle: 'Receivables & payables' },
   treasury: { title: 'Treasury', subtitle: 'Accounts & reserves' },
   expenses: { title: 'Expenses', subtitle: 'Costs & owner draws' },
@@ -39,10 +40,11 @@ export const Topbar: React.FC<TopbarProps> = ({
   const current = tabTitles[activeTab] || tabTitles.overview;
 
   return (
-    <header className="h-16 px-4 lg:px-8 flex items-center justify-between bg-[#f6f8fa] dark:bg-[#0b0f17] relative z-10 transition-colors">
+    <header className="sticky top-0 z-40 h-16 px-4 lg:px-8 flex items-center justify-between bg-[#f6f8fa]/95 dark:bg-[#0b0f17]/95 backdrop-blur-md transition-colors border-b border-slate-200/60 dark:border-slate-800/60">
       <div className="flex items-center gap-3">
         {/* Mobile Hamburger */}
         <button
+          type="button"
           onClick={onOpenMobileSidebar}
           className="md:hidden p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:text-slate-900 shadow-xs"
         >
@@ -75,6 +77,7 @@ export const Topbar: React.FC<TopbarProps> = ({
         {/* User Persona Pill (Clickable for Account Settings) */}
         {user && (
           <button
+            type="button"
             onClick={onOpenProfile}
             title="Manage account details & password"
             className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/90 shadow-xs text-xs font-semibold text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700 transition-colors"
@@ -97,9 +100,10 @@ export const Topbar: React.FC<TopbarProps> = ({
         {/* Theme Toggle Button (Sun / Moon) */}
         {onToggleTheme && (
           <button
+            type="button"
             onClick={onToggleTheme}
             title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-            className="w-9 h-9 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/90 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition-colors shadow-xs active:scale-95"
+            className="w-9 h-9 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/90 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition-colors shadow-xs active:scale-95 cursor-pointer"
           >
             {theme === 'dark' ? (
               <Sun className="w-4 h-4 text-amber-400" />
@@ -112,6 +116,7 @@ export const Topbar: React.FC<TopbarProps> = ({
         {/* New Sale Button */}
         {onQuickAction && (
           <button
+            type="button"
             onClick={onQuickAction}
             className="h-9 px-3.5 rounded-xl bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 text-white dark:text-slate-900 text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 active:scale-[0.98]"
           >

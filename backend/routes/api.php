@@ -85,9 +85,12 @@ Route::prefix('v1')->group(function () {
         Route::delete('/accounts/{id}', [AccountController::class, 'destroy']);
         Route::post('/accounts/transfer', [AccountController::class, 'transfer']);
 
-        // Contacts & People Directory
+        // Contacts & People Directory (Partners, Brokers, Suppliers, Customers)
         Route::get('/contacts', [ContactController::class, 'index']);
         Route::post('/contacts', [ContactController::class, 'store']);
+        Route::get('/contacts/{id}', [ContactController::class, 'show']);
+        Route::put('/contacts/{id}', [ContactController::class, 'update']);
+        Route::delete('/contacts/{id}', [ContactController::class, 'destroy']);
 
         // Operational Expenses & Owner Draws
         Route::get('/expenses', [ExpenseController::class, 'index']);

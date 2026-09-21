@@ -50,4 +50,9 @@ class Contact extends Model
     {
         return $this->hasMany(SalesOrderItem::class, 'vendor_contact_id');
     }
+
+    public function suppliedUnits(): HasMany
+    {
+        return $this->hasMany(InventoryUnit::class, 'supplier_contact_id');
+    }
 }

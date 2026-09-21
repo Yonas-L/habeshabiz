@@ -82,7 +82,17 @@ export interface Contact {
   id: string;
   name: string;
   phone: string | null;
+  alt_phone?: string | null;
+  email?: string | null;
   roles: string[];
+  notes?: string | null;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+  debts_count?: number;
+  sales_orders_count?: number;
+  brokered_items_count?: number;
+  supplied_units_count?: number;
 }
 
 export interface SalesOrderItem {
@@ -587,12 +597,41 @@ export const api = {
       method: 'DELETE',
     }),
 
-  getContacts: (params?: { role?: string; search?: string }) => {
+  getContacts: (params?: { role?: string; search?: string; is_active?: boolean }) => {
     const query = new URLSearchParams();
     if (params?.role) query.set('role', params.role);
     if (params?.search) query.set('search', params.search);
+    if (params?.is_active !== undefined) query.set('is_active', String(params.is_active));
     return request<Contact[]>(`/contacts?${query.toString()}`);
   },
+
+  getContact: (id: string) =>
+    request<Contact>(`/contacts/${id}`),
+
+  createContact: (data: {
+    name: string;
+    phone?: string | null;
+    alt_phone?: string | null;
+    email?: string | null;
+    roles: string[];
+    notes?: string | null;
+    is_active?: boolean;
+  }) =>
+    request<Contact>('/contacts', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateContact: (id: string, data: Partial<Contact>) =>
+    request<Contact>(`/contacts/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deleteContact: (id: string) =>
+    request<{ message: string; can_deactivate?: boolean }>(`/contacts/${id}`, {
+      method: 'DELETE',
+    }),
 
   getExpenses: (params?: { is_owner_draw?: boolean; category?: string }) => {
     const query = new URLSearchParams();
