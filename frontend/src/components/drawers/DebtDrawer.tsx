@@ -91,7 +91,7 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
       });
 
       toast.success(
-        isReceivable ? 'Customer debt collected' : 'Peer payable settled',
+        isReceivable ? 'Receivable payment collected' : 'Payable settled',
         {
           description: `${parseFloat(paymentAmount).toLocaleString()} ETB processed with ${debt.contact?.name}`,
         }
@@ -111,8 +111,8 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
     <SlideOverDrawer
       isOpen={isOpen}
       onClose={onClose}
-      title={debt.contact?.name || 'Party Debt'}
-      subtitle={isReceivable ? 'Customer Receivable (Money In)' : 'Supplier Payable (Money Out)'}
+      title={debt.contact?.name || (isReceivable ? 'Receivable Entry' : 'Payable Entry')}
+      subtitle={isReceivable ? 'Receivable (Money Owed to You)' : 'Payable (Money You Owe)'}
       badge={
         <span
           className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${

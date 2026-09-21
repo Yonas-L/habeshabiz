@@ -80,7 +80,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     badge?: number;
     shortcut?: string;
   }[] = [
-    { id: 'debts', label: 'Debts & Credit', icon: CreditCard, badge: openDebtsCount, shortcut: '⌘6' },
+    { id: 'debts', label: 'Receivable & Payable', icon: CreditCard, badge: openDebtsCount, shortcut: '⌘6' },
     { id: 'treasury', label: 'Treasury & Cash', icon: Landmark, shortcut: '⌘7' },
     { id: 'expenses', label: 'Expenses & Draws', icon: DollarSign, shortcut: '⌘8' },
   ];

@@ -21,7 +21,7 @@ const tabTitles: Record<NavTab, { title: string; subtitle: string }> = {
   inventory: { title: 'Inventory', subtitle: 'Stock on hand' },
   sales: { title: 'Sales History', subtitle: 'Transactions & margins' },
   partners: { title: 'Partners & Brokers', subtitle: 'Peer shops, sourcing network & suppliers' },
-  debts: { title: 'Debts & Credit', subtitle: 'Receivables & payables' },
+  debts: { title: 'Receivable & Payable', subtitle: 'Customer credit, vendor payouts & holdings' },
   treasury: { title: 'Treasury', subtitle: 'Accounts & reserves' },
   expenses: { title: 'Expenses', subtitle: 'Costs & owner draws' },
   staff: { title: 'Staff & Team', subtitle: 'Manage team, accounts & audit log' },

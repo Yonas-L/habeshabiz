@@ -135,7 +135,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            Who Owes Us (Receivables)
+            Receivables (Owed to Us)
           </button>
           <button
             onClick={() => setDebtType('payable')}
@@ -145,7 +145,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            Who We Owe (Payables)
+            Payables (We Owe)
           </button>
         </div>
 
@@ -162,13 +162,13 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
             />
           </form>
 
-          {/* Record Debt Button */}
+          {/* Record Button */}
           <button
             onClick={() => setShowRecordModal(true)}
             className="h-10 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs active:scale-[0.98] flex items-center gap-1.5 whitespace-nowrap"
           >
             <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">Record Debt</span>
+            <span className="hidden sm:inline">Record Entry</span>
           </button>
         </div>
       </div>
@@ -177,7 +177,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
       <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-100 dark:border-slate-800/80 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
         <div>
           <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-            Total Outstanding {debtType === 'receivable' ? 'Customer Receivables' : 'Supplier Payables'}
+            Total Outstanding {debtType === 'receivable' ? 'Receivables & Holdings' : 'Payables & Payouts'}
           </span>
           <div
             className={`text-3xl font-extrabold font-mono tabular-nums tracking-tight mt-1 ${
@@ -201,7 +201,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
             <thead className="bg-slate-50/70 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
               <tr>
                 <th className="py-3 px-5">Contact Name</th>
-                <th className="py-3 px-5">Original Debt</th>
+                <th className="py-3 px-5">Original Amount</th>
                 <th className="py-3 px-5">Already Paid</th>
                 <th className="py-3 px-5">Remaining Balance</th>
                 <th className="py-3 px-5">Due Date</th>

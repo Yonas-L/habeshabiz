@@ -21,7 +21,7 @@ export const Navigation: React.FC<NavigationProps> = ({
     { id: 'counter', label: 'Counter POS', icon: ShoppingCart },
     { id: 'inventory', label: 'Inventory & IMEIs', icon: Smartphone },
     { id: 'sales', label: 'Sales History', icon: Receipt },
-    { id: 'debts', label: 'Debts & Credit', icon: CreditCard, badge: openReceivablesCount + openPayablesCount },
+    { id: 'debts', label: 'Receivable & Payable', icon: CreditCard, badge: openReceivablesCount + openPayablesCount },
     { id: 'treasury', label: 'Treasury & Accounts', icon: Landmark },
     { id: 'expenses', label: 'Expenses', icon: DollarSign },
   ];

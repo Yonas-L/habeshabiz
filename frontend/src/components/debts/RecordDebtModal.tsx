@@ -133,8 +133,8 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-slate-800">
           <div>
-            <h2 className="text-sm font-bold text-slate-900 dark:text-white">Record Debt / Credit</h2>
-            <p className="text-[11px] text-slate-400 mt-0.5">Manually log money owed to or by someone</p>
+            <h2 className="text-sm font-bold text-slate-900 dark:text-white">Record Receivable / Payable</h2>
+            <p className="text-[11px] text-slate-400 mt-0.5">Log customer credit, peer vendor payout, or loan entry</p>
           </div>
           <button
             onClick={onClose}

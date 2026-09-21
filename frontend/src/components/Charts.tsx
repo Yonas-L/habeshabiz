@@ -440,7 +440,7 @@ export const DonutCapitalChart: React.FC<{
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0 mt-0.5" />
           <div className="min-w-0">
             <span className="text-slate-400 dark:text-slate-500 block text-[10px] font-medium">
-              Debts ({(recPct * 100).toFixed(0)}%)
+              Receivables ({(recPct * 100).toFixed(0)}%)
             </span>
             <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono text-xs truncate block">
               +<AnimatedNumber value={receivables} /> ETB

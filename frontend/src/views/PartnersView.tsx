@@ -539,7 +539,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                     )}
                     {(contact.debts_count ?? 0) > 0 && (
                       <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/20">
-                        {contact.debts_count} Debts/Credits
+                        {contact.debts_count} Receivables/Payables
                       </span>
                     )}
                   </div>

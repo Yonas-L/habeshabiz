@@ -396,7 +396,7 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({ user }) => {
         user={user}
         onCollectPayment={(order) => {
           toast.info('Collection Note', {
-            description: `Party ${order.customer?.name || 'Walk-in'} can be settled under Debts & Credit tab.`,
+            description: `Party ${order.customer?.name || 'Walk-in'} can be settled under Receivable & Payable tab.`,
           });
         }}
       />

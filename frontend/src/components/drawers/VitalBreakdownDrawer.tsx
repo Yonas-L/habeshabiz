@@ -61,7 +61,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
       amount: capital_overview.receivables,
       icon: CreditCard,
       targetTab: 'debts',
-      actionLabel: 'Open Debts Ledger',
+      actionLabel: 'Open Receivable & Payable Ledger',
     },
     inventory: {
       title: 'Physical Shop Inventory',
