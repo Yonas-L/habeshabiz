@@ -16,7 +16,13 @@ class InventoryController extends Controller
     {
         $query = InventoryUnit::with(['variant.product.categoryRel', 'supplier']);
 
-        if ($request->filled('status') && $request->status !== 'all') {
+        if ($request->filled('source_type') && $request->source_type !== 'all') {
+            $query->where('source_type', $request->source_type);
+        }
+
+        if ($request->status === 'vendor_stock') {
+            $query->where('status', 'in_stock')->where('source_type', 'consignment');
+        } elseif ($request->filled('status') && $request->status !== 'all') {
             $query->where('status', $request->status);
         } elseif (! $request->filled('status')) {
             $query->where('status', 'in_stock');
@@ -43,6 +49,9 @@ class InventoryController extends Controller
                     ->orWhere('return_reason', 'ilike', "%{$search}%")
                     ->orWhereHas('variant.product', function ($pq) use ($search) {
                         $pq->where('name', 'ilike', "%{$search}%");
+                    })
+                    ->orWhereHas('supplier', function ($sq) use ($search) {
+                        $sq->where('name', 'ilike', "%{$search}%");
                     });
             });
         }
@@ -57,9 +66,11 @@ class InventoryController extends Controller
 
         $counts = [
             'in_stock' => $serializedInStock + $nonSerializedInStock,
+            'vendor_stock' => InventoryUnit::where('status', 'in_stock')->where('source_type', 'consignment')->count(),
             'out' => InventoryUnit::where('status', 'out')->count(),
             'sold' => InventoryUnit::where('status', 'sold')->count(),
-            'returned' => InventoryUnit::where('status', 'returned')->count(),
+            'returned' => InventoryUnit::whereIn('status', ['returned', 'returned_to_vendor'])->count(),
+            'returned_to_vendor' => InventoryUnit::where('status', 'returned_to_vendor')->count(),
             'all' => InventoryUnit::count() + $nonSerializedInStock,
         ];
 
@@ -107,10 +118,19 @@ class InventoryController extends Controller
             'condition' => ['required', 'string', 'max:50'],
             'cost_basis' => ['required', 'numeric', 'min:0'],
             'selling_price' => ['nullable', 'numeric', 'min:0'],
+            'source_type' => ['nullable', 'string', 'in:purchase,consignment'],
             'supplier_contact_id' => ['nullable', 'exists:contacts,id'],
+            'return_deadline' => ['nullable', 'date'],
             'location' => ['nullable', 'string', 'max:100'],
             'notes' => ['nullable', 'string'],
         ]);
+
+        if (($validated['source_type'] ?? 'purchase') === 'consignment' && empty($validated['supplier_contact_id'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'A vendor or broker must be selected for consignment stock.',
+            ], 422);
+        }
 
         if (empty($validated['sim_type'])) {
             $validated['sim_type'] = 'na';
@@ -150,8 +170,9 @@ class InventoryController extends Controller
                     'condition' => $validated['condition'],
                     'cost_basis' => $costBasis,
                     'status' => 'in_stock',
-                    'source_type' => 'purchase',
+                    'source_type' => $validated['source_type'] ?? 'purchase',
                     'supplier_contact_id' => $validated['supplier_contact_id'] ?? null,
+                    'return_deadline' => $validated['return_deadline'] ?? null,
                     'location' => $validated['location'] ?? 'Shop Counter',
                     'notes' => $validated['notes'] ?? null,
                 ]);
@@ -393,6 +414,73 @@ class InventoryController extends Controller
             'success' => true,
             'message' => 'Device repaired and restocked back to shop shelf.',
             'data' => $unit->load('variant.product'),
+        ]);
+    }
+
+    /**
+     * Return an unsold vendor consignment item back to the broker/seller.
+     * Decrements stock and marks unit as returned_to_vendor.
+     */
+    public function returnToVendor(Request $request, string $id): JsonResponse
+    {
+        $unit = InventoryUnit::with(['variant.product', 'supplier'])->findOrFail($id);
+
+        if ($unit->status === 'sold') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Sold products cannot be returned to vendor. If returned by customer, handle customer return first.',
+            ], 422);
+        }
+
+        if ($unit->status === 'returned_to_vendor') {
+            return response()->json([
+                'success' => false,
+                'message' => 'This device has already been returned to the vendor.',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'return_reason' => ['nullable', 'string', 'max:500'],
+            'notes' => ['nullable', 'string'],
+        ]);
+
+        $vendorName = $unit->supplier?->name ?? 'Vendor';
+        $previousStatus = $unit->status;
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($unit, $validated, $previousStatus) {
+            $unit->update([
+                'status' => 'returned_to_vendor',
+                'returned_at' => now(),
+                'return_reason' => $validated['return_reason'] ?? 'Returned unsold to vendor within agreed terms',
+                'location' => 'Returned to Vendor',
+                'handover_to' => null,
+                'handed_out_at' => null,
+            ]);
+
+            // Decrement active stock if it was previously in_stock or out
+            if (in_array($previousStatus, ['in_stock', 'out'], true)) {
+                $stock = InventoryStock::where('variant_id', $unit->variant_id)->first();
+                if ($stock && $stock->quantity_on_hand > 0) {
+                    $stock->decrement('quantity_on_hand', 1);
+                }
+            }
+
+            AuditLog::record(
+                action: 'returned_to_vendor',
+                entityType: 'InventoryUnit',
+                entityId: (string) $unit->id,
+                newValues: [
+                    'imei_or_serial' => $unit->imei_or_serial,
+                    'vendor' => $unit->supplier?->name,
+                    'return_reason' => $unit->return_reason,
+                ]
+            );
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => "Item successfully returned to {$vendorName} and removed from shop inventory.",
+            'data' => $unit->fresh()->load(['variant.product', 'supplier']),
         ]);
     }
 

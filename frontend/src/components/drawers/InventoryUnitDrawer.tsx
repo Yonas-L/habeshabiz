@@ -21,6 +21,7 @@ import {
   Undo2,
   Wrench,
   Clock,
+  Handshake,
 } from 'lucide-react';
 
 interface InventoryUnitDrawerProps {
@@ -85,6 +86,22 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
   };
 
   const getStatusBadge = () => {
+    if (isInStock && unit.source_type === 'consignment') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/60 dark:border-amber-800/60">
+          <Handshake className="w-3 h-3" />
+          VENDOR STOCK
+        </span>
+      );
+    }
+    if (unit.status === 'returned_to_vendor') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200/60 dark:border-slate-700/60">
+          <RotateCcw className="w-3 h-3" />
+          RETURNED TO BROKER
+        </span>
+      );
+    }
     if (isInStock) {
       return (
         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60">
@@ -262,6 +279,57 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
           </p>
           <p className="text-[11px] text-rose-600 dark:text-rose-400 mt-1">
             Once repaired and tested, click "Repaired & Restock to Shelf" to place back into stock.
+          </p>
+        </div>
+      )}
+
+      {/* Vendor Consignment Notice Banner */}
+      {unit.source_type === 'consignment' && (
+        <div className="p-4 rounded-2xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/60 text-xs text-amber-900 dark:text-amber-200 space-y-2">
+          <div className="font-bold flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <Handshake className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+              <span>Vendor Consignment Stock</span>
+            </div>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-200/60 dark:bg-amber-800/50 text-amber-800 dark:text-amber-300 font-semibold">
+              Broker Agreement
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-2.5 text-[11px] pt-1">
+            {unit.cost_basis && (
+              <div className="p-2 rounded-xl bg-white/70 dark:bg-slate-900/60 border border-amber-200/50 dark:border-amber-800/30">
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 block">Agreed Vendor Payout:</span>
+                <div className="font-mono font-bold text-amber-900 dark:text-amber-200 text-xs mt-0.5">
+                  {Number(unit.cost_basis).toLocaleString()} ETB
+                </div>
+              </div>
+            )}
+            {unit.variant?.default_selling_price && (
+              <div className="p-2 rounded-xl bg-white/70 dark:bg-slate-900/60 border border-amber-200/50 dark:border-amber-800/30">
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 block">Retail Price:</span>
+                <div className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-xs mt-0.5">
+                  {Number(unit.variant.default_selling_price).toLocaleString()} ETB
+                </div>
+              </div>
+            )}
+          </div>
+          {unit.return_deadline && (
+            <div className="pt-1 text-[11px] font-medium">
+              {new Date(unit.return_deadline) < new Date() ? (
+                <span className="text-rose-600 dark:text-rose-400 font-bold">
+                  ⚠ Return deadline passed · {new Date(unit.return_deadline).toLocaleDateString()}
+                </span>
+              ) : (
+                <span className="text-amber-700 dark:text-amber-300">
+                  Return deadline: {new Date(unit.return_deadline).toLocaleDateString()} (
+                  {Math.max(0, Math.ceil((new Date(unit.return_deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))}{' '}
+                  days left)
+                </span>
+              )}
+            </div>
+          )}
+          <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
+            When sold, payment tops up shop balance and creates a payable debt to the vendor for their cut.
           </p>
         </div>
       )}

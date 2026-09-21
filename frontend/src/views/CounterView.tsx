@@ -23,6 +23,7 @@ import {
   Zap,
   Plus,
   Minus,
+  Handshake,
 } from 'lucide-react';
 import { PartnerFormModal } from '../components/partners/PartnerFormModal';
 
@@ -199,6 +200,12 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
   const isSerialRequired = !!selectedProduct?.has_serials && sourcingType === 'internal_stock';
   const hasSelectedSerials = selectedUnitIds.length > 0;
   const isSerialComplete = !isSerialRequired || (hasSelectedSerials && selectedUnitIds.length === quantity);
+  const selectedUnitsHaveConsignment = useMemo(() => {
+    return selectedUnitIds.some((uId) => {
+      const u = availableUnits.find((unit) => unit.id === uId);
+      return u?.source_type === 'consignment';
+    });
+  }, [selectedUnitIds, availableUnits]);
 
   // Step progress
   const step1Done = !!selectedProductId;
@@ -685,9 +692,17 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                         }`}
                       >
                         <div className="flex items-center justify-between">
-                          <span className="font-mono font-bold text-slate-900 dark:text-white text-[11px]">
-                            {u.imei_or_serial || 'No Serial'}
-                          </span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-mono font-bold text-slate-900 dark:text-white text-[11px]">
+                              {u.imei_or_serial || 'No Serial'}
+                            </span>
+                            {u.source_type === 'consignment' && (
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50 dark:border-amber-800/50">
+                                <Handshake className="w-2.5 h-2.5" />
+                                Vendor
+                              </span>
+                            )}
+                          </div>
                           <div className={`w-5 h-5 rounded-full flex items-center justify-center ${
                             isSelected ? 'bg-emerald-500 text-white' : 'border border-slate-300 dark:border-slate-700'
                           }`}>
@@ -1112,12 +1127,24 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                             {selectedUnitIds.map((uId) => {
                               const u = availableUnits.find((unit) => unit.id === uId);
                               return (
-                                <div key={uId} className="flex items-center gap-1">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                <div key={uId} className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
                                   <span>SN: {u?.imei_or_serial || 'Unknown'}</span>
+                                  {u?.source_type === 'consignment' && (
+                                    <span className="inline-flex items-center gap-0.5 px-1 py-0.2 rounded text-[9px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50 dark:border-amber-800/50">
+                                      <Handshake className="w-2.5 h-2.5" />
+                                      Vendor
+                                    </span>
+                                  )}
                                 </div>
                               );
                             })}
+                          </div>
+                        )}
+                        {selectedUnitsHaveConsignment && (
+                          <div className="inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/30 text-[10px] font-bold text-amber-700 dark:text-amber-400 border border-amber-200/50 dark:border-amber-800/40">
+                            <Handshake className="w-2.5 h-2.5" />
+                            Consignment Unit (Vendor cut auto-payable)
                           </div>
                         )}
                         {sourcingType === 'brokered_neighbour' && (

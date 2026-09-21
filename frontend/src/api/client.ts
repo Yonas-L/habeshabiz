@@ -66,7 +66,10 @@ export interface InventoryUnit {
   sim_type: 'physical' | 'esim' | 'dual' | 'na';
   condition: string;
   cost_basis?: string | number;
-  status: 'in_stock' | 'out' | 'sold' | 'returned' | 'reserved' | 'damaged';
+  status: 'in_stock' | 'out' | 'sold' | 'returned' | 'returned_to_vendor' | 'reserved' | 'damaged';
+  source_type?: 'purchase' | 'consignment';
+  supplier_contact_id?: string | null;
+  return_deadline?: string | null;
   location: string;
   handover_to?: string | null;
   handed_out_at?: string | null;
@@ -442,11 +445,13 @@ export const api = {
     if (!res.ok) throw new Error(json.message || 'API request failed');
     return {
       units: (json.data || []) as InventoryUnit[],
-      counts: (json.counts || { in_stock: 0, out: 0, sold: 0, returned: 0, all: 0 }) as {
+      counts: (json.counts || { in_stock: 0, vendor_stock: 0, out: 0, sold: 0, returned: 0, returned_to_vendor: 0, all: 0 }) as {
         in_stock: number;
+        vendor_stock: number;
         out: number;
         sold: number;
         returned: number;
+        returned_to_vendor: number;
         all: number;
       },
     };
@@ -460,7 +465,9 @@ export const api = {
     imei_or_serial?: string | null;
     imeis?: string[];
     selling_price?: number;
+    source_type?: 'purchase' | 'consignment';
     supplier_contact_id?: string | null;
+    return_deadline?: string | null;
     location?: string;
     notes?: string | null;
     battery_health?: number | null;
@@ -487,6 +494,12 @@ export const api = {
     request<InventoryUnit>(`/inventory/units/${id}/customer-return`, {
       method: 'POST',
       body: JSON.stringify(data),
+    }),
+
+  returnUnitToVendor: (id: string, data?: { return_reason?: string; notes?: string }) =>
+    request<InventoryUnit>(`/inventory/units/${id}/return-to-vendor`, {
+      method: 'POST',
+      body: JSON.stringify(data || {}),
     }),
 
   repairedRestockInventoryUnit: (id: string, data?: { condition?: string; notes?: string }) =>

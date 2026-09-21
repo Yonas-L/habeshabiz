@@ -31,6 +31,7 @@ class InventoryUnit extends Model
         'notes',
         'return_reason',
         'returned_at',
+        'return_deadline',
         'sold_at',
     ];
 
@@ -42,6 +43,7 @@ class InventoryUnit extends Model
             'cost_basis' => 'decimal:2',
             'handed_out_at' => 'datetime',
             'returned_at' => 'datetime',
+            'return_deadline' => 'date',
             'sold_at' => 'datetime',
         ];
     }

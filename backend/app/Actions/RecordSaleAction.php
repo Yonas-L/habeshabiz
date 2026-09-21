@@ -122,6 +122,30 @@ class RecordSaleAction
                             'sold_at' => now(),
                         ]);
 
+                        // If this was vendor consignment stock, auto-create a payable for the broker's agreed cut
+                        if ($unit->source_type === 'consignment' && $unit->supplier_contact_id) {
+                            $vendorContactId = $unit->supplier_contact_id;
+                            $vendorCost = $unitCost;
+                            $sourcingType = 'brokered_neighbour';
+
+                            $payableAmount = $unitCost * $qty;
+                            if ($payableAmount > 0) {
+                                Debt::create([
+                                    'tenant_id' => $tenantId,
+                                    'contact_id' => $unit->supplier_contact_id,
+                                    'type' => 'payable',
+                                    'reference_type' => 'consignment_sale',
+                                    'reference_id' => $order->id,
+                                    'original_amount' => $payableAmount,
+                                    'paid_amount' => 0.0,
+                                    'remaining_amount' => $payableAmount,
+                                    'due_date' => now()->addDays(7),
+                                    'status' => 'open',
+                                    'notes' => "Vendor stock payout for SN: " . ($unit->imei_or_serial ?: 'Unit') . " in Order #{$order->order_number}. Agreed vendor cut.",
+                                ]);
+                            }
+                        }
+
                         // Keep aggregated stock in sync
                         $stock = InventoryStock::where('variant_id', $itemData['variant_id'])->first();
                         if ($stock && $stock->quantity_on_hand > 0) {
@@ -163,6 +187,22 @@ class RecordSaleAction
                                     'status' => 'sold',
                                     'sold_at' => now(),
                                 ]);
+
+                                if ($u->source_type === 'consignment' && $u->supplier_contact_id && (float) $u->cost_basis > 0) {
+                                    Debt::create([
+                                        'tenant_id' => $tenantId,
+                                        'contact_id' => $u->supplier_contact_id,
+                                        'type' => 'payable',
+                                        'reference_type' => 'consignment_sale',
+                                        'reference_id' => $order->id,
+                                        'original_amount' => (float) $u->cost_basis,
+                                        'paid_amount' => 0.0,
+                                        'remaining_amount' => (float) $u->cost_basis,
+                                        'due_date' => now()->addDays(7),
+                                        'status' => 'open',
+                                        'notes' => "Vendor stock payout for unit in Order #{$order->order_number}. Agreed vendor cut.",
+                                    ]);
+                                }
                             }
                         }
                     }

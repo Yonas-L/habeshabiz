@@ -27,6 +27,7 @@ import {
   Package,
   ChevronsDown,
   ChevronsUp,
+  Handshake,
 } from 'lucide-react';
 import { InventoryUnitDrawer } from '../components/drawers/InventoryUnitDrawer';
 import { StockIntakeModal } from '../components/inventory/StockIntakeModal';
@@ -37,7 +38,7 @@ interface InventoryViewProps {
   user: User | null;
 }
 
-type TabType = 'in_stock' | 'out' | 'sold' | 'returned' | 'all';
+type TabType = 'in_stock' | 'vendor_stock' | 'out' | 'sold' | 'returned' | 'all';
 
 export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
   const [units, setUnits] = useState<InventoryUnit[]>([]);
@@ -53,6 +54,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
   // Tab counts from server
   const [counts, setCounts] = useState({
     in_stock: 0,
+    vendor_stock: 0,
+    returned_to_vendor: 0,
     out: 0,
     sold: 0,
     returned: 0,
@@ -89,6 +92,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
   const [repairedNotes, setRepairedNotes] = useState('');
   const [repairedSubmitting, setRepairedSubmitting] = useState(false);
 
+  // Return to Vendor Modal State (for vendor consignment units -> returned_to_vendor)
+  const [returnToVendorUnit, setReturnToVendorUnit] = useState<InventoryUnit | null>(null);
+  const [returnToVendorReason, setReturnToVendorReason] = useState('');
+  const [returnToVendorSubmitting, setReturnToVendorSubmitting] = useState(false);
+
   useEffect(() => {
     loadInventory();
   }, [statusFilter, selectedCategoryId]);
@@ -103,11 +111,12 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
         if (handoverTargetUnit) setHandoverTargetUnit(null);
         if (returnTargetUnit) setReturnTargetUnit(null);
         if (repairedTargetUnit) setRepairedTargetUnit(null);
+        if (returnToVendorUnit) setReturnToVendorUnit(null);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showIntakeModal, isCategoryModalOpen, editingProduct, handoverTargetUnit, returnTargetUnit, repairedTargetUnit]);
+  }, [showIntakeModal, isCategoryModalOpen, editingProduct, handoverTargetUnit, returnTargetUnit, repairedTargetUnit, returnToVendorUnit]);
 
   const loadInventory = async () => {
     try {
@@ -339,6 +348,31 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
     }
   };
 
+  // Submit Return to Vendor
+  const handleSubmitReturnToVendor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!returnToVendorUnit) return;
+
+    try {
+      setReturnToVendorSubmitting(true);
+      await api.returnUnitToVendor(returnToVendorUnit.id, {
+        return_reason: returnToVendorReason.trim() || 'Unsold within agreed window',
+      });
+
+      toast.success('Unit Returned to Vendor', {
+        description: `${returnToVendorUnit.variant?.product?.name || 'Device'} returned to vendor/broker. Removed from active shelf stock.`,
+      });
+
+      setReturnToVendorUnit(null);
+      setReturnToVendorReason('');
+      loadInventory();
+    } catch (err: any) {
+      toast.error('Failed to return unit to vendor', { description: err.message });
+    } finally {
+      setReturnToVendorSubmitting(false);
+    }
+  };
+
   const canViewCost = user?.can_view_costs ?? false;
 
   const getItemCategoryIcon = (category?: string, name?: string) => {
@@ -374,6 +408,22 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
             <span>In Stock</span>
             <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 font-mono">
               {counts.in_stock}
+            </span>
+          </button>
+
+          {/* Tab: Vendor Stock */}
+          <button
+            onClick={() => setStatusFilter('vendor_stock')}
+            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-1.5 whitespace-nowrap ${
+              statusFilter === 'vendor_stock'
+                ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs font-bold'
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <Handshake className="w-3.5 h-3.5 text-amber-500" />
+            <span>Vendor Stock</span>
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 font-mono font-bold">
+              {counts.vendor_stock ?? 0}
             </span>
           </button>
 
@@ -809,11 +859,21 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
                                                 className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors cursor-pointer group"
                                               >
                                                 <td className="py-2.5 px-4 font-mono font-semibold text-slate-900 dark:text-white">
-                                                  {unit.imei_or_serial || (
-                                                    <span className="text-slate-400 font-sans italic text-[11px]">
-                                                      Bulk Unit
+                                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                                    <span>
+                                                      {unit.imei_or_serial || (
+                                                        <span className="text-slate-400 font-sans italic text-[11px]">
+                                                          Bulk Unit
+                                                        </span>
+                                                      )}
                                                     </span>
-                                                  )}
+                                                    {unit.source_type === 'consignment' && (
+                                                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50 dark:border-amber-800/50">
+                                                        <Handshake className="w-2.5 h-2.5" />
+                                                        Vendor
+                                                      </span>
+                                                    )}
+                                                  </div>
                                                 </td>
                                                 <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">
                                                   {unitSpec}
@@ -847,20 +907,36 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
                                                   </td>
                                                 )}
                                                 <td className="py-2.5 px-4 text-right">
-                                                  <button
-                                                    onClick={(e) => {
-                                                      e.stopPropagation();
-                                                      setHandoverTargetUnit(unit);
-                                                      setHandoverTo('');
-                                                      setHandoverLocation('');
-                                                      setHandoverNotes('');
-                                                    }}
-                                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-amber-950/50 text-slate-700 dark:text-slate-300 hover:text-amber-700 dark:hover:text-amber-400 transition-colors shadow-2xs active:scale-95"
-                                                    title="Handover device to staff or broker to sell"
-                                                  >
-                                                    <UserCheck className="w-3 h-3" />
-                                                    <span>Handover / Out</span>
-                                                  </button>
+                                                  <div className="flex items-center justify-end gap-1.5">
+                                                    {unit.source_type === 'consignment' && (
+                                                      <button
+                                                        onClick={(e) => {
+                                                          e.stopPropagation();
+                                                          setReturnToVendorUnit(unit);
+                                                          setReturnToVendorReason('');
+                                                        }}
+                                                        className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold bg-amber-50 dark:bg-amber-950/50 border border-amber-200/60 dark:border-amber-800/60 text-amber-700 dark:text-amber-400 hover:bg-amber-100 transition-colors shadow-2xs active:scale-95"
+                                                        title="Return unsold consignment unit back to broker"
+                                                      >
+                                                        <Handshake className="w-3 h-3" />
+                                                        <span>Return</span>
+                                                      </button>
+                                                    )}
+                                                    <button
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setHandoverTargetUnit(unit);
+                                                        setHandoverTo('');
+                                                        setHandoverLocation('');
+                                                        setHandoverNotes('');
+                                                      }}
+                                                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-amber-950/50 text-slate-700 dark:text-slate-300 hover:text-amber-700 dark:hover:text-amber-400 transition-colors shadow-2xs active:scale-95"
+                                                      title="Handover device to staff or broker to sell"
+                                                    >
+                                                      <UserCheck className="w-3 h-3" />
+                                                      <span>Handover / Out</span>
+                                                    </button>
+                                                  </div>
                                                 </td>
                                                 <td className="py-2.5 px-2 text-right">
                                                   <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-700 dark:group-hover:text-slate-300 group-hover:translate-x-0.5 transition-all" />
@@ -968,6 +1044,12 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
                                     {pCatRel.name}
                                   </span>
                                 )}
+                                {unit.source_type === 'consignment' && (
+                                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/40 dark:border-amber-800/40">
+                                    <Handshake className="w-2.5 h-2.5" />
+                                    Vendor Stock
+                                  </span>
+                                )}
                                 <span>{variantSubtitle}</span>
                               </div>
                             </div>
@@ -1009,7 +1091,29 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
 
                         {/* Status & Location / Handover info */}
                         <td className="py-3.5 px-5 text-center">
-                          {unit.status === 'in_stock' && (
+                          {unit.status === 'in_stock' && unit.source_type === 'consignment' && (
+                            <div>
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50 dark:border-amber-800/50">
+                                <Handshake className="w-3 h-3" />
+                                Vendor Stock
+                              </span>
+                              {unit.return_deadline ? (
+                                <div className="text-[10px] mt-0.5">
+                                  {new Date(unit.return_deadline) < new Date() ? (
+                                    <span className="text-rose-600 dark:text-rose-400 font-bold">Return Overdue</span>
+                                  ) : (
+                                    <span className="text-amber-700 dark:text-amber-400 font-medium">
+                                      Return by {new Date(unit.return_deadline).toLocaleDateString()}
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="text-[10px] text-slate-400 mt-0.5">{unit.location || 'Shop Counter'}</div>
+                              )}
+                            </div>
+                          )}
+
+                          {unit.status === 'in_stock' && unit.source_type !== 'consignment' && (
                             <div>
                               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-800/50">
                                 <CheckCircle2 className="w-3 h-3" />
@@ -1058,6 +1162,20 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
                               )}
                             </div>
                           )}
+
+                          {unit.status === 'returned_to_vendor' && (
+                            <div>
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200/50 dark:border-slate-700/50">
+                                <RotateCcw className="w-3 h-3" />
+                                Returned to Broker
+                              </span>
+                              {unit.returned_at && (
+                                <div className="text-[10px] text-slate-400 mt-0.5">
+                                  {new Date(unit.returned_at).toLocaleDateString()}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </td>
 
                         {/* Cost basis (owner only) */}
@@ -1069,69 +1187,86 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
 
                         {/* Contextual Action Button */}
                         <td className="py-3.5 px-5 text-right">
-                          {unit.status === 'in_stock' && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setHandoverTargetUnit(unit);
-                                setHandoverTo('');
-                                setHandoverLocation('');
-                                setHandoverNotes('');
-                              }}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-amber-950/50 text-slate-700 dark:text-slate-300 hover:text-amber-700 dark:hover:text-amber-400 transition-colors shadow-2xs active:scale-95"
-                              title="Handover this device to a staff member or broker to sell"
-                            >
-                              <UserCheck className="w-3 h-3" />
-                              <span>Handover / Out</span>
-                            </button>
-                          )}
+                          <div className="flex items-center justify-end gap-1.5">
+                            {unit.source_type === 'consignment' && unit.status === 'in_stock' && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setReturnToVendorUnit(unit);
+                                  setReturnToVendorReason('');
+                                }}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-50 dark:bg-amber-950/50 border border-amber-200/60 dark:border-amber-800/60 text-amber-700 dark:text-amber-400 hover:bg-amber-100 transition-colors shadow-2xs active:scale-95"
+                                title="Return unsold consignment item back to broker"
+                              >
+                                <Handshake className="w-3 h-3" />
+                                <span>Return to Vendor</span>
+                              </button>
+                            )}
 
-                          {unit.status === 'out' && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleRestockOut(unit);
-                              }}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200/60 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 transition-colors shadow-2xs active:scale-95"
-                              title="Restock this unsold unit back to shop shelf"
-                            >
-                              <RotateCcw className="w-3 h-3" />
-                              <span>Restock to Shelf</span>
-                            </button>
-                          )}
+                            {unit.status === 'in_stock' && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setHandoverTargetUnit(unit);
+                                  setHandoverTo('');
+                                  setHandoverLocation('');
+                                  setHandoverNotes('');
+                                }}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-amber-950/50 text-slate-700 dark:text-slate-300 hover:text-amber-700 dark:hover:text-amber-400 transition-colors shadow-2xs active:scale-95"
+                                title="Handover this device to a staff member or broker to sell"
+                              >
+                                <UserCheck className="w-3 h-3" />
+                                <span>Handover / Out</span>
+                              </button>
+                            )}
 
-                          {unit.status === 'sold' && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setReturnTargetUnit(unit);
-                                setReturnReason('');
-                                setReturnCondition('inspection_needed');
-                                setReturnNotes('');
-                              }}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-rose-50 dark:bg-rose-950/50 border border-rose-200/60 dark:border-rose-800/60 text-rose-700 dark:text-rose-400 hover:bg-rose-100 transition-colors shadow-2xs active:scale-95"
-                              title="Customer returned this sold device"
-                            >
-                              <Undo2 className="w-3 h-3" />
-                              <span>Customer Return</span>
-                            </button>
-                          )}
+                            {unit.status === 'out' && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRestockOut(unit);
+                                }}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200/60 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 transition-colors shadow-2xs active:scale-95"
+                                title="Restock this unsold unit back to shop shelf"
+                              >
+                                <RotateCcw className="w-3 h-3" />
+                                <span>Restock to Shelf</span>
+                              </button>
+                            )}
 
-                          {unit.status === 'returned' && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setRepairedTargetUnit(unit);
-                                setRepairedCondition('refurbished');
-                                setRepairedNotes('');
-                              }}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-50 dark:bg-blue-950/50 border border-blue-200/60 dark:border-blue-800/60 text-blue-700 dark:text-blue-400 hover:bg-blue-100 transition-colors shadow-2xs active:scale-95"
-                              title="Device repaired and ready to place back in stock"
-                            >
-                              <Wrench className="w-3 h-3" />
-                              <span>Repaired & Restock</span>
-                            </button>
-                          )}
+                            {unit.status === 'sold' && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setReturnTargetUnit(unit);
+                                  setReturnReason('');
+                                  setReturnCondition('inspection_needed');
+                                  setReturnNotes('');
+                                }}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-rose-50 dark:bg-rose-950/50 border border-rose-200/60 dark:border-rose-800/60 text-rose-700 dark:text-rose-400 hover:bg-rose-100 transition-colors shadow-2xs active:scale-95"
+                                title="Customer returned this sold device"
+                              >
+                                <Undo2 className="w-3 h-3" />
+                                <span>Customer Return</span>
+                              </button>
+                            )}
+
+                            {unit.status === 'returned' && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setRepairedTargetUnit(unit);
+                                  setRepairedCondition('refurbished');
+                                  setRepairedNotes('');
+                                }}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-50 dark:bg-blue-950/50 border border-blue-200/60 dark:border-blue-800/60 text-blue-700 dark:text-blue-400 hover:bg-blue-100 transition-colors shadow-2xs active:scale-95"
+                                title="Device repaired and ready to place back in stock"
+                              >
+                                <Wrench className="w-3 h-3" />
+                                <span>Repaired & Restock</span>
+                              </button>
+                            )}
+                          </div>
                         </td>
 
                         <td className="py-3.5 px-3 text-right">
@@ -1466,6 +1601,107 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user }) => {
                 >
                   {repairedSubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wrench className="w-3.5 h-3.5" />}
                   <span>Restock Repaired Device</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Return to Vendor Modal (Consignment unit returned to broker/partner) */}
+      {returnToVendorUnit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs animate-backdrop-enter"
+            onClick={() => setReturnToVendorUnit(null)}
+          />
+
+          <div className="relative z-10 bg-white dark:bg-[#131926] rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-2xl max-w-md w-full p-6 space-y-4 animate-modal-enter">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                  <Handshake className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 dark:text-white text-sm">
+                    Return to Vendor / Broker
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Remove unsold consignment item from store stock
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setReturnToVendorUnit(null)}
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-800/40 text-xs space-y-1.5">
+              <div className="font-bold text-slate-900 dark:text-white text-sm">
+                {returnToVendorUnit.variant?.product?.name}
+              </div>
+              <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                Serial/IMEI: {returnToVendorUnit.imei_or_serial || 'Standard stock'}
+              </div>
+              {returnToVendorUnit.return_deadline && (
+                <div className="text-[11px] font-medium pt-1 border-t border-amber-200/50 dark:border-amber-800/30">
+                  {new Date(returnToVendorUnit.return_deadline) < new Date() ? (
+                    <span className="text-rose-600 dark:text-rose-400 font-bold">
+                      ⚠ Agreed deadline passed ({new Date(returnToVendorUnit.return_deadline).toLocaleDateString()})
+                    </span>
+                  ) : (
+                    <span className="text-amber-700 dark:text-amber-300">
+                      Agreed return by: {new Date(returnToVendorUnit.return_deadline).toLocaleDateString()}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <form onSubmit={handleSubmitReturnToVendor} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Reason for Return
+                </label>
+                <input
+                  type="text"
+                  value={returnToVendorReason}
+                  onChange={(e) => setReturnToVendorReason(e.target.value)}
+                  placeholder="e.g. Unsold within agreed window, Customer demand low"
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700"
+                />
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {['Unsold within agreed window', 'Consignment expired', 'Broker requested return', 'Customer demand low'].map((reason) => (
+                    <button
+                      key={reason}
+                      type="button"
+                      onClick={() => setReturnToVendorReason(reason)}
+                      className="px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-amber-50 hover:text-amber-700 dark:hover:bg-amber-950/60 transition-colors"
+                    >
+                      {reason}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setReturnToVendorUnit(null)}
+                  className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+                >
+                  Cancel (Esc)
+                </button>
+                <button
+                  type="submit"
+                  disabled={returnToVendorSubmitting}
+                  className="h-9 px-4 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition-all shadow-xs disabled:opacity-50 flex items-center gap-1.5 active:scale-95"
+                >
+                  {returnToVendorSubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Handshake className="w-3.5 h-3.5" />}
+                  <span>Confirm Return to Broker</span>
                 </button>
               </div>
             </form>
