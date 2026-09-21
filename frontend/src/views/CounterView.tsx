@@ -120,19 +120,17 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
   // Calculate maximum available stock for internal inventory
   const maxAvailableStock = useMemo(() => {
     if (sourcingType === 'brokered_neighbour') {
-      return 9999; // Brokered items are sourced externally from peer merchant
+      return 9999;
     }
     if (!selectedVariant) return 0;
 
     const inStockUnitsCount = unitsForVariant.length;
     const quantityOnHand = selectedVariant.stock?.quantity_on_hand ?? 0;
 
-    // Serialized products: strictly the count of physical in-stock units
     if (selectedProduct?.has_serials) {
       return inStockUnitsCount;
     }
 
-    // Non-serialized items: check quantity_on_hand or in-stock unit count
     return Math.max(quantityOnHand, inStockUnitsCount);
   }, [sourcingType, selectedVariant, selectedProduct, unitsForVariant]);
 
@@ -216,7 +214,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
     setSelectedUnitIds((prev) => {
       const isRemoving = prev.includes(unitId);
       if (!isRemoving && maxAvailableStock > 0 && prev.length >= maxAvailableStock) {
-        toast.warning(`All ${maxAvailableStock} available unit(s) are already selected.`);
+        toast.warning(`All ${maxAvailableStock} available unit(s) are selected.`);
         return prev;
       }
       const next = isRemoving ? prev.filter((id) => id !== unitId) : [...prev, unitId];
@@ -237,12 +235,12 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
   const handleQuantityChange = (newQty: number) => {
     if (sourcingType === 'internal_stock') {
       if (maxAvailableStock <= 0) {
-        toast.error('Item is out of stock in shop inventory. Switch to "Brokered" to source from a peer.');
+        toast.error('Item is out of stock.');
         setQuantity(1);
         return;
       }
       if (newQty > maxAvailableStock) {
-        toast.warning(`Cannot exceed available inventory (${maxAvailableStock} in stock).`);
+        toast.warning(`Maximum available stock is ${maxAvailableStock}.`);
         newQty = maxAvailableStock;
       }
     }
@@ -274,10 +272,10 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
     if (d < 0) d = 0;
     if (type === 'percent' && d > 100) {
       d = 100;
-      toast.warning('Percentage discount cannot exceed 100%.');
+      toast.warning('Discount percentage cannot exceed 100%.');
     } else if (type === 'fixed' && grossSubtotal > 0 && d > grossSubtotal) {
       d = grossSubtotal;
-      toast.warning(`Fixed discount cannot exceed subtotal (${grossSubtotal.toLocaleString()} ETB).`);
+      toast.warning(`Fixed discount cannot exceed ${grossSubtotal.toLocaleString()} ETB.`);
     }
 
     setDiscountValue(val === '' ? '' : String(d));
@@ -318,7 +316,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
     }
     if (sourcingType === 'internal_stock') {
       if (maxAvailableStock <= 0) {
-        toast.error('Cannot record sale: Item is out of stock in shop inventory.');
+        toast.error('Item is out of stock in shop inventory.');
         return;
       }
       if (quantity > maxAvailableStock) {
@@ -340,7 +338,6 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
     try {
       setSubmitting(true);
 
-      // Build items array
       let itemsPayload: Array<{
         variant_id: string;
         inventory_unit_id: string | null;
@@ -352,7 +349,6 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
       }> = [];
 
       if (sourcingType === 'internal_stock' && selectedUnitIds.length > 0) {
-        // Multiple or single serialized units
         itemsPayload = selectedUnitIds.map((uId) => ({
           variant_id: selectedVariantId,
           inventory_unit_id: uId,
@@ -363,7 +359,6 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
           vendor_cost: null,
         }));
       } else {
-        // Quantity-based sale (non-serialized or without specific serial unit)
         itemsPayload = [
           {
             variant_id: selectedVariantId,
@@ -389,11 +384,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
 
       const order = await api.recordSale(salePayload);
 
-      toast.success(`Sale recorded! Order #${order.order_number}`, {
-        description: sourcingType === 'brokered_neighbour'
-          ? `Brokered sale of ${quantity} unit(s) booked & payable recorded.`
-          : `Sold ${quantity} unit(s) — Inventory deducted & ledger updated.`,
-      });
+      toast.success(`Sale recorded: Order #${order.order_number}`);
 
       resetForm();
       loadData();
@@ -405,7 +396,6 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
     }
   };
 
-  // ─── Variant display label ───
   const variantLabel = (v: ProductVariant) => {
     const specParts = v.specs ? Object.values(v.specs).map(String) : [];
     const parts = [v.storage, v.ram ? `${v.ram} RAM` : null, v.color, ...specParts].filter(Boolean);
@@ -416,7 +406,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
     return (
       <div className="py-24 text-center text-slate-400 dark:text-slate-500 text-xs flex items-center justify-center gap-2 animate-pulse">
         <Loader2 className="w-4 h-4 animate-spin text-slate-900 dark:text-white" />
-        <span>Loading catalog and inventory items...</span>
+        <span>Loading POS workspace...</span>
       </div>
     );
   }
@@ -431,10 +421,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
           </div>
           <div>
             <h2 className="font-black text-slate-900 dark:text-white text-base tracking-tight">Point of Sale</h2>
-            <p className="text-[11px] text-slate-400 font-medium">
-              {user && <span className="text-slate-600 dark:text-slate-300 font-bold">{user.name}</span>}
-              {user && ' — '}Quick sale entry with percentage (%) and fixed discount modes
-            </p>
+            <p className="text-[11px] text-slate-400 font-medium">Checkout &amp; Sales Entry</p>
           </div>
         </div>
 
@@ -466,7 +453,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
             }`}
           >
             <Package className="w-3.5 h-3.5" />
-            From Our Stock
+            Shop Inventory
           </button>
           <button
             type="button"
@@ -481,7 +468,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
             }`}
           >
             <ArrowRightLeft className="w-3.5 h-3.5" />
-            Brokered (Peer Shop)
+            Brokered Sourcing
           </button>
         </div>
       </div>
@@ -521,7 +508,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
               <div className="p-3 max-h-[320px] overflow-y-auto">
                 {filteredProducts.length === 0 ? (
                   <div className="py-8 text-center text-xs text-slate-400">
-                    No products match "{productSearch}"
+                    No products found
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -584,7 +571,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                 {/* ── STEP 2: Variant Chips ── */}
                 <div className="mt-3">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2 block">
-                    Select Variant
+                    Variant
                   </span>
                   <div className="flex flex-wrap gap-2">
                     {variants.map((v) => {
@@ -607,7 +594,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                             <span className={`ml-1.5 text-[10px] font-bold ${
                               vStock > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500 dark:text-rose-400'
                             }`}>
-                              ({vStock > 0 ? `${vStock} in stock` : '0 in stock'})
+                              ({vStock})
                             </span>
                           )}
                         </button>
@@ -619,24 +606,24 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
             )}
           </div>
 
-          {/* ── Serial Unit Selection (for internal stock with serials) ── */}
+          {/* ── Serial Unit Selection ── */}
           {selectedVariant && sourcingType === 'internal_stock' && selectedProduct?.has_serials && (
             <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800/90 p-4 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                  Pick Serialized Units ({unitsForVariant.length} in stock)
+                  Serial Units ({unitsForVariant.length} in stock)
                 </span>
                 {selectedUnitIds.length > 0 && (
                   <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-                    {selectedUnitIds.length} / {maxAvailableStock} unit(s) selected
+                    {selectedUnitIds.length} selected
                   </span>
                 )}
               </div>
 
               {unitsForVariant.length === 0 ? (
-                <div className="p-4 rounded-xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-800/50 text-xs text-amber-700 dark:text-amber-400 flex items-center gap-2">
+                <div className="p-3.5 rounded-xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-800/50 text-xs text-amber-700 dark:text-amber-400 flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 shrink-0" />
-                  <span>Out of stock in shop inventory. You can switch to "Brokered" above to source from a peer merchant without inventory limit.</span>
+                  <span>Out of stock in shop inventory. Switch to "Brokered" to source from a partner.</span>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -692,7 +679,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
               <div className="flex items-center gap-2 mb-3">
                 <Zap className="w-4 h-4 text-amber-500" />
                 <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
-                  Brokered Source Details
+                  Brokered Details
                 </span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -706,7 +693,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                     className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
                     required
                   >
-                    <option value="">— Select Sourcing Partner —</option>
+                    <option value="">— Select Partner —</option>
                     {peerMerchants.map((m) => (
                       <option key={m.id} value={m.id}>
                         {m.name} {m.phone ? `(${m.phone})` : ''}
@@ -716,14 +703,14 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                    Peer Unit Cost (ETB)
+                    Unit Cost (ETB)
                   </label>
                   <input
                     type="number"
                     step="0.01"
                     value={vendorCost}
                     onChange={(e) => setVendorCost(e.target.value)}
-                    placeholder="Agreed cost per unit"
+                    placeholder="Agreed unit cost"
                     className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
                     required
                   />
@@ -735,7 +722,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                     ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-800/50'
                     : 'bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-400 border border-rose-200/50 dark:border-rose-800/50'
                 }`}>
-                  {brokeredProfit > 0 ? '+' : ''}{brokeredProfit.toLocaleString()} ETB total margin ({quantity} × {(unitPriceNum - vendorCostNum).toLocaleString()} ETB)
+                  {brokeredProfit > 0 ? '+' : ''}{brokeredProfit.toLocaleString()} ETB Margin
                 </div>
               )}
             </div>
@@ -751,7 +738,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                        Quantity / Number of Units
+                        Quantity
                       </span>
                       {sourcingType === 'internal_stock' && (
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
@@ -763,13 +750,6 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                         </span>
                       )}
                     </div>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">
-                      {selectedUnitIds.length > 0
-                        ? `${selectedUnitIds.length} specific serial unit(s) selected above`
-                        : sourcingType === 'internal_stock'
-                        ? `Max ${maxAvailableStock} unit(s) can be sold from inventory`
-                        : 'Specify how many units to sell'}
-                    </p>
                   </div>
 
                   {/* Stepper + Quick count chips */}
@@ -804,7 +784,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                       </button>
                     </div>
 
-                    {/* Quick Count Preset Chips (only enabled if <= maxAvailableStock) */}
+                    {/* Quick Count Preset Chips */}
                     <div className="hidden sm:flex items-center gap-1">
                       {[1, 2, 3, 5, 10].map((count) => {
                         const isOverStock = sourcingType === 'internal_stock' && count > maxAvailableStock;
@@ -814,8 +794,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                             type="button"
                             onClick={() => handleQuantityChange(count)}
                             disabled={isOverStock}
-                            title={isOverStock ? `Only ${maxAvailableStock} in stock` : undefined}
-                            className={`h-8 px-2 rounded-lg text-xs font-mono font-bold transition-all ${
+                            className={`h-8 px-2.5 rounded-lg text-xs font-mono font-bold transition-all ${
                               quantity === count
                                 ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-2xs'
                                 : isOverStock
@@ -845,13 +824,13 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                     step="0.01"
                     value={unitSellingPrice}
                     onChange={(e) => handleUnitPriceChange(e.target.value)}
-                    placeholder="Price per unit"
+                    placeholder="0.00"
                     className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-sm font-mono font-black text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
                     required
                   />
                   {quantity > 1 && unitPriceNum > 0 && (
                     <span className="text-[10px] text-slate-400 mt-1 block font-mono">
-                      = {grossSubtotal.toLocaleString()} ETB subtotal
+                      Subtotal: {grossSubtotal.toLocaleString()} ETB
                     </span>
                   )}
                 </div>
@@ -875,7 +854,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                             : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
                         }`}
                       >
-                        % Percent
+                        %
                       </button>
                       <button
                         type="button"
@@ -889,7 +868,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                             : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
                         }`}
                       >
-                        ETB Fixed
+                        ETB
                       </button>
                     </div>
                   </div>
@@ -903,7 +882,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                       value={discountValue}
                       onChange={(e) => handleDiscountChange(e.target.value, discountType)}
                       disabled={user ? !user.can_discount : false}
-                      placeholder={discountType === 'percent' ? 'e.g. 20 (for 20%)' : 'e.g. 5000 (flat)'}
+                      placeholder={discountType === 'percent' ? '0%' : '0 ETB'}
                       className="w-full h-10 pl-3 pr-10 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-sm font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 disabled:opacity-40"
                     />
                     <div className="absolute right-3 top-2.5 text-xs font-mono font-bold text-slate-400 pointer-events-none">
@@ -913,9 +892,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
 
                   {calculatedDiscountAmount > 0 && (
                     <span className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-1 block font-mono font-bold">
-                      {discountType === 'percent'
-                        ? `= -${calculatedDiscountAmount.toLocaleString()} ETB off (${rawDiscountVal}% of ${grossSubtotal.toLocaleString()} ETB)`
-                        : `= -${calculatedDiscountAmount.toLocaleString()} ETB off (${((calculatedDiscountAmount / (grossSubtotal || 1)) * 100).toFixed(1)}%)`}
+                      -{calculatedDiscountAmount.toLocaleString()} ETB ({discountType === 'percent' ? `${rawDiscountVal}%` : `${((calculatedDiscountAmount / (grossSubtotal || 1)) * 100).toFixed(1)}%`})
                     </span>
                   )}
                 </div>
@@ -923,24 +900,24 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                 {/* 3. Paid Now */}
                 <div>
                   <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                    Paid Now (ETB)
+                    Amount Paid (ETB)
                   </label>
                   <input
                     type="number"
                     step="0.01"
                     value={paidAmount}
                     onChange={(e) => setPaidAmount(e.target.value)}
-                    placeholder="Full or partial"
+                    placeholder="0.00"
                     className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-sm font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10"
                     required
                   />
-                  {totalAfterDiscount > 0 && (
+                  {totalAfterDiscount > 0 && paidNum !== totalAfterDiscount && (
                     <button
                       type="button"
                       onClick={() => setPaidAmount(String(totalAfterDiscount))}
                       className="text-[10px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 mt-1 block font-medium underline"
                     >
-                      Fill full net amount ({totalAfterDiscount.toLocaleString()} ETB)
+                      Set full ({totalAfterDiscount.toLocaleString()} ETB)
                     </button>
                   )}
                 </div>
@@ -1060,7 +1037,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
               {!selectedProduct ? (
                 <div className="py-8 text-center">
                   <ShoppingBag className="w-8 h-8 text-slate-200 dark:text-slate-700 mx-auto mb-3" />
-                  <p className="text-xs text-slate-400 font-medium">Search and select a product to begin</p>
+                  <p className="text-xs text-slate-400 font-medium">Select a product to begin</p>
                 </div>
               ) : (
                 <>
@@ -1108,7 +1085,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                   {sourcingType === 'internal_stock' && maxAvailableStock <= 0 && (
                     <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 text-xs text-rose-700 dark:text-rose-300 flex items-center gap-2">
                       <AlertTriangle className="w-4 h-4 shrink-0" />
-                      <span>Item is out of stock in shop inventory. Switch to "Brokered" to source from a peer.</span>
+                      <span>Item is out of stock in shop inventory.</span>
                     </div>
                   )}
 
@@ -1123,7 +1100,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
 
                     {quantity > 1 && (
                       <div className="flex justify-between text-slate-600 dark:text-slate-400">
-                        <span>Gross Subtotal ({quantity} × {unitPriceNum.toLocaleString()})</span>
+                        <span>Subtotal ({quantity}x)</span>
                         <span className="font-mono font-bold text-slate-900 dark:text-white">
                           {grossSubtotal > 0 ? grossSubtotal.toLocaleString() : '—'} ETB
                         </span>
@@ -1133,7 +1110,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                     {calculatedDiscountAmount > 0 && (
                       <div className="flex justify-between text-rose-600 dark:text-rose-400">
                         <span>
-                          Discount {discountType === 'percent' ? `(${rawDiscountVal}%)` : '(Fixed)'}
+                          Discount {discountType === 'percent' ? `(${rawDiscountVal}%)` : ''}
                         </span>
                         <span className="font-mono font-bold">
                           -{calculatedDiscountAmount.toLocaleString()} ETB
@@ -1142,7 +1119,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                     )}
 
                     <div className="flex justify-between pt-2 border-t border-dashed border-slate-200 dark:border-slate-700">
-                      <span className="font-bold text-slate-900 dark:text-white">Total Net Payable</span>
+                      <span className="font-bold text-slate-900 dark:text-white">Net Total</span>
                       <span className="font-mono font-black text-base text-slate-900 dark:text-white">
                         {totalAfterDiscount > 0 ? totalAfterDiscount.toLocaleString() : '—'} ETB
                       </span>
@@ -1168,13 +1145,6 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                     )}
                   </div>
 
-                  {/* Credit Warning */}
-                  {isCredit && unitPriceNum > 0 && (
-                    <div className="p-2.5 rounded-xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-800/50 text-[11px] text-amber-700 dark:text-amber-400 font-medium">
-                      A receivable debt of {balanceDue.toLocaleString()} ETB will be created for {customerId ? 'this customer' : 'anonymous debtor'}.
-                    </div>
-                  )}
-
                   {/* Brokered Margin */}
                   {brokeredProfit !== null && (
                     <div className={`p-2.5 rounded-xl text-[11px] font-bold text-center ${
@@ -1182,7 +1152,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                         ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-800/50'
                         : 'bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-400 border border-rose-200/50 dark:border-rose-800/50'
                     }`}>
-                      Total margin: {brokeredProfit > 0 ? '+' : ''}{brokeredProfit.toLocaleString()} ETB ({quantity} units)
+                      Margin: {brokeredProfit > 0 ? '+' : ''}{brokeredProfit.toLocaleString()} ETB ({quantity}x)
                     </div>
                   )}
                 </>
@@ -1209,11 +1179,11 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                 )}
                 <span>
                   {submitting
-                    ? 'Recording...'
+                    ? 'Processing...'
                     : !selectedVariantId
-                    ? 'Select a Product'
+                    ? 'Select Product'
                     : sourcingType === 'internal_stock' && maxAvailableStock <= 0
-                    ? 'Out of Stock in Inventory'
+                    ? 'Out of Stock'
                     : unitPriceNum <= 0
                     ? 'Enter Unit Price'
                     : `Complete Sale (${quantity}x) — ${totalAfterDiscount.toLocaleString()} ETB`}
