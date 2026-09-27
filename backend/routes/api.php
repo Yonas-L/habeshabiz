@@ -9,8 +9,10 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DebtController;
 use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\InventoryController;
+use App\Http\Controllers\Api\OnboardingController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\SaleController;
+use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\StaffController;
 use App\Http\Controllers\Api\TaskController;
 use Illuminate\Support\Facades\Route;
@@ -18,10 +20,16 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('v1')->group(function () {
     // Public Endpoints
     Route::post('/auth/login', [AuthController::class, 'login']);
+    Route::post('/onboard', [OnboardingController::class, 'onboard']);
     Route::get('/public/statement/{token}', [ContactController::class, 'publicStatement']);
 
     // Protected Routes
     Route::middleware('auth:sanctum')->group(function () {
+        // Business Settings & Profile (Owner Only)
+        Route::get('/settings/profile', [SettingsController::class, 'getProfile']);
+        Route::put('/settings/profile', [SettingsController::class, 'updateProfile']);
+        Route::post('/settings/profile/logo', [SettingsController::class, 'uploadLogo']);
+
         // User Profile & Session
         Route::get('/auth/me', [AuthController::class, 'me']);
         Route::post('/auth/logout', [AuthController::class, 'logout']);

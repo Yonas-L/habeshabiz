@@ -26,7 +26,8 @@ export type NavTab =
   | 'treasury'
   | 'expenses'
   | 'staff'
-  | 'logs';
+  | 'logs'
+  | 'settings';
 
 interface SidebarProps {
   activeTab: NavTab;
@@ -36,7 +37,7 @@ interface SidebarProps {
   netCapital: number | null;
   openDebtsCount: number;
   onLogout: () => void;
-  onQuickSwitchUser: (email: string) => void;
+  onQuickSwitchUser?: (email: string) => void;
   isOpenMobile: boolean;
   onCloseMobile: () => void;
   onOpenProfile?: () => void;
@@ -50,13 +51,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
   tenant,
   openDebtsCount,
   onLogout,
-  onQuickSwitchUser,
   isOpenMobile,
   onCloseMobile,
   onOpenProfile,
   onOpenQuickSearch,
 }) => {
   const isOwner = user?.role === 'owner';
+
+  const businessInitials = React.useMemo(() => {
+    if (!tenant?.name) return 'HB';
+    const words = tenant.name.trim().split(/\s+/);
+    if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+    return (words[0][0] + words[1][0]).toUpperCase();
+  }, [tenant?.name]);
 
   const mainNav: {
     id: NavTab;
@@ -85,7 +92,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     shortcut?: string;
   }[] = [
     { id: 'debts', label: 'Receivable & Payable', icon: CreditCard, badge: openDebtsCount, shortcut: '⌘6' },
-    { id: 'treasury', label: 'Treasury & Cash', icon: Landmark, shortcut: '⌘7' },
+    { id: 'treasury', label: 'Bank Accounts', icon: Landmark, shortcut: '⌘7' },
     { id: 'expenses', label: 'Expenses', icon: DollarSign, shortcut: '⌘8' },
   ];
 
@@ -93,20 +100,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <aside className="w-64 h-full bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-[0_4px_24px_-4px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_24px_-4px_rgba(0,0,0,0.4)] flex flex-col justify-between select-none p-3.5 transition-colors">
       <div>
         {/* Brand Header */}
-        <div className="px-2 py-3 flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-slate-900 via-slate-800 to-emerald-600 text-white flex items-center justify-center font-bold text-sm shadow-sm tracking-tight">
-              HB
+        <div className="px-2 py-2.5 flex items-center justify-between gap-2.5 border-b border-slate-100 dark:border-slate-800/80">
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            <div className="w-9 h-9 rounded-xl bg-slate-900 dark:bg-slate-800 border border-slate-700/30 text-white flex items-center justify-center font-bold text-xs tracking-tight shrink-0 shadow-xs overflow-hidden">
+              {tenant?.settings?.logo_url ? (
+                <img
+                  src={tenant.settings.logo_url}
+                  alt={tenant.name}
+                  className="w-full h-full object-contain p-0.5"
+                />
+              ) : (
+                businessInitials
+              )}
             </div>
-            <div className="leading-tight">
-              <div className="font-bold text-slate-900 dark:text-white text-sm tracking-tight">
+            <div className="leading-tight min-w-0 flex-1">
+              <div
+                className="font-bold text-slate-900 dark:text-white text-xs tracking-tight truncate"
+                title={tenant?.name || 'HabeshaBiz'}
+              >
                 {tenant?.name || 'HabeshaBiz'}
               </div>
-              <div className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">Business OS</div>
+              <div className="text-[10px] text-slate-400 dark:text-slate-500 font-medium truncate mt-0.5">
+                Business Management
+              </div>
             </div>
           </div>
 
-          <span className="w-2 h-2 rounded-full bg-emerald-500 ring-4 ring-emerald-100 dark:ring-emerald-950/60 animate-pulse" />
+          <span
+            className="w-2 h-2 rounded-full bg-emerald-500 ring-4 ring-emerald-100 dark:ring-emerald-950/60 shrink-0"
+            title="System Online"
+          />
         </div>
 
         {/* Quick Search Trigger */}
@@ -233,42 +256,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 ⌘0
               </span>
             </button>
+
+            <button
+              onClick={() => {
+                onChangeTab('settings');
+                onCloseMobile();
+              }}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                activeTab === 'settings'
+                  ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800/50'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <Settings className={`size-4 ${activeTab === 'settings' ? 'text-emerald-400 dark:text-emerald-600' : 'text-slate-400 dark:text-slate-500'}`} />
+                <span>Settings</span>
+              </div>
+            </button>
           </div>
         )}
       </div>
 
-      {/* Bottom Persona & Switcher */}
+      {/* Bottom User Profile */}
       <div className="pt-3 border-t border-slate-100/80 dark:border-slate-800/80">
-        {/* Quick Role Switcher */}
-        <div className="mb-2.5 p-1 bg-slate-100 dark:bg-slate-800/70 rounded-xl grid grid-cols-2 gap-1 text-[11px] font-medium">
-          <button
-            onClick={() => onQuickSwitchUser('yoni@boletech.et')}
-            className={`py-1 rounded-lg transition-all ${
-              user?.role === 'owner'
-                ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white font-bold shadow-xs'
-                : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            Yoni (Owner)
-          </button>
-          <button
-            onClick={() => onQuickSwitchUser('husa@boletech.et')}
-            className={`py-1 rounded-lg transition-all ${
-              user?.role === 'salesperson'
-                ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white font-bold shadow-xs'
-                : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            Husa (Sales)
-          </button>
-        </div>
-
         {/* Current User Card */}
         <div className="flex items-center justify-between px-1">
           <div
-            onClick={onOpenProfile}
-            title="Click to manage account settings & change password"
-            className="flex items-center gap-2 cursor-pointer group flex-1 mr-2"
+            onClick={isOwner ? () => onChangeTab('settings') : onOpenProfile}
+            title={isOwner ? 'Business Settings & Profile' : 'Account Settings & Profile'}
+            className="flex items-center gap-2 cursor-pointer group flex-1 mr-2 min-w-0"
           >
             <div className="w-8 h-8 rounded-xl bg-slate-900 dark:bg-slate-800 text-white flex items-center justify-center text-xs font-bold uppercase shadow-xs group-hover:bg-slate-800 transition-colors">
               {user?.name?.slice(0, 2) || 'HB'}
@@ -284,7 +300,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
 
           <div className="flex items-center gap-1">
-            {onOpenProfile && (
+            {isOwner ? (
+              <button
+                onClick={() => onChangeTab('settings')}
+                title="Business Settings"
+                className={`w-7 h-7 rounded-lg border transition-colors flex items-center justify-center cursor-pointer ${
+                  activeTab === 'settings'
+                    ? 'border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400'
+                    : 'border-slate-200/80 dark:border-slate-800 text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`}
+              >
+                <Settings className="w-3.5 h-3.5" />
+              </button>
+            ) : onOpenProfile ? (
               <button
                 onClick={onOpenProfile}
                 title="Account Settings"
@@ -292,7 +320,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               >
                 <Settings className="w-3.5 h-3.5" />
               </button>
-            )}
+            ) : null}
             <button
               onClick={onLogout}
               title="Sign out"
@@ -309,7 +337,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <>
       {/* Desktop Persistent Sidebar */}
-      <div className="hidden md:block shrink-0 w-64 h-[calc(100vh-2rem)] sticky top-4 my-4 ml-4">
+      <div className="hidden md:block shrink-0 w-64 h-[calc(100vh-2rem)] sticky top-4 my-4 ml-4 animate-fluid-sidebar">
         {sidebarInner}
       </div>
 

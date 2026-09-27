@@ -16,16 +16,17 @@ interface TopbarProps {
 }
 
 const tabTitles: Record<NavTab, { title: string; subtitle: string }> = {
-  overview: { title: 'Dashboard', subtitle: 'Capital, performance & obligations' },
-  counter: { title: 'Sales', subtitle: 'Record a sale' },
-  inventory: { title: 'Stock', subtitle: 'Stock on hand' },
-  sales: { title: 'Sales History', subtitle: 'Transactions & margins' },
-  partners: { title: 'Vendors', subtitle: 'Peer shops, sourcing network & suppliers' },
-  debts: { title: 'Receivable & Payable', subtitle: 'Customer credit, vendor payouts & holdings' },
-  treasury: { title: 'Treasury', subtitle: 'Accounts & reserves' },
-  expenses: { title: 'Expenses', subtitle: 'Costs & owner draws' },
-  staff: { title: 'Staff', subtitle: 'Manage team, access permissions & performance' },
-  logs: { title: 'Audit Logs', subtitle: 'Immutable security tracking, user events & change logs' },
+  overview: { title: 'Dashboard', subtitle: 'Capital overview and store performance' },
+  counter: { title: 'Sales Counter', subtitle: 'Point of sale checkout' },
+  inventory: { title: 'Inventory', subtitle: 'Active store devices and catalog' },
+  sales: { title: 'Sales History', subtitle: 'Transactions and store profit' },
+  partners: { title: 'Vendors', subtitle: 'Suppliers and partner stores' },
+  debts: { title: 'Receivable and Payable', subtitle: 'Customer credit and vendor balances' },
+  treasury: { title: 'Bank Accounts', subtitle: 'Bank accounts and mobile wallets' },
+  expenses: { title: 'Expenses', subtitle: 'Store operational costs and withdrawals' },
+  staff: { title: 'Staff', subtitle: 'Team members and access permissions' },
+  logs: { title: 'Audit Logs', subtitle: 'System security and audit records' },
+  settings: { title: 'Settings', subtitle: 'Business profile and credentials' },
 };
 
 const MONTH_NAMES = [
@@ -103,7 +104,7 @@ export const Topbar: React.FC<TopbarProps> = ({
   const displayLabel = `${MONTH_NAMES[selectedMonthIndex]} ${selectedYear}`;
 
   return (
-    <header className="sticky top-0 z-40 h-16 px-4 lg:px-8 flex items-center justify-between bg-[#f6f8fa]/95 dark:bg-[#0b0f17]/95 backdrop-blur-md transition-colors border-b border-slate-200/60 dark:border-slate-800/60">
+    <header className="sticky top-0 z-40 h-16 px-4 lg:px-8 flex items-center justify-between bg-[#f6f8fa]/95 dark:bg-[#0b0f17]/95 backdrop-blur-md transition-colors border-b border-slate-200/60 dark:border-slate-800/60 animate-fluid-topbar">
       <div className="flex items-center gap-3">
         {/* Mobile Hamburger */}
         <button

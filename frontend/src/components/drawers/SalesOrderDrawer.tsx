@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import type { SalesOrder, User, FinancialAccount, InventoryUnit } from '../../api/client';
+import type { SalesOrder, User, FinancialAccount, InventoryUnit, Tenant } from '../../api/client';
 import { api } from '../../api/client';
 import { SlideOverDrawer } from './SlideOverDrawer';
 import { toast } from 'sonner';
@@ -31,6 +31,7 @@ interface SalesOrderDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   user: User | null;
+  tenant?: Tenant | null;
   accounts?: FinancialAccount[];
   onPaymentCollected?: (updatedOrder: SalesOrder) => void;
 }
@@ -40,6 +41,7 @@ export const SalesOrderDrawer: React.FC<SalesOrderDrawerProps> = ({
   isOpen,
   onClose,
   user,
+  tenant,
   accounts,
   onPaymentCollected,
 }) => {
@@ -145,7 +147,7 @@ export const SalesOrderDrawer: React.FC<SalesOrderDrawerProps> = ({
       telebirr: 'Telebirr',
       cbe_birr: 'CBE Birr',
       cash: 'Cash on Hand',
-      bank_transfer: 'Bank Transfer (CBE/Awash)',
+      bank_transfer: 'Bank Transfer',
       amole: 'Amole',
       credit: 'Customer Credit',
     };
@@ -157,7 +159,7 @@ export const SalesOrderDrawer: React.FC<SalesOrderDrawerProps> = ({
     const map: Record<string, string> = {
       new: 'Brand New',
       used_clean: 'Grade A Clean',
-      used_like_new: 'Like New (A+)',
+      used_like_new: 'Like New',
       grade_a: 'Grade A',
       grade_b: 'Grade B',
       refurbished: 'Refurbished',
@@ -246,11 +248,11 @@ export const SalesOrderDrawer: React.FC<SalesOrderDrawerProps> = ({
       .map((item, index) => {
         const unit = item.inventory_unit;
         const isExchanged = unit?.source_type === 'exchange' || Boolean(unit?.exchange_sales_order_id);
-        const tagText = isExchanged ? ' (Exchanged)' : '';
+        const tagText = isExchanged ? ' - Exchanged' : '';
         const imeiText = unit?.imei_or_serial ? `\n   SN: ${unit.imei_or_serial}` : '';
         const batteryText = unit?.battery_health ? ` · ${unit.battery_health}% Batt` : '';
         const spec = [item.variant?.storage, item.variant?.color].filter(Boolean).join(' · ');
-        const specText = spec ? ` (${spec})` : '';
+        const specText = spec ? ` - ${spec}` : '';
         return `${index + 1}. ${item.quantity}x ${item.variant?.product?.name || 'Device'}${specText}${tagText}${imeiText}${batteryText}\n   ${Number(item.unit_price).toLocaleString()} ETB`;
       })
       .join('\n\n');
@@ -258,27 +260,27 @@ export const SalesOrderDrawer: React.FC<SalesOrderDrawerProps> = ({
     return `========================================
 HABESHABIZ ELECTRONICS
 Bole Medhanialem • Addis Ababa
-Tel: +251 91 123 4567 / +251 90 987 6543
+Tel: +251 91 123 4567
 ========================================
 OFFICIAL SALES INVOICE & RECEIPT
 Ref: ${order.order_number}
 Date: ${formattedDate} ${formattedTime}
-Customer: ${order.customer?.name || 'Walk-in Customer'} ${order.customer?.phone ? `(${order.customer.phone})` : ''}
+Customer: ${order.customer?.name || 'Walk-in Customer'} ${order.customer?.phone ? `• ${order.customer.phone}` : ''}
 Sales Attendant: ${order.salesperson?.name || 'Habeshabiz Sales Staff'}
 Payment Method: ${formatPaymentMethod(order.payment_method)}
-Status: ${isPaid ? 'PAID IN FULL' : 'CREDIT / UNPAID'}
+Status: ${isPaid ? 'PAID IN FULL' : 'CREDIT DUE'}
 ========================================
 ITEMS PURCHASED:
 ${itemsText}
 ========================================
 Subtotal: ${grossAmount.toLocaleString()} ETB
-${discountAmount > 0 ? `Discount: -${discountAmount.toLocaleString()} ETB\n` : ''}${exchangeAllowance > 0 ? `Exchanged Device (${order.exchange_unit?.variant?.product?.name || 'Device'}): ${exchangeAllowance.toLocaleString()} ETB\n` : ''}${exchangeAllowance > 0 ? 'Cash Difference to Pay' : 'Total Net Amount'}: ${netPayable.toLocaleString()} ETB
+${discountAmount > 0 ? `Discount: -${discountAmount.toLocaleString()} ETB\n` : ''}${exchangeAllowance > 0 ? `Exchanged Device: ${exchangeAllowance.toLocaleString()} ETB\n` : ''}${exchangeAllowance > 0 ? 'Cash Difference to Pay' : 'Total Net Amount'}: ${netPayable.toLocaleString()} ETB
 Amount Paid: ${paidAmount.toLocaleString()} ETB
 ${remainingDebt > 0 ? `Balance Due: ${remainingDebt.toLocaleString()} ETB\n` : ''}========================================
 WARRANTY & TERMS:
 • 7 Days Testing Warranty on internal hardware.
 • Valid receipt and matching IMEI required for warranty claims.
-• Physical/water damage voids warranty.
+• Physical or water damage voids warranty.
 
 Thank you for choosing Habeshabiz Electronics!
 ========================================`;
@@ -354,16 +356,16 @@ Thank you for choosing Habeshabiz Electronics!
               <button
                 type="button"
                 onClick={handleCopyReceipt}
-                className="h-9 px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                className="h-9 px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
               >
                 {copiedReceipt ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Share2 className="w-3.5 h-3.5" />}
-                <span>{copiedReceipt ? 'Receipt Copied!' : 'Share Receipt'}</span>
+                <span>{copiedReceipt ? 'Receipt Copied' : 'Share Receipt'}</span>
               </button>
               <button
                 type="button"
                 onClick={handleDownloadReceipt}
                 title="Download Slip Text"
-                className="h-9 w-9 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center transition-colors"
+                className="h-9 w-9 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center transition-colors cursor-pointer shrink-0"
               >
                 <Download className="w-3.5 h-3.5" />
               </button>
@@ -380,8 +382,8 @@ Thank you for choosing Habeshabiz Electronics!
                       setShowMultiSwapPicker(true);
                     }
                   }}
-                  className="h-9 px-3.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60 text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 active:scale-95 cursor-pointer"
-                  title="Warranty Swap: 1-to-1 replacement for a defective device"
+                  className="h-9 px-3.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60 text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 active:scale-95 cursor-pointer shrink-0"
+                  title="Warranty Swap"
                 >
                   <ArrowLeftRight className="w-3.5 h-3.5" />
                   <span>Warranty Swap</span>
@@ -392,16 +394,16 @@ Thank you for choosing Habeshabiz Electronics!
                 <button
                   type="button"
                   onClick={handleOpenCollect}
-                  className="h-9 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95 cursor-pointer"
+                  className="h-9 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95 cursor-pointer shrink-0"
                 >
                   <DollarSign className="w-3.5 h-3.5" />
-                  <span>Collect Balance ({remainingDebt.toLocaleString()} ETB)</span>
+                  <span>Collect Balance</span>
                 </button>
               )}
             <button
               type="button"
               onClick={handlePrint}
-              className="h-9 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs flex items-center gap-1.5 active:scale-95"
+              className="h-9 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs flex items-center gap-1.5 active:scale-95 cursor-pointer shrink-0"
             >
               <Printer className="w-3.5 h-3.5" />
               <span>Print Slip</span>
@@ -417,12 +419,27 @@ Thank you for choosing Habeshabiz Electronics!
       >
         {/* Header: Company + Ref */}
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
-          <div>
-            <div className="font-black text-sm tracking-tight text-slate-900 dark:text-white uppercase">
-              HABESHABIZ ELECTRONICS
-            </div>
-            <div className="text-[11px] text-slate-400 mt-0.5">
-              Bole Medhanialem, Addis Ababa · +251 91 123 4567
+          <div className="flex items-center gap-3">
+            {tenant?.settings?.logo_url && (
+              <img
+                src={tenant.settings.logo_url}
+                alt={tenant.name}
+                className="w-10 h-10 object-contain rounded-lg border border-slate-200 dark:border-slate-700 p-0.5"
+              />
+            )}
+            <div>
+              <div className="font-black text-sm tracking-tight text-slate-900 dark:text-white uppercase">
+                {tenant?.name || 'HABESHABIZ ELECTRONICS'}
+              </div>
+              <div className="text-[11px] text-slate-400 mt-0.5">
+                {[
+                  tenant?.settings?.address || 'Bole Medhanialem',
+                  tenant?.settings?.city || 'Addis Ababa',
+                  tenant?.phone || '+251 91 123 4567',
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </div>
             </div>
           </div>
 
@@ -499,7 +516,7 @@ Thank you for choosing Habeshabiz Electronics!
                         {specString && <span className="font-normal text-slate-400">· {specString}</span>}
                         {(unit?.source_type === 'exchange' || Boolean(unit?.exchange_sales_order_id)) && (
                           <span className="text-[10px] font-medium text-slate-400 font-sans">
-                            (Exchanged)
+                            Exchanged
                           </span>
                         )}
                         {(unit?.is_repaired || (unit?.maintenance_records && unit.maintenance_records.length > 0)) && (
@@ -521,7 +538,7 @@ Thank you for choosing Habeshabiz Electronics!
                           <button
                             type="button"
                             onClick={() => handleCopyImei(unit.imei_or_serial!)}
-                            title="Copy Serial / IMEI"
+                            title="Copy Serial Number"
                             className="inline-flex items-center gap-1 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
                           >
                             <span>SN: {unit.imei_or_serial}</span>
@@ -550,7 +567,7 @@ Thank you for choosing Habeshabiz Electronics!
                           <Undo2 className="w-3 h-3 shrink-0" />
                           <span>
                             Customer returned on {new Date(unit.returned_at).toLocaleDateString()}
-                            {unit.return_reason ? ` (${unit.return_reason})` : ''}
+                            {unit.return_reason ? ` • ${unit.return_reason}` : ''}
                             {unit.status === 'in_stock' ? ' — Restocked in Inventory' : unit.status === 'fixed' ? ' — Repaired & Ready' : ' — Under Repair'}
                           </span>
                         </div>
@@ -597,8 +614,8 @@ Thank you for choosing Habeshabiz Electronics!
             <div className="flex justify-between text-purple-700 dark:text-purple-300 font-semibold bg-purple-50/70 dark:bg-purple-950/30 px-2 py-1 rounded-lg border border-purple-200/60 dark:border-purple-800/40">
               <span className="flex items-center gap-1 text-[11px]">
                 <Repeat className="w-3 h-3 text-purple-500" />
-                Exchanged Device ({order.exchange_unit?.variant?.product?.name || 'Device'}
-                {order.exchange_unit?.imei_or_serial ? ` · ${order.exchange_unit.imei_or_serial}` : ''})
+                Exchanged Device • {order.exchange_unit?.variant?.product?.name || 'Device'}
+                {order.exchange_unit?.imei_or_serial ? ` · ${order.exchange_unit.imei_or_serial}` : ''}
               </span>
               <span className="font-mono tabular-nums whitespace-nowrap">{exchangeAllowance.toLocaleString()} ETB</span>
             </div>
@@ -613,7 +630,7 @@ Thank you for choosing Habeshabiz Electronics!
             </span>
           </div>
           <div className="flex justify-between text-slate-500 dark:text-slate-400">
-            <span>Cash/Transfer Paid</span>
+            <span>Amount Paid</span>
             <span className="font-mono tabular-nums font-semibold">{paidAmount.toLocaleString()} ETB</span>
           </div>
           {remainingDebt > 0 && (
@@ -630,7 +647,7 @@ Thank you for choosing Habeshabiz Electronics!
           )}
         </div>
 
-        {/* Notes & Service / Repair History */}
+        {/* Notes & Service History */}
         {order.notes && (
           <div className="pt-3 border-t border-slate-100 dark:border-slate-800 text-xs">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
@@ -642,10 +659,11 @@ Thank you for choosing Habeshabiz Electronics!
           </div>
         )}
 
-        {/* Warranty — minimal */}
+        {/* Warranty & Terms Notice */}
         <div className="text-[10px] text-slate-400 space-y-0.5 pt-3 border-t border-slate-100 dark:border-slate-800">
-          <span className="font-semibold text-slate-500 dark:text-slate-400">Warranty: </span>
-          7-day hardware defect coverage. Keep this receipt + IMEI for claims. Physical/water damage excluded.
+          <span className="font-semibold text-slate-500 dark:text-slate-400">Notice: </span>
+          {tenant?.settings?.footer_note ||
+            '7-day hardware defect coverage. Keep this receipt with serial number for claims. Physical or water damage excluded.'}
         </div>
       </div>
 
@@ -807,7 +825,7 @@ Thank you for choosing Habeshabiz Electronics!
                     .filter((a) => !a.is_custom_asset && a.is_active !== false)
                     .map((acc) => (
                       <option key={acc.id} value={acc.id}>
-                        {acc.name} ({Number(acc.current_balance).toLocaleString()} ETB)
+                        {acc.name} • {Number(acc.current_balance).toLocaleString()} ETB
                       </option>
                     ))}
                 </select>
@@ -816,7 +834,7 @@ Thank you for choosing Habeshabiz Electronics!
               {/* Reference Number */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Reference / TxID <span className="text-slate-400 font-normal">(Optional)</span>
+                  Transaction Reference <span className="text-slate-400 font-normal">Optional</span>
                 </label>
                 <input
                   type="text"
@@ -830,7 +848,7 @@ Thank you for choosing Habeshabiz Electronics!
               {/* Notes */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Notes <span className="text-slate-400 font-normal">(Optional)</span>
+                  Notes <span className="text-slate-400 font-normal">Optional</span>
                 </label>
                 <input
                   type="text"

@@ -59,40 +59,40 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
     }
   > = {
     cash: {
-      title: 'Available Liquid Cash',
-      subtitle: 'Cash Drawer & Verified Bank Accounts',
+      title: 'Liquid Cash & Bank',
+      subtitle: 'Cash Drawer and Bank Accounts',
       amount: capital_overview.cash_and_banks,
       icon: Landmark,
       targetTab: 'treasury',
-      actionLabel: 'Open Treasury Workspace',
+      actionLabel: 'Open Bank Accounts',
     },
     receivables: {
-      title: 'Money Owed to You (Receivables)',
-      subtitle: 'Customer Credit, Vendor Handover Holdings & Inflows',
+      title: 'Money Owed to You',
+      subtitle: 'Customer Credit and Vendor Handover Holdings',
       amount: capital_overview.receivables,
       icon: CreditCard,
       targetTab: 'debts',
-      actionLabel: 'Open Receivable & Payable Ledger',
+      actionLabel: 'Open Debt Ledger',
     },
     payables: {
-      title: 'Money You Owe (Payables)',
-      subtitle: 'Supplier Debts, Broker Cuts & Consignment Payouts',
+      title: 'Money You Owe',
+      subtitle: 'Supplier Debts and Consignment Payouts',
       amount: capital_overview.payables,
       icon: Clock,
       targetTab: 'debts',
-      actionLabel: 'Open Receivable & Payable Ledger',
+      actionLabel: 'Open Debt Ledger',
     },
     inventory: {
-      title: 'Physical Shop Inventory',
-      subtitle: 'Phones, Consoles & Electronics on Shelf',
+      title: 'Shop Inventory',
+      subtitle: 'Phones, Consoles and Electronics on Shelf',
       amount: capital_overview.stock_value,
       icon: Smartphone,
       targetTab: 'inventory',
       actionLabel: 'Open Inventory Catalog',
     },
     reserves: {
-      title: 'Store Gold & FX Reserves',
-      subtitle: 'Physical Gold Bars & Crypto/USDT Hedge',
+      title: 'Store Reserves',
+      subtitle: 'Physical Gold Bars and Foreign Currency',
       amount: capital_overview.custom_assets,
       icon: Coins,
       targetTab: 'treasury',
@@ -160,7 +160,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
             onClick={onClose}
             className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
-            Close (Esc)
+            Close
           </button>
 
           <button
@@ -197,7 +197,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
       {/* Conditional Content by Vital Type */}
       {vitalType === 'cash' && (
         <ProgressiveSection
-          title={`Liquid Accounts (${liquidAccounts.length})`}
+          title="Liquid Accounts"
           icon={<Landmark className="w-4 h-4" />}
           defaultOpen={true}
         >
@@ -274,7 +274,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
 
       {vitalType === 'receivables' && (
         <ProgressiveSection
-          title={`Receivables & Handover Holdings (${counts.open_receivables} pending)`}
+          title="Receivables & Handover Holdings"
           icon={<CreditCard className="w-4 h-4" />}
           defaultOpen={true}
         >
@@ -342,7 +342,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
 
       {vitalType === 'payables' && (
         <ProgressiveSection
-          title={`Outstanding Payables (${counts.open_payables} pending)`}
+          title="Outstanding Payables"
           icon={<Clock className="w-4 h-4" />}
           defaultOpen={true}
         >
@@ -429,24 +429,20 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                 {capital_overview.stock_value.toLocaleString()} ETB
               </span>
             </div>
-
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 pt-1 leading-relaxed">
-              Real-time cost valuation across smartphones, PlayStation consoles, TVs, and shop accessories.
-            </p>
           </div>
         </ProgressiveSection>
       )}
 
       {vitalType === 'reserves' && (
         <ProgressiveSection
-          title={`Reserve Assets (${reserveAccounts.length})`}
+          title="Reserve Assets"
           icon={<Coins className="w-4 h-4" />}
           defaultOpen={true}
         >
           <div className="space-y-2.5">
             <div className="flex items-center justify-between pb-1">
               <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                Store Hedge Reserves (Gold & Forex)
+                Store Hedge Reserves
               </span>
               <button
                 type="button"
@@ -460,7 +456,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
 
             {reserveAccounts.length === 0 ? (
               <div className="py-6 text-center text-xs text-slate-400">
-                No active reserve assets. Click "Add Asset Reserve" to store physical gold, crypto, or forex hedges.
+                No active reserve assets. Click "Add Asset Reserve" to store physical gold, crypto, or foreign currency hedges.
               </div>
             ) : (
               reserveAccounts.map((acc) => (

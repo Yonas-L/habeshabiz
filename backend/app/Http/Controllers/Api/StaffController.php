@@ -12,7 +12,6 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 
 class StaffController extends Controller
 {
@@ -30,7 +29,8 @@ class StaffController extends Controller
             ], 403);
         }
 
-        $staffMembers = User::where('role', 'salesperson')
+        $staffMembers = User::where('tenant_id', $currentUser->tenant_id)
+            ->where('role', 'salesperson')
             ->orderBy('name')
             ->get();
 
@@ -106,14 +106,15 @@ class StaffController extends Controller
             'can_discount' => ['nullable', 'boolean'],
         ]);
 
-        $tenantId = TenantScope::getActiveTenantId();
+        $tenantId = $currentUser->tenant_id ?? TenantScope::getActiveTenantId();
+        $tenantSlug = $currentUser->tenant?->slug ?? 'shop';
 
         // Generate email if omitted
         $email = $validated['email'] ?? null;
         if (! $email) {
             $cleanName = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', explode(' ', $validated['name'])[0]));
             $rand = rand(100, 999);
-            $email = "{$cleanName}{$rand}@boletech.et";
+            $email = "{$cleanName}{$rand}@{$tenantSlug}.et";
         }
 
         // Generate readable, secure temporary password e.g. Bole-4982
@@ -175,7 +176,7 @@ class StaffController extends Controller
             ], 422);
         }
 
-        $staff = User::findOrFail($id);
+        $staff = User::where('tenant_id', $currentUser->tenant_id)->findOrFail($id);
         $newStatus = ! $staff->is_active;
         $staff->update(['is_active' => $newStatus]);
 
@@ -188,7 +189,7 @@ class StaffController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => "Staff access updated to ".($newStatus ? 'Active' : 'Suspended'),
+            'message' => 'Staff access updated to '.($newStatus ? 'Active' : 'Suspended'),
             'data' => $staff,
         ]);
     }
@@ -207,7 +208,7 @@ class StaffController extends Controller
             ], 403);
         }
 
-        $staff = User::findOrFail($id);
+        $staff = User::where('tenant_id', $currentUser->tenant_id)->findOrFail($id);
         $tempPassword = 'Bole-'.rand(1000, 9999);
         $staff->update(['password' => Hash::make($tempPassword)]);
 
@@ -233,20 +234,34 @@ class StaffController extends Controller
      */
     public function leaderboard(Request $request): JsonResponse
     {
-        $startOfWeek = Carbon::now()->startOfWeek();
-        $startOfMonth = Carbon::now()->startOfMonth();
+        /** @var User $currentUser */
+        $currentUser = $request->user();
 
-        $staffMembers = User::where('role', 'salesperson')
+        $monthParam = $request->query('month');
+        $isMonthlyFilter = false;
+        if ($monthParam && preg_match('/^\d{4}-\d{2}$/', $monthParam)) {
+            $startOfMonth = Carbon::createFromFormat('Y-m', $monthParam)->startOfMonth();
+            $endOfMonth = $startOfMonth->copy()->endOfMonth();
+            $isMonthlyFilter = true;
+        } else {
+            $startOfMonth = Carbon::now()->startOfMonth();
+            $endOfMonth = Carbon::now()->endOfMonth();
+        }
+
+        $startOfWeek = Carbon::now()->startOfWeek();
+
+        $staffMembers = User::where('tenant_id', $currentUser->tenant_id)
+            ->where('role', 'salesperson')
             ->where('is_active', true)
             ->get();
 
-        $rankings = $staffMembers->map(function ($staff) {
+        $rankings = $staffMembers->map(function ($staff) use ($startOfWeek, $startOfMonth, $endOfMonth) {
             $weekOrders = SalesOrder::where('salesperson_id', $staff->id)
-                ->where('created_at', '>=', Carbon::now()->startOfWeek())
+                ->where('created_at', '>=', $startOfWeek)
                 ->get();
 
             $monthOrders = SalesOrder::where('salesperson_id', $staff->id)
-                ->where('created_at', '>=', Carbon::now()->startOfMonth())
+                ->whereBetween('order_date', [$startOfMonth, $endOfMonth])
                 ->get();
 
             $weekVolume = (float) $weekOrders->sum('total_amount');
@@ -268,6 +283,7 @@ class StaffController extends Controller
 
             $bonusDebts = Debt::where('salesperson_id', $staff->id)
                 ->where('reference_type', 'salesperson_bonus')
+                ->where('created_at', '<=', $endOfMonth)
                 ->get();
 
             $uncollectedBonus = (float) $bonusDebts->whereIn('status', ['open', 'partially_paid'])->sum('remaining_amount');
@@ -288,11 +304,16 @@ class StaffController extends Controller
                 'collected_bonus' => $collectedBonus,
                 'total_bonus_earned' => $totalBonusEarned,
             ];
-        })->sortByDesc('week_volume')->values();
+        });
+
+        $sorted = $isMonthlyFilter
+            ? $rankings->sortByDesc('month_volume')->values()
+            : $rankings->sortByDesc('week_volume')->values();
 
         // Assign ranks
-        $ranked = $rankings->map(function ($item, $idx) {
+        $ranked = $sorted->map(function ($item, $idx) {
             $item['rank'] = $idx + 1;
+
             return $item;
         });
 

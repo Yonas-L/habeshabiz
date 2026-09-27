@@ -195,6 +195,125 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   animation: skeletonPulse 1.8s ease-in-out infinite;
 }
 
+/* Liquid Flow Step Transitions */
+@keyframes liquidSlideInRight {
+  0% {
+    opacity: 0;
+    transform: translateX(28px) scale(0.985);
+    filter: blur(2px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes liquidSlideInLeft {
+  0% {
+    opacity: 0;
+    transform: translateX(-28px) scale(0.985);
+    filter: blur(2px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+.animate-liquid-forward {
+  animation: liquidSlideInRight 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-liquid-backward {
+  animation: liquidSlideInLeft 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Fluid Staggered Entrance Animations */
+@keyframes fluidFadeInLeft {
+  0% {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fluidFadeInDown {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fluidFadeInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(14px);
+    filter: blur(2px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+.animate-fluid-sidebar {
+  animation: fluidFadeInLeft 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-fluid-topbar {
+  animation: fluidFadeInDown 0.38s cubic-bezier(0.16, 1, 0.3, 1) 0.04s both;
+}
+
+.animate-stagger-1 {
+  animation: fluidFadeInUp 0.46s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both;
+}
+
+.animate-stagger-2 {
+  animation: fluidFadeInUp 0.46s cubic-bezier(0.16, 1, 0.3, 1) 0.16s both;
+}
+
+.animate-stagger-3 {
+  animation: fluidFadeInUp 0.46s cubic-bezier(0.16, 1, 0.3, 1) 0.24s both;
+}
+
+.animate-stagger-4 {
+  animation: fluidFadeInUp 0.46s cubic-bezier(0.16, 1, 0.3, 1) 0.32s both;
+}
+
+.animate-stagger-5 {
+  animation: fluidFadeInUp 0.46s cubic-bezier(0.16, 1, 0.3, 1) 0.40s both;
+}
+
+.animate-stagger-6 {
+  animation: fluidFadeInUp 0.46s cubic-bezier(0.16, 1, 0.3, 1) 0.48s both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fluid-sidebar,
+  .animate-fluid-topbar,
+  .animate-stagger-1,
+  .animate-stagger-2,
+  .animate-stagger-3,
+  .animate-stagger-4,
+  .animate-stagger-5,
+  .animate-stagger-6 {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+  }
+}
+
 /* Dedicated Print Stylesheet for Professional Invoices */
 @media print {
   body {

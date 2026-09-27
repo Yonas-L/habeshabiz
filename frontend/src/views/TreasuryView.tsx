@@ -655,7 +655,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                   onClick={() => setShowTransferModal(false)}
                   className="h-10 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                 >
-                  Cancel (Esc)
+                  Cancel
                 </button>
                 <button
                   type="submit"

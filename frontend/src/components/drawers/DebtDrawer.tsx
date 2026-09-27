@@ -117,8 +117,8 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
         debt.reference_type === 'salesperson_bonus'
           ? 'Sales Agent Upsell Bonus Payout'
           : isReceivable
-          ? 'Receivable (Money Owed to You)'
-          : 'Payable (Money You Owe)'
+          ? 'Receivable'
+          : 'Payable'
       }
       badge={
         <div className="flex items-center gap-1.5">
@@ -150,9 +150,9 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
           >
-            Close (Esc)
+            Close
           </button>
 
           {/* Delete — only for manual debts with no payments */}
@@ -259,7 +259,7 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                {isReceivable ? 'Deposit Into Account (Money In)' : 'Debit From Account (Money Out)'}
+                {isReceivable ? 'Deposit Into Account' : 'Debit From Account'}
               </label>
               {(() => {
                 const sel = accounts.find((a) => a.id === paymentAccountId);
@@ -274,7 +274,7 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
             >
               {accounts.filter((a) => !a.is_custom_asset).map((a) => (
                 <option key={a.id} value={a.id}>
-                  {a.name} ({Number(a.current_balance).toLocaleString()} ETB)
+                  {a.name} • {Number(a.current_balance).toLocaleString()} ETB
                 </option>
               ))}
             </select>
@@ -282,7 +282,7 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
 
           <div>
             <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              Bank Reference / SMS TxID
+              Transaction Reference
             </label>
             <input
               type="text"
@@ -315,7 +315,7 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
 
       {/* Progressive Section 1: Party Profile */}
       <ProgressiveSection
-        title="Party Profile & Contact"
+        title="Party Profile"
         icon={<User className="w-4 h-4" />}
         defaultOpen={true}
       >
@@ -366,7 +366,7 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
 
       {/* Progressive Section 2: Context & Notes */}
       <ProgressiveSection
-        title="Transaction Context & Memo"
+        title="Transaction Details"
         icon={<Calendar className="w-4 h-4" />}
         defaultOpen={true}
       >
@@ -396,7 +396,7 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
                   }
                 >
                   {new Date(debt.due_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                  {new Date(debt.due_date) < new Date() && ' (Overdue)'}
+                  {new Date(debt.due_date) < new Date() && ' • Overdue'}
                 </span>
               </div>
             )}
@@ -407,7 +407,7 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
       {/* Progressive Section 3: Previous Payment History */}
       {debt.payments && debt.payments.length > 0 && (
         <ProgressiveSection
-          title={`Payment Log (${debt.payments.length})`}
+          title="Payment Log"
           icon={<History className="w-4 h-4" />}
           defaultOpen={false}
         >

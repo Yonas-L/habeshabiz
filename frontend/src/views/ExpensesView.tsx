@@ -13,13 +13,13 @@ import {
   Loader2,
   Receipt,
   TrendingDown,
-  Sparkles,
   ChevronRight,
 } from 'lucide-react';
 import { MiniSparkline, MiniBarHistogram } from '../components/Charts';
 import { AnimatedNumber } from '../components/AnimatedNumber';
 import { ExpenseDrawer } from '../components/drawers/ExpenseDrawer';
 import { RecordExpenseModal } from '../components/RecordExpenseModal';
+import { Pagination } from '../components/Pagination';
 
 interface ExpensesViewProps {
   accounts: FinancialAccount[];
@@ -34,6 +34,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
 }) => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Selected Expense for Workspace Drawer
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
@@ -57,12 +58,15 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
       setLoading(true);
       const res = await api.getExpenses();
       setExpenses(res);
+      setCurrentPage(1);
     } catch (err: any) {
       toast.error('Failed to load expenses', { description: err.message });
     } finally {
       setLoading(false);
     }
   };
+
+  const pagedExpenses = expenses.slice((currentPage - 1) * 6, currentPage * 6);
 
   const operatingTotal = expenses
     .filter((e) => !e.is_owner_draw)
@@ -98,8 +102,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
             <h2 className="font-bold text-slate-900 dark:text-white text-lg tracking-tight">
               Operating Expenses & Owner Draws
             </h2>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/60">
-              <Sparkles className="w-3 h-3" />
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/60">
               Uncommingled Ledgers
             </span>
           </div>
@@ -113,7 +116,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
           className="h-10 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs flex items-center gap-2 self-start sm:self-auto active:scale-[0.98]"
         >
           <Plus className="w-4 h-4 text-emerald-400 dark:text-emerald-600" />
-          <span>Record Expense / Draw</span>
+          <span>Record Expense</span>
         </button>
       </div>
 
@@ -194,9 +197,9 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
               <tr>
                 <th className="py-3 px-5">Date</th>
                 <th className="py-3 px-5">Category</th>
-                <th className="py-3 px-5">Description / Detail</th>
+                <th className="py-3 px-5">Description</th>
                 <th className="py-3 px-5">Paid From Account</th>
-                <th className="py-3 px-5 text-right">Amount (ETB)</th>
+                <th className="py-3 px-5 text-right">Amount ETB</th>
                 <th className="py-3 px-5 text-center">Classification</th>
                 <th className="py-3 px-3"></th>
               </tr>
@@ -218,7 +221,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
                   </td>
                 </tr>
               ) : (
-                expenses.map((exp) => (
+                pagedExpenses.map((exp) => (
                   <tr
                     key={exp.id}
                     onClick={() => setSelectedExpense(exp)}
@@ -288,6 +291,16 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
             </tbody>
           </table>
         </div>
+        {expenses.length > 0 && (
+          <div className="px-5 pb-4">
+            <Pagination
+              currentPage={currentPage}
+              totalItems={expenses.length}
+              pageSize={6}
+              onPageChange={setCurrentPage}
+            />
+          </div>
+        )}
       </div>
 
       {/* Expense Detail Workspace Drawer */}

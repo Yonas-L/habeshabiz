@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import type { SalesOrder, User, InventoryUnit } from '../api/client';
+import type { SalesOrder, User, InventoryUnit, Tenant } from '../api/client';
 import { api } from '../api/client';
 import { toast } from 'sonner';
 import {
@@ -15,21 +15,26 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { AnimatedNumber } from '../components/AnimatedNumber';
+import { Pagination } from '../components/Pagination';
 import { SalesOrderDrawer } from '../components/drawers/SalesOrderDrawer';
 import { SwapDeviceModal } from '../components/inventory/SwapDeviceModal';
 
 interface SalesHistoryViewProps {
   user: User | null;
+  tenant?: Tenant | null;
   initialSelectedOrder?: SalesOrder | null;
   onClearInitialContext?: () => void;
 }
 
 export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
   user,
+  tenant,
   initialSelectedOrder,
   onClearInitialContext,
 }) => {
   const [sales, setSales] = useState<SalesOrder[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
   const [counts, setCounts] = useState<{ all: number; paid: number; credit: number; exchange: number }>({
     all: 0,
     paid: 0,
@@ -71,6 +76,7 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
   const loadSales = async (searchOverride?: string) => {
     try {
       setLoading(true);
+      setCurrentPage(1);
       const activeSearch = searchOverride !== undefined ? searchOverride : search;
       const res = await api.getSalesWithCounts({
         payment_status: statusFilter || undefined,
@@ -223,7 +229,7 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
           <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Settled</div>
           <div className="text-xl font-black font-mono text-slate-900 dark:text-white tabular-nums mt-0.5">
             {sales.filter((s) => s.payment_status === 'paid').length}
-            <span className="text-xs font-normal text-slate-400 font-mono"> / {sales.length}</span>
+            <span className="text-xs font-normal text-slate-400 font-mono"> of {sales.length}</span>
           </div>
           <div className="text-[11px] text-slate-400 mt-1">
             {sales.length > 0
@@ -255,7 +261,7 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            All ({counts.all})
+            All • {counts.all}
           </button>
           <button
             onClick={() => { setStatusFilter('paid'); setSourceFilter(''); }}
@@ -265,7 +271,7 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            Paid ({counts.paid})
+            Paid • {counts.paid}
           </button>
           <button
             onClick={() => { setStatusFilter('credit'); setSourceFilter(''); }}
@@ -275,7 +281,7 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            Credit ({counts.credit})
+            Credit • {counts.credit}
           </button>
           <button
             onClick={() => {
@@ -293,7 +299,7 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
             }`}
           >
             <Repeat className="w-3 h-3 text-purple-500" />
-            Exchange ({counts.exchange})
+            Exchange • {counts.exchange}
           </button>
         </div>
 
@@ -363,7 +369,7 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
                   </td>
                 </tr>
               ) : (
-                sales.map((order) => {
+                sales.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((order) => {
                   const gross = Number(order.total_amount) || 0;
                   const disc = Number(order.discount_amount) || 0;
                   const exchange = Number(order.exchange_allowance) || 0;
@@ -539,6 +545,16 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
             </tbody>
           </table>
         </div>
+
+        {/* Pagination */}
+        <div className="px-5 pb-4">
+          <Pagination
+            currentPage={currentPage}
+            totalItems={sales.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+          />
+        </div>
       </div>
 
       {/* Transaction Detail Workspace Drawer */}
@@ -547,6 +563,7 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
         isOpen={selectedOrder !== null}
         onClose={() => setSelectedOrder(null)}
         user={user}
+        tenant={tenant}
         onPaymentCollected={(updatedOrder) => {
           setSelectedOrder(updatedOrder);
           loadSales();
@@ -667,7 +684,7 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Technician / Customer Notes (Optional)
+                  Notes
                 </label>
                 <textarea
                   value={returnNotes}
@@ -684,7 +701,7 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
                   onClick={() => setReturnTargetUnit(null)}
                   className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
                 >
-                  Cancel (Esc)
+                  Cancel
                 </button>
                 <button
                   type="submit"

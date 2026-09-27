@@ -12,7 +12,6 @@ import {
   UserMinus,
   DollarSign,
   Landmark,
-  Sparkles,
 } from 'lucide-react';
 
 interface ExpenseDrawerProps {
@@ -75,7 +74,7 @@ export const ExpenseDrawer: React.FC<ExpenseDrawerProps> = ({
           onClick={onClose}
           className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors ml-auto"
         >
-          Close (Esc)
+          Close
         </button>
       }
     >
@@ -99,14 +98,14 @@ export const ExpenseDrawer: React.FC<ExpenseDrawerProps> = ({
       {/* Progressive Section 1: Classification & Accounting Rule */}
       <ProgressiveSection
         title="Ledger Segregation & Classification"
-        icon={<Sparkles className="w-4 h-4 text-purple-500" />}
+        icon={<Receipt className="w-4 h-4 text-purple-500" />}
         defaultOpen={true}
       >
-        <div className="p-3.5 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/70 dark:border-slate-800/90 text-xs space-y-2">
+        <div className="space-y-2 text-xs">
           <div className="flex items-center justify-between">
             <span className="text-slate-400">Ledger Classification</span>
             <span className="font-bold text-slate-900 dark:text-white">
-              {isOwnerDraw ? 'Owner Personal Draw (Equity)' : 'Shop Operating Overhead'}
+              {isOwnerDraw ? 'Owner Personal Draw' : 'Shop Operating Overhead'}
             </span>
           </div>
 
@@ -118,7 +117,7 @@ export const ExpenseDrawer: React.FC<ExpenseDrawerProps> = ({
               }`}
             >
               {isOwnerDraw
-                ? 'Neutral (Does not distort shop margin)'
+                ? 'Neutral to Shop Margin'
                 : 'Deducted from Net Operating Profit'}
             </span>
           </div>
@@ -139,9 +138,9 @@ export const ExpenseDrawer: React.FC<ExpenseDrawerProps> = ({
         icon={<Receipt className="w-4 h-4" />}
         defaultOpen={true}
       >
-        <div className="p-3.5 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/70 dark:border-slate-800/90 text-xs space-y-2">
+        <div className="space-y-2 text-xs">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-            Memo / Purpose
+            Purpose
           </span>
           <p className="font-medium text-slate-900 dark:text-white leading-relaxed">
             {expense.description}

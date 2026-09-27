@@ -32,6 +32,7 @@ import {
   DollarSign,
 } from 'lucide-react';
 import { InventoryUnitDrawer } from '../components/drawers/InventoryUnitDrawer';
+import { Pagination } from '../components/Pagination';
 import { StockIntakeModal } from '../components/inventory/StockIntakeModal';
 import { CategoryManagementModal, getCategoryIcon } from '../components/inventory/CategoryManagementModal';
 import { EditProductModal } from '../components/inventory/EditProductModal';
@@ -57,6 +58,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   onClearInitialContext,
 }) => {
   const [units, setUnits] = useState<InventoryUnit[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -254,6 +257,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const loadUnitsAndCounts = async (searchTerm = debouncedSearch) => {
     if (statusFilter === 'archived') return;
     try {
+      setCurrentPage(1);
       const res = await api.getInventoryWithCounts({
         status: statusFilter === 'all' ? undefined : statusFilter,
         category_id: selectedCategoryId === 'all' ? undefined : selectedCategoryId,
@@ -269,6 +273,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const loadInventory = async (searchTerm = debouncedSearch) => {
     try {
       setLoading(true);
+      setCurrentPage(1);
       const [res, p, cats, conts, accs] = await Promise.all([
         api.getInventoryWithCounts({
           status: statusFilter === 'all' || statusFilter === 'archived' ? undefined : statusFilter,
@@ -732,19 +737,22 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           <div className="relative min-w-[140px] sm:w-44 shrink-0">
             <select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as TabType)}
+              onChange={(e) => {
+                setStatusFilter(e.target.value as TabType);
+                setCurrentPage(1);
+              }}
               className="w-full h-10 pl-3 pr-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700 shadow-2xs appearance-none cursor-pointer"
             >
-              <option value="in_stock">In Stock ({counts.in_stock})</option>
-              <option value="vendor_stock">Vendor Stock ({counts.vendor_stock ?? 0})</option>
-              <option value="exchange_stock">Exchanged Stock ({counts.exchange_stock ?? 0})</option>
-              <option value="out">Out for Sale ({counts.out})</option>
-              <option value="sold">Sold ({counts.sold})</option>
-              <option value="returned">Returns / Repair ({counts.returned})</option>
-              <option value="returned_to_vendor">With Vendor ({counts.returned_to_vendor ?? 0})</option>
-              <option value="all">All Records ({counts.all})</option>
+              <option value="in_stock">In Stock • {counts.in_stock}</option>
+              <option value="vendor_stock">Vendor Stock • {counts.vendor_stock ?? 0}</option>
+              <option value="exchange_stock">Exchanged Stock • {counts.exchange_stock ?? 0}</option>
+              <option value="out">Out for Sale • {counts.out}</option>
+              <option value="sold">Sold • {counts.sold}</option>
+              <option value="returned">Returns • {counts.returned}</option>
+              <option value="returned_to_vendor">With Vendor • {counts.returned_to_vendor ?? 0}</option>
+              <option value="all">All Records • {counts.all}</option>
               {isOwner && (
-                <option value="archived">Archived Models ({archivedProducts.length})</option>
+                <option value="archived">Archived Models • {archivedProducts.length}</option>
               )}
             </select>
             <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2.5 top-3 pointer-events-none" />
@@ -754,13 +762,16 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           <div className="relative min-w-[130px] sm:w-44 shrink-0">
             <select
               value={selectedCategoryId}
-              onChange={(e) => setSelectedCategoryId(e.target.value)}
+              onChange={(e) => {
+                setSelectedCategoryId(e.target.value);
+                setCurrentPage(1);
+              }}
               className="w-full h-10 pl-3 pr-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700 shadow-2xs appearance-none cursor-pointer"
             >
               <option value="all">All Categories</option>
               {categories.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.name} {c.in_stock_units_count ? `(${c.in_stock_units_count})` : ''}
+                  {c.name} {c.in_stock_units_count ? `• ${c.in_stock_units_count}` : ''}
                 </option>
               ))}
             </select>
@@ -876,8 +887,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 <tr>
                   <th className="py-2.5 px-3.5 whitespace-nowrap">Model</th>
                   <th className="py-2.5 px-3.5 whitespace-nowrap font-mono">Stock</th>
-                  <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Price (ETB)</th>
-                  {canViewCost && <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Cost (ETB)</th>}
+                  <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Price ETB</th>
+                  {canViewCost && <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Cost ETB</th>}
                   {isOwner && <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Action</th>}
                   <th className="py-2.5 px-2"></th>
                 </tr>
@@ -903,7 +914,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     </td>
                   </tr>
                 ) : (
-                  inStockProducts.map((item) => {
+                  inStockProducts.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((item) => {
                     const isExpanded = expandedProductIds.has(item.product.id);
                     const pCat = item.product.category;
                     const pCatRel = item.product.category_rel;
@@ -1225,7 +1236,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     </td>
                   </tr>
                 ) : (
-                  filteredArchivedProducts.map((prod) => {
+                  filteredArchivedProducts.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((prod) => {
                     const pCat = prod.category;
                     const pCatRel = prod.category_rel;
                     const categoryName = pCatRel?.name || categories.find((c) => c.slug === pCat || c.id === prod.category_id)?.name || prod.category || 'General';
@@ -1316,7 +1327,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   <th className="py-2.5 px-3.5 whitespace-nowrap">Model</th>
                   <th className="py-2.5 px-3.5 whitespace-nowrap font-mono">IMEI</th>
                   <th className="py-2.5 px-3.5 text-center whitespace-nowrap">Status</th>
-                  {canViewCost && <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Cost (ETB)</th>}
+                  {canViewCost && <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Cost ETB</th>}
                   {isOwner && <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Action</th>}
                   <th className="py-2.5 px-2"></th>
                 </tr>
@@ -1344,7 +1355,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     </td>
                   </tr>
                 ) : (
-                  units.map((unit) => {
+                  units.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((unit) => {
                     const pName = unit.variant?.product?.name || 'Device';
                     const pCat = unit.variant?.product?.category;
                     const pCatRel = unit.variant?.product?.category_rel;
@@ -1685,6 +1696,22 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             </table>
           )}
         </div>
+
+        {/* Pagination */}
+        <div className="px-5 pb-4">
+          <Pagination
+            currentPage={currentPage}
+            totalItems={
+              statusFilter === 'in_stock'
+                ? inStockProducts.length
+                : statusFilter === 'archived'
+                ? filteredArchivedProducts.length
+                : units.length
+            }
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+          />
+        </div>
       </div>
 
       {/* Handover Modal (Mark In-Stock Device as Out for Sale) */}
@@ -1941,7 +1968,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   onClick={() => setHandoverTargetUnit(null)}
                   className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
                 >
-                  Cancel (Esc)
+                  Cancel
                 </button>
                 <button
                   type="submit"
@@ -2203,7 +2230,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   onClick={() => setMarkSoldUnit(null)}
                   className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
                 >
-                  Cancel (Esc)
+                  Cancel
                 </button>
                 <button
                   type="submit"
@@ -2414,7 +2441,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   onClick={() => setReturnTargetUnit(null)}
                   className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
                 >
-                  Cancel (Esc)
+                  Cancel
                 </button>
                 <button
                   type="submit"
@@ -2658,7 +2685,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   onClick={() => setRepairedTargetUnit(null)}
                   className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
                 >
-                  Cancel (Esc)
+                  Cancel
                 </button>
                 <button
                   type="submit"
@@ -2759,7 +2786,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   onClick={() => setReturnToVendorUnit(null)}
                   className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
                 >
-                  Cancel (Esc)
+                  Cancel
                 </button>
                 <button
                   type="submit"
@@ -2948,7 +2975,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   onClick={() => setReceiveFixedUnit(null)}
                   className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
                 >
-                  Cancel (Esc)
+                  Cancel
                 </button>
                 <button
                   type="submit"
@@ -3152,7 +3179,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   onClick={() => setVendorSwapUnit(null)}
                   className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
                 >
-                  Cancel (Esc)
+                  Cancel
                 </button>
                 <button
                   type="submit"

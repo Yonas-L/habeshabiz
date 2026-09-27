@@ -264,7 +264,7 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
             className="h-9 px-3.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
           >
             <Printer className="w-3.5 h-3.5" />
-            <span>Print / PDF Statement</span>
+            <span>Print Statement</span>
           </button>
         </div>
       </div>
@@ -538,7 +538,7 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
                   <tr className="bg-slate-50/80 dark:bg-slate-900/60 border-b border-slate-200/80 dark:border-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                     <th className="py-2.5 px-3.5 whitespace-nowrap">Date</th>
                     <th className="py-2.5 px-3.5 whitespace-nowrap">Type</th>
-                    <th className="py-2.5 px-3.5 min-w-[220px]">Context / Agreement</th>
+                    <th className="py-2.5 px-3.5 min-w-[220px]">Description</th>
                     <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Payable</th>
                     <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Receivable</th>
                     <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Running Balance</th>
@@ -647,11 +647,11 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
               <thead>
                 <tr className="bg-slate-50/80 dark:bg-slate-900/60 border-b border-slate-200/80 dark:border-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                   <th className="py-2.5 px-3.5">Device Model</th>
-                  <th className="py-2.5 px-3.5">IMEI / Serial</th>
-                  <th className="py-2.5 px-3.5 text-right">Agreed Cut (Cost)</th>
+                  <th className="py-2.5 px-3.5">Serial Number</th>
+                  <th className="py-2.5 px-3.5 text-right">Cost</th>
                   <th className="py-2.5 px-3.5 text-right">Selling Price</th>
                   <th className="py-2.5 px-3.5 text-center">Status</th>
-                  <th className="py-2.5 px-3.5 whitespace-nowrap">Order / Sold Date</th>
+                  <th className="py-2.5 px-3.5 whitespace-nowrap">Sold Date</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 font-mono text-xs">
@@ -724,7 +724,7 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
               <thead>
                 <tr className="bg-slate-50/80 dark:bg-slate-900/60 border-b border-slate-200/80 dark:border-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                   <th className="py-2.5 px-3.5">Device Model</th>
-                  <th className="py-2.5 px-3.5">IMEI / Serial</th>
+                  <th className="py-2.5 px-3.5">Serial Number</th>
                   <th className="py-2.5 px-3.5 text-right">Holding Value</th>
                   <th className="py-2.5 px-3.5 whitespace-nowrap">Handed Out Date</th>
                   <th className="py-2.5 px-3.5 text-center">Status</th>
@@ -774,8 +774,8 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
               <thead>
                 <tr className="bg-slate-50/80 dark:bg-slate-900/60 border-b border-slate-200/80 dark:border-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                   <th className="py-2.5 px-3.5">Device Model</th>
-                  <th className="py-2.5 px-3.5">IMEI / Serial</th>
-                  <th className="py-2.5 px-3.5">Defect / Reason</th>
+                  <th className="py-2.5 px-3.5">Serial Number</th>
+                  <th className="py-2.5 px-3.5">Reason</th>
                   <th className="py-2.5 px-3.5 text-right">Maintenance Cost</th>
                   <th className="py-2.5 px-3.5 whitespace-nowrap">Returned Date</th>
                   <th className="py-2.5 px-3.5 text-center">Status</th>
@@ -814,7 +814,7 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
                               : 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50'
                           }`}
                         >
-                          {unit.status === 'fixed' ? 'Fixed (Ready to restock)' : 'With Vendor'}
+                          {unit.status === 'fixed' ? 'Fixed' : 'With Vendor'}
                         </span>
                       </td>
                     </tr>

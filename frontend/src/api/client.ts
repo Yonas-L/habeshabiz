@@ -1,8 +1,24 @@
+export interface TenantSettings {
+  city?: string;
+  address?: string;
+  team_size?: string;
+  tin_number?: string;
+  logo_url?: string | null;
+  footer_note?: string;
+  secondary_currencies?: string[];
+  vat_registered?: boolean;
+  [key: string]: any;
+}
+
 export interface Tenant {
   id: string;
   name: string;
   slug: string;
   currency: string;
+  currency_code?: string;
+  business_type?: string;
+  phone?: string;
+  settings?: TenantSettings;
 }
 
 export interface User {
@@ -547,11 +563,65 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   return data.data !== undefined ? data.data : data;
 }
 
+export interface OnboardingPayload {
+  business_type: 'electronics' | 'general_retail' | 'clothing' | 'food_beverage';
+  business_name: string;
+  owner_name: string;
+  owner_phone: string;
+  owner_email: string;
+  password: string;
+  city: string;
+  team_size: string;
+}
+
+export interface SettingsProfileResponse {
+  tenant: {
+    id: string;
+    name: string;
+    slug: string;
+    phone: string;
+    currency_code: string;
+    business_type: string;
+    city: string;
+    address: string;
+    team_size: string;
+    tin_number: string;
+    logo_url: string | null;
+    footer_note: string;
+    secondary_currencies: string[];
+  };
+  user: {
+    id: number;
+    name: string;
+    email: string;
+    phone: string;
+    role: string;
+  };
+}
+
+export interface UpdateSettingsPayload {
+  name: string;
+  phone?: string;
+  currency_code?: string;
+  city?: string;
+  address?: string;
+  tin_number?: string;
+  footer_note?: string;
+  secondary_currencies?: string[];
+  owner_name?: string;
+  owner_phone?: string;
+}
+
 export const api = {
   login: (credentials: { email: string; password: string }) =>
     request<{ token: string; user: User; tenant: Tenant }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify(credentials),
+    }),
+  onboard: (data: OnboardingPayload) =>
+    request<{ token: string; user: User; tenant: Tenant }>('/onboard', {
+      method: 'POST',
+      body: JSON.stringify(data),
     }),
   getMe: () => request<{ user: User; tenant: Tenant }>('/auth/me'),
   logout: () => request<void>('/auth/logout', { method: 'POST' }),
@@ -1102,8 +1172,10 @@ export const api = {
       method: 'POST',
     }),
 
-  getLeaderboard: () =>
-    request<{ leaderboard: LeaderboardItem[]; top_seller: LeaderboardItem | null }>('/staff/leaderboard'),
+  getLeaderboard: (month?: string) =>
+    request<{ leaderboard: LeaderboardItem[]; top_seller: LeaderboardItem | null }>(
+      month ? `/staff/leaderboard?month=${month}` : '/staff/leaderboard'
+    ),
 
   getAuditLogs: (params?: {
     page?: number;
@@ -1159,4 +1231,20 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
+
+  // Business Settings Profile & Logo
+  getSettingsProfile: () => request<SettingsProfileResponse>('/settings/profile'),
+  updateSettingsProfile: (data: UpdateSettingsPayload) =>
+    request<SettingsProfileResponse>('/settings/profile', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  uploadBusinessLogo: (file: File) => {
+    const formData = new FormData();
+    formData.append('logo', file);
+    return request<{ logo_url: string }>('/settings/profile/logo', {
+      method: 'POST',
+      body: formData,
+    });
+  },
 };

@@ -16,7 +16,6 @@ import {
   ArrowRight,
   ChevronRight,
   TrendingUp,
-  Award,
   Plus,
   ArrowLeftRight,
 } from 'lucide-react';
@@ -47,11 +46,11 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
   useEffect(() => {
     if (user?.role === 'owner') {
-      api.getLeaderboard()
+      api.getLeaderboard(selectedMonth)
         .then((res) => setTopSeller(res.top_seller || null))
         .catch(() => {});
     }
-  }, [user]);
+  }, [user, selectedMonth]);
 
   /* ─── Skeleton ─── */
   if (!data) {
@@ -106,7 +105,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     },
     {
       key: 'cash',
-      label: 'Cash & Bank',
+      label: 'Bank Accounts',
       value: capital_overview.cash_and_banks,
       prefix: '',
       onClick: () => setSelectedVital('cash'),
@@ -129,11 +128,11 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   ];
 
   return (
-    <div className="space-y-4 animate-page-enter">
+    <div className="space-y-4">
 
       {/* ── 1. Inline Alerts (only when action needed) ── */}
       {(hasReceivablesAlert || hasPayablesAlert) && (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 animate-stagger-1">
           {hasReceivablesAlert && (
             <button
               onClick={() => setSelectedVital('receivables')}
@@ -167,7 +166,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       )}
 
       {/* ── 2. Capital Strip — single compact row, no cards ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-px bg-slate-200/60 dark:bg-slate-800/50 rounded-xl overflow-hidden">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-px bg-slate-200/60 dark:bg-slate-800/50 rounded-xl overflow-hidden animate-stagger-2">
         {capitalMetrics.map((m) => (
           <button
             key={m.key}
@@ -186,7 +185,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       </div>
 
       {/* ── 3. Charts — Sales trajectory + Capital allocation, side by side ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 animate-stagger-3">
         <div className="lg:col-span-7 bg-white dark:bg-[#131926] rounded-xl border border-slate-200/60 dark:border-slate-800/60 p-5">
           <InteractiveSalesWaveChart
             data={data.sales_chart || []}
@@ -219,7 +218,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       </div>
 
       {/* ── 4. Monthly Performance (High-Visibility Operational Metrics) ── */}
-      <div className="bg-white dark:bg-[#131926] rounded-xl border border-slate-200/60 dark:border-slate-800/60 p-5">
+      <div className="bg-white dark:bg-[#131926] rounded-xl border border-slate-200/60 dark:border-slate-800/60 p-5 animate-stagger-4">
         <div className="flex items-center justify-between pb-3.5 border-b border-slate-100 dark:border-slate-800/60">
           <div className="flex items-center gap-2">
             <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
@@ -239,13 +238,12 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 title="View Staff & Team Dashboard"
                 className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-900/50 text-amber-900 dark:text-amber-300 text-[11px] font-semibold hover:border-amber-400 transition-all active:scale-[0.98]"
               >
-                <Award className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                <span>Week's Top Seller: <span className="font-bold">{topSeller.name}</span></span>
+                <span>Top Seller: <span className="font-bold">{topSeller.name}</span></span>
                 <ChevronRight className="w-3 h-3 opacity-60" />
               </button>
             )}
 
-            {/* Quick Action: Record Expense / Draw Modal */}
+            {/* Quick Action: Record Expense */}
             <button
               onClick={() => setIsExpenseModalOpen(true)}
               title="Quickly record a shop expense or owner personal draw"
@@ -255,17 +253,17 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               <span>Record Expense</span>
             </button>
 
-            {/* Quick Action: Record Receivable / Payable Modal */}
+            {/* Quick Action: Record Debt Modal */}
             <button
               onClick={() => {
                 setDebtModalDefaultType('receivable');
                 setIsDebtModalOpen(true);
               }}
-              title="Record Receivable / Payable — Log customer credit, peer vendor payout, or loan entry"
+              title="Record customer credit, peer vendor payout, or loan entry"
               className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white dark:bg-[#131926] hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700/80 text-slate-800 dark:text-slate-200 text-[11px] font-bold transition-all shadow-xs active:scale-[0.98] cursor-pointer"
             >
               <ArrowLeftRight className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
-              <span><span className="hidden sm:inline">Record </span>Receivable / Payable</span>
+              <span>Record Debt</span>
             </button>
           </div>
         </div>
@@ -346,19 +344,19 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               <span className="text-xs font-medium text-purple-400 ml-1 font-sans">ETB</span>
             </div>
             <span className="text-[10px] text-purple-500/80 dark:text-purple-400/80 mt-0.5 block">
-              Personal drawings (Yoni)
+              Personal drawings
             </span>
           </div>
         </div>
       </div>
 
       {/* ── 5. Debt Ledgers — compact side-by-side tables ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-stagger-5">
         {/* Receivables */}
         <div className="bg-white dark:bg-[#131926] rounded-xl border border-slate-200/60 dark:border-slate-800/60 p-4">
           <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100 dark:border-slate-800/60">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-slate-900 dark:text-white">Owed to You (Inflow)</span>
+              <span className="text-xs font-bold text-slate-900 dark:text-white">Owed to You</span>
               <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-800/50">
                 +{capital_overview.receivables.toLocaleString()} ETB
               </span>
@@ -380,7 +378,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 onClick={() => onNavigateTab('debts')}
                 className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors cursor-pointer"
               >
-                View all ({counts.open_receivables}) →
+                View all · {counts.open_receivables} →
               </button>
             </div>
           </div>
@@ -439,7 +437,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         <div className="bg-white dark:bg-[#131926] rounded-xl border border-slate-200/60 dark:border-slate-800/60 p-4">
           <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100 dark:border-slate-800/60">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-slate-900 dark:text-white">You Owe (Outflow)</span>
+              <span className="text-xs font-bold text-slate-900 dark:text-white">You Owe</span>
               <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-bold bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-200/50 dark:border-rose-800/50">
                 −{capital_overview.payables.toLocaleString()} ETB
               </span>
@@ -461,7 +459,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 onClick={() => onNavigateTab('debts')}
                 className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 transition-colors cursor-pointer"
               >
-                View all ({counts.open_payables}) →
+                View all · {counts.open_payables} →
               </button>
             </div>
           </div>

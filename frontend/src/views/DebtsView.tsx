@@ -6,6 +6,7 @@ import { Search, Loader2, ChevronRight, Plus, Pencil, Trash2, CalendarDays, Aler
 import { AnimatedNumber } from '../components/AnimatedNumber';
 import { DebtDrawer } from '../components/drawers/DebtDrawer';
 import { RecordDebtModal } from '../components/debts/RecordDebtModal';
+import { Pagination } from '../components/Pagination';
 
 interface DebtsViewProps {
   accounts: FinancialAccount[];
@@ -13,6 +14,8 @@ interface DebtsViewProps {
 
 export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
   const [debts, setDebts] = useState<Debt[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 6;
   const [debtType, setDebtType] = useState<'receivable' | 'payable'>('receivable');
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -152,24 +155,30 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
         {/* Segmented Control */}
         <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl text-xs font-semibold">
           <button
-            onClick={() => setDebtType('receivable')}
+            onClick={() => {
+              setDebtType('receivable');
+              setCurrentPage(1);
+            }}
             className={`px-4 py-2 rounded-lg transition-all ${
               debtType === 'receivable'
                 ? 'bg-white dark:bg-[#131926] text-slate-900 dark:text-white shadow-xs'
                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            Receivables (Owed to Us)
+            Receivables
           </button>
           <button
-            onClick={() => setDebtType('payable')}
+            onClick={() => {
+              setDebtType('payable');
+              setCurrentPage(1);
+            }}
             className={`px-4 py-2 rounded-lg transition-all ${
               debtType === 'payable'
                 ? 'bg-white dark:bg-[#131926] text-slate-900 dark:text-white shadow-xs'
                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            Payables (We Owe)
+            Payables
           </button>
         </div>
 
@@ -245,7 +254,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
                 <th className="py-3 px-5">Already Paid</th>
                 <th className="py-3 px-5">Remaining Balance</th>
                 <th className="py-3 px-5">Due Date</th>
-                <th className="py-3 px-5">Context / Notes</th>
+                <th className="py-3 px-5">Notes</th>
                 <th className="py-3 px-5 text-center">Status</th>
                 <th className="py-3 px-5 text-right">Actions</th>
                 <th className="py-3 px-2"></th>
@@ -268,7 +277,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
                   </td>
                 </tr>
               ) : (
-                debts.map((debt) => {
+                debts.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((debt) => {
                   const due = formatDueDate(debt.due_date);
                   const isManual = debt.reference_type === 'direct_credit';
                   const hasPayments = parseFloat(String(debt.paid_amount)) > 0;
@@ -300,7 +309,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
                           <span className="text-[11px] text-slate-400">{debt.contact?.phone || 'No phone'}</span>
                           {hasOffset && (
                             <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
-                              · Net: {(debt.contact?.net_balance ?? 0) > 0 ? `+${Number(debt.contact?.net_balance).toLocaleString()} ETB (Owes us)` : (debt.contact?.net_balance ?? 0) < 0 ? `−${Math.abs(Number(debt.contact?.net_balance)).toLocaleString()} ETB (We owe)` : 'Settled'}
+                              · Net: {(debt.contact?.net_balance ?? 0) > 0 ? `+${Number(debt.contact?.net_balance).toLocaleString()} ETB · Owed to us` : (debt.contact?.net_balance ?? 0) < 0 ? `−${Math.abs(Number(debt.contact?.net_balance)).toLocaleString()} ETB · We owe` : 'Settled'}
                             </span>
                           )}
                         </div>
@@ -402,6 +411,16 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination */}
+        <div className="px-5 pb-4">
+          <Pagination
+            currentPage={currentPage}
+            totalItems={debts.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+          />
+        </div>
       </div>
 
       {/* Debt Detail Workspace Drawer */}
@@ -439,7 +458,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
             <form onSubmit={handleSaveEdit} className="p-5 space-y-4">
               <div>
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                  Amount (ETB)
+                  Amount ETB
                 </label>
                 <input
                   type="number"

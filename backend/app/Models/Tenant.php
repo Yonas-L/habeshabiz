@@ -16,6 +16,7 @@ class Tenant extends Model
         'slug',
         'phone',
         'currency_code',
+        'business_type',
         'settings',
         'is_active',
     ];

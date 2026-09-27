@@ -33,14 +33,14 @@ class AuditLogController extends Controller
             $term = mb_strtolower(trim($request->query('search')));
             $query->where(function ($q) use ($term) {
                 $q->whereRaw('LOWER(action) LIKE ?', ["%{$term}%"])
-                  ->orWhereRaw('LOWER(entity_type) LIKE ?', ["%{$term}%"])
-                  ->orWhereRaw('LOWER(entity_id) LIKE ?', ["%{$term}%"])
-                  ->orWhereRaw('LOWER(ip_address) LIKE ?', ["%{$term}%"])
-                  ->orWhereHas('user', function ($uq) use ($term) {
-                      $uq->whereRaw('LOWER(name) LIKE ?', ["%{$term}%"])
-                         ->orWhereRaw('LOWER(email) LIKE ?', ["%{$term}%"]);
-                  })
-                  ->orWhereRaw('LOWER(CAST(new_values AS text)) LIKE ?', ["%{$term}%"]);
+                    ->orWhereRaw('LOWER(entity_type) LIKE ?', ["%{$term}%"])
+                    ->orWhereRaw('LOWER(entity_id) LIKE ?', ["%{$term}%"])
+                    ->orWhereRaw('LOWER(ip_address) LIKE ?', ["%{$term}%"])
+                    ->orWhereHas('user', function ($uq) use ($term) {
+                        $uq->whereRaw('LOWER(name) LIKE ?', ["%{$term}%"])
+                            ->orWhereRaw('LOWER(email) LIKE ?', ["%{$term}%"]);
+                    })
+                    ->orWhereRaw('LOWER(CAST(new_values AS text)) LIKE ?', ["%{$term}%"]);
             });
         }
 
@@ -85,7 +85,7 @@ class AuditLogController extends Controller
         // Distinct actions and entity types for quick filter pills
         $distinctActions = AuditLog::distinct()->pluck('action')->filter()->values();
         $distinctEntities = AuditLog::distinct()->pluck('entity_type')->filter()->values();
-        $distinctUsers = User::select('id', 'name', 'role')->get();
+        $distinctUsers = User::where('tenant_id', $currentUser->tenant_id)->select('id', 'name', 'role')->get();
 
         return response()->json([
             'success' => true,

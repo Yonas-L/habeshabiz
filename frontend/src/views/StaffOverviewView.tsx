@@ -4,14 +4,12 @@ import { api } from '../api/client';
 import { toast } from 'sonner';
 import {
   TrendingUp,
-  Award,
   CheckCircle2,
   Circle,
   Plus,
   Trash2,
   ShoppingCart,
   Smartphone,
-  Trophy,
   ArrowRight,
   Target,
   Loader2,
@@ -168,10 +166,10 @@ export const StaffOverviewView: React.FC<StaffOverviewViewProps> = ({
   }
 
   return (
-    <div className="space-y-5 animate-page-enter">
+    <div className="space-y-5">
 
       {/* ── 1. Quick Action Bar ── */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between animate-stagger-1">
         <div>
           <h2 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
             Welcome back, {user?.name?.split(' ')[0] || 'Staff'}
@@ -199,7 +197,7 @@ export const StaffOverviewView: React.FC<StaffOverviewViewProps> = ({
       </div>
 
       {/* ── 2. KPI Strip ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 animate-stagger-2">
         <div className="p-4 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/80">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Week</span>
@@ -215,7 +213,7 @@ export const StaffOverviewView: React.FC<StaffOverviewViewProps> = ({
         <div className="p-4 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/80">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Month</span>
-            <Award className="w-3.5 h-3.5 text-purple-500" />
+            <TrendingUp className="w-3.5 h-3.5 text-purple-500" />
           </div>
           <div className="text-xl font-bold font-mono text-slate-900 dark:text-white">
             <AnimatedNumber value={userStats.month_volume} />
@@ -227,13 +225,13 @@ export const StaffOverviewView: React.FC<StaffOverviewViewProps> = ({
         <div className="p-4 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/80">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Rank</span>
-            <Trophy className="w-3.5 h-3.5 text-amber-500" />
+            <Target className="w-3.5 h-3.5 text-amber-500" />
           </div>
           <div className="text-xl font-bold font-mono text-slate-900 dark:text-white">
             #{userStats.rank}
           </div>
           <div className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5">
-            {userStats.rank === 1 ? '🥇 Top seller' : 'Store ranking'}
+            {userStats.rank === 1 ? 'Top seller' : 'Store ranking'}
           </div>
         </div>
 
@@ -270,7 +268,7 @@ export const StaffOverviewView: React.FC<StaffOverviewViewProps> = ({
       </div>
 
       {/* ── 3. Commission Progress ── */}
-      <div className="p-4 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/80">
+      <div className="p-4 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/80 animate-stagger-3">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Target className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
@@ -294,7 +292,7 @@ export const StaffOverviewView: React.FC<StaffOverviewViewProps> = ({
                 {' '}to {nextTier.name} · <span className="text-emerald-600 dark:text-emerald-400 font-semibold">+{nextTier.bonus.toLocaleString()} ETB bonus</span>
               </>
             ) : (
-              <span className="text-emerald-600 dark:text-emerald-400 font-semibold">🎉 Max tier achieved!</span>
+              <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Max tier achieved</span>
             )}
           </span>
           <div className="flex items-center gap-2">
@@ -308,7 +306,7 @@ export const StaffOverviewView: React.FC<StaffOverviewViewProps> = ({
       </div>
 
       {/* ── 4. Tasks & Leaderboard ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 animate-stagger-4">
         {/* Tasks */}
         <div className="lg:col-span-7 bg-white dark:bg-[#131926] rounded-xl border border-slate-200/80 dark:border-slate-800/80 p-4 flex flex-col">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800/80 mb-3">
@@ -392,7 +390,7 @@ export const StaffOverviewView: React.FC<StaffOverviewViewProps> = ({
         <div className="lg:col-span-5 bg-white dark:bg-[#131926] rounded-xl border border-slate-200/80 dark:border-slate-800/80 p-4 flex flex-col">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800/80 mb-3">
             <div className="flex items-center gap-2">
-              <Trophy className="w-3.5 h-3.5 text-amber-500" />
+              <TrendingUp className="w-3.5 h-3.5 text-slate-500" />
               <span className="text-xs font-bold text-slate-900 dark:text-white">This Week</span>
             </div>
             <button
@@ -416,13 +414,13 @@ export const StaffOverviewView: React.FC<StaffOverviewViewProps> = ({
                   }`}
                 >
                   <div className="flex items-center gap-2.5">
-                    <span className="w-6 text-center text-sm">
-                      {item.rank === 1 ? '🥇' : item.rank === 2 ? '🥈' : item.rank === 3 ? '🥉' : `#${item.rank}`}
+                    <span className="w-6 text-center text-xs font-mono font-bold text-slate-400 dark:text-slate-500">
+                      #{item.rank}
                     </span>
                     <div>
                       <div className="text-xs font-semibold text-slate-900 dark:text-white flex items-center gap-1">
                         {item.name}
-                        {isCurrentUser && <span className="text-[10px] text-emerald-600 dark:text-emerald-400">(You)</span>}
+                        {isCurrentUser && <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold ml-1">You</span>}
                       </div>
                       <div className="text-[10px] text-slate-400">{item.week_count} sold</div>
                     </div>

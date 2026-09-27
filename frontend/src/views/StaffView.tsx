@@ -9,8 +9,6 @@ import {
   Copy,
   Check,
   Search,
-  Award,
-  Sparkles,
   Phone,
   Mail,
   X,
@@ -20,6 +18,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { AnimatedNumber } from '../components/AnimatedNumber';
+import { Pagination } from '../components/Pagination';
 
 interface StaffViewProps {
   currentUser: User | null;
@@ -27,7 +26,6 @@ interface StaffViewProps {
 
 export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
   const [staff, setStaff] = useState<StaffMember[]>([]);
-  const [leaderboard, setLeaderboard] = useState<LeaderboardItem[]>([]);
   const [topSeller, setTopSeller] = useState<LeaderboardItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -60,7 +58,6 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
         api.getLeaderboard(),
       ]);
       setStaff(staffRes);
-      setLeaderboard(lbRes.leaderboard || []);
       setTopSeller(lbRes.top_seller || null);
     } catch (err: any) {
       toast.error('Failed to load team data', { description: err.message });
@@ -158,6 +155,8 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
     setTimeout(() => setCopiedCredentials(false), 3000);
   };
 
+  const [currentPage, setCurrentPage] = useState(1);
+
   const filteredStaff = staff.filter((s) => {
     const q = searchTerm.toLowerCase();
     return (
@@ -166,6 +165,8 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
       (s.phone && s.phone.includes(q))
     );
   });
+
+  const pagedStaff = filteredStaff.slice((currentPage - 1) * 6, currentPage * 6);
 
   const totalWeekVolume = staff.reduce((acc, s) => acc + (s.stats?.sales_volume_week || 0), 0);
   const activeCount = staff.filter((s) => s.is_active).length;
@@ -179,7 +180,7 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
             <Users className="w-4 h-4 text-emerald-500" />
           </div>
           <div>
-            <h2 className="text-sm font-bold text-slate-900 dark:text-white">Staff Team ({staff.length})</h2>
+            <h2 className="text-sm font-bold text-slate-900 dark:text-white">Staff Team · {staff.length}</h2>
             <p className="text-[11px] text-slate-400">Manage permissions, accounts, and performance metrics</p>
           </div>
         </div>
@@ -237,7 +238,7 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
         <div className="lg:col-span-2 p-4 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between">
           <div>
             <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 text-[10px] font-bold uppercase tracking-wider mb-1">
-              <Award className="w-3.5 h-3.5" />
+              <TrendingUp className="w-3.5 h-3.5" />
               Top This Week
             </div>
             {topSeller ? (
@@ -257,7 +258,6 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
               <div className="text-xs text-slate-400">No sales this week yet.</div>
             )}
           </div>
-          <Sparkles className="w-6 h-6 text-amber-400 dark:text-amber-500 shrink-0" />
         </div>
       </div>
 
@@ -282,9 +282,8 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
                     <td colSpan={8} className="py-8 text-center text-slate-400">No staff found.</td>
                   </tr>
                 ) : (
-                  filteredStaff.map((member) => {
+                  pagedStaff.map((member) => {
                     const isSelf = member.id === currentUser?.id;
-                    const rankItem = leaderboard.find((l) => l.user_id === member.id);
 
                     return (
                       <tr key={member.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/30 transition-colors">
@@ -297,12 +296,9 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
                             <div className="min-w-0">
                               <div className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5 whitespace-nowrap">
                                 {member.name}
-                                {isSelf && <span className="text-[10px] text-emerald-600 dark:text-emerald-400">(You)</span>}
+                                {isSelf && <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold ml-1">You</span>}
                                 {member.role === 'owner' && (
                                   <span className="text-[9px] font-bold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-400 px-1.5 py-0.5 rounded">Owner</span>
-                                )}
-                                {rankItem && rankItem.rank <= 3 && (
-                                  <span className="text-[10px]">{rankItem.rank === 1 ? '🥇' : rankItem.rank === 2 ? '🥈' : '🥉'}</span>
                                 )}
                               </div>
                               <div className="text-[10px] text-slate-400 truncate max-w-[160px]">{member.email}</div>
@@ -413,6 +409,16 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
               </tbody>
             </table>
           </div>
+          {filteredStaff.length > 6 && (
+            <div className="px-4 pb-4">
+              <Pagination
+                currentPage={currentPage}
+                totalItems={filteredStaff.length}
+                pageSize={6}
+                onPageChange={setCurrentPage}
+              />
+            </div>
+          )}
         </div>
 
       {/* ── Modal 1: Add Staff Member ── */}

@@ -131,7 +131,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
     if (!currentUnit.imei_or_serial) return;
     navigator.clipboard.writeText(currentUnit.imei_or_serial);
     setCopiedImei(true);
-    toast.success('Serial/IMEI copied', { description: currentUnit.imei_or_serial });
+    toast.success('Serial number copied', { description: currentUnit.imei_or_serial });
     setTimeout(() => setCopiedImei(false), 2000);
   };
 
@@ -232,7 +232,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
             : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200/60 dark:border-slate-700/60'
         }`}>
           {currentUnit.customer_waiting ? <Clock className="w-3 h-3" /> : <RotateCcw className="w-3 h-3" />}
-          {currentUnit.customer_waiting ? 'WITH VENDOR (CUSTOMER WAITING)' : 'WITH VENDOR / BROKER'}
+          {currentUnit.customer_waiting ? 'WITH VENDOR • WAITING' : 'WITH VENDOR'}
         </span>
       );
     }
@@ -256,7 +256,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
       return (
         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/60 dark:border-amber-800/60">
           <ArrowLeftRight className="w-3 h-3" />
-          SWAPPED (INSPECTION)
+          SWAPPED
         </span>
       );
     }
@@ -264,7 +264,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
       return (
         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/60">
           <CheckCircle2 className="w-3 h-3" />
-          {currentUnit.swapped_from_unit_id ? 'SOLD (SWAP)' : 'SOLD'}
+          SOLD
         </span>
       );
     }
@@ -303,7 +303,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
           {currentUnit.imei_or_serial && !isEditing && (
             <button
               onClick={handleCopyImei}
-              title="Copy Serial/IMEI"
+              title="Copy Serial Number"
               className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
             >
               {copiedImei ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
@@ -345,7 +345,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
                 setIsEditing(false);
               }}
               disabled={saving}
-              className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
             >
               Cancel
             </button>
@@ -353,7 +353,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
               type="button"
               onClick={handleSave}
               disabled={saving}
-              className="h-9 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs active:scale-95 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              className="h-9 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs active:scale-95 flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0"
             >
               {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
               <span>Save Changes</span>
@@ -364,9 +364,9 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
             >
-              Close (Esc)
+              Close
             </button>
 
             <div className="flex items-center gap-2">
@@ -545,12 +545,12 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
           {/* Section 1: Identification & Condition */}
           <div className="p-3.5 rounded-2xl bg-white dark:bg-[#131926] border border-slate-100 dark:border-slate-800 space-y-3 shadow-2xs">
             <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-              Device Serial / IMEI & Condition
+              Serial Number & Condition
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Device Serial / IMEI
+                  Serial Number
                 </label>
                 <input
                   type="text"
@@ -563,19 +563,19 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Cosmetic Grade / Condition
+                  Condition
                 </label>
                 <select
                   value={condition}
                   onChange={(e) => setCondition(e.target.value)}
                   className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white capitalize focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700"
                 >
-                  <option value="new">Brand New (Sealed)</option>
-                  <option value="used_clean">Used Clean (Pristine)</option>
-                  <option value="scratched">Scratched (Minor wear)</option>
-                  <option value="backcrack">Back Crack (Rear glass crack)</option>
-                  <option value="screen_blemish">Screen Blemish (Minor screen mark)</option>
-                  <option value="defective">Defective / Needs Repair</option>
+                  <option value="new">Brand New</option>
+                  <option value="used_clean">Used Clean</option>
+                  <option value="scratched">Scratched</option>
+                  <option value="backcrack">Back Crack</option>
+                  <option value="screen_blemish">Screen Blemish</option>
+                  <option value="defective">Defective</option>
                 </select>
               </div>
             </div>
@@ -590,7 +590,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Cost Basis (ETB)
+                    Cost Basis ETB
                   </label>
                   <input
                     type="text"
@@ -607,7 +607,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Unit Selling Price (ETB)
+                    Unit Selling Price ETB
                   </label>
                   <input
                     type="text"
@@ -622,7 +622,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
                     className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                   />
                   <span className="text-[10px] text-slate-400 mt-1 block">
-                    Unit price override (leave empty for catalog price)
+                    Unit price override. Leave empty for catalog price.
                   </span>
                 </div>
 
@@ -632,7 +632,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
                     <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
                       Projected Gross Margin:
                       {sellingPrice === '' && currentUnit.variant?.default_selling_price && (
-                        <span className="text-[10px] text-slate-400 ml-1">(catalog default)</span>
+                        <span className="text-[10px] text-slate-400 ml-1">• Catalog default</span>
                       )}
                     </span>
                     <div className="flex items-center gap-2 font-mono font-bold">
@@ -663,7 +663,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Battery Health (%)
+                  Battery Health
                 </label>
                 <div className="relative">
                   <input
@@ -704,7 +704,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
                 >
                   <option value="physical">Physical SIM</option>
                   <option value="esim">eSIM Only</option>
-                  <option value="dual">Dual SIM (Physical + eSIM)</option>
+                  <option value="dual">Dual SIM</option>
                   <option value="na">Not Applicable</option>
                 </select>
               </div>
@@ -729,7 +729,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
                   className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700"
                 />
                 <div className="flex flex-wrap gap-1.5 mt-1.5">
-                  {['Shop Counter', 'Display Cabinet', 'Safe / Backroom', 'Warehouse'].map((loc) => (
+                  {['Shop Counter', 'Display Cabinet', 'Safe Backroom', 'Warehouse'].map((loc) => (
                     <button
                       key={loc}
                       type="button"
@@ -748,7 +748,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Supplier / Vendor Contact
+                  Supplier Contact
                 </label>
                 <select
                   value={supplierContactId}
@@ -758,7 +758,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
                   <option value="">No Supplier Assigned</option>
                   {contacts.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.name} {c.phone ? `(${c.phone})` : ''}
+                      {c.name} {c.phone ? `• ${c.phone}` : ''}
                     </option>
                   ))}
                 </select>
@@ -788,7 +788,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
               <div className="font-bold flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
                   <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                  <span>Currently Out with Staff / Broker</span>
+                  <span>Currently Out with Staff</span>
                 </div>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-200/60 dark:bg-amber-800/50 text-amber-800 dark:text-amber-300 font-semibold">
                   Handover
@@ -872,8 +872,8 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
                   )}
                   <span>
                     {currentUnit.customer_waiting
-                      ? 'With Vendor for Warranty / Repair (Customer Waiting)'
-                      : 'Returned to Vendor / Broker'}
+                      ? 'With Vendor for Repair • Customer Waiting'
+                      : 'Returned to Vendor'}
                   </span>
                 </div>
                 {currentUnit.customer_waiting && currentUnit.sales_order_item?.sales_order?.order_number && (
@@ -884,7 +884,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
               </div>
               <p className="text-[11px] leading-relaxed">
                 {currentUnit.return_reason ? (
-                  <>Reason / Issue: <strong className="font-semibold">{currentUnit.return_reason}</strong></>
+                  <>Issue: <strong className="font-semibold">{currentUnit.return_reason}</strong></>
                 ) : (
                   'Device sent to vendor for resolution.'
                 )}
@@ -927,7 +927,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
                 {(currentUnit.selling_price || currentUnit.variant?.default_selling_price) && (
                   <div>
                     <span className="text-[10px] text-slate-500 dark:text-slate-400 block">
-                      {currentUnit.selling_price ? 'Retail Price (Unit-Specific):' : 'Retail Price:'}
+                      Retail Price:
                     </span>
                     <div className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-xs mt-0.5">
                       {Number(currentUnit.selling_price || currentUnit.variant?.default_selling_price).toLocaleString()} ETB
@@ -951,10 +951,10 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
                         : 'text-slate-600 dark:text-slate-400'
                     }`}>
                       {currentUnit.supplier.net_balance > 0
-                        ? `+${currentUnit.supplier.net_balance.toLocaleString()} ETB (Owes us)`
+                        ? `+${currentUnit.supplier.net_balance.toLocaleString()} ETB • Owes us`
                         : currentUnit.supplier.net_balance < 0
-                        ? `${currentUnit.supplier.net_balance.toLocaleString()} ETB (We owe)`
-                        : '0.00 ETB (Settled)'}
+                        ? `${currentUnit.supplier.net_balance.toLocaleString()} ETB • We owe`
+                        : '0.00 ETB • Settled'}
                     </span>
                   </div>
 
@@ -965,10 +965,10 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
                     </span>
                     <span className="font-mono font-bold text-amber-900 dark:text-amber-100">
                       {currentUnit.supplier.net_balance >= 0
-                        ? '0 ETB (Covered by handovers / credits)'
+                        ? '0 ETB • Covered by handovers'
                         : `${Math.min(Math.abs(currentUnit.supplier.net_balance), Number(currentUnit.cost_basis)).toLocaleString()} ETB${
                             Math.abs(currentUnit.supplier.net_balance) < Number(currentUnit.cost_basis)
-                              ? ' (Reduced by handover offsets)'
+                              ? ' • Reduced by handover offsets'
                               : ''
                           }`}
                     </span>
@@ -984,13 +984,13 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
               <div className="font-bold flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
                   <RotateCcw className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                  <span>Customer Trade-In / Exchange Item</span>
+                  <span>Customer Exchange Item</span>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3 text-[11px] pt-1">
                 {currentUnit.cost_basis && (
                   <div>
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block">Exchanged Value (Cost):</span>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block">Exchanged Value:</span>
                     <div className="font-mono font-bold text-purple-900 dark:text-purple-200 text-xs mt-0.5">
                       {Number(currentUnit.cost_basis).toLocaleString()} ETB
                     </div>
@@ -999,7 +999,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
                 {(currentUnit.selling_price || currentUnit.variant?.default_selling_price) && (
                   <div>
                     <span className="text-[10px] text-slate-500 dark:text-slate-400 block">
-                      {currentUnit.selling_price ? 'Retail Price (Unit-Specific):' : 'Retail Price:'}
+                      Retail Price:
                     </span>
                     <div className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-xs mt-0.5">
                       {Number(currentUnit.selling_price || currentUnit.variant?.default_selling_price).toLocaleString()} ETB
@@ -1038,7 +1038,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
                 </div>
 
                 <div>
-                  <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">Date Purchased / Intaken:</span>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">Date Purchased:</span>
                   <div className="font-semibold text-slate-900 dark:text-white mt-0.5">
                     {currentUnit.created_at
                       ? new Date(currentUnit.created_at).toLocaleDateString(undefined, {
@@ -1115,7 +1115,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
                 {currentUnit.swapped_replacement_unit && (
                   <div>
                     <span className="text-[10px] text-amber-700/80 dark:text-amber-400/80 font-medium block">
-                      Swapped For (Replacement):
+                      Replacement Device:
                     </span>
                     <div className="font-mono font-bold text-slate-900 dark:text-white mt-0.5">
                       {currentUnit.swapped_replacement_unit.imei_or_serial || 'Serialized Unit'}
@@ -1160,7 +1160,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
                 {currentUnit.return_reason && (
                   <div className="col-span-2">
                     <span className="text-[10px] text-amber-700/80 dark:text-amber-400/80 font-medium block">
-                      Reported Defect / Reason:
+                      Reported Defect:
                     </span>
                     <div className="font-medium text-amber-950 dark:text-amber-100 mt-0.5">
                       {currentUnit.return_reason.replace(/^\[Warranty Swap\]\s*/, '')}
@@ -1175,7 +1175,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
           <div className="flex items-start justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
             <div className="space-y-1">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                Device Serial / IMEI
+                Serial Number
               </span>
               <div
                 onClick={handleCopyImei}
@@ -1253,7 +1253,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
                         </span>
                         {vendorMaintenance > 0 && (
                           <span className="text-[9px] text-blue-600 dark:text-blue-400 block font-medium">
-                            ({vendorMaintenance.toLocaleString()} ETB vendor covered)
+                            • {vendorMaintenance.toLocaleString()} ETB vendor covered
                           </span>
                         )}
                       </div>
@@ -1344,7 +1344,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
                     <span>{currentUnit.battery_health}%</span>
                     {currentUnit.cycle_count ? (
                       <span className="text-[10px] font-normal text-slate-400 font-sans">
-                        ({currentUnit.cycle_count} cycles)
+                        • {currentUnit.cycle_count} cycles
                       </span>
                     ) : null}
                   </div>
@@ -1392,14 +1392,14 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
               </h4>
               {currentUnit.created_at && (
                 <span className="text-[10px] text-slate-400 font-mono">
-                  Received {new Date(currentUnit.created_at).toLocaleDateString()} ({formatPurchaseAge(currentUnit.created_at)} ago)
+                  Received {new Date(currentUnit.created_at).toLocaleDateString()} • {formatPurchaseAge(currentUnit.created_at)} ago
                 </span>
               )}
             </div>
             <div className="p-3 rounded-xl bg-slate-50/70 dark:bg-slate-900/50 text-xs text-slate-700 dark:text-slate-300 font-normal leading-relaxed space-y-1.5">
               {currentUnit.supplier && (
                 <div className="text-[11px] font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1">
-                  <span className="text-slate-400">Supplier / Vendor:</span>
+                  <span className="text-slate-400">Supplier:</span>
                   <span className="font-semibold text-slate-800 dark:text-slate-100">{currentUnit.supplier.name}</span>
                 </div>
               )}

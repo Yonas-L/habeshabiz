@@ -155,7 +155,7 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
             </div>
             <div>
               <h2 className="text-sm font-bold text-slate-900 dark:text-white leading-none">
-                Record Receivable / Payable
+                Record Debt
               </h2>
               <p className="text-[11px] text-slate-400 mt-1">
                 Log customer credit, peer vendor payout, or loan entry
@@ -222,7 +222,7 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
                 </div>
                 <div className="min-w-0">
                   <div className="text-xs font-bold truncate">I Owe Someone</div>
-                  <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate">Vendor / Loan · Payable</div>
+                  <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate">Vendor or Loan · Payable</div>
                 </div>
               </button>
             </div>
@@ -231,7 +231,7 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
           {/* Contact */}
           <div>
             <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-              Contact / Party
+              Contact
             </label>
             {/* Mode toggle */}
             <div className="flex gap-2 mb-2">
@@ -274,7 +274,7 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
                   type="text"
                   value={contactPhone}
                   onChange={(e) => setContactPhone(e.target.value)}
-                  placeholder="Phone (optional)"
+                  placeholder="Phone"
                   className="h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 focus:border-slate-900 dark:focus:border-slate-600"
                 />
               </div>
@@ -301,7 +301,7 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                Amount (ETB) *
+                Amount ETB *
               </label>
               <input
                 type="number"
@@ -332,7 +332,7 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
           <div>
             <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
               <FileText className="w-3 h-3 inline mr-1 text-slate-400" />
-              Notes / Reference
+              Notes
             </label>
             <input
               type="text"
@@ -362,13 +362,13 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
                 <span className="text-xs font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
                   <Wallet className="w-3.5 h-3.5 text-slate-400" />
                   {debtType === 'receivable'
-                    ? 'Disburse cash now (deduct from account)'
-                    : 'Receive cash now (deposit into account)'}
+                    ? 'Disburse cash now'
+                    : 'Receive cash now'}
                 </span>
                 <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5">
                   {debtType === 'receivable'
-                    ? 'Check if money left your account immediately as a cash or bank loan'
-                    : 'Check if borrowed funds were immediately deposited into your account'}
+                    ? 'Money leaves your account immediately'
+                    : 'Borrowed funds deposited into your account'}
                 </span>
               </div>
             </label>

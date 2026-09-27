@@ -10,7 +10,6 @@ import {
   Trash2,
   AlertTriangle,
   ChevronDown,
-  Sparkles,
   Edit2,
   Check,
 } from 'lucide-react';
@@ -325,7 +324,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 md:p-8 pt-20 sm:pt-24 pb-8 overflow-y-auto">
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-slate-950/40 dark:bg-black/60 backdrop-blur-xs animate-backdrop-enter"
@@ -333,7 +332,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
       />
 
       {/* Modal Surface */}
-      <div className="relative z-10 w-full max-w-xl bg-white dark:bg-[#131926] rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden animate-modal-enter flex flex-col max-h-[88vh]">
+      <div className="relative z-10 w-full max-w-xl bg-white dark:bg-[#131926] rounded-2xl shadow-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden animate-modal-enter flex flex-col max-h-[calc(100vh-7rem)] my-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-2.5">
@@ -477,7 +476,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
             {showAddVariant && (
               <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200/80 dark:border-slate-800 space-y-3 animate-page-enter">
                 <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
+                  <Plus className="w-3.5 h-3.5 text-emerald-500" />
                   <span>New Specification</span>
                 </div>
 

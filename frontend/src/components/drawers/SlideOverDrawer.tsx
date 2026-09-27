@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 interface SlideOverDrawerProps {
@@ -60,12 +61,12 @@ export const SlideOverDrawer: React.FC<SlideOverDrawerProps> = ({
 
   if (!rendered) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 overflow-hidden" role="dialog" aria-modal="true">
+  const content = (
+    <div className="fixed inset-0 z-[70] overflow-hidden" role="dialog" aria-modal="true">
       {/* Dimmed subtle backdrop allowing dashboard visibility */}
       <div
         onClick={onClose}
-        className={`fixed inset-0 bg-slate-950/25 dark:bg-black/50 backdrop-blur-[2px] transition-opacity duration-200 ${
+        className={`fixed inset-0 bg-slate-950/40 dark:bg-black/60 backdrop-blur-xs transition-opacity duration-200 ${
           isClosing ? 'opacity-0' : 'opacity-100 animate-backdrop-enter'
         }`}
       />
@@ -120,4 +121,6 @@ export const SlideOverDrawer: React.FC<SlideOverDrawerProps> = ({
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(content, document.body) : content;
 };

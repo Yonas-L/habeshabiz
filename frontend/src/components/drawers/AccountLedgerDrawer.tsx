@@ -329,7 +329,7 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
           {/* Total Inflows */}
           <div className="bg-white dark:bg-[#131926] rounded-xl border border-slate-200/80 dark:border-slate-800/80 p-3.5 transition-all">
             <div className="flex items-center justify-between text-slate-400 mb-1.5">
-              <span className="text-[10px] font-bold uppercase tracking-wider">Inflows (+)</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider">Inflows</span>
               <div className="w-5 h-5 rounded-md bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
                 <ArrowDownLeft className="w-3.5 h-3.5" />
               </div>
@@ -343,7 +343,7 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
           {/* Total Outflows */}
           <div className="bg-white dark:bg-[#131926] rounded-xl border border-slate-200/80 dark:border-slate-800/80 p-3.5 transition-all">
             <div className="flex items-center justify-between text-slate-400 mb-1.5">
-              <span className="text-[10px] font-bold uppercase tracking-wider">Outflows (-)</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider">Outflows</span>
               <div className="w-5 h-5 rounded-md bg-rose-50 dark:bg-rose-950/50 flex items-center justify-center text-rose-600 dark:text-rose-400">
                 <ArrowUpRight className="w-3.5 h-3.5" />
               </div>
@@ -383,7 +383,7 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
             </div>
             <div className="font-mono font-black text-base text-slate-900 dark:text-white truncate">
               {summary.filtered_count}{' '}
-              <span className="text-xs font-normal text-slate-400">/ {summary.total_count}</span>
+              <span className="text-xs font-normal text-slate-400">of {summary.total_count}</span>
             </div>
             <span className="text-[10px] text-slate-400 block mt-0.5">Recorded items</span>
           </div>
@@ -464,12 +464,12 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
             <div className="flex items-center gap-1.5">
               {[
                 { id: 'all', label: 'All Activities' },
-                { id: 'inflow', label: 'Inflows (+)' },
-                { id: 'outflow', label: 'Outflows (-)' },
+                { id: 'inflow', label: 'Inflows' },
+                { id: 'outflow', label: 'Outflows' },
                 { id: 'sale', label: 'Sales & Debt Collections' },
                 { id: 'supplier_payment', label: 'Vendor Payouts' },
                 { id: 'transfer', label: 'Transfers' },
-                { id: 'expense', label: 'Expenses & Draws' },
+                { id: 'expense', label: 'Expenses' },
               ].map((pill) => (
                 <button
                   key={pill.id}
@@ -572,8 +572,8 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
               <div className="hidden md:grid md:grid-cols-12 px-5 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-slate-50/70 dark:bg-slate-900/40">
                 <div className="col-span-3">Date & Number</div>
                 <div className="col-span-3">Type & Counterparty</div>
-                <div className="col-span-2 text-right">Inflow (+)</div>
-                <div className="col-span-2 text-right">Outflow (-)</div>
+                <div className="col-span-2 text-right">Inflow</div>
+                <div className="col-span-2 text-right">Outflow</div>
                 <div className="col-span-2 text-right">Running Balance</div>
               </div>
 
@@ -609,7 +609,7 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
                           {isInflow ? <ArrowDownLeft className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
                         </div>
                         <div className="min-w-0">
-                          <div className="text-xs font-bold text-slate-800 dark:text-slate-200 leading-tight">
+                           <div className="text-xs font-bold text-slate-800 dark:text-slate-200 leading-tight">
                             {formattedDate}
                           </div>
                           <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-0.5">
@@ -678,7 +678,7 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
                             -{act.outflow.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             {act.fee > 0 && (
                               <span className="block text-[9px] text-slate-400 font-normal">
-                                (fee: {act.fee.toFixed(2)})
+                                Fee: {act.fee.toFixed(2)}
                               </span>
                             )}
                           </span>
@@ -742,7 +742,7 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
                         {act.description && (
                           <div className="pt-2 border-t border-slate-200/50 dark:border-slate-800/50">
                             <span className="text-slate-400 uppercase tracking-wider text-[9px] font-bold block mb-0.5">
-                              Memo / Description
+                              Description
                             </span>
                             <p className="text-slate-700 dark:text-slate-300 bg-white/70 dark:bg-slate-800/60 p-2 rounded-lg border border-slate-200/40 dark:border-slate-700/40 text-xs">
                               {act.description}

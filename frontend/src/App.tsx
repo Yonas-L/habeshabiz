@@ -27,6 +27,8 @@ import { StaffView } from './views/StaffView';
 import { StaffOverviewView } from './views/StaffOverviewView';
 import { PartnersView } from './views/PartnersView';
 import { LogsView } from './views/LogsView';
+import { SettingsView } from './views/SettingsView';
+import { OnboardingView } from './views/OnboardingView';
 import { PublicStatementView } from './views/PublicStatementView';
 import { ProfileSettingsModal } from './components/ProfileSettingsModal';
 import { QuickSearchModal, type NavigationPayload } from './components/QuickSearchModal';
@@ -58,6 +60,12 @@ export default function App() {
     showIntake?: boolean;
     showRecordExpense?: boolean;
   }>({});
+  const [isOnboarding, setIsOnboarding] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return window.location.pathname === '/onboard';
+    }
+    return false;
+  });
 
   const handleClearNavContext = useCallback(() => {
     setNavContext({});
@@ -96,8 +104,8 @@ export default function App() {
   };
 
   // Login form state
-  const [email, setEmail] = useState('yoni@boletech.et');
-  const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState<string | null>(null);
   const [isSubmittingAuth, setIsSubmittingAuth] = useState<boolean>(false);
 
@@ -147,6 +155,7 @@ export default function App() {
                 '8': 'expenses',
                 '9': 'staff',
                 '0': 'logs',
+                ',': 'settings',
               }
             : {}),
         };
@@ -170,7 +179,7 @@ export default function App() {
   // Fallback to overview if active tab is restricted for non-owner role
   useEffect(() => {
     if (user && user.role !== 'owner') {
-      const ownerOnlyTabs: NavTab[] = ['partners', 'debts', 'treasury', 'expenses', 'staff', 'logs'];
+      const ownerOnlyTabs: NavTab[] = ['partners', 'debts', 'treasury', 'expenses', 'staff', 'logs', 'settings'];
       if (ownerOnlyTabs.includes(activeTab)) {
         setActiveTab('overview');
       }
@@ -184,7 +193,7 @@ export default function App() {
     }
   }, [activeTab, user, refreshData]);
 
-  // Check existing session or perform initial login
+  // Check existing session on boot (no hardcoded auto-login)
   useEffect(() => {
     const initSession = async () => {
       setLoading(true);
@@ -203,18 +212,7 @@ export default function App() {
         }
       }
 
-      // Auto-authenticate with seeded owner credentials for instant experience
-      try {
-        const res = await api.login({ email: 'yoni@boletech.et', password: 'password123' });
-        setAuthToken(res.token);
-        setUser(res.user);
-        setTenant(res.tenant);
-        await refreshData();
-      } catch {
-        // Fallback to manual login screen if backend isn't seeded yet
-      } finally {
-        setLoading(false);
-      }
+      setLoading(false);
     };
 
     initSession();
@@ -229,32 +227,15 @@ export default function App() {
     try {
       const res = await api.login({ email, password });
       setAuthToken(res.token);
+      await refreshData();
       setUser(res.user);
       setTenant(res.tenant);
-      await refreshData();
       toast.success(`Welcome back, ${res.user.name}`);
     } catch (err: any) {
       setAuthError(err.message || 'Invalid credentials. Please try again.');
       toast.error('Sign in failed', { description: err.message });
     } finally {
       setIsSubmittingAuth(false);
-    }
-  };
-
-  // Switch between Yoni (owner) and Husa (salesperson)
-  const handleQuickSwitchUser = async (targetEmail: string) => {
-    setLoading(true);
-    try {
-      const res = await api.login({ email: targetEmail, password: 'password123' });
-      setAuthToken(res.token);
-      setUser(res.user);
-      setTenant(res.tenant);
-      await refreshData();
-      toast.info(`Switched view to ${res.user.name} (${res.user.role})`);
-    } catch (err: any) {
-      toast.error('Persona switch failed', { description: err.message });
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -304,29 +285,55 @@ export default function App() {
     );
   }
 
-  // Not authenticated view (Elevated Apple Enterprise / Finova sign-in)
+  // Not authenticated view (Elevated Apple Enterprise / Finova sign-in or Onboarding)
   if (!user) {
+    if (isOnboarding) {
+      return (
+        <div className={theme === 'dark' ? 'dark' : ''}>
+          <Toaster position="bottom-right" richColors closeButton theme={theme} />
+          <OnboardingView
+            onSuccess={async (token, newUser, newTenant) => {
+              setAuthToken(token);
+              await refreshData();
+              setUser(newUser);
+              setTenant(newTenant);
+              setIsOnboarding(false);
+              if (typeof window !== 'undefined' && window.history.pushState) {
+                window.history.pushState({}, '', '/');
+              }
+            }}
+            onCancelToLogin={() => {
+              setIsOnboarding(false);
+              if (typeof window !== 'undefined' && window.history.pushState) {
+                window.history.pushState({}, '', '/');
+              }
+            }}
+          />
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen bg-[#f6f8fa] dark:bg-[#0b0f17] flex flex-col items-center justify-center p-4 selection:bg-slate-900 selection:text-white transition-colors duration-200">
         <Toaster position="bottom-right" richColors closeButton theme={theme} />
-        <div className="w-full max-w-md bg-white dark:bg-[#131926] rounded-3xl border border-slate-200/80 dark:border-slate-800 p-8 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.06)] dark:shadow-[0_20px_60px_-15px_rgba(0,0,0,0.4)]">
-          <div className="text-center mb-7">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-slate-950 via-slate-900 to-indigo-950 text-white mx-auto flex items-center justify-center font-extrabold text-base mb-3.5 shadow-md ring-4 ring-slate-50 dark:ring-slate-800">
+        <div className="w-full max-w-sm bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800 p-7 shadow-xl">
+          <div className="text-center mb-6">
+            <div className="w-10 h-10 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 mx-auto flex items-center justify-center font-bold text-xs mb-3 shadow-xs tracking-tight">
               HB
             </div>
-            <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">HabeshaBiz</h1>
-            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 font-medium">
-              Retail & Electronics Store Management
+            <h1 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">HabeshaBiz</h1>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              Store & Inventory Management
             </p>
           </div>
 
           {authError && (
-            <div className="mb-5 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200/60 dark:border-rose-800 text-xs font-semibold text-rose-700 dark:text-rose-400">
+            <div className="mb-4 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-xs font-medium text-rose-700 dark:text-rose-400">
               {authError}
             </div>
           )}
 
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleLogin} className="space-y-3.5">
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Email Address</label>
               <input
@@ -334,7 +341,8 @@ export default function App() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-600 shadow-2xs"
+                placeholder="name@company.com"
+                className="w-full h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder:text-slate-400"
               />
             </div>
 
@@ -345,66 +353,41 @@ export default function App() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-600 shadow-2xs"
+                placeholder="••••••••"
+                className="w-full h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder:text-slate-400"
               />
             </div>
 
             <button
               type="submit"
               disabled={isSubmittingAuth}
-              className="w-full h-11 px-4 rounded-xl bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 text-white dark:text-slate-900 text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 active:scale-[0.98]"
+              className="w-full h-10 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-xs disabled:opacity-50 active:scale-[0.98] cursor-pointer"
             >
               {isSubmittingAuth ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 <>
-                  <span>Sign In to Workspace</span>
-                  <ArrowRight className="w-4 h-4 text-emerald-400 dark:text-emerald-600" />
+                  <span>Sign In</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
                 </>
               )}
             </button>
           </form>
 
-          {/* Quick Demo Personas */}
-          <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-3 text-center">
-              Quick Switch Demo Personas
-            </div>
-            <div className="grid grid-cols-2 gap-2.5">
-              <button
-                onClick={() => {
-                  setEmail('yoni@boletech.et');
-                  setPassword('password123');
-                  handleQuickSwitchUser('yoni@boletech.et');
-                }}
-                className="p-3 rounded-2xl border border-slate-200/80 dark:border-slate-700 hover:border-slate-900/20 dark:hover:border-slate-500 hover:bg-slate-50/70 dark:hover:bg-slate-800/50 text-left transition-all group"
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-black dark:group-hover:text-white">Yoni</span>
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-400">
-                    Owner
-                  </span>
-                </div>
-                <div className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">Full capital & margins</div>
-              </button>
-
-              <button
-                onClick={() => {
-                  setEmail('husa@boletech.et');
-                  setPassword('password123');
-                  handleQuickSwitchUser('husa@boletech.et');
-                }}
-                className="p-3 rounded-2xl border border-slate-200/80 dark:border-slate-700 hover:border-slate-900/20 dark:hover:border-slate-500 hover:bg-slate-50/70 dark:hover:bg-slate-800/50 text-left transition-all group"
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-black dark:group-hover:text-white">Husa</span>
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400">
-                    Sales
-                  </span>
-                </div>
-                <div className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">Cost-masked counter</div>
-              </button>
-            </div>
+          <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800 text-center">
+            <button
+              type="button"
+              onClick={() => {
+                setIsOnboarding(true);
+                if (typeof window !== 'undefined' && window.history.pushState) {
+                  window.history.pushState({}, '', '/onboard');
+                }
+              }}
+              className="text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+            >
+              <span>New business? Set up your workspace</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
       </div>
@@ -427,7 +410,6 @@ export default function App() {
         netCapital={netCapital}
         openDebtsCount={openDebtsCount}
         onLogout={handleLogout}
-        onQuickSwitchUser={handleQuickSwitchUser}
         isOpenMobile={isMobileSidebarOpen}
         onCloseMobile={() => setIsMobileSidebarOpen(false)}
         onOpenProfile={() => setIsProfileModalOpen(true)}
@@ -491,6 +473,7 @@ export default function App() {
           {activeTab === 'sales' && (
             <SalesHistoryView
               user={user}
+              tenant={tenant}
               initialSelectedOrder={navContext.order}
               onClearInitialContext={handleClearNavContext}
             />
@@ -531,6 +514,17 @@ export default function App() {
 
           {activeTab === 'logs' && user?.role === 'owner' && (
             <LogsView currentUser={user} />
+          )}
+
+          {activeTab === 'settings' && user?.role === 'owner' && (
+            <SettingsView
+              user={user}
+              tenant={tenant}
+              onProfileUpdated={(updatedTenant, updatedUser) => {
+                setTenant(updatedTenant);
+                setUser(updatedUser);
+              }}
+            />
           )}
         </main>
       </div>

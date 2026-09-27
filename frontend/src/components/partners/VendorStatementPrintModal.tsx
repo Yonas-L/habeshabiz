@@ -78,7 +78,7 @@ export const VendorStatementPrintModal: React.FC<VendorStatementPrintModalProps>
               className="h-8 px-3.5 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
             >
               <Printer className="w-3.5 h-3.5" />
-              <span>Print / Save PDF</span>
+              <span>Print Statement</span>
             </button>
             <button
               type="button"
@@ -206,7 +206,7 @@ export const VendorStatementPrintModal: React.FC<VendorStatementPrintModalProps>
                   <tr className="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                     <th className="py-2.5 px-3 whitespace-nowrap">Date</th>
                     <th className="py-2.5 px-3 whitespace-nowrap">Type</th>
-                    <th className="py-2.5 px-3 min-w-[200px]">Context / Agreement</th>
+                    <th className="py-2.5 px-3 min-w-[200px]">Description</th>
                     <th className="py-2.5 px-3 text-right whitespace-nowrap">Payable</th>
                     <th className="py-2.5 px-3 text-right whitespace-nowrap">Receivable</th>
                     <th className="py-2.5 px-3 text-right whitespace-nowrap">Balance</th>
@@ -336,7 +336,7 @@ export const VendorStatementPrintModal: React.FC<VendorStatementPrintModalProps>
 
             <div className="sm:text-right space-y-4">
               <div className="w-48 border-b border-slate-300 dark:border-slate-700 pb-1 text-center font-mono text-[10px] text-slate-400">
-                Authorized Signature / Stamp
+                Authorized Signature
               </div>
             </div>
           </div>

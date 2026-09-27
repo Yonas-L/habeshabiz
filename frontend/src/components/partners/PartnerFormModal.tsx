@@ -13,8 +13,8 @@ interface PartnerFormModalProps {
 }
 
 const ROLES = [
-  { id: 'peer_vendor', label: 'Peer Shop / Broker' },
-  { id: 'supplier', label: 'Supplier / Importer' },
+  { id: 'peer_vendor', label: 'Broker' },
+  { id: 'supplier', label: 'Supplier' },
   { id: 'partner', label: 'Strategic Partner' },
   { id: 'customer', label: 'Customer' },
 ];
@@ -168,7 +168,7 @@ export const PartnerFormModal: React.FC<PartnerFormModalProps> = ({
           {/* Name */}
           <div>
             <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-              Partner / Shop Name <span className="text-rose-500">*</span>
+              Partner Name <span className="text-rose-500">*</span>
             </label>
             <input
               type="text"
@@ -204,7 +204,7 @@ export const PartnerFormModal: React.FC<PartnerFormModalProps> = ({
                 type="text"
                 value={altPhone}
                 onChange={(e) => setAltPhone(e.target.value)}
-                placeholder="Optional secondary phone"
+                placeholder="Secondary phone"
                 className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 focus:border-slate-900 dark:focus:border-slate-600"
               />
             </div>
@@ -219,7 +219,7 @@ export const PartnerFormModal: React.FC<PartnerFormModalProps> = ({
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="partner@example.com (optional)"
+              placeholder="partner@example.com"
               className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 focus:border-slate-900 dark:focus:border-slate-600"
             />
           </div>

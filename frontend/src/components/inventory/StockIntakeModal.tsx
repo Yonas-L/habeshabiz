@@ -804,7 +804,7 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 md:p-8 pt-20 sm:pt-24 pb-8 overflow-y-auto">
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-slate-950/40 dark:bg-black/60 backdrop-blur-xs animate-backdrop-enter"
@@ -812,7 +812,7 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
       />
 
       {/* Modal Surface */}
-      <div className="relative z-10 w-full max-w-2xl bg-white dark:bg-[#131926] rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden animate-modal-enter flex flex-col max-h-[88vh]">
+      <div className="relative z-10 w-full max-w-2xl bg-white dark:bg-[#131926] rounded-2xl shadow-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden animate-modal-enter flex flex-col max-h-[calc(100vh-7rem)] my-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-2.5">
@@ -836,7 +836,7 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
               onClose();
             }}
             className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-            title="Close (Esc)"
+            title="Close"
           >
             <X className="w-4 h-4" />
           </button>

@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { PartnerFormModal } from '../components/partners/PartnerFormModal';
 import { PartnerDetailView } from './PartnerDetailView';
+import { Pagination } from '../components/Pagination';
 
 interface PartnersViewProps {
   user?: User | null;
@@ -41,6 +42,8 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
   onClearInitialContext,
 }) => {
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 6;
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedRole, setSelectedRole] = useState<RoleFilter>('all');
@@ -264,7 +267,10 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
             <button
               key={tab.id}
               type="button"
-              onClick={() => setSelectedRole(tab.id as RoleFilter)}
+              onClick={() => {
+                setSelectedRole(tab.id as RoleFilter);
+                setCurrentPage(1);
+              }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg whitespace-nowrap transition-all ${
                 selectedRole === tab.id
                   ? 'bg-white dark:bg-[#131926] text-slate-900 dark:text-white shadow-xs font-bold'
@@ -292,14 +298,20 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
             <input
               type="text"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setCurrentPage(1);
+              }}
               placeholder="Search name, phone…"
               className="h-9 w-52 pl-9 pr-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 transition-colors"
             />
             {search && (
               <button
                 type="button"
-                onClick={() => setSearch('')}
+                onClick={() => {
+                  setSearch('');
+                  setCurrentPage(1);
+                }}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
               >
                 <X className="w-3.5 h-3.5" />
@@ -311,7 +323,10 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
             <input
               type="checkbox"
               checked={onlyActive}
-              onChange={(e) => setOnlyActive(e.target.checked)}
+              onChange={(e) => {
+                setOnlyActive(e.target.checked);
+                setCurrentPage(1);
+              }}
               className="rounded text-slate-900 focus:ring-slate-900 dark:bg-slate-900 dark:border-slate-800"
             />
             Active only
@@ -351,8 +366,9 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
         </div>
       ) : viewMode === 'grid' ? (
         /* ═══ GRID CARDS VIEW ═══ */
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filteredContacts.map((contact) => {
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {filteredContacts.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((contact) => {
             const isBrokered = contact.roles.includes('peer_vendor');
             const initials = contact.name
               .split(' ')
@@ -471,10 +487,10 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                           : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-transparent'
                       }`}>
                         {contact.net_balance > 0
-                          ? `+${contact.net_balance.toLocaleString()} ETB (Owes Us)`
+                          ? `+${contact.net_balance.toLocaleString()} ETB · Owes Us`
                           : contact.net_balance < 0
-                          ? `−${Math.abs(contact.net_balance).toLocaleString()} ETB (We Owe)`
-                          : '0.00 ETB (Settled)'}
+                          ? `−${Math.abs(contact.net_balance).toLocaleString()} ETB · We Owe`
+                          : '0.00 ETB · Settled'}
                       </span>
                     </div>
                   )}
@@ -566,6 +582,13 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
               </div>
             );
           })}
+          </div>
+          <Pagination
+            currentPage={currentPage}
+            totalItems={filteredContacts.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+          />
         </div>
       ) : (
         /* ═══ TABLE VIEW ═══ */
@@ -575,7 +598,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
               <thead>
                 <tr className="border-b border-slate-100 dark:border-slate-800/80">
                   <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 bg-slate-50/70 dark:bg-slate-900/40 whitespace-nowrap">
-                    Partner / Merchant
+                    Partner
                   </th>
                   <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 bg-slate-50/70 dark:bg-slate-900/40 whitespace-nowrap">
                     Roles
@@ -595,7 +618,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
-                {filteredContacts.map((contact) => {
+                {filteredContacts.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((contact) => {
                   const isBrokered = contact.roles.includes('peer_vendor');
                   const isInactive = contact.is_active === false;
                   return (
@@ -727,6 +750,14 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                 })}
               </tbody>
             </table>
+          </div>
+          <div className="px-5 pb-4">
+            <Pagination
+              currentPage={currentPage}
+              totalItems={filteredContacts.length}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+            />
           </div>
         </div>
       )}

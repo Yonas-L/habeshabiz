@@ -19,8 +19,20 @@ class DashboardController extends Controller
 {
     public function summary(Request $request): JsonResponse
     {
-        // 1. Inventory Valuation
-        $serializedStockValue = (float) InventoryUnit::where('status', 'in_stock')->sum('cost_basis');
+        // 0. Time Horizon (selected month or current calendar month)
+        $monthParam = $request->query('month'); // e.g. "2025-12"
+        if ($monthParam && preg_match('/^\d{4}-\d{2}$/', $monthParam)) {
+            $startOfMonth = Carbon::createFromFormat('Y-m', $monthParam)->startOfMonth();
+            $endOfMonth = $startOfMonth->copy()->endOfMonth();
+        } else {
+            $startOfMonth = now()->startOfMonth();
+            $endOfMonth = now()->endOfMonth();
+        }
+
+        // 1. Inventory Valuation (up to end of selected period)
+        $serializedStockValue = (float) InventoryUnit::where('created_at', '<=', $endOfMonth)
+            ->where('status', 'in_stock')
+            ->sum('cost_basis');
         $quantityStockValue = (float) InventoryStock::whereHas('variant.product', fn ($q) => $q->where('has_serials', false))
             ->whereDoesntHave('variant.inventoryUnits', fn ($q) => $q->where('status', 'in_stock'))
             ->get()
@@ -30,7 +42,9 @@ class DashboardController extends Controller
         // 2. Debts: Receivables vs Payables — bilaterally netted per contact
         // If a contact owes us 100k AND we owe them 100k, the net is 0
         // and neither figure should inflate the dashboard.
-        $openDebts = Debt::whereIn('status', ['open', 'partially_paid'])->get();
+        $openDebts = Debt::where('created_at', '<=', $endOfMonth)
+            ->whereIn('status', ['open', 'partially_paid'])
+            ->get();
         $debtsByContact = $openDebts->groupBy('contact_id');
 
         $totalReceivables = 0.0;
@@ -66,14 +80,6 @@ class DashboardController extends Controller
         $netCapital = $totalStockValue + $totalReceivables + $cashAndBankBalance + $customAssetsBalance - $totalPayables;
 
         // 5. Monthly Performance (selected month or current calendar month)
-        $monthParam = $request->query('month'); // e.g. "2025-12"
-        if ($monthParam && preg_match('/^\d{4}-\d{2}$/', $monthParam)) {
-            $startOfMonth = Carbon::createFromFormat('Y-m', $monthParam)->startOfMonth();
-            $endOfMonth = $startOfMonth->copy()->endOfMonth();
-        } else {
-            $startOfMonth = now()->startOfMonth();
-            $endOfMonth = now()->endOfMonth();
-        }
 
         $monthlyRevenue = (float) SalesOrder::whereBetween('order_date', [$startOfMonth, $endOfMonth])->sum('total_amount');
         $monthlyDiscounts = (float) SalesOrder::whereBetween('order_date', [$startOfMonth, $endOfMonth])->sum('discount_amount');
@@ -102,6 +108,7 @@ class DashboardController extends Controller
         // 7. Top Receivables (Parties who actually owe the shop money net)
         $topReceivables = Debt::with('contact')
             ->where('type', 'receivable')
+            ->where('created_at', '<=', $endOfMonth)
             ->whereIn('contact_id', $netReceivableContactIds)
             ->whereIn('status', ['open', 'partially_paid'])
             ->orderByDesc('remaining_amount')
@@ -111,6 +118,7 @@ class DashboardController extends Controller
         // 8. Top Payables (Parties whom the shop actually owes money net)
         $topPayables = Debt::with('contact')
             ->where('type', 'payable')
+            ->where('created_at', '<=', $endOfMonth)
             ->whereIn('contact_id', $netPayableContactIds)
             ->whereIn('status', ['open', 'partially_paid'])
             ->orderByDesc('remaining_amount')
@@ -149,7 +157,7 @@ class DashboardController extends Controller
                     ->orWhereHas('debts')
                     ->orWhereHas('suppliedUnits');
             })
-            ->with(['debts' => fn ($q) => $q->whereIn('status', ['open', 'partially_paid'])])
+            ->with(['debts' => fn ($q) => $q->where('created_at', '<=', $endOfMonth)->whereIn('status', ['open', 'partially_paid'])])
             ->get();
 
         $partnerSettlements = [];
@@ -178,6 +186,7 @@ class DashboardController extends Controller
             $allDebtedUnitIds = array_unique(array_merge($existingStockIntakeUnitIds, $soldUnitIdsWithDebt));
 
             $unDebtStockPayable = (float) InventoryUnit::where('supplier_contact_id', $p->id)
+                ->where('created_at', '<=', $endOfMonth)
                 ->where('status', 'in_stock')
                 ->whereNotIn('id', $allDebtedUnitIds)
                 ->sum('cost_basis');
@@ -200,6 +209,7 @@ class DashboardController extends Controller
                     ->count();
 
                 $suppliedInStockCount = InventoryUnit::where('supplier_contact_id', $p->id)
+                    ->where('created_at', '<=', $endOfMonth)
                     ->where('status', 'in_stock')
                     ->count();
 
@@ -240,13 +250,13 @@ class DashboardController extends Controller
                     'net_profit' => $monthlyNetProfit,
                 ],
                 'counts' => [
-                    'in_stock_phones' => InventoryUnit::where('status', 'in_stock')->count(),
-                    'open_receivables' => Debt::where('type', 'receivable')->whereIn('status', ['open', 'partially_paid'])->count(),
+                    'in_stock_phones' => InventoryUnit::where('created_at', '<=', $endOfMonth)->where('status', 'in_stock')->count(),
+                    'open_receivables' => Debt::where('created_at', '<=', $endOfMonth)->where('type', 'receivable')->whereIn('status', ['open', 'partially_paid'])->count(),
                     'open_receivable_parties' => $netReceivableParties,
-                    'open_payables' => Debt::where('type', 'payable')->whereIn('status', ['open', 'partially_paid'])->count(),
+                    'open_payables' => Debt::where('created_at', '<=', $endOfMonth)->where('type', 'payable')->whereIn('status', ['open', 'partially_paid'])->count(),
                     'open_payable_parties' => $netPayableParties,
-                    'uncollected_staff_bonuses' => (float) Debt::where('type', 'payable')->where('reference_type', 'salesperson_bonus')->whereIn('status', ['open', 'partially_paid'])->sum('remaining_amount'),
-                    'pending_bonus_staff_count' => Debt::where('type', 'payable')->where('reference_type', 'salesperson_bonus')->whereIn('status', ['open', 'partially_paid'])->distinct('salesperson_id')->count('salesperson_id'),
+                    'uncollected_staff_bonuses' => (float) Debt::where('created_at', '<=', $endOfMonth)->where('type', 'payable')->where('reference_type', 'salesperson_bonus')->whereIn('status', ['open', 'partially_paid'])->sum('remaining_amount'),
+                    'pending_bonus_staff_count' => Debt::where('created_at', '<=', $endOfMonth)->where('type', 'payable')->where('reference_type', 'salesperson_bonus')->whereIn('status', ['open', 'partially_paid'])->distinct('salesperson_id')->count('salesperson_id'),
                 ],
                 'partner_settlements' => [
                     'partners_owing_us_count' => $partnersOwingUsCount,

@@ -22,7 +22,7 @@ import {
   Plus,
   Minus,
   Handshake,
-  Sparkles,
+  TrendingUp,
   Repeat,
   Wrench,
 } from 'lucide-react';
@@ -927,9 +927,9 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                   )}
                   {isUpsell && (
                     <div className="mt-1.5 flex items-center gap-1.5 px-2 py-1 rounded-lg bg-purple-50 dark:bg-purple-950/40 border border-purple-200/60 dark:border-purple-800/40 text-[10px] text-purple-700 dark:text-purple-300 font-bold">
-                      <Sparkles className="w-3 h-3 text-purple-600 dark:text-purple-400 shrink-0" />
+                      <TrendingUp className="w-3 h-3 text-purple-600 dark:text-purple-400 shrink-0" />
                       <span>
-                        +{netEstimatedBonus.toLocaleString()} ETB Bonus (+{upsellBonusPerUnit.toLocaleString()} above set {settedPrice.toLocaleString()})
+                        +{netEstimatedBonus.toLocaleString()} ETB Bonus · +{upsellBonusPerUnit.toLocaleString()} above target
                       </span>
                     </div>
                   )}
