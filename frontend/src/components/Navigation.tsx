@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, ShoppingCart, Smartphone, Receipt, CreditCard, Landmark, DollarSign } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, Package, Receipt, CreditCard, Landmark, DollarSign } from 'lucide-react';
 
 export type NavTab = 'overview' | 'counter' | 'inventory' | 'sales' | 'debts' | 'treasury' | 'expenses';
 
@@ -19,7 +19,7 @@ export const Navigation: React.FC<NavigationProps> = ({
   const tabs: { id: NavTab; label: string; icon: React.FC<{ className?: string }>; badge?: number }[] = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
     { id: 'counter', label: 'Counter POS', icon: ShoppingCart },
-    { id: 'inventory', label: 'Inventory & IMEIs', icon: Smartphone },
+    { id: 'inventory', label: 'Stock', icon: Package },
     { id: 'sales', label: 'Sales History', icon: Receipt },
     { id: 'debts', label: 'Receivable & Payable', icon: CreditCard, badge: openReceivablesCount + openPayablesCount },
     { id: 'treasury', label: 'Treasury & Accounts', icon: Landmark },

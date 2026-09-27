@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type {
   User,
   Tenant,
   DashboardData,
   FinancialAccount,
   Contact,
+  InventoryUnit,
+  SalesOrder,
 } from './api/client';
 import {
   api,
@@ -24,9 +26,17 @@ import { ExpensesView } from './views/ExpensesView';
 import { StaffView } from './views/StaffView';
 import { StaffOverviewView } from './views/StaffOverviewView';
 import { PartnersView } from './views/PartnersView';
+import { LogsView } from './views/LogsView';
+import { PublicStatementView } from './views/PublicStatementView';
 import { ProfileSettingsModal } from './components/ProfileSettingsModal';
+import { QuickSearchModal, type NavigationPayload } from './components/QuickSearchModal';
 import { Toaster, toast } from 'sonner';
 import { ArrowRight, Loader2 } from 'lucide-react';
+
+export const getCurrentMonth = (): string => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+};
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -36,8 +46,35 @@ export default function App() {
   const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [selectedMonth, setSelectedMonth] = useState<string>(getCurrentMonth);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
+  const [isQuickSearchOpen, setIsQuickSearchOpen] = useState<boolean>(false);
+  const [navContext, setNavContext] = useState<{
+    unit?: InventoryUnit | null;
+    order?: SalesOrder | null;
+    partnerId?: string | null;
+    account?: FinancialAccount | null;
+    showIntake?: boolean;
+    showRecordExpense?: boolean;
+  }>({});
+
+  const handleClearNavContext = useCallback(() => {
+    setNavContext({});
+  }, []);
+
+  const handleQuickSearchNavigate = useCallback((payload: NavigationPayload) => {
+    setNavContext({
+      unit: payload.unit || null,
+      order: payload.order || null,
+      partnerId: payload.partnerId || null,
+      account: payload.account || null,
+      showIntake: payload.action === 'stock_intake',
+      showRecordExpense: payload.action === 'new_expense',
+    });
+    setActiveTab(payload.tab);
+    setIsQuickSearchOpen(false);
+  }, []);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     if (typeof window !== 'undefined') {
       return (localStorage.getItem('habeshabiz_theme') as 'light' | 'dark') || 'light';
@@ -65,10 +102,11 @@ export default function App() {
   const [isSubmittingAuth, setIsSubmittingAuth] = useState<boolean>(false);
 
   // Load app data when user is authenticated
-  const refreshData = useCallback(async () => {
+  const refreshData = useCallback(async (monthOverride?: string) => {
     try {
+      const targetMonth = monthOverride !== undefined ? monthOverride : selectedMonth;
       const [dashRes, accountsRes, contactsRes] = await Promise.all([
-        api.getDashboardSummary(),
+        api.getDashboardSummary(targetMonth),
         api.getAccounts(),
         api.getContacts(),
       ]);
@@ -83,7 +121,12 @@ export default function App() {
     } catch (err) {
       console.error('Failed refreshing workspace data:', err);
     }
-  }, []);
+  }, [selectedMonth]);
+
+  const handleMonthChange = (newMonth: string) => {
+    setSelectedMonth(newMonth);
+    refreshData(newMonth);
+  };
 
   // Keyboard navigation shortcuts
   useEffect(() => {
@@ -103,9 +146,16 @@ export default function App() {
                 '7': 'treasury',
                 '8': 'expenses',
                 '9': 'staff',
+                '0': 'logs',
               }
             : {}),
         };
+        if (key === 'k' || key === 'K') {
+          e.preventDefault();
+          setIsQuickSearchOpen((prev) => !prev);
+          return;
+        }
+
         if (tabMap[key]) {
           e.preventDefault();
           setActiveTab(tabMap[key]);
@@ -120,7 +170,7 @@ export default function App() {
   // Fallback to overview if active tab is restricted for non-owner role
   useEffect(() => {
     if (user && user.role !== 'owner') {
-      const ownerOnlyTabs: NavTab[] = ['partners', 'debts', 'treasury', 'expenses', 'staff'];
+      const ownerOnlyTabs: NavTab[] = ['partners', 'debts', 'treasury', 'expenses', 'staff', 'logs'];
       if (ownerOnlyTabs.includes(activeTab)) {
         setActiveTab('overview');
       }
@@ -221,6 +271,27 @@ export default function App() {
       toast.info('Signed out');
     }
   };
+
+  // Public statement link routing (e.g. /statement/{token} or ?statement_token={token})
+  const publicStatementToken = useMemo(() => {
+    if (typeof window === 'undefined') return null;
+    const path = window.location.pathname;
+    if (path.startsWith('/statement/')) {
+      const parts = path.split('/');
+      return parts[2] || null;
+    }
+    const params = new URLSearchParams(window.location.search);
+    return params.get('statement_token') || null;
+  }, []);
+
+  if (publicStatementToken) {
+    return (
+      <div className={theme === 'dark' ? 'dark' : ''}>
+        <PublicStatementView token={publicStatementToken} />
+        <Toaster position="bottom-right" richColors closeButton theme={theme} />
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -360,6 +431,7 @@ export default function App() {
         isOpenMobile={isMobileSidebarOpen}
         onCloseMobile={() => setIsMobileSidebarOpen(false)}
         onOpenProfile={() => setIsProfileModalOpen(true)}
+        onOpenQuickSearch={() => setIsQuickSearchOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -368,6 +440,8 @@ export default function App() {
         <Topbar
           activeTab={activeTab}
           user={user}
+          selectedMonth={selectedMonth}
+          onMonthChange={handleMonthChange}
           theme={theme}
           onToggleTheme={handleToggleTheme}
           onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
@@ -383,6 +457,7 @@ export default function App() {
                 data={dashboardData}
                 user={user}
                 accounts={accounts}
+                selectedMonth={selectedMonth}
                 onNavigateTab={setActiveTab}
                 onRefreshData={refreshData}
               />
@@ -404,11 +479,21 @@ export default function App() {
           )}
 
           {activeTab === 'inventory' && (
-            <InventoryView user={user} onInventoryChange={refreshData} />
+            <InventoryView
+              user={user}
+              onInventoryChange={refreshData}
+              initialSelectedUnit={navContext.unit}
+              initialShowIntake={navContext.showIntake}
+              onClearInitialContext={handleClearNavContext}
+            />
           )}
 
           {activeTab === 'sales' && (
-            <SalesHistoryView user={user} />
+            <SalesHistoryView
+              user={user}
+              initialSelectedOrder={navContext.order}
+              onClearInitialContext={handleClearNavContext}
+            />
           )}
 
           {/* Owner-only Tabs */}
@@ -417,6 +502,8 @@ export default function App() {
               user={user}
               onNavigateTab={setActiveTab}
               onRefreshContacts={refreshData}
+              initialSelectedPartnerId={navContext.partnerId}
+              onClearInitialContext={handleClearNavContext}
             />
           )}
           {activeTab === 'debts' && user?.role === 'owner' && (
@@ -424,15 +511,26 @@ export default function App() {
           )}
 
           {activeTab === 'treasury' && user?.role === 'owner' && (
-            <TreasuryView />
+            <TreasuryView
+              initialSelectedAccount={navContext.account}
+              onClearInitialContext={handleClearNavContext}
+            />
           )}
 
           {activeTab === 'expenses' && user?.role === 'owner' && (
-            <ExpensesView accounts={accounts} />
+            <ExpensesView
+              accounts={accounts}
+              initialShowRecordExpense={navContext.showRecordExpense}
+              onClearInitialContext={handleClearNavContext}
+            />
           )}
 
           {activeTab === 'staff' && user?.role === 'owner' && (
             <StaffView currentUser={user} />
+          )}
+
+          {activeTab === 'logs' && user?.role === 'owner' && (
+            <LogsView currentUser={user} />
           )}
         </main>
       </div>
@@ -445,6 +543,15 @@ export default function App() {
         onUserUpdated={(updatedUser) => {
           setUser((prev) => (prev ? { ...prev, ...updatedUser } : updatedUser));
         }}
+      />
+
+      {/* Global Quick Search & Command Palette (⌘K) */}
+      <QuickSearchModal
+        isOpen={isQuickSearchOpen}
+        onClose={() => setIsQuickSearchOpen(false)}
+        user={user}
+        accounts={accounts}
+        onNavigate={handleQuickSearchNavigate}
       />
     </div>
   );

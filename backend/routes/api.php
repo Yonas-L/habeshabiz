@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AccountController;
+use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\ContactController;
@@ -15,8 +16,9 @@ use App\Http\Controllers\Api\TaskController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
-    // Public Authentication
+    // Public Endpoints
     Route::post('/auth/login', [AuthController::class, 'login']);
+    Route::get('/public/statement/{token}', [ContactController::class, 'publicStatement']);
 
     // Protected Routes
     Route::middleware('auth:sanctum')->group(function () {
@@ -32,7 +34,8 @@ Route::prefix('v1')->group(function () {
         Route::patch('/staff/{id}/toggle-status', [StaffController::class, 'toggleStatus']);
         Route::post('/staff/{id}/reset-password', [StaffController::class, 'resetPassword']);
         Route::get('/staff/leaderboard', [StaffController::class, 'leaderboard']);
-        Route::get('/staff/audit-logs', [StaffController::class, 'auditLogs']);
+        Route::get('/audit-logs', [AuditLogController::class, 'index']);
+        Route::get('/staff/audit-logs', [AuditLogController::class, 'index']);
 
         // Personal Staff Tasks & Targets Checklist
         Route::get('/tasks', [TaskController::class, 'index']);
@@ -61,16 +64,22 @@ Route::prefix('v1')->group(function () {
         // Serialized & Quantity Inventory
         Route::get('/inventory/units', [InventoryController::class, 'units']);
         Route::post('/inventory/units', [InventoryController::class, 'intakeUnit']);
+        Route::put('/inventory/units/{id}', [InventoryController::class, 'updateUnit']);
         Route::post('/inventory/units/{id}/handover', [InventoryController::class, 'handoverUnit']);
+        Route::post('/inventory/units/{id}/mark-handover-sold', [InventoryController::class, 'markHandoverSold']);
         Route::post('/inventory/units/{id}/restock', [InventoryController::class, 'restockUnit']);
         Route::post('/inventory/units/{id}/customer-return', [InventoryController::class, 'customerReturn']);
+        Route::post('/inventory/units/{id}/swap', [InventoryController::class, 'swapUnit']);
         Route::post('/inventory/units/{id}/return-to-vendor', [InventoryController::class, 'returnToVendor']);
+        Route::post('/inventory/units/{id}/receive-from-vendor', [InventoryController::class, 'receiveFromVendor']);
+        Route::post('/inventory/units/{id}/vendor-swap', [InventoryController::class, 'vendorSwap']);
         Route::post('/inventory/units/{id}/repaired-restock', [InventoryController::class, 'repairAndRestock']);
         Route::get('/inventory/stock-summary', [InventoryController::class, 'stockSummary']);
 
         // Sales & Brokered Sourcing
         Route::get('/sales', [SaleController::class, 'index']);
         Route::post('/sales', [SaleController::class, 'store']);
+        Route::post('/sales/{id}/collect', [SaleController::class, 'collectPayment']);
 
         // Debts: Receivables & Payables Ledger
         Route::get('/debts', [DebtController::class, 'index']);
@@ -82,6 +91,7 @@ Route::prefix('v1')->group(function () {
         // Financial Treasury Accounts & Transfers
         Route::get('/accounts', [AccountController::class, 'index']);
         Route::post('/accounts', [AccountController::class, 'store']);
+        Route::get('/accounts/{id}/activities', [AccountController::class, 'activities']);
         Route::put('/accounts/{id}', [AccountController::class, 'update']);
         Route::delete('/accounts/{id}', [AccountController::class, 'destroy']);
         Route::post('/accounts/transfer', [AccountController::class, 'transfer']);
@@ -92,6 +102,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/contacts/{id}', [ContactController::class, 'show']);
         Route::put('/contacts/{id}', [ContactController::class, 'update']);
         Route::delete('/contacts/{id}', [ContactController::class, 'destroy']);
+        Route::get('/contacts/{id}/statement', [ContactController::class, 'statement']);
 
         // Operational Expenses & Owner Draws
         Route::get('/expenses', [ExpenseController::class, 'index']);

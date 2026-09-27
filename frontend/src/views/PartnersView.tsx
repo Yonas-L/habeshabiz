@@ -7,24 +7,28 @@ import {
   Search,
   Plus,
   Phone,
-  Building2,
   Pencil,
   Trash2,
   Copy,
   Check,
   Loader2,
-  Package,
   ShoppingBag,
   ShieldAlert,
   LayoutGrid,
   List,
+  X,
+  ChevronRight,
+  ExternalLink,
 } from 'lucide-react';
 import { PartnerFormModal } from '../components/partners/PartnerFormModal';
+import { PartnerDetailView } from './PartnerDetailView';
 
 interface PartnersViewProps {
   user?: User | null;
   onNavigateTab?: (tab: any) => void;
   onRefreshContacts?: () => void;
+  initialSelectedPartnerId?: string | null;
+  onClearInitialContext?: () => void;
 }
 
 type RoleFilter = 'all' | 'peer_vendor' | 'supplier' | 'partner' | 'customer';
@@ -33,6 +37,8 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
   user: _user,
   onNavigateTab,
   onRefreshContacts,
+  initialSelectedPartnerId,
+  onClearInitialContext,
 }) => {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,6 +46,14 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
   const [selectedRole, setSelectedRole] = useState<RoleFilter>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [onlyActive, setOnlyActive] = useState(true);
+  const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (initialSelectedPartnerId) {
+      setSelectedPartnerId(initialSelectedPartnerId);
+      onClearInitialContext?.();
+    }
+  }, [initialSelectedPartnerId, onClearInitialContext]);
 
   // Modal State
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
@@ -49,7 +63,6 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
   // Safe Delete Modal State
   const [deletingContact, setDeletingContact] = useState<Contact | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState<{ message: string; canDeactivate: boolean } | null>(null);
 
   // Copied state indicator
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -95,32 +108,14 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
     if (!deletingContact) return;
     try {
       setIsDeleting(true);
-      setDeleteError(null);
       await api.deleteContact(deletingContact.id);
-      toast.success(`Partner "${deletingContact.name}" removed`);
-      setDeletingContact(null);
-      loadContacts();
-    } catch (err: any) {
-      setDeleteError({
-        message: err.message || 'Cannot delete partner',
-        canDeactivate: true,
+      toast.success(`Partner "${deletingContact.name}" removed`, {
+        description: 'All historical transactions, debts, and inventory records are preserved.',
       });
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
-  const handleDeactivateInstead = async () => {
-    if (!deletingContact) return;
-    try {
-      setIsDeleting(true);
-      await api.updateContact(deletingContact.id, { is_active: false });
-      toast.success(`Partner "${deletingContact.name}" deactivated`);
       setDeletingContact(null);
-      setDeleteError(null);
       loadContacts();
     } catch (err: any) {
-      toast.error('Failed to deactivate partner', { description: err.message });
+      toast.error('Failed to remove partner', { description: err.message });
     } finally {
       setIsDeleting(false);
     }
@@ -139,15 +134,8 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
   // Filter and search
   const filteredContacts = useMemo(() => {
     return contacts.filter((c) => {
-      // Role filter
-      if (selectedRole !== 'all' && !c.roles.includes(selectedRole)) {
-        return false;
-      }
-      // Active filter
-      if (onlyActive && c.is_active === false) {
-        return false;
-      }
-      // Search
+      if (selectedRole !== 'all' && !c.roles.includes(selectedRole)) return false;
+      if (onlyActive && c.is_active === false) return false;
       if (search.trim()) {
         const q = search.toLowerCase();
         const matchesName = c.name.toLowerCase().includes(q);
@@ -155,9 +143,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
         const matchesAltPhone = c.alt_phone?.toLowerCase().includes(q);
         const matchesNotes = c.notes?.toLowerCase().includes(q);
         const matchesEmail = c.email?.toLowerCase().includes(q);
-        if (!matchesName && !matchesPhone && !matchesAltPhone && !matchesNotes && !matchesEmail) {
-          return false;
-        }
+        if (!matchesName && !matchesPhone && !matchesAltPhone && !matchesNotes && !matchesEmail) return false;
       }
       return true;
     });
@@ -175,63 +161,58 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
   const getRoleBadge = (role: string) => {
     switch (role) {
       case 'peer_vendor':
-        return {
-          label: 'Sourcing Broker',
-          classes: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-200/80 dark:border-amber-800/60',
-        };
+        return { label: 'Broker', classes: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200/60 dark:border-amber-800/50' };
       case 'supplier':
-        return {
-          label: 'Supplier / Importer',
-          classes: 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border-blue-200/80 dark:border-blue-800/60',
-        };
+        return { label: 'Supplier', classes: 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800/50' };
       case 'partner':
-        return {
-          label: 'Strategic Partner',
-          classes: 'bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-400 border-purple-200/80 dark:border-purple-800/60',
-        };
+        return { label: 'Partner', classes: 'bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-400 border border-purple-200/60 dark:border-purple-800/50' };
       case 'customer':
-        return {
-          label: 'Customer',
-          classes: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-200/80 dark:border-emerald-800/60',
-        };
+        return { label: 'Customer', classes: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/50' };
       default:
-        return {
-          label: role,
-          classes: 'bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800',
-        };
+        return { label: role, classes: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-transparent' };
     }
   };
 
   if (loading && contacts.length === 0) {
     return (
-      <div className="py-24 text-center text-slate-400 dark:text-slate-500 text-xs flex items-center justify-center gap-2 animate-pulse">
-        <Loader2 className="w-4 h-4 animate-spin text-slate-900 dark:text-white" />
-        <span>Loading partners &amp; brokers network...</span>
+      <div className="py-24 text-center text-slate-400 dark:text-slate-500 text-xs flex items-center justify-center gap-2">
+        <Loader2 className="w-4 h-4 animate-spin text-slate-700 dark:text-slate-300" />
+        <span className="font-medium">Loading partners &amp; brokers network...</span>
       </div>
     );
   }
 
+  if (selectedPartnerId) {
+    return (
+      <PartnerDetailView
+        contactId={selectedPartnerId}
+        user={_user}
+        onBack={() => {
+          setSelectedPartnerId(null);
+          loadContacts();
+        }}
+        onEditContact={handleOpenEditModal}
+      />
+    );
+  }
+
   return (
-    <div className="animate-page-enter space-y-6">
-      {/* ─── Header & Primary Action ─── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-600 text-white flex items-center justify-center shadow-sm">
-            <Handshake className="w-5 h-5" />
-          </div>
-          <div>
-            <h1 className="text-lg font-extrabold text-slate-900 dark:text-white tracking-tight leading-none">
-              Partners &amp; Brokers
-            </h1>
-            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 font-medium">
-              Manage neighbour shop sourcing, wholesale importers &amp; peer network
-            </p>
-          </div>
+    <div className="animate-page-enter space-y-4">
+
+      {/* ─── Page Header ─── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h2 className="text-base font-bold text-slate-900 dark:text-white tracking-tight leading-none">
+            Vendor Network
+          </h2>
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5 font-medium">
+            Brokers, suppliers, strategic partners &amp; wholesale customers
+          </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
-          {/* View mode toggle */}
-          <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl border border-slate-200/60 dark:border-slate-800">
+        <div className="flex items-center gap-2">
+          {/* View toggle */}
+          <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl">
             <button
               type="button"
               onClick={() => setViewMode('grid')}
@@ -258,128 +239,74 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
             </button>
           </div>
 
-          {/* Add Partner Button */}
           <button
             type="button"
             onClick={() => handleOpenAddModal('peer_vendor')}
-            className="h-9 px-4 rounded-xl bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 text-white dark:text-slate-900 text-xs font-bold transition-all shadow-sm flex items-center gap-2 active:scale-98"
+            className="h-9 px-4 rounded-xl bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 text-white dark:text-slate-900 text-xs font-bold transition-all shadow-sm flex items-center gap-2 active:scale-[0.98]"
           >
-            <Plus className="w-4 h-4 text-emerald-400 dark:text-emerald-600" />
-            <span>Add Partner</span>
+            <Plus className="w-3.5 h-3.5 text-emerald-400 dark:text-emerald-600" />
+            Add Partner
           </button>
         </div>
       </div>
 
-      {/* ─── Vitals / Metric Cards ─── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
-        {/* Total Network */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/90 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.03)]">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-              Total Network
-            </span>
-            <Building2 className="w-4 h-4 text-slate-400" />
-          </div>
-          <div className="text-2xl font-black text-slate-900 dark:text-white mt-2 tracking-tight">
-            {stats.total}
-          </div>
-          <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
-            Registered business contacts
-          </div>
-        </div>
-
-        {/* Sourcing Brokers */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/90 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.03)]">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
-              Sourcing Brokers
-            </span>
-            <span className="w-2 h-2 rounded-full bg-amber-500 ring-2 ring-amber-100 dark:ring-amber-950/60 animate-pulse" />
-          </div>
-          <div className="text-2xl font-black text-amber-600 dark:text-amber-400 mt-2 tracking-tight">
-            {stats.brokers}
-          </div>
-          <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
-            Neighbour shops for POS sourcing
-          </div>
-        </div>
-
-        {/* Wholesale Suppliers */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/90 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.03)]">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
-              Wholesale Importers
-            </span>
-            <Package className="w-4 h-4 text-blue-500" />
-          </div>
-          <div className="text-2xl font-black text-blue-600 dark:text-blue-400 mt-2 tracking-tight">
-            {stats.suppliers}
-          </div>
-          <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
-            Bulk stock intake suppliers
-          </div>
-        </div>
-
-        {/* Strategic Associates */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/90 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.03)]">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">
-              Business Partners
-            </span>
-            <Handshake className="w-4 h-4 text-purple-500" />
-          </div>
-          <div className="text-2xl font-black text-purple-600 dark:text-purple-400 mt-2 tracking-tight">
-            {stats.partners}
-          </div>
-          <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
-            Commercial trade associates
-          </div>
-        </div>
-      </div>
-
-      {/* ─── Search Bar & Role Filters ─── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3.5">
-        {/* Role Tabs */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
+      {/* ─── Filter Row ─── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        {/* Role tabs */}
+        <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl text-xs font-semibold overflow-x-auto shrink-0">
           {[
-            { id: 'all', label: 'All Network' },
-            { id: 'peer_vendor', label: 'Sourcing Brokers' },
-            { id: 'supplier', label: 'Suppliers' },
-            { id: 'partner', label: 'Partners' },
-            { id: 'customer', label: 'Customers' },
-          ].map((tab) => {
-            const isActive = selectedRole === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setSelectedRole(tab.id as RoleFilter)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
-                  isActive
-                    ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
-                    : 'bg-white dark:bg-[#131926] text-slate-600 dark:text-slate-400 border border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
-                }`}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
+            { id: 'all', label: `All`, count: stats.total },
+            { id: 'peer_vendor', label: 'Brokers', count: stats.brokers },
+            { id: 'supplier', label: 'Suppliers', count: stats.suppliers },
+            { id: 'partner', label: 'Partners', count: stats.partners },
+            { id: 'customer', label: 'Customers', count: null },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setSelectedRole(tab.id as RoleFilter)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg whitespace-nowrap transition-all ${
+                selectedRole === tab.id
+                  ? 'bg-white dark:bg-[#131926] text-slate-900 dark:text-white shadow-xs font-bold'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <span>{tab.label}</span>
+              {tab.count !== null && (
+                <span className={`text-[10px] font-mono leading-none px-1.5 py-0.5 rounded-md ${
+                  selectedRole === tab.id
+                    ? 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                    : 'text-slate-400 dark:text-slate-600'
+                }`}>
+                  {tab.count}
+                </span>
+              )}
+            </button>
+          ))}
         </div>
 
-        {/* Search & Active Toggle */}
-        <div className="flex items-center gap-3">
-          <div className="relative flex-1 sm:w-64">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+        {/* Search + Active toggle */}
+        <div className="flex items-center gap-2.5">
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search partner, phone, notes..."
-              className="w-full h-9 pl-9 pr-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+              placeholder="Search name, phone…"
+              className="h-9 w-52 pl-9 pr-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 transition-colors"
             />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
-          {/* Active only filter */}
           <label className="flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-400 cursor-pointer select-none shrink-0">
             <input
               type="checkbox"
@@ -387,29 +314,40 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
               onChange={(e) => setOnlyActive(e.target.checked)}
               className="rounded text-slate-900 focus:ring-slate-900 dark:bg-slate-900 dark:border-slate-800"
             />
-            <span>Active only</span>
+            Active only
           </label>
+
+          <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium shrink-0 tabular-nums">
+            {filteredContacts.length} shown
+          </span>
         </div>
       </div>
 
-      {/* ─── Main Content Surface ─── */}
+      {/* ─── Main Content ─── */}
       {filteredContacts.length === 0 ? (
-        <div className="py-20 text-center rounded-3xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/90 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.03)]">
-          <Handshake className="w-10 h-10 text-slate-300 dark:text-slate-700 mx-auto mb-3" />
-          <h3 className="text-sm font-bold text-slate-900 dark:text-white">No partners found</h3>
-          <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 max-w-sm mx-auto">
+        /* ═══ EMPTY STATE ═══ */
+        <div className="py-20 text-center rounded-2xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/90 shadow-[0_2px_12px_-2px_rgba(0,0,0,0.04)]">
+          <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-4">
+            <Handshake className="w-7 h-7 text-slate-400 dark:text-slate-500" />
+          </div>
+          <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+            {search ? 'No partners matched' : 'No partners yet'}
+          </h3>
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5 max-w-xs mx-auto leading-relaxed">
             {search
-              ? `No partner matched "${search}". Try clearing filters or searching with a different term.`
+              ? `No match for "${search}". Try clearing the search or adjusting filters.`
               : 'Add neighbouring shop merchants or wholesale suppliers to begin brokered sourcing.'}
           </p>
-          <button
-            type="button"
-            onClick={() => handleOpenAddModal('peer_vendor')}
-            className="mt-4 px-4 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold inline-flex items-center gap-1.5 shadow-sm"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Add First Partner</span>
-          </button>
+          {!search && (
+            <button
+              type="button"
+              onClick={() => handleOpenAddModal('peer_vendor')}
+              className="mt-5 h-9 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold inline-flex items-center gap-1.5 shadow-sm hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors active:scale-[0.98]"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add First Partner
+            </button>
+          )}
         </div>
       ) : viewMode === 'grid' ? (
         /* ═══ GRID CARDS VIEW ═══ */
@@ -422,58 +360,53 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
               .slice(0, 2)
               .join('')
               .toUpperCase();
+            const isInactive = contact.is_active === false;
 
             return (
               <div
                 key={contact.id}
-                className={`rounded-2xl border transition-all flex flex-col justify-between overflow-hidden shadow-[0_4px_20px_-4px_rgba(0,0,0,0.03)] ${
-                  contact.is_active === false
-                    ? 'bg-slate-50/60 dark:bg-[#131926]/40 border-slate-200/50 dark:border-slate-800/50 opacity-70'
-                    : 'bg-white dark:bg-[#131926] border-slate-200/80 dark:border-slate-800/90 hover:border-slate-300 dark:hover:border-slate-700'
+                onClick={() => setSelectedPartnerId(contact.id)}
+                className={`group rounded-2xl border flex flex-col overflow-hidden transition-all duration-150 cursor-pointer ${
+                  isInactive
+                    ? 'bg-slate-50/80 dark:bg-[#131926]/60 border-slate-200/50 dark:border-slate-800/40 opacity-60'
+                    : 'bg-white dark:bg-[#131926] border-slate-200/80 dark:border-slate-800/80 hover:border-slate-400/80 dark:hover:border-slate-600 shadow-[0_2px_12px_-2px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_24px_-4px_rgba(0,0,0,0.08)]'
                 }`}
               >
-                <div className="p-5 space-y-3.5">
-                  {/* Card Header: Avatar, Name, Status Pill */}
+                {/* ── Card Body ── */}
+                <div className="p-5 flex-1 space-y-4">
+
+                  {/* Header: Avatar + Name + Status + Badges */}
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
-                      <div
-                        className={`w-10 h-10 rounded-2xl flex items-center justify-center font-extrabold text-xs shadow-xs shrink-0 ${
-                          isBrokered
-                            ? 'bg-gradient-to-tr from-amber-500 to-amber-600 text-white'
-                            : 'bg-gradient-to-tr from-slate-800 to-slate-900 text-white dark:from-slate-700 dark:to-slate-800'
-                        }`}
-                      >
+                      {/* Avatar */}
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-extrabold text-xs shrink-0 ${
+                        isBrokered
+                          ? 'bg-gradient-to-br from-amber-400 to-amber-600 text-white shadow-sm'
+                          : 'bg-gradient-to-br from-slate-700 to-slate-900 text-white dark:from-slate-600 dark:to-slate-800 shadow-sm'
+                      }`}>
                         {initials}
                       </div>
+
+                      {/* Name + Status dot */}
                       <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate tracking-tight">
-                            {contact.name}
-                          </h3>
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate tracking-tight leading-tight group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                          {contact.name}
+                        </h3>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isInactive ? 'bg-slate-400' : 'bg-emerald-500'}`} />
+                          <span className={`text-[10px] font-semibold ${isInactive ? 'text-slate-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                            {isInactive ? 'Inactive' : 'Active'}
+                          </span>
                         </div>
-                        {contact.is_active === false ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-400">
-                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                            Inactive
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                            Active Partner
-                          </span>
-                        )}
                       </div>
                     </div>
 
                     {/* Role Badges */}
-                    <div className="flex flex-wrap items-center justify-end gap-1 shrink-0">
+                    <div className="flex flex-wrap items-start justify-end gap-1 shrink-0 pt-0.5">
                       {contact.roles.map((r) => {
                         const badge = getRoleBadge(r);
                         return (
-                          <span
-                            key={r}
-                            className={`text-[9px] font-bold px-2 py-0.5 rounded-md border ${badge.classes}`}
-                          >
+                          <span key={r} className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md leading-none ${badge.classes}`}>
                             {badge.label}
                           </span>
                         );
@@ -481,120 +414,147 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                     </div>
                   </div>
 
-                  {/* Phone & Contact Links */}
-                  <div className="space-y-1 text-xs">
+                  {/* Phone */}
+                  <div className="flex items-center justify-between">
                     {contact.phone ? (
-                      <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800/80">
-                        <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300 font-mono text-[11px] font-medium">
-                          <Phone className="w-3.5 h-3.5 text-slate-400" />
-                          <a
-                            href={`tel:${contact.phone}`}
-                            className="hover:text-slate-900 dark:hover:text-white hover:underline"
-                          >
-                            {contact.phone}
-                          </a>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleCopyPhone(contact.phone!, contact.id)}
-                          title="Copy phone"
-                          className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <Phone className="w-3 h-3 text-slate-400 shrink-0" />
+                        <a
+                          href={`tel:${contact.phone}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-[11px] font-mono text-slate-700 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors truncate"
                         >
-                          {copiedId === contact.id ? (
-                            <Check className="w-3.5 h-3.5 text-emerald-500" />
-                          ) : (
-                            <Copy className="w-3.5 h-3.5" />
-                          )}
-                        </button>
+                          {contact.phone}
+                        </a>
+                        {contact.alt_phone && (
+                          <span className="text-[11px] font-mono text-slate-400 truncate">· {contact.alt_phone}</span>
+                        )}
                       </div>
                     ) : (
-                      <div className="text-[11px] text-slate-400 italic">No phone registered</div>
+                      <span className="text-[11px] text-slate-400 italic">No phone on file</span>
                     )}
 
-                    {contact.alt_phone && (
-                      <div className="flex items-center gap-2 px-2.5 py-1 text-[10px] text-slate-500 dark:text-slate-400 font-mono">
-                        <span>Alt: {contact.alt_phone}</span>
-                      </div>
+                    {contact.phone && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCopyPhone(contact.phone!, contact.id);
+                        }}
+                        title="Copy phone number"
+                        className="ml-2 p-1 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0"
+                      >
+                        {copiedId === contact.id
+                          ? <Check className="w-3.5 h-3.5 text-emerald-500" />
+                          : <Copy className="w-3.5 h-3.5" />
+                        }
+                      </button>
                     )}
                   </div>
 
-                  {/* Notes / Shop Location */}
+                  {/* Notes */}
                   {contact.notes && (
-                    <div className="p-2.5 rounded-xl bg-slate-50/70 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800/60 text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
-                      <p className="line-clamp-2">{contact.notes}</p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed border-t border-slate-100 dark:border-slate-800/60 pt-3">
+                      {contact.notes}
+                    </p>
+                  )}
+
+                  {/* Live Bilateral Balance Badge */}
+                  {typeof contact.net_balance === 'number' && (
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800/60">
+                      <span className="text-[10px] text-slate-400 font-medium">Bilateral Balance:</span>
+                      <span className={`text-[11px] font-bold font-mono px-2 py-0.5 rounded-lg border ${
+                        contact.net_balance > 0
+                          ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border-emerald-200/60 dark:border-emerald-800/50'
+                          : contact.net_balance < 0
+                          ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border-rose-200/60 dark:border-rose-800/50'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-transparent'
+                      }`}>
+                        {contact.net_balance > 0
+                          ? `+${contact.net_balance.toLocaleString()} ETB (Owes Us)`
+                          : contact.net_balance < 0
+                          ? `−${Math.abs(contact.net_balance).toLocaleString()} ETB (We Owe)`
+                          : '0.00 ETB (Settled)'}
+                      </span>
                     </div>
                   )}
 
-                  {/* Activity Stats Chips */}
-                  <div className="flex items-center gap-2 pt-1">
-                    {(contact.brokered_items_count ?? 0) > 0 && (
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
-                        {contact.brokered_items_count} Brokered Sales
-                      </span>
-                    )}
-                    {(contact.supplied_units_count ?? 0) > 0 && (
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20">
-                        {contact.supplied_units_count} Supplied Units
-                      </span>
-                    )}
-                    {(contact.debts_count ?? 0) > 0 && (
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/20">
-                        {contact.debts_count} Receivables/Payables
-                      </span>
-                    )}
-                  </div>
+                  {/* Activity Counts */}
+                  {((contact.brokered_items_count ?? 0) > 0 || (contact.supplied_units_count ?? 0) > 0 || (contact.debts_count ?? 0) > 0) && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {(contact.brokered_items_count ?? 0) > 0 && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border border-amber-200/50 dark:border-amber-800/40">
+                          {contact.brokered_items_count} brokered
+                        </span>
+                      )}
+                      {(contact.supplied_units_count ?? 0) > 0 && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 border border-blue-200/50 dark:border-blue-800/40">
+                          {contact.supplied_units_count} supplied
+                        </span>
+                      )}
+                      {(contact.debts_count ?? 0) > 0 && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-50 dark:bg-purple-950/30 text-purple-700 dark:text-purple-400 border border-purple-200/50 dark:border-purple-800/40">
+                          {contact.debts_count} debts
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
-                {/* Card Footer Actions */}
-                <div className="px-5 py-3 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/30 flex items-center justify-between">
-                  {/* Quick Shortcut to POS Brokered Sourcing */}
-                  {isBrokered && onNavigateTab ? (
+                {/* ── Card Footer ── */}
+                <div className="px-4 py-2.5 border-t border-slate-100 dark:border-slate-800/60 bg-slate-50/50 dark:bg-slate-900/20 flex items-center justify-between">
+                  {/* Left: Statement & Ledger indicator */}
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600 dark:text-slate-300 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                    Statement &amp; Ledger
+                    <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
+                  </span>
+
+                  {/* Right: action buttons */}
+                  <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+                    {isBrokered && onNavigateTab && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onNavigateTab('counter');
+                          toast.info(`Source from ${contact.name} in POS`);
+                        }}
+                        title="Source in POS"
+                        className="p-1.5 rounded-lg text-amber-600 dark:text-amber-400 hover:bg-amber-100/50 dark:hover:bg-amber-950/50 transition-colors"
+                      >
+                        <ShoppingBag className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+
                     <button
                       type="button"
-                      onClick={() => {
-                        onNavigateTab('counter');
-                        toast.info(`Switched to POS Counter to source from ${contact.name}`);
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleActive(contact);
                       }}
-                      className="text-[11px] font-bold text-amber-700 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-300 flex items-center gap-1 transition-colors"
+                      title={isInactive ? 'Mark active' : 'Mark inactive'}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors"
                     >
-                      <ShoppingBag className="w-3.5 h-3.5" />
-                      <span>Source in POS</span>
-                    </button>
-                  ) : (
-                    <span className="text-[10px] text-slate-400 font-medium">Partner</span>
-                  )}
-
-                  <div className="flex items-center gap-1">
-                    {/* Toggle Active button */}
-                    <button
-                      type="button"
-                      onClick={() => handleToggleActive(contact)}
-                      title={contact.is_active ? 'Deactivate' : 'Activate'}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-800 transition-colors"
-                    >
-                      <span
-                        className={`block w-2 h-2 rounded-full ${
-                          contact.is_active ? 'bg-emerald-500' : 'bg-slate-300'
-                        }`}
-                      />
+                      <span className={`block w-2 h-2 rounded-full transition-colors ${isInactive ? 'bg-slate-300 dark:bg-slate-600' : 'bg-emerald-500'}`} />
                     </button>
 
-                    {/* Edit button */}
                     <button
                       type="button"
-                      onClick={() => handleOpenEditModal(contact)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenEditModal(contact);
+                      }}
                       title="Edit details"
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-800 transition-colors"
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors"
                     >
                       <Pencil className="w-3.5 h-3.5" />
                     </button>
 
-                    {/* Delete button */}
                     <button
                       type="button"
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setDeletingContact(contact);
-                        setDeleteError(null);
                       }}
                       title="Remove partner"
                       className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
@@ -608,109 +568,138 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
           })}
         </div>
       ) : (
-        /* ═══ COMPACT TABLE VIEW ═══ */
-        <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800/90 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.03)] overflow-hidden">
+        /* ═══ TABLE VIEW ═══ */
+        <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800/80 overflow-hidden shadow-[0_2px_12px_-2px_rgba(0,0,0,0.04)]">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left">
               <thead>
-                <tr className="border-b border-slate-100 dark:border-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-slate-50/60 dark:bg-slate-900/40">
-                  <th className="py-3 px-4">Partner / Merchant</th>
-                  <th className="py-3 px-4">Roles</th>
-                  <th className="py-3 px-4">Primary Phone</th>
-                  <th className="py-3 px-4">Shop &amp; Notes</th>
-                  <th className="py-3 px-4 text-center">Status</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
+                <tr className="border-b border-slate-100 dark:border-slate-800/80">
+                  <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 bg-slate-50/70 dark:bg-slate-900/40 whitespace-nowrap">
+                    Partner / Merchant
+                  </th>
+                  <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 bg-slate-50/70 dark:bg-slate-900/40 whitespace-nowrap">
+                    Roles
+                  </th>
+                  <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 bg-slate-50/70 dark:bg-slate-900/40 whitespace-nowrap">
+                    Phone
+                  </th>
+                  <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 bg-slate-50/70 dark:bg-slate-900/40 whitespace-nowrap hidden lg:table-cell">
+                    Notes
+                  </th>
+                  <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 bg-slate-50/70 dark:bg-slate-900/40 text-center whitespace-nowrap">
+                    Status
+                  </th>
+                  <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 bg-slate-50/70 dark:bg-slate-900/40 text-right whitespace-nowrap">
+                    Actions
+                  </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-xs">
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
                 {filteredContacts.map((contact) => {
                   const isBrokered = contact.roles.includes('peer_vendor');
+                  const isInactive = contact.is_active === false;
                   return (
                     <tr
                       key={contact.id}
-                      className="hover:bg-slate-50/70 dark:hover:bg-slate-800/30 transition-colors"
+                      onClick={() => setSelectedPartnerId(contact.id)}
+                      className={`group transition-colors cursor-pointer ${isInactive ? 'opacity-60' : 'hover:bg-slate-50/70 dark:hover:bg-slate-800/30'}`}
                     >
+                      {/* Name */}
                       <td className="py-3 px-4">
-                        <div className="font-bold text-slate-900 dark:text-white">
-                          {contact.name}
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm font-semibold text-slate-900 dark:text-white block leading-tight group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                            {contact.name}
+                          </span>
+                          <ChevronRight className="w-3.5 h-3.5 text-slate-300 opacity-0 group-hover:opacity-100 group-hover:text-indigo-500 transition-all" />
                         </div>
                         {contact.email && (
-                          <div className="text-[10px] text-slate-400">{contact.email}</div>
+                          <span className="text-[10px] text-slate-400 font-medium mt-0.5 block">{contact.email}</span>
                         )}
                       </td>
+
+                      {/* Roles */}
                       <td className="py-3 px-4">
                         <div className="flex flex-wrap gap-1">
                           {contact.roles.map((r) => {
                             const badge = getRoleBadge(r);
                             return (
-                              <span
-                                key={r}
-                                className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${badge.classes}`}
-                              >
+                              <span key={r} className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md leading-none ${badge.classes}`}>
                                 {badge.label}
                               </span>
                             );
                           })}
                         </div>
                       </td>
-                      <td className="py-3 px-4 font-mono text-[11px]">
+
+                      {/* Phone */}
+                      <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
                         {contact.phone ? (
-                          <span className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5">
                             <a
                               href={`tel:${contact.phone}`}
-                              className="hover:underline text-slate-700 dark:text-slate-300"
+                              className="text-[11px] font-mono text-slate-700 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
                             >
                               {contact.phone}
                             </a>
                             <button
                               type="button"
                               onClick={() => handleCopyPhone(contact.phone!, contact.id)}
-                              title="Copy"
-                              className="text-slate-400 hover:text-slate-700"
+                              title="Copy phone"
+                              className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
                             >
-                              {copiedId === contact.id ? (
-                                <Check className="w-3 h-3 text-emerald-500" />
-                              ) : (
-                                <Copy className="w-3 h-3" />
-                              )}
+                              {copiedId === contact.id
+                                ? <Check className="w-3 h-3 text-emerald-500" />
+                                : <Copy className="w-3 h-3" />
+                              }
                             </button>
-                          </span>
+                          </div>
                         ) : (
-                          <span className="text-slate-400 italic">—</span>
+                          <span className="text-[11px] text-slate-400">—</span>
                         )}
                       </td>
-                      <td className="py-3 px-4 text-slate-500 dark:text-slate-400 text-[11px] max-w-xs truncate">
-                        {contact.notes || '—'}
+
+                      {/* Notes (hidden on smaller screens) */}
+                      <td className="py-3 px-4 hidden lg:table-cell">
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400 max-w-xs truncate block">
+                          {contact.notes || <span className="text-slate-300 dark:text-slate-600">—</span>}
+                        </span>
                       </td>
-                      <td className="py-3 px-4 text-center">
+
+                      {/* Status */}
+                      <td className="py-3 px-4 text-center" onClick={(e) => e.stopPropagation()}>
                         <button
                           type="button"
                           onClick={() => handleToggleActive(contact)}
-                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                            contact.is_active !== false
-                              ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
-                              : 'bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'
+                          title={isInactive ? 'Mark active' : 'Mark inactive'}
+                          className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-bold transition-colors ${
+                            !isInactive
+                              ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-950/60'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'
                           }`}
                         >
-                          <span
-                            className={`w-1.5 h-1.5 rounded-full ${
-                              contact.is_active !== false ? 'bg-emerald-500' : 'bg-slate-400'
-                            }`}
-                          />
-                          {contact.is_active !== false ? 'Active' : 'Inactive'}
+                          <span className={`w-1.5 h-1.5 rounded-full ${!isInactive ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                          {!isInactive ? 'Active' : 'Inactive'}
                         </button>
                       </td>
-                      <td className="py-3 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
+
+                      {/* Actions */}
+                      <td className="py-3 px-4 text-right" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedPartnerId(contact.id)}
+                            title="Open Statement & Ledger"
+                            className="px-2 py-1 rounded-lg text-[10px] font-bold text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors inline-flex items-center gap-1"
+                          >
+                            Statement
+                            <ExternalLink className="w-3 h-3" />
+                          </button>
                           {isBrokered && onNavigateTab && (
                             <button
                               type="button"
-                              onClick={() => {
-                                onNavigateTab('counter');
-                                toast.info(`Switched to POS for ${contact.name}`);
-                              }}
+                              onClick={() => { onNavigateTab('counter'); toast.info(`Switched to POS for ${contact.name}`); }}
                               title="Source in POS"
-                              className="p-1 rounded-lg text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40"
+                              className="p-1.5 rounded-lg text-amber-500 hover:text-amber-700 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors"
                             >
                               <ShoppingBag className="w-3.5 h-3.5" />
                             </button>
@@ -719,18 +708,15 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                             type="button"
                             onClick={() => handleOpenEditModal(contact)}
                             title="Edit"
-                            className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                           >
                             <Pencil className="w-3.5 h-3.5" />
                           </button>
                           <button
                             type="button"
-                            onClick={() => {
-                              setDeletingContact(contact);
-                              setDeleteError(null);
-                            }}
+                            onClick={() => setDeletingContact(contact)}
                             title="Remove"
-                            className="p-1 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -757,73 +743,62 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
         onSuccess={() => loadContacts()}
       />
 
-      {/* ─── Delete / Deactivate Confirmation Dialog ─── */}
+      {/* ─── Delete Confirmation Dialog ─── */}
       {deletingContact && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
-            className="fixed inset-0 bg-slate-950/40 dark:bg-slate-950/70 backdrop-blur-xs transition-opacity"
+            className="fixed inset-0 bg-slate-950/40 dark:bg-slate-950/70 backdrop-blur-xs animate-backdrop-enter"
             onClick={() => !isDeleting && setDeletingContact(null)}
           />
-          <div className="relative w-full max-w-md bg-white dark:bg-[#131926] rounded-3xl border border-slate-200/80 dark:border-slate-800/90 shadow-2xl p-6 overflow-hidden animate-modal-enter z-10">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-2xl bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60 flex items-center justify-center">
+
+          <div className="relative w-full max-w-sm bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800/90 shadow-2xl overflow-hidden animate-modal-enter z-10">
+            {/* Dialog Header */}
+            <div className="px-6 pt-6 pb-4 flex items-start gap-4">
+              <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
                 <ShieldAlert className="w-5 h-5" />
               </div>
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+              <div className="min-w-0">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
                   Remove Partner
                 </h3>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium truncate">
                   {deletingContact.name}
                 </p>
               </div>
             </div>
 
-            {deleteError ? (
-              <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 text-xs text-amber-800 dark:text-amber-300 space-y-2 mb-5 leading-relaxed">
-                <p>{deleteError.message}</p>
-                <p className="text-[11px] text-amber-700 dark:text-amber-400">
-                  Tip: Deactivating will remove them from POS sourcing dropdowns without breaking transaction history.
-                </p>
-              </div>
-            ) : (
-              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed mb-5">
-                Are you sure you want to remove <span className="font-bold text-slate-900 dark:text-white">"{deletingContact.name}"</span>?
-                If they have associated brokered sales, debts, or inventory records, they can be deactivated instead.
+            {/* Dialog Body */}
+            <div className="px-6 pb-5">
+              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                This will remove{' '}
+                <span className="font-bold text-slate-900 dark:text-white">"{deletingContact.name}"</span>{' '}
+                from your active partners list. All historical transactions, brokered sales, debts, and inventory records are preserved in your audit trail.
               </p>
-            )}
+            </div>
 
-            <div className="flex items-center justify-end gap-2">
+            {/* Dialog Footer */}
+            <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/30 flex items-center justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setDeletingContact(null)}
                 disabled={isDeleting}
-                className="h-9 px-3.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                className="h-9 px-4 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
 
-              {deleteError ? (
-                <button
-                  type="button"
-                  onClick={handleDeactivateInstead}
-                  disabled={isDeleting}
-                  className="h-9 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
-                >
-                  {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-                  <span>Deactivate Partner Instead</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleConfirmDelete}
-                  disabled={isDeleting}
-                  className="h-9 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
-                >
-                  {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                  <span>Confirm Delete</span>
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                className="h-9 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white text-xs font-bold transition-colors shadow-xs flex items-center gap-1.5 disabled:opacity-50 active:scale-[0.98]"
+              >
+                {isDeleting
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  : <Trash2 className="w-3.5 h-3.5" />
+                }
+                <span>{isDeleting ? 'Removing…' : 'Remove Partner'}</span>
+              </button>
             </div>
           </div>
         </div>

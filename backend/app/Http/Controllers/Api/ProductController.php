@@ -101,39 +101,26 @@ class ProductController extends Controller
         $product = Product::with(['variants'])->findOrFail($id);
         $variantIds = $product->variants->pluck('id')->toArray();
 
-        // Check for active units in stock or out
-        $activeUnitsCount = \App\Models\InventoryUnit::whereIn('variant_id', $variantIds)
-            ->whereIn('status', ['in_stock', 'out'])
-            ->count();
+        DB::transaction(function () use ($product, $variantIds) {
+            // Archive and soft-delete any active inventory units so they no longer appear in in-stock inventory or valuation
+            \App\Models\InventoryUnit::whereIn('variant_id', $variantIds)
+                ->whereIn('status', ['in_stock', 'out'])
+                ->update(['status' => 'archived']);
 
-        if ($activeUnitsCount > 0) {
-            return response()->json([
-                'success' => false,
-                'message' => "Cannot delete '{$product->name}' because it currently has {$activeUnitsCount} unit(s) in stock or out for sale. Transfer, sell, or mark them returned first.",
-            ], 422);
-        }
+            \App\Models\InventoryUnit::whereIn('variant_id', $variantIds)->delete();
 
-        // Check for historical sales or units
-        $hasHistoricalSales = \App\Models\SalesOrderItem::whereIn('variant_id', $variantIds)->exists();
-        $hasHistoricalUnits = \App\Models\InventoryUnit::whereIn('variant_id', $variantIds)->exists();
+            // Zero out quantity on hand in stock counter
+            \App\Models\InventoryStock::whereIn('variant_id', $variantIds)->update(['quantity_on_hand' => 0]);
 
-        if ($hasHistoricalSales || $hasHistoricalUnits) {
+            // Soft-delete variants and product
+            \App\Models\ProductVariant::whereIn('id', $variantIds)->delete();
             $product->update(['is_active' => false]);
-            return response()->json([
-                'success' => true,
-                'message' => "Product '{$product->name}' has historical sales records. It has been deactivated and archived from active stock.",
-                'deactivated' => true,
-            ]);
-        }
-
-        DB::transaction(function () use ($product) {
-            $product->variants()->delete();
             $product->delete();
         });
 
         return response()->json([
             'success' => true,
-            'message' => "Product '{$product->name}' and its variants were permanently deleted.",
+            'message' => "Product '{$product->name}' removed successfully. All historical sales and records are preserved.",
             'deleted' => true,
         ]);
     }
@@ -182,30 +169,24 @@ class ProductController extends Controller
 
         $variant = ProductVariant::findOrFail($id);
 
-        $activeUnits = \App\Models\InventoryUnit::where('variant_id', $variant->id)
-            ->whereIn('status', ['in_stock', 'out'])
-            ->count();
+        DB::transaction(function () use ($variant) {
+            // Archive and soft-delete any active inventory units for this variant
+            \App\Models\InventoryUnit::where('variant_id', $variant->id)
+                ->whereIn('status', ['in_stock', 'out'])
+                ->update(['status' => 'archived']);
 
-        if ($activeUnits > 0) {
-            return response()->json([
-                'success' => false,
-                'message' => "Cannot delete variant because it has {$activeUnits} active unit(s) in inventory.",
-            ], 422);
-        }
+            \App\Models\InventoryUnit::where('variant_id', $variant->id)->delete();
 
-        $hasSales = \App\Models\SalesOrderItem::where('variant_id', $variant->id)->exists();
-        if ($hasSales) {
-            return response()->json([
-                'success' => false,
-                'message' => "Cannot delete variant with historical sales records.",
-            ], 422);
-        }
+            // Zero out quantity on hand
+            \App\Models\InventoryStock::where('variant_id', $variant->id)->update(['quantity_on_hand' => 0]);
 
-        $variant->delete();
+            // Soft-delete the variant
+            $variant->delete();
+        });
 
         return response()->json([
             'success' => true,
-            'message' => "Variant deleted successfully.",
+            'message' => "Variant removed successfully. Historical records are preserved.",
         ]);
     }
 

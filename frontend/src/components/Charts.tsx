@@ -1,46 +1,40 @@
 import React, { useState, useEffect } from 'react';
 import { AnimatedNumber } from './AnimatedNumber';
 
-interface DataPoint {
+
+export interface DataPoint {
   day: string;
   revenue: number;
   profit: number;
   orders: number;
+  date?: string;
 }
-
-// 14-day sample derived from December trading patterns
-const defaultData: DataPoint[] = [
-  { day: 'Dec 01', revenue: 145000, profit: 14200, orders: 2 },
-  { day: 'Dec 03', revenue: 220000, profit: 21500, orders: 3 },
-  { day: 'Dec 05', revenue: 95000, profit: 9200, orders: 1 },
-  { day: 'Dec 08', revenue: 340000, profit: 32000, orders: 4 },
-  { day: 'Dec 10', revenue: 180000, profit: 17500, orders: 2 },
-  { day: 'Dec 12', revenue: 420000, profit: 39000, orders: 5 },
-  { day: 'Dec 15', revenue: 290000, profit: 27000, orders: 3 },
-  { day: 'Dec 18', revenue: 380000, profit: 36000, orders: 4 },
-  { day: 'Dec 20', revenue: 195000, profit: 18000, orders: 2 },
-  { day: 'Dec 22', revenue: 510000, profit: 48000, orders: 6 },
-  { day: 'Dec 25', revenue: 280000, profit: 25000, orders: 3 },
-  { day: 'Dec 28', revenue: 560000, profit: 52000, orders: 7 },
-];
 
 export const InteractiveSalesWaveChart: React.FC<{
   data?: DataPoint[];
   currency?: string;
   canViewCost?: boolean;
+  totalRevenue?: number;
+  totalProfit?: number;
 }> = ({
-  data = defaultData,
+  data = [],
   currency = 'ETB',
   canViewCost = true,
+  totalRevenue,
+  totalProfit,
 }) => {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const [metric, setMetric] = useState<'revenue' | 'profit'>('revenue');
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    const t = setTimeout(() => setIsLoaded(true), 50);
-    return () => clearTimeout(t);
-  }, []);
+    setIsLoaded(false);
+    const raf = requestAnimationFrame(() => {
+      const t = setTimeout(() => setIsLoaded(true), 60);
+      return () => clearTimeout(t);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [data, metric]);
 
   const width = 640;
   const height = 180;
@@ -52,27 +46,40 @@ export const InteractiveSalesWaveChart: React.FC<{
   const values = data.map((d) => (metric === 'revenue' ? d.revenue : d.profit));
   const maxVal = Math.max(...values, 10000);
 
-  // Generate smooth cubic bezier curve
+  // Generate smooth cubic bezier curve points
   const points = data.map((d, i) => {
     const val = metric === 'revenue' ? d.revenue : d.profit;
-    const x = padX + (i / (data.length - 1)) * chartW;
+    const x = padX + (data.length > 1 ? (i / (data.length - 1)) * chartW : chartW / 2);
     const y = height - padY - (val / maxVal) * chartH;
     return { x, y, ...d, val };
   });
 
   // Calculate smooth SVG path
-  const curvePath = points.reduce((acc, pt, i, arr) => {
-    if (i === 0) return `M ${pt.x},${pt.y}`;
-    const prev = arr[i - 1];
-    const cpx1 = prev.x + (pt.x - prev.x) / 2;
-    const cpy1 = prev.y;
-    const cpx2 = prev.x + (pt.x - prev.x) / 2;
-    const cpy2 = pt.y;
-    return `${acc} C ${cpx1},${cpy1} ${cpx2},${cpy2} ${pt.x},${pt.y}`;
-  }, '');
+  let curvePath = '';
+  let areaPath = '';
+  if (points.length >= 2) {
+    curvePath = points.reduce((acc, pt, i, arr) => {
+      if (i === 0) return `M ${pt.x},${pt.y}`;
+      const prev = arr[i - 1];
+      const cpx1 = prev.x + (pt.x - prev.x) / 2;
+      const cpy1 = prev.y;
+      const cpx2 = prev.x + (pt.x - prev.x) / 2;
+      const cpy2 = pt.y;
+      return `${acc} C ${cpx1},${cpy1} ${cpx2},${cpy2} ${pt.x},${pt.y}`;
+    }, '');
+    areaPath = `${curvePath} L ${points[points.length - 1].x},${height - padY} L ${points[0].x},${height - padY} Z`;
+  } else if (points.length === 1) {
+    curvePath = `M ${padX},${points[0].y} L ${width - padX},${points[0].y}`;
+    areaPath = `${curvePath} L ${width - padX},${height - padY} L ${padX},${height - padY} Z`;
+  }
 
-  const areaPath = `${curvePath} L ${points[points.length - 1].x},${height - padY} L ${points[0].x},${height - padY} Z`;
-  const activePoint = hoverIndex !== null ? points[hoverIndex] : points[points.length - 1];
+  const sumValues = data.reduce((s, d) => s + (metric === 'revenue' ? d.revenue : d.profit), 0);
+  const totalVal = metric === 'revenue'
+    ? (totalRevenue !== undefined ? totalRevenue : sumValues)
+    : (totalProfit !== undefined ? totalProfit : sumValues);
+
+  const activePoint = hoverIndex !== null && points[hoverIndex] ? points[hoverIndex] : null;
+  const displayVal = activePoint !== null ? activePoint.val : totalVal;
 
   return (
     <div className="w-full">
@@ -80,10 +87,12 @@ export const InteractiveSalesWaveChart: React.FC<{
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <div>
           <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-            Sales
+            {activePoint !== null
+              ? `${activePoint.day} ${metric === 'revenue' ? 'Sales' : 'Margin'}`
+              : (metric === 'revenue' ? 'Sales' : 'Gross Margin')}
           </span>
           <div className="text-xl font-bold text-slate-900 dark:text-white font-mono tracking-tight mt-0.5">
-            <AnimatedNumber value={activePoint.val} />{' '}
+            <AnimatedNumber value={displayVal} />{' '}
             <span className="text-xs font-medium text-slate-400 dark:text-slate-500 font-sans">{currency}</span>
           </div>
         </div>
@@ -92,8 +101,11 @@ export const InteractiveSalesWaveChart: React.FC<{
         {canViewCost && (
           <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl text-xs font-medium self-start sm:self-auto">
             <button
-              onClick={() => setMetric('revenue')}
-              className={`px-3 py-1.5 rounded-lg transition-all ${
+              onClick={() => {
+                setMetric('revenue');
+                setHoverIndex(null);
+              }}
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
                 metric === 'revenue'
                   ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs font-bold'
                   : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -102,8 +114,11 @@ export const InteractiveSalesWaveChart: React.FC<{
               Gross Sales
             </button>
             <button
-              onClick={() => setMetric('profit')}
-              className={`px-3 py-1.5 rounded-lg transition-all ${
+              onClick={() => {
+                setMetric('profit');
+                setHoverIndex(null);
+              }}
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
                 metric === 'profit'
                   ? 'bg-white dark:bg-slate-700 text-emerald-700 dark:text-emerald-400 shadow-xs font-bold'
                   : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -117,6 +132,13 @@ export const InteractiveSalesWaveChart: React.FC<{
 
       {/* SVG Canvas Container */}
       <div className="relative w-full h-[180px] bg-gradient-to-b from-slate-50/50 to-transparent dark:from-slate-800/20 dark:to-transparent rounded-xl border border-slate-100/90 dark:border-slate-800/80 overflow-hidden">
+        {points.length === 0 && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-xs text-slate-400 font-medium z-10">
+            <span>No sales recorded for this month</span>
+            <span className="text-[10px] text-slate-400/70 mt-0.5 font-sans">Recorded sales will plot a real trend wave here</span>
+          </div>
+        )}
+
         <svg
           viewBox={`0 0 ${width} ${height}`}
           className="w-full h-full overflow-visible"
@@ -165,21 +187,35 @@ export const InteractiveSalesWaveChart: React.FC<{
           />
 
           {/* Shaded Area */}
-          <path
-            d={areaPath}
-            fill={metric === 'revenue' ? 'url(#indigoWave)' : 'url(#emeraldWave)'}
-            className={`transition-opacity duration-700 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
-          />
+          {areaPath && (
+            <path
+              d={areaPath}
+              fill={metric === 'revenue' ? 'url(#indigoWave)' : 'url(#emeraldWave)'}
+              style={{
+                clipPath: isLoaded ? 'inset(0 0% 0 0)' : 'inset(0 100% 0 0)',
+                transition: 'clip-path 1100ms cubic-bezier(0.16, 1, 0.3, 1), opacity 600ms ease-out',
+              }}
+              className={isLoaded ? 'opacity-100' : 'opacity-0'}
+            />
+          )}
 
           {/* Bezier Stroke Curve */}
-          <path
-            d={curvePath}
-            fill="none"
-            stroke={metric === 'revenue' ? '#6366f1' : '#10b981'}
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            className={`transition-all duration-700 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
-          />
+          {curvePath && (
+            <path
+              d={curvePath}
+              fill="none"
+              stroke={metric === 'revenue' ? '#6366f1' : '#10b981'}
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              pathLength={1000}
+              strokeDasharray={1000}
+              strokeDashoffset={isLoaded ? 0 : 1000}
+              style={{
+                transition: 'stroke-dashoffset 1000ms cubic-bezier(0.16, 1, 0.3, 1), opacity 400ms ease-out',
+              }}
+              className={isLoaded ? 'opacity-100' : 'opacity-0'}
+            />
+          )}
 
           {/* Interactive Guides & Points */}
           {points.map((pt, i) => (
@@ -202,7 +238,12 @@ export const InteractiveSalesWaveChart: React.FC<{
                 fill={hoverIndex === i ? (metric === 'revenue' ? '#6366f1' : '#10b981') : '#ffffff'}
                 stroke={metric === 'revenue' ? '#6366f1' : '#10b981'}
                 strokeWidth="2"
-                className="cursor-pointer transition-all duration-150"
+                style={{
+                  transformOrigin: `${pt.x}px ${pt.y}px`,
+                  transition: 'transform 400ms cubic-bezier(0.16, 1, 0.3, 1), opacity 350ms ease-out',
+                  transitionDelay: `${250 + i * (650 / Math.max(points.length, 1))}ms`,
+                }}
+                className={`cursor-pointer ${isLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-0'}`}
                 onMouseEnter={() => setHoverIndex(i)}
                 onMouseLeave={() => setHoverIndex(null)}
               />
@@ -211,7 +252,7 @@ export const InteractiveSalesWaveChart: React.FC<{
         </svg>
 
         {/* Floating Tooltip Pill */}
-        {hoverIndex !== null && (
+        {hoverIndex !== null && points[hoverIndex] && (
           <div
             className="absolute z-10 pointer-events-none -translate-x-1/2 -translate-y-full bg-slate-900 dark:bg-slate-800 text-white px-3 py-1.5 rounded-xl shadow-xl text-xs font-mono whitespace-nowrap animate-modal-enter border border-slate-700/50"
             style={{
@@ -230,11 +271,17 @@ export const InteractiveSalesWaveChart: React.FC<{
       </div>
 
       {/* Axis Labels */}
-      <div className="flex justify-between text-[11px] text-slate-400 dark:text-slate-500 mt-2 px-1 font-mono font-medium">
-        <span>{data[0]?.day}</span>
-        <span>{data[Math.floor(data.length / 2)]?.day}</span>
-        <span>{data[data.length - 1]?.day}</span>
-      </div>
+      {data.length > 0 ? (
+        <div className="flex justify-between text-[11px] text-slate-400 dark:text-slate-500 mt-2 px-1 font-mono font-medium">
+          <span>{data[0]?.day}</span>
+          {data.length > 2 && <span>{data[Math.floor(data.length / 2)]?.day}</span>}
+          {data.length > 1 && <span>{data[data.length - 1]?.day}</span>}
+        </div>
+      ) : (
+        <div className="text-center text-[10px] text-slate-400 dark:text-slate-500 mt-2 font-mono">
+          No sales activity in this period
+        </div>
+      )}
     </div>
   );
 };
@@ -333,6 +380,17 @@ export const DonutCapitalChart: React.FC<{
   payables?: number;
   netCapital: number;
 }> = ({ stock, receivables, treasury, assets, payables = 0, netCapital }) => {
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  useEffect(() => {
+    setIsLoaded(false);
+    const raf = requestAnimationFrame(() => {
+      const t = setTimeout(() => setIsLoaded(true), 50);
+      return () => clearTimeout(t);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [stock, receivables, treasury, assets, payables]);
+
   const grossAssets = stock + receivables + treasury + assets;
   const total = grossAssets + payables;
   const radius = 58;
@@ -355,7 +413,15 @@ export const DonutCapitalChart: React.FC<{
     <div className="flex flex-col sm:flex-row lg:flex-col xl:flex-row items-center justify-center gap-5 sm:gap-6">
       {/* SVG Ring (Enlarged) */}
       <div className="relative w-44 h-44 sm:w-48 sm:h-48 shrink-0">
-        <svg viewBox="0 0 160 160" className="w-full h-full -rotate-90">
+        <svg
+          viewBox="0 0 160 160"
+          className="w-full h-full transition-all duration-1000 ease-out"
+          style={{
+            transform: isLoaded ? 'rotate(-90deg) scale(1)' : 'rotate(-135deg) scale(0.92)',
+            opacity: isLoaded ? 1 : 0.4,
+            transformOrigin: 'center center',
+          }}
+        >
           <circle
             cx="80"
             cy="80"
@@ -373,9 +439,12 @@ export const DonutCapitalChart: React.FC<{
             fill="none"
             stroke="#64748b"
             strokeWidth={stroke}
-            strokeDasharray={`${circum * stockPct} ${circum}`}
-            strokeDashoffset={-stockOffset}
-            className="transition-all duration-500"
+            strokeDasharray={isLoaded ? `${circum * stockPct} ${circum}` : `0 ${circum}`}
+            strokeDashoffset={isLoaded ? -stockOffset : 0}
+            style={{
+              transition: 'stroke-dasharray 900ms cubic-bezier(0.16, 1, 0.3, 1), stroke-dashoffset 900ms cubic-bezier(0.16, 1, 0.3, 1)',
+              transitionDelay: '40ms',
+            }}
           />
           {/* Receivables segment */}
           <circle
@@ -385,9 +454,12 @@ export const DonutCapitalChart: React.FC<{
             fill="none"
             stroke="#10b981"
             strokeWidth={stroke}
-            strokeDasharray={`${circum * recPct} ${circum}`}
-            strokeDashoffset={-recOffset}
-            className="transition-all duration-500"
+            strokeDasharray={isLoaded ? `${circum * recPct} ${circum}` : `0 ${circum}`}
+            strokeDashoffset={isLoaded ? -recOffset : 0}
+            style={{
+              transition: 'stroke-dasharray 900ms cubic-bezier(0.16, 1, 0.3, 1), stroke-dashoffset 900ms cubic-bezier(0.16, 1, 0.3, 1)',
+              transitionDelay: '80ms',
+            }}
           />
           {/* Treasury segment */}
           <circle
@@ -397,9 +469,12 @@ export const DonutCapitalChart: React.FC<{
             fill="none"
             stroke="#3b82f6"
             strokeWidth={stroke}
-            strokeDasharray={`${circum * treasPct} ${circum}`}
-            strokeDashoffset={-treasOffset}
-            className="transition-all duration-500"
+            strokeDasharray={isLoaded ? `${circum * treasPct} ${circum}` : `0 ${circum}`}
+            strokeDashoffset={isLoaded ? -treasOffset : 0}
+            style={{
+              transition: 'stroke-dasharray 900ms cubic-bezier(0.16, 1, 0.3, 1), stroke-dashoffset 900ms cubic-bezier(0.16, 1, 0.3, 1)',
+              transitionDelay: '120ms',
+            }}
           />
           {/* Assets segment */}
           <circle
@@ -409,9 +484,12 @@ export const DonutCapitalChart: React.FC<{
             fill="none"
             stroke="#f59e0b"
             strokeWidth={stroke}
-            strokeDasharray={`${circum * assetPct} ${circum}`}
-            strokeDashoffset={-assetOffset}
-            className="transition-all duration-500"
+            strokeDasharray={isLoaded ? `${circum * assetPct} ${circum}` : `0 ${circum}`}
+            strokeDashoffset={isLoaded ? -assetOffset : 0}
+            style={{
+              transition: 'stroke-dasharray 900ms cubic-bezier(0.16, 1, 0.3, 1), stroke-dashoffset 900ms cubic-bezier(0.16, 1, 0.3, 1)',
+              transitionDelay: '160ms',
+            }}
           />
           {/* Payables segment */}
           {payables > 0 && (
@@ -422,15 +500,22 @@ export const DonutCapitalChart: React.FC<{
               fill="none"
               stroke="#f43f5e"
               strokeWidth={stroke}
-              strokeDasharray={`${circum * payablePct} ${circum}`}
-              strokeDashoffset={-payableOffset}
-              className="transition-all duration-500"
+              strokeDasharray={isLoaded ? `${circum * payablePct} ${circum}` : `0 ${circum}`}
+              strokeDashoffset={isLoaded ? -payableOffset : 0}
+              style={{
+                transition: 'stroke-dasharray 900ms cubic-bezier(0.16, 1, 0.3, 1), stroke-dashoffset 900ms cubic-bezier(0.16, 1, 0.3, 1)',
+                transitionDelay: '200ms',
+              }}
             />
           )}
         </svg>
 
         {/* Center Readout: Net Capital (as before) */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center select-none pointer-events-none">
+        <div
+          className={`absolute inset-0 flex flex-col items-center justify-center text-center select-none pointer-events-none transition-all duration-700 delay-300 ${
+            isLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-90'
+          }`}
+        >
           <span className="text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500 font-semibold">
             Net Capital
           </span>

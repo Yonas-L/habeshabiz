@@ -8,6 +8,8 @@ import {
 import { AnimatedNumber } from '../components/AnimatedNumber';
 import { VitalBreakdownDrawer, type VitalType } from '../components/drawers/VitalBreakdownDrawer';
 import { DebtDrawer } from '../components/drawers/DebtDrawer';
+import { RecordExpenseModal } from '../components/RecordExpenseModal';
+import { RecordDebtModal } from '../components/debts/RecordDebtModal';
 import {
   AlertCircle,
   Clock,
@@ -15,12 +17,15 @@ import {
   ChevronRight,
   TrendingUp,
   Award,
+  Plus,
+  ArrowLeftRight,
 } from 'lucide-react';
 
 interface OverviewViewProps {
   data: DashboardData | null;
   user: User | null;
   accounts?: FinancialAccount[];
+  selectedMonth?: string;
   onNavigateTab: (tab: any) => void;
   onRefreshData?: () => void;
 }
@@ -29,12 +34,16 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   data,
   user,
   accounts = [],
+  selectedMonth,
   onNavigateTab,
   onRefreshData,
 }) => {
   const [selectedVital, setSelectedVital] = useState<VitalType | null>(null);
   const [selectedDebt, setSelectedDebt] = useState<Debt | null>(null);
   const [topSeller, setTopSeller] = useState<LeaderboardItem | null>(null);
+  const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
+  const [isDebtModalOpen, setIsDebtModalOpen] = useState(false);
+  const [debtModalDefaultType, setDebtModalDefaultType] = useState<'receivable' | 'payable'>('receivable');
 
   useEffect(() => {
     if (user?.role === 'owner') {
@@ -64,6 +73,9 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
   const { capital_overview, monthly_performance, counts, top_receivables, top_payables } = data;
   const canViewCost = user?.can_view_costs ?? false;
+
+  const receivableParties = counts.open_receivable_parties ?? counts.open_receivables;
+  const payableParties = counts.open_payable_parties ?? counts.open_payables;
 
   const hasReceivablesAlert = counts.open_receivables > 0 && capital_overview.receivables > 0;
   const hasPayablesAlert = counts.open_payables > 0 && capital_overview.payables > 0;
@@ -130,7 +142,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               <AlertCircle className="w-3.5 h-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
               <span>
                 <span className="font-bold text-emerald-800 dark:text-emerald-300">Owed to you:</span>{' '}
-                <span className="font-semibold">{counts.open_receivables}</span> {counts.open_receivables === 1 ? 'party owes' : 'parties owe'}{' '}
+                <span className="font-semibold">{receivableParties}</span> {receivableParties === 1 ? 'party owes' : 'parties owe'}{' '}
                 <span className="font-mono font-bold text-emerald-950 dark:text-emerald-100">{capital_overview.receivables.toLocaleString()}</span> ETB
               </span>
               <ArrowRight className="w-3 h-3 opacity-50" />
@@ -145,7 +157,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               <Clock className="w-3.5 h-3.5 shrink-0 opacity-70" />
               <span>
                 <span className="font-bold text-rose-800 dark:text-rose-300">You owe:</span>{' '}
-                <span className="font-semibold">{counts.open_payables}</span> {counts.open_payables === 1 ? 'payable due' : 'payables due'}{' '}
+                <span className="font-semibold">{payableParties}</span> {payableParties === 1 ? 'party' : 'parties'}{' '}
                 <span className="font-mono font-bold text-rose-900 dark:text-rose-200">{capital_overview.payables.toLocaleString()}</span> ETB
               </span>
               <ArrowRight className="w-3 h-3 opacity-50" />
@@ -176,7 +188,12 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       {/* ── 3. Charts — Sales trajectory + Capital allocation, side by side ── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         <div className="lg:col-span-7 bg-white dark:bg-[#131926] rounded-xl border border-slate-200/60 dark:border-slate-800/60 p-5">
-          <InteractiveSalesWaveChart canViewCost={canViewCost} />
+          <InteractiveSalesWaveChart
+            data={data.sales_chart || []}
+            totalRevenue={monthly_performance.revenue}
+            totalProfit={monthly_performance.gross_profit}
+            canViewCost={canViewCost}
+          />
         </div>
 
         <div className="lg:col-span-5 bg-white dark:bg-[#131926] rounded-xl border border-slate-200/60 dark:border-slate-800/60 p-5 flex flex-col justify-between">
@@ -201,17 +218,21 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         </div>
       </div>
 
-      {/* ── 4. This Month's Performance (High-Visibility Operational Metrics) ── */}
+      {/* ── 4. Monthly Performance (High-Visibility Operational Metrics) ── */}
       <div className="bg-white dark:bg-[#131926] rounded-xl border border-slate-200/60 dark:border-slate-800/60 p-5">
         <div className="flex items-center justify-between pb-3.5 border-b border-slate-100 dark:border-slate-800/60">
           <div className="flex items-center gap-2">
             <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
             <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white">
-              This Month's Performance
+              {selectedMonth ? (() => {
+                const [y, m] = selectedMonth.split('-').map(Number);
+                const d = new Date(y, m - 1);
+                return `${d.toLocaleString('default', { month: 'long' })} ${y} Performance`;
+              })() : "This Month's Performance"}
             </h2>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
             {topSeller && user?.role === 'owner' && (
               <button
                 onClick={() => onNavigateTab('staff')}
@@ -223,9 +244,29 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 <ChevronRight className="w-3 h-3 opacity-60" />
               </button>
             )}
-            <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">
-              Active Trading Period
-            </span>
+
+            {/* Quick Action: Record Expense / Draw Modal */}
+            <button
+              onClick={() => setIsExpenseModalOpen(true)}
+              title="Quickly record a shop expense or owner personal draw"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-[11px] font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs active:scale-[0.98] cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5 text-emerald-400 dark:text-emerald-600" />
+              <span>Record Expense</span>
+            </button>
+
+            {/* Quick Action: Record Receivable / Payable Modal */}
+            <button
+              onClick={() => {
+                setDebtModalDefaultType('receivable');
+                setIsDebtModalOpen(true);
+              }}
+              title="Record Receivable / Payable — Log customer credit, peer vendor payout, or loan entry"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white dark:bg-[#131926] hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700/80 text-slate-800 dark:text-slate-200 text-[11px] font-bold transition-all shadow-xs active:scale-[0.98] cursor-pointer"
+            >
+              <ArrowLeftRight className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+              <span><span className="hidden sm:inline">Record </span>Receivable / Payable</span>
+            </button>
           </div>
         </div>
 
@@ -259,19 +300,26 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             </div>
           )}
 
-          {/* Expenses */}
-          <div>
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 block">
-              Expenses
-            </span>
+          {/* Expenses (Clickable to trigger Record Expense Modal) */}
+          <button
+            onClick={() => setIsExpenseModalOpen(true)}
+            title="Click to record an expense or personal draw"
+            className="text-left group cursor-pointer -m-2 p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/30"
+          >
+            <div className="flex items-center gap-1">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 group-hover:text-slate-700 dark:group-hover:text-slate-300 transition-colors">
+                Expenses
+              </span>
+              <Plus className="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
             <div className="text-xl sm:text-2xl font-bold font-mono tracking-tight text-slate-800 dark:text-slate-200 mt-1">
               −<AnimatedNumber value={monthly_performance.operating_expenses} />
               <span className="text-xs font-medium text-slate-400 dark:text-slate-500 ml-1 font-sans">ETB</span>
             </div>
-            <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 block">
-              Rent, delivery, staff
+            <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 block group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+              Rent, ride, food · <span className="underline decoration-dotted">Record +</span>
             </span>
-          </div>
+          </button>
 
           {canViewCost && (
             <div>
@@ -315,12 +363,26 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 +{capital_overview.receivables.toLocaleString()} ETB
               </span>
             </div>
-            <button
-              onClick={() => onNavigateTab('debts')}
-              className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
-            >
-              View all ({counts.open_receivables}) →
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setDebtModalDefaultType('receivable');
+                  setIsDebtModalOpen(true);
+                }}
+                title="Record new customer credit or receivable"
+                className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors flex items-center gap-0.5 cursor-pointer"
+              >
+                <Plus className="w-3 h-3" />
+                <span>Record</span>
+              </button>
+              <span className="text-slate-300 dark:text-slate-700">·</span>
+              <button
+                onClick={() => onNavigateTab('debts')}
+                className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors cursor-pointer"
+              >
+                View all ({counts.open_receivables}) →
+              </button>
+            </div>
           </div>
 
           {top_receivables.length === 0 ? (
@@ -382,12 +444,26 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 −{capital_overview.payables.toLocaleString()} ETB
               </span>
             </div>
-            <button
-              onClick={() => onNavigateTab('debts')}
-              className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"
-            >
-              View all ({counts.open_payables}) →
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setDebtModalDefaultType('payable');
+                  setIsDebtModalOpen(true);
+                }}
+                title="Record new vendor payable or debt"
+                className="text-[10px] font-semibold text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 transition-colors flex items-center gap-0.5 cursor-pointer"
+              >
+                <Plus className="w-3 h-3" />
+                <span>Record</span>
+              </button>
+              <span className="text-slate-300 dark:text-slate-700">·</span>
+              <button
+                onClick={() => onNavigateTab('debts')}
+                className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 transition-colors cursor-pointer"
+              >
+                View all ({counts.open_payables}) →
+              </button>
+            </div>
           </div>
 
           {top_payables.length === 0 ? (
@@ -435,6 +511,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           setSelectedVital(null);
           setSelectedDebt(debt);
         }}
+        onRefreshData={onRefreshData}
       />
 
       <DebtDrawer
@@ -443,6 +520,27 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         onClose={() => setSelectedDebt(null)}
         accounts={accounts}
         onPaymentSettled={() => {
+          if (onRefreshData) onRefreshData();
+        }}
+      />
+
+      {/* ── Quick Action: Record Expense / Draw Modal ── */}
+      <RecordExpenseModal
+        isOpen={isExpenseModalOpen}
+        onClose={() => setIsExpenseModalOpen(false)}
+        accounts={accounts}
+        onSuccess={() => {
+          if (onRefreshData) onRefreshData();
+        }}
+      />
+
+      {/* ── Quick Action: Record Receivable / Payable Modal ── */}
+      <RecordDebtModal
+        isOpen={isDebtModalOpen}
+        onClose={() => setIsDebtModalOpen(false)}
+        accounts={accounts}
+        defaultType={debtModalDefaultType}
+        onSuccess={() => {
           if (onRefreshData) onRefreshData();
         }}
       />

@@ -288,7 +288,7 @@ test('salesperson is forbidden from updating or deleting products (403)', functi
         ->assertStatus(403);
 });
 
-test('owner cannot delete product with active units in stock (422)', function () {
+test('owner can safely delete product with active units in stock preserving data', function () {
     $product = Product::create([
         'tenant_id' => $this->tenant->id,
         'name' => 'iPhone 14 Pro',
@@ -303,7 +303,7 @@ test('owner cannot delete product with active units in stock (422)', function ()
         'color' => 'Space Black',
     ]);
 
-    InventoryUnit::create([
+    $unit = InventoryUnit::create([
         'tenant_id' => $this->tenant->id,
         'variant_id' => $variant->id,
         'imei_or_serial' => '358123456789012',
@@ -314,13 +314,17 @@ test('owner cannot delete product with active units in stock (422)', function ()
 
     $response = $this->actingAs($this->owner)->deleteJson("/api/v1/products/{$product->id}");
 
-    $response->assertStatus(422)
-        ->assertJsonPath('success', false);
+    $response->assertStatus(200)
+        ->assertJsonPath('success', true);
 
-    expect(Product::find($product->id))->not->toBeNull();
+    expect(Product::find($product->id))->toBeNull();
+    expect(Product::withTrashed()->find($product->id))->not->toBeNull();
+    expect(ProductVariant::find($variant->id))->toBeNull();
+    expect(InventoryUnit::find($unit->id))->toBeNull();
+    expect(InventoryUnit::withTrashed()->find($unit->id)->status)->toBe('archived');
 });
 
-test('owner deleting product with historical sales archives it instead of deleting', function () {
+test('owner deleting product with historical sales safely archives it preserving data', function () {
     $product = Product::create([
         'tenant_id' => $this->tenant->id,
         'name' => 'MacBook Pro M1 (Old Batch)',
@@ -337,7 +341,7 @@ test('owner deleting product with historical sales archives it instead of deleti
     ]);
 
     // Create a historical sold unit
-    InventoryUnit::create([
+    $soldUnit = InventoryUnit::create([
         'tenant_id' => $this->tenant->id,
         'variant_id' => $variant->id,
         'imei_or_serial' => 'C02D1234MD6R',
@@ -350,14 +354,15 @@ test('owner deleting product with historical sales archives it instead of deleti
     $response = $this->actingAs($this->owner)->deleteJson("/api/v1/products/{$product->id}");
 
     $response->assertStatus(200)
-        ->assertJsonPath('deactivated', true);
+        ->assertJsonPath('success', true);
 
-    $fresh = Product::find($product->id);
-    expect($fresh)->not->toBeNull();
-    expect($fresh->is_active)->toBeFalse();
+    expect(Product::find($product->id))->toBeNull();
+    expect(Product::withTrashed()->find($product->id))->not->toBeNull();
+    // Historical sold unit still resolves its product name
+    expect($soldUnit->fresh()->variant->product->name)->toBe('MacBook Pro M1 (Old Batch)');
 });
 
-test('owner can permanently delete an unused product with no stock and no history', function () {
+test('owner can safely delete an unused product with no stock and no history', function () {
     $product = Product::create([
         'tenant_id' => $this->tenant->id,
         'name' => 'Accidental Product Entry',
@@ -413,5 +418,39 @@ test('owner can update and delete product variants', function () {
         ->assertJsonPath('success', true);
 
     expect(ProductVariant::find($variant->id))->toBeNull();
+});
+
+test('owner can safely delete a variant with active units preserving data', function () {
+    $product = Product::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Galaxy S24 Ultra',
+        'category' => 'smartphones',
+    ]);
+
+    $variant = ProductVariant::create([
+        'tenant_id' => $this->tenant->id,
+        'product_id' => $product->id,
+        'storage' => '256GB',
+        'color' => 'Titanium Gray',
+        'default_selling_price' => 120000.00,
+    ]);
+
+    $unit = InventoryUnit::create([
+        'tenant_id' => $this->tenant->id,
+        'variant_id' => $variant->id,
+        'imei_or_serial' => '998877665544332',
+        'condition' => 'new',
+        'cost_basis' => 90000.00,
+        'status' => 'in_stock',
+    ]);
+
+    $deleteRes = $this->actingAs($this->owner)->deleteJson("/api/v1/variants/{$variant->id}");
+    $deleteRes->assertStatus(200)
+        ->assertJsonPath('success', true);
+
+    expect(ProductVariant::find($variant->id))->toBeNull();
+    expect(ProductVariant::withTrashed()->find($variant->id))->not->toBeNull();
+    expect(InventoryUnit::find($unit->id))->toBeNull();
+    expect(InventoryUnit::withTrashed()->find($unit->id)->status)->toBe('archived');
 });
 

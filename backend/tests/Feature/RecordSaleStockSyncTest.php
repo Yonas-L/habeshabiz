@@ -158,3 +158,199 @@ test('serialized sale marks specific unit sold and decrements inventory_stock', 
     $stock = InventoryStock::where('variant_id', $variant->id)->first();
     expect($stock->quantity_on_hand)->toBe(0);
 });
+
+test('can collect payment on a walk-in sales order with remaining balance', function () {
+    $product = Product::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'AirPods Pro 2',
+        'category' => 'audio',
+        'has_serials' => false,
+    ]);
+
+    $variant = ProductVariant::create([
+        'tenant_id' => $this->tenant->id,
+        'product_id' => $product->id,
+        'color' => 'White',
+        'default_selling_price' => 30000.00,
+    ]);
+
+    InventoryStock::create([
+        'tenant_id' => $this->tenant->id,
+        'variant_id' => $variant->id,
+        'quantity_on_hand' => 5,
+        'average_cost' => 20000.00,
+    ]);
+
+    $action = new RecordSaleAction;
+    $order = $action->execute([
+        'paid_amount' => 10000.00,
+        'payment_method' => 'cash',
+        'financial_account_id' => $this->account->id,
+        'items' => [
+            [
+                'variant_id' => $variant->id,
+                'quantity' => 1,
+                'unit_price' => 30000.00,
+            ],
+        ],
+    ]);
+
+    expect($order->payment_status)->toBe('partially_paid');
+    expect((float) $order->paid_amount)->toBe(10000.00);
+
+    $initialBalance = (float) $this->account->fresh()->current_balance;
+
+    // Collect remaining 20,000 ETB
+    $res = $this->actingAs($this->user, 'sanctum')
+        ->postJson("/api/v1/sales/{$order->id}/collect", [
+            'amount' => 20000.00,
+            'financial_account_id' => $this->account->id,
+            'reference_number' => 'WALK-IN-REC-01',
+            'notes' => 'Collected walk-in remaining balance',
+        ]);
+
+    $res->assertOk();
+    $res->assertJsonPath('success', true);
+    $res->assertJsonPath('data.payment_status', 'paid');
+    expect((float) $res->json('data.paid_amount'))->toBe(30000.00);
+
+    // Account was credited
+    expect((float) $this->account->fresh()->current_balance)->toBe($initialBalance + 20000.00);
+});
+
+test('can collect payment on customer sales order and synchronizes linked debt', function () {
+    $customer = Contact::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Abebe Bikila',
+        'phone' => '0911223344',
+        'roles' => ['customer'],
+    ]);
+
+    $product = Product::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'iPad Air M2',
+        'category' => 'tablets',
+        'has_serials' => false,
+    ]);
+
+    $variant = ProductVariant::create([
+        'tenant_id' => $this->tenant->id,
+        'product_id' => $product->id,
+        'color' => 'Space Gray',
+        'default_selling_price' => 70000.00,
+    ]);
+
+    InventoryStock::create([
+        'tenant_id' => $this->tenant->id,
+        'variant_id' => $variant->id,
+        'quantity_on_hand' => 5,
+        'average_cost' => 50000.00,
+    ]);
+
+    $action = new RecordSaleAction;
+    $order = $action->execute([
+        'customer_id' => $customer->id,
+        'paid_amount' => 20000.00,
+        'payment_method' => 'cash',
+        'financial_account_id' => $this->account->id,
+        'items' => [
+            [
+                'variant_id' => $variant->id,
+                'quantity' => 1,
+                'unit_price' => 70000.00,
+            ],
+        ],
+    ]);
+
+    $debt = \App\Models\Debt::where('reference_type', 'sales_order')
+        ->where('reference_id', $order->id)
+        ->first();
+
+    expect($debt)->not->toBeNull();
+    expect((float) $debt->remaining_amount)->toBe(50000.00);
+    expect($debt->status)->toBe('open');
+
+    // Collect 50,000 ETB on the sales order directly
+    $res = $this->actingAs($this->user, 'sanctum')
+        ->postJson("/api/v1/sales/{$order->id}/collect", [
+            'amount' => 50000.00,
+            'financial_account_id' => $this->account->id,
+        ]);
+
+    $res->assertOk();
+
+    // Linked debt must now be fully settled
+    $freshDebt = $debt->fresh();
+    expect($freshDebt->status)->toBe('settled');
+    expect((float) $freshDebt->remaining_amount)->toBe(0.00);
+    expect((float) $freshDebt->paid_amount)->toBe(50000.00);
+
+    // Debt payment record created
+    expect(\App\Models\DebtPayment::where('debt_id', $debt->id)->count())->toBe(1);
+});
+
+test('settling customer debt via debt payments endpoint synchronizes sales order status', function () {
+    $customer = Contact::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Derartu Tulu',
+        'phone' => '0922334455',
+        'roles' => ['customer'],
+    ]);
+
+    $product = Product::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Apple Watch Series 9',
+        'category' => 'smartwatches',
+        'has_serials' => false,
+    ]);
+
+    $variant = ProductVariant::create([
+        'tenant_id' => $this->tenant->id,
+        'product_id' => $product->id,
+        'color' => 'Midnight',
+        'default_selling_price' => 45000.00,
+    ]);
+
+    InventoryStock::create([
+        'tenant_id' => $this->tenant->id,
+        'variant_id' => $variant->id,
+        'quantity_on_hand' => 3,
+        'average_cost' => 35000.00,
+    ]);
+
+    $action = new RecordSaleAction;
+    $order = $action->execute([
+        'customer_id' => $customer->id,
+        'paid_amount' => 15000.00,
+        'payment_method' => 'cash',
+        'financial_account_id' => $this->account->id,
+        'items' => [
+            [
+                'variant_id' => $variant->id,
+                'quantity' => 1,
+                'unit_price' => 45000.00,
+            ],
+        ],
+    ]);
+
+    $debt = \App\Models\Debt::where('reference_type', 'sales_order')
+        ->where('reference_id', $order->id)
+        ->first();
+
+    expect($debt)->not->toBeNull();
+    expect((float) $debt->remaining_amount)->toBe(30000.00);
+
+    // Settle from debts endpoint
+    $res = $this->actingAs($this->user, 'sanctum')
+        ->postJson("/api/v1/debts/{$debt->id}/payments", [
+            'amount' => 30000.00,
+            'financial_account_id' => $this->account->id,
+        ]);
+
+    $res->assertOk();
+
+    // Sales order must be updated to paid in full
+    $freshOrder = $order->fresh();
+    expect($freshOrder->payment_status)->toBe('paid');
+    expect((float) $freshOrder->paid_amount)->toBe(45000.00);
+});

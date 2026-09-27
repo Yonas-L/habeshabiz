@@ -19,8 +19,10 @@ class SalesOrderItem extends Model
         'inventory_unit_id',
         'quantity',
         'unit_price',
+        'setted_price',
         'unit_cost',
         'profit',
+        'bonus_amount',
         'sourcing_type',
         'vendor_contact_id',
         'vendor_cost',
@@ -31,8 +33,10 @@ class SalesOrderItem extends Model
         return [
             'quantity' => 'integer',
             'unit_price' => 'decimal:2',
+            'setted_price' => 'decimal:2',
             'unit_cost' => 'decimal:2',
             'profit' => 'decimal:2',
+            'bonus_amount' => 'decimal:2',
             'vendor_cost' => 'decimal:2',
         ];
     }
@@ -44,17 +48,17 @@ class SalesOrderItem extends Model
 
     public function variant(): BelongsTo
     {
-        return $this->belongsTo(ProductVariant::class, 'variant_id');
+        return $this->belongsTo(ProductVariant::class, 'variant_id')->withTrashed();
     }
 
     public function inventoryUnit(): BelongsTo
     {
-        return $this->belongsTo(InventoryUnit::class, 'inventory_unit_id');
+        return $this->belongsTo(InventoryUnit::class, 'inventory_unit_id')->withTrashed();
     }
 
     public function vendorContact(): BelongsTo
     {
-        return $this->belongsTo(Contact::class, 'vendor_contact_id');
+        return $this->belongsTo(Contact::class, 'vendor_contact_id')->withTrashed();
     }
 
     public function isBrokered(): bool

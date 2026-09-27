@@ -38,7 +38,7 @@ class DebtPayment extends Model
 
     public function financialAccount(): BelongsTo
     {
-        return $this->belongsTo(FinancialAccount::class);
+        return $this->belongsTo(FinancialAccount::class)->withTrashed();
     }
 
     public function creator(): BelongsTo

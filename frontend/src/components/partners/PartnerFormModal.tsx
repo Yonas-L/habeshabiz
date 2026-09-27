@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import type { Contact } from '../../api/client';
 import { api } from '../../api/client';
 import { toast } from 'sonner';
-import { X, Handshake, Phone, Mail, Building2, FileText, Check, Loader2 } from 'lucide-react';
+import { X, Handshake, Check, Loader2 } from 'lucide-react';
 
 interface PartnerFormModalProps {
   isOpen: boolean;
@@ -12,31 +12,11 @@ interface PartnerFormModalProps {
   onSuccess: (savedContact: Contact) => void;
 }
 
-const AVAILABLE_ROLES = [
-  {
-    id: 'peer_vendor',
-    label: 'Sourcing Broker (Peer Shop)',
-    description: 'Neighbour shop merchant used for brokered phone sourcing in POS sales.',
-    badgeColor: 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/60',
-  },
-  {
-    id: 'supplier',
-    label: 'Supplier / Importer',
-    description: 'Wholesale importer or source for batch inventory intake.',
-    badgeColor: 'text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800/60',
-  },
-  {
-    id: 'partner',
-    label: 'Strategic Business Partner',
-    description: 'Commercial associate, showroom collaborator, or co-financer.',
-    badgeColor: 'text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/40 border-purple-200 dark:border-purple-800/60',
-  },
-  {
-    id: 'customer',
-    label: 'Wholesale / Retail Customer',
-    description: 'Direct buyer or corporate client.',
-    badgeColor: 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800/60',
-  },
+const ROLES = [
+  { id: 'peer_vendor', label: 'Peer Shop / Broker' },
+  { id: 'supplier', label: 'Supplier / Importer' },
+  { id: 'partner', label: 'Strategic Partner' },
+  { id: 'customer', label: 'Customer' },
 ];
 
 export const PartnerFormModal: React.FC<PartnerFormModalProps> = ({
@@ -74,6 +54,16 @@ export const PartnerFormModal: React.FC<PartnerFormModalProps> = ({
       setIsActive(true);
     }
   }, [contactToEdit, isOpen, defaultRole]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -135,153 +125,133 @@ export const PartnerFormModal: React.FC<PartnerFormModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Dimmed backdrop */}
+      {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-slate-950/40 dark:bg-slate-950/70 backdrop-blur-xs transition-opacity"
+        className="fixed inset-0 bg-slate-950/40 dark:bg-black/60 backdrop-blur-xs animate-backdrop-enter"
         onClick={onClose}
       />
 
       {/* Modal Surface */}
-      <div className="relative w-full max-w-lg bg-white dark:bg-[#131926] rounded-3xl border border-slate-200/80 dark:border-slate-800/90 shadow-2xl overflow-hidden animate-modal-enter z-10">
+      <div className="relative z-10 w-full max-w-lg bg-white dark:bg-[#131926] rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden animate-modal-enter flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-amber-500/10 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-500/20 shadow-xs">
-              <Handshake className="w-5 h-5" />
+        <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-slate-800">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center shrink-0">
+              <Handshake className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
-                {contactToEdit ? 'Edit Partner / Broker' : 'Add Partner / Broker'}
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white leading-none">
+                {contactToEdit ? 'Edit Partner' : 'Add Partner'}
               </h2>
-              <p className="text-xs text-slate-400 dark:text-slate-500 font-medium">
+              <p className="text-[11px] text-slate-400 mt-1">
                 {contactToEdit
-                  ? 'Update contact details, roles, or shop address'
-                  : 'Register a neighbouring shop, broker, or wholesale supplier'}
+                  ? 'Update contact details and business roles'
+                  : 'Register a supplier, peer vendor, or client'}
               </p>
             </div>
           </div>
-
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[calc(85vh-8rem)] overflow-y-auto">
-          {/* Name Field */}
+        <form
+          id="partner-form"
+          onSubmit={handleSubmit}
+          className="flex-1 overflow-y-auto p-5 space-y-4"
+        >
+          {/* Name */}
           <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+            <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
               Partner / Shop Name <span className="text-rose-500">*</span>
             </label>
-            <div className="relative">
-              <Building2 className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-              <input
-                type="text"
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Mekdi (Bole Medhanialem) or Smith Electronics"
-                className="w-full h-9 pl-9 pr-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
-              />
-            </div>
+            <input
+              type="text"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Mekdi Electronics, Smith Imports"
+              className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 focus:border-slate-900 dark:focus:border-slate-600"
+              autoFocus
+            />
           </div>
 
           {/* Phone Numbers */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                Primary Phone <span className="text-slate-400 font-normal">(Calls / TeleBirr)</span>
+              <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                Primary Phone
               </label>
-              <div className="relative">
-                <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                <input
-                  type="text"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+251 9... or 09..."
-                  className="w-full h-9 pl-9 pr-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs font-mono text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
-                />
-              </div>
+              <input
+                type="text"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+251 9... or 09..."
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 focus:border-slate-900 dark:focus:border-slate-600"
+              />
             </div>
 
             <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+              <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
                 Alternate Phone
               </label>
-              <div className="relative">
-                <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                <input
-                  type="text"
-                  value={altPhone}
-                  onChange={(e) => setAltPhone(e.target.value)}
-                  placeholder="Secondary phone (optional)"
-                  className="w-full h-9 pl-9 pr-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs font-mono text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Email (Optional) */}
-          <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-              Email Address <span className="text-slate-400 font-normal">(Optional)</span>
-            </label>
-            <div className="relative">
-              <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
               <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="partner@example.com"
-                className="w-full h-9 pl-9 pr-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+                type="text"
+                value={altPhone}
+                onChange={(e) => setAltPhone(e.target.value)}
+                placeholder="Optional secondary phone"
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 focus:border-slate-900 dark:focus:border-slate-600"
               />
             </div>
           </div>
 
-          {/* Roles Selection */}
+          {/* Email */}
           <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
-              Partner Classification &amp; Roles <span className="text-rose-500">*</span>
+            <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+              Email Address
             </label>
-            <div className="space-y-2">
-              {AVAILABLE_ROLES.map((r) => {
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="partner@example.com (optional)"
+              className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 focus:border-slate-900 dark:focus:border-slate-600"
+            />
+          </div>
+
+          {/* Roles */}
+          <div>
+            <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
+              Roles & Classification <span className="text-rose-500">*</span>
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {ROLES.map((r) => {
                 const isSelected = roles.includes(r.id);
                 return (
                   <button
                     key={r.id}
                     type="button"
                     onClick={() => toggleRole(r.id)}
-                    className={`w-full text-left p-3 rounded-2xl border transition-all flex items-start gap-3 ${
+                    className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
                       isSelected
-                        ? 'border-slate-900 dark:border-white bg-slate-50 dark:bg-slate-800/40 shadow-xs'
-                        : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-white dark:bg-[#131926]'
+                        ? 'border-slate-900 dark:border-slate-200 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-xs'
+                        : 'border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700'
                     }`}
                   >
+                    <span>{r.label}</span>
                     <div
-                      className={`w-5 h-5 mt-0.5 rounded-lg border flex items-center justify-center transition-colors shrink-0 ${
+                      className={`w-4 h-4 rounded-md flex items-center justify-center transition-all ${
                         isSelected
-                          ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white'
-                          : 'border-slate-300 dark:border-slate-700 bg-transparent'
+                          ? 'bg-white/20 dark:bg-slate-900/20 text-white dark:text-slate-900'
+                          : 'border border-slate-300 dark:border-slate-600 text-transparent'
                       }`}
                     >
-                      {isSelected && <Check className="w-3.5 h-3.5" />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs font-bold text-slate-900 dark:text-white">
-                          {r.label}
-                        </span>
-                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${r.badgeColor}`}>
-                          {r.id === 'peer_vendor' ? 'Brokered' : r.id}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 leading-relaxed">
-                        {r.description}
-                      </p>
+                      <Check className="w-3 h-3" />
                     </div>
                   </button>
                 );
@@ -289,78 +259,76 @@ export const PartnerFormModal: React.FC<PartnerFormModalProps> = ({
             </div>
           </div>
 
-          {/* Notes / Shop Location */}
+          {/* Notes */}
           <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-              Shop Location, Specialties &amp; Terms
+            <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+              Location & Notes
             </label>
-            <div className="relative">
-              <FileText className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-              <textarea
-                rows={2}
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="e.g. Shop #104 Morning Star Mall; specializes in iPhone 16 Pro Max; accepts 24h trade settlement..."
-                className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
-              />
-            </div>
+            <textarea
+              rows={2}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="e.g. Shop #104 Morning Star Mall, Bole..."
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 focus:border-slate-900 dark:focus:border-slate-600 resize-none"
+            />
           </div>
 
-          {/* Active Toggle (Only on edit) */}
+          {/* Active Toggle — edit mode only */}
           {contactToEdit && (
-            <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800">
+            <div className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
               <div>
-                <span className="text-xs font-bold text-slate-900 dark:text-white block">
+                <span className="text-xs font-semibold text-slate-900 dark:text-white block">
                   Active Status
                 </span>
-                <span className="text-[11px] text-slate-400 dark:text-slate-500">
+                <span className="text-[11px] text-slate-400">
                   Inactive partners are hidden from sales and stock dropdowns
                 </span>
               </div>
               <button
                 type="button"
                 onClick={() => setIsActive(!isActive)}
-                className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors ${
-                  isActive ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'
+                className={`w-10 h-6 flex items-center rounded-full p-0.5 transition-colors cursor-pointer ${
+                  isActive ? 'bg-slate-900 dark:bg-white' : 'bg-slate-300 dark:bg-slate-700'
                 }`}
               >
                 <div
-                  className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
-                    isActive ? 'translate-x-5' : 'translate-x-0'
+                  className={`w-5 h-5 rounded-full transition-transform ${
+                    isActive ? 'bg-white dark:bg-slate-900 translate-x-4' : 'bg-white dark:bg-slate-300 translate-x-0'
                   }`}
                 />
               </button>
             </div>
           )}
-
-          {/* Action Buttons */}
-          <div className="pt-2 flex items-center justify-end gap-2.5">
-            <button
-              type="button"
-              onClick={onClose}
-              className="h-10 px-4 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="h-10 px-5 rounded-xl bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 text-white dark:text-slate-900 text-xs font-bold transition-all shadow-sm flex items-center gap-2 disabled:opacity-50"
-            >
-              {submitting ? (
-                <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  <span>Saving Partner...</span>
-                </>
-              ) : (
-                <>
-                  <Check className="w-3.5 h-3.5" />
-                  <span>{contactToEdit ? 'Save Changes' : 'Add to Network'}</span>
-                </>
-              )}
-            </button>
-          </div>
         </form>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-2.5 p-5 border-t border-slate-100 dark:border-slate-800">
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-10 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            form="partner-form"
+            disabled={submitting}
+            className="h-10 px-5 rounded-xl bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 text-white dark:text-slate-900 text-xs font-bold transition-all shadow-xs flex items-center gap-2 disabled:opacity-50 active:scale-[0.98] cursor-pointer"
+          >
+            {submitting ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>Saving...</span>
+              </>
+            ) : (
+              <>
+                <Check className="w-3.5 h-3.5" />
+                <span>{contactToEdit ? 'Save Changes' : 'Add Partner'}</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );

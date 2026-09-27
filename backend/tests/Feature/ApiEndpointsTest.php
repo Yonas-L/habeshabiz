@@ -82,6 +82,7 @@ test('api dashboard returns capital breakdown and monthly metrics', function () 
             'data' => [
                 'capital_overview' => ['net_capital', 'stock_value', 'receivables', 'cash_and_banks', 'payables'],
                 'monthly_performance' => ['revenue', 'gross_profit', 'net_profit'],
+                'sales_chart',
             ],
         ]);
 });

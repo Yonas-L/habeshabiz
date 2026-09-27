@@ -115,7 +115,7 @@ test('owner can deactivate account', function () {
         ->assertJsonPath('data.is_active', false);
 });
 
-test('owner cannot delete account with transactions (should deactivate instead)', function () {
+test('owner can delete account with transactions safely via soft delete preserving data', function () {
     $account = FinancialAccount::create([
         'tenant_id' => $this->tenant->id,
         'name' => 'Active Bank',
@@ -134,7 +134,7 @@ test('owner cannot delete account with transactions (should deactivate instead)'
         'is_active' => true,
     ]);
 
-    FinancialTransaction::create([
+    $txn = FinancialTransaction::create([
         'tenant_id' => $this->tenant->id,
         'transaction_number' => 'TXN-123',
         'source_account_id' => $account->id,
@@ -147,10 +147,144 @@ test('owner cannot delete account with transactions (should deactivate instead)'
 
     $response = $this->actingAs($this->owner)->deleteJson("/api/v1/accounts/{$account->id}");
 
-    $response->assertStatus(422)
-        ->assertJsonPath('success', false);
+    $response->assertStatus(200)
+        ->assertJsonPath('success', true);
 
-    $account->refresh();
-    expect($account->is_active)->toBeFalse();
-    expect(FinancialAccount::find($account->id))->not->toBeNull();
+    // Account is soft-deleted: excluded from active queries but preserved in DB
+    expect(FinancialAccount::find($account->id))->toBeNull();
+    expect(FinancialAccount::withTrashed()->find($account->id))->not->toBeNull();
+
+    // Dependable historical data is preserved
+    $txn->refresh();
+    expect($txn->sourceAccount)->not->toBeNull();
+    expect($txn->sourceAccount->name)->toBe('Active Bank');
 });
+
+test('owner can store and update account with logo, and staff can view logo', function () {
+    $dummyLogo = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+
+    $createRes = $this->actingAs($this->owner)->postJson('/api/v1/accounts', [
+        'name' => 'Commercial Bank of Ethiopia',
+        'type' => 'bank',
+        'account_number' => '1000987654321',
+        'opening_balance' => 25000.00,
+        'logo' => $dummyLogo,
+    ]);
+
+    $createRes->assertStatus(201)
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.logo', $dummyLogo);
+
+    $accountId = $createRes->json('data.id');
+
+    // Update logo
+    $newLogo = 'data:image/svg+xml;utf8,<svg></svg>';
+    $updateRes = $this->actingAs($this->owner)->putJson("/api/v1/accounts/{$accountId}", [
+        'logo' => $newLogo,
+    ]);
+
+    $updateRes->assertStatus(200)
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.logo', $newLogo);
+
+    // Staff member viewing accounts should see the logo as well
+    $staffRes = $this->actingAs($this->seller)->getJson('/api/v1/accounts');
+    $staffRes->assertStatus(200)
+        ->assertJsonPath('success', true);
+
+    $accounts = collect($staffRes->json('data.treasury_accounts'));
+    $cbe = $accounts->firstWhere('id', $accountId);
+    expect($cbe)->not->toBeNull();
+    expect($cbe['logo'])->toBe($newLogo);
+});
+
+test('owner can retrieve dedicated account activities ledger with precise running balance', function () {
+    $account = FinancialAccount::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Ledger Test Bank',
+        'type' => 'bank',
+        'account_number' => '100012345678',
+        'current_balance' => 15000.00,
+        'is_custom_asset' => false,
+        'is_active' => true,
+    ]);
+
+    $otherAccount = FinancialAccount::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Cash Wallet',
+        'type' => 'cash',
+        'current_balance' => 5000.00,
+        'is_custom_asset' => false,
+        'is_active' => true,
+    ]);
+
+    // Create 3 transactions:
+    // 1. Initial Deposit / Sale inflow +10,000
+    // 2. Transfer out -2,000 (with fee 50 = total -2050)
+    // 3. Customer payment inflow +7,050
+    // Live balance: 15,000
+    FinancialTransaction::create([
+        'tenant_id' => $this->tenant->id,
+        'transaction_number' => 'TXN-IN-01',
+        'destination_account_id' => $account->id,
+        'type' => 'customer_payment',
+        'amount' => 10000.00,
+        'fee' => 0,
+        'date' => now()->subDays(3),
+        'created_by' => $this->owner->id,
+        'description' => 'Initial customer deposit',
+    ]);
+
+    FinancialTransaction::create([
+        'tenant_id' => $this->tenant->id,
+        'transaction_number' => 'TXN-OUT-02',
+        'source_account_id' => $account->id,
+        'destination_account_id' => $otherAccount->id,
+        'type' => 'transfer',
+        'amount' => 2000.00,
+        'fee' => 50.00,
+        'date' => now()->subDays(2),
+        'created_by' => $this->owner->id,
+        'description' => 'ATM withdrawal / transfer',
+    ]);
+
+    FinancialTransaction::create([
+        'tenant_id' => $this->tenant->id,
+        'transaction_number' => 'TXN-IN-03',
+        'destination_account_id' => $account->id,
+        'type' => 'customer_payment',
+        'amount' => 7050.00,
+        'fee' => 0,
+        'date' => now()->subDay(),
+        'created_by' => $this->owner->id,
+        'description' => 'Second sale payment',
+    ]);
+
+    $res = $this->actingAs($this->owner)->getJson("/api/v1/accounts/{$account->id}/activities");
+
+    $res->assertStatus(200)
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.summary.current_balance', 15000)
+        ->assertJsonPath('data.summary.total_count', 3);
+
+    $activities = $res->json('data.activities');
+    expect($activities)->toHaveCount(3);
+
+    // Latest activity should have stamped running balance equal to current_balance (15,000)
+    expect($activities[0]['transaction_number'])->toBe('TXN-IN-03');
+    expect($activities[0]['direction'])->toBe('inflow');
+    expect($activities[0]['balance_after'])->toEqual(15000);
+
+    // Prior activity (transfer out of 2050): balance was 15,000 - 7,050 = 7,950
+    expect($activities[1]['transaction_number'])->toBe('TXN-OUT-02');
+    expect($activities[1]['direction'])->toBe('outflow');
+    expect($activities[1]['balance_after'])->toEqual(7950);
+
+    // Filter by type=transfer
+    $filterRes = $this->actingAs($this->owner)->getJson("/api/v1/accounts/{$account->id}/activities?type=transfer");
+    $filterRes->assertStatus(200)
+        ->assertJsonPath('data.summary.filtered_count', 1);
+    expect($filterRes->json('data.activities.0.transaction_number'))->toBe('TXN-OUT-02');
+});
+
+

@@ -16,6 +16,7 @@ import {
   History,
   Trash2,
 } from 'lucide-react';
+import { AccountLogo } from '../../utils/bankLogos';
 
 interface DebtDrawerProps {
   debt: Debt | null;
@@ -112,24 +113,37 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title={debt.contact?.name || (isReceivable ? 'Receivable Entry' : 'Payable Entry')}
-      subtitle={isReceivable ? 'Receivable (Money Owed to You)' : 'Payable (Money You Owe)'}
+      subtitle={
+        debt.reference_type === 'salesperson_bonus'
+          ? 'Sales Agent Upsell Bonus Payout'
+          : isReceivable
+          ? 'Receivable (Money Owed to You)'
+          : 'Payable (Money You Owe)'
+      }
       badge={
-        <span
-          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-            debt.status === 'settled'
-              ? 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
-              : isReceivable
-              ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60'
-              : 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border border-rose-200/60 dark:border-rose-800/60'
-          }`}
-        >
-          {debt.status === 'settled' ? (
-            <CheckCircle2 className="w-3 h-3" />
-          ) : (
-            <Clock className="w-3 h-3" />
+        <div className="flex items-center gap-1.5">
+          {debt.reference_type === 'salesperson_bonus' && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800/80">
+              Sales Bonus
+            </span>
           )}
-          {debt.status.replace(/_/g, ' ').toUpperCase()}
-        </span>
+          <span
+            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+              debt.status === 'settled'
+                ? 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                : isReceivable
+                ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60'
+                : 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border border-rose-200/60 dark:border-rose-800/60'
+            }`}
+          >
+            {debt.status === 'settled' ? (
+              <CheckCircle2 className="w-3 h-3" />
+            ) : (
+              <Clock className="w-3 h-3" />
+            )}
+            {debt.status.replace(/_/g, ' ').toUpperCase()}
+          </span>
+        </div>
       }
       footerActions={
         <>
@@ -161,7 +175,13 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
               className="h-9 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs active:scale-95 flex items-center gap-1.5"
             >
               <DollarSign className="w-3.5 h-3.5" />
-              <span>{isReceivable ? 'Collect Payment Now' : 'Pay Sourcing Partner'}</span>
+              <span>
+                {debt.reference_type === 'salesperson_bonus'
+                  ? 'Pay Sales Bonus Now'
+                  : isReceivable
+                  ? 'Collect Payment Now'
+                  : 'Pay Sourcing Partner'}
+              </span>
             </button>
           )}
         </>
@@ -237,9 +257,15 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
           </div>
 
           <div>
-            <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              {isReceivable ? 'Deposit Into Account (Money In)' : 'Debit From Account (Money Out)'}
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                {isReceivable ? 'Deposit Into Account (Money In)' : 'Debit From Account (Money Out)'}
+              </label>
+              {(() => {
+                const sel = accounts.find((a) => a.id === paymentAccountId);
+                return sel ? <AccountLogo account={sel} size="xs" /> : null;
+              })()}
+            </div>
             <select
               value={paymentAccountId}
               onChange={(e) => setPaymentAccountId(e.target.value)}
@@ -312,6 +338,29 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
               {debt.contact?.roles?.join(', ') || 'Customer'}
             </span>
           </div>
+
+          {debt.contact && ((debt.contact.open_payable ?? 0) > 0 || (debt.contact.open_receivable ?? 0) > 0) && (
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-800/90 flex items-center justify-between">
+              <div>
+                <span className="text-slate-400 block text-[10px] font-bold uppercase tracking-wider">Overall Net Position</span>
+                <span className="text-[11px] text-slate-500 mt-0.5">
+                  Rec: {Number(debt.contact.open_receivable || 0).toLocaleString()} · Pay: {Number(debt.contact.open_payable || 0).toLocaleString()}
+                </span>
+              </div>
+              <span
+                className={`font-mono font-bold text-sm ${
+                  (debt.contact.net_balance ?? 0) > 0
+                    ? 'text-emerald-600 dark:text-emerald-400'
+                    : (debt.contact.net_balance ?? 0) < 0
+                    ? 'text-rose-600 dark:text-rose-400'
+                    : 'text-slate-500'
+                }`}
+              >
+                {(debt.contact.net_balance ?? 0) > 0 ? '+' : ''}
+                {Number(debt.contact.net_balance ?? 0).toLocaleString()} ETB
+              </span>
+            </div>
+          )}
         </div>
       </ProgressiveSection>
 
@@ -333,7 +382,7 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
 
           <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5 text-[11px] text-slate-400">
             <div className="flex justify-between">
-              <span>Reference Type: {debt.reference_type}</span>
+              <span>Reference: {debt.reference_type === 'salesperson_bonus' ? 'Salesperson Upsell Bonus' : debt.reference_type}</span>
               <span>Created: {new Date(debt.created_at).toLocaleDateString()}</span>
             </div>
             {debt.due_date && (
@@ -368,12 +417,15 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
                 key={p.id}
                 className="p-3 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/70 dark:border-slate-800/90 flex items-center justify-between text-xs"
               >
-                <div>
-                  <div className="font-bold text-slate-900 dark:text-white font-mono">
-                    {Number(p.amount).toLocaleString()} ETB
-                  </div>
-                  <div className="text-[11px] text-slate-400">
-                    {new Date(p.payment_date).toLocaleDateString()} &bull; {p.reference_number || 'Cash'}
+                <div className="flex items-center gap-2.5">
+                  {p.financial_account && <AccountLogo account={p.financial_account} size="xs" />}
+                  <div>
+                    <div className="font-bold text-slate-900 dark:text-white font-mono">
+                      {Number(p.amount).toLocaleString()} ETB
+                    </div>
+                    <div className="text-[11px] text-slate-400">
+                      {new Date(p.payment_date).toLocaleDateString()} &bull; {p.financial_account?.name || p.reference_number || 'Cash'}
+                    </div>
                   </div>
                 </div>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold">

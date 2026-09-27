@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { FinancialAccount } from '../../api/client';
 import { api } from '../../api/client';
 import { toast } from 'sonner';
@@ -12,13 +12,16 @@ import {
   DollarSign,
   Plus,
   Globe,
+  ImagePlus,
 } from 'lucide-react';
+import { PRESET_BANK_LOGOS } from '../../utils/bankLogos';
 
 interface ManageAccountModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSaved: () => void;
   editAccount?: FinancialAccount | null;
+  defaultType?: string;
 }
 
 const ACCOUNT_TYPES = [
@@ -35,17 +38,32 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
   onClose,
   onSaved,
   editAccount,
+  defaultType,
 }) => {
   const isEditing = !!editAccount;
 
   const [name, setName] = useState('');
-  const [accountType, setAccountType] = useState('bank');
+  const [accountType, setAccountType] = useState(defaultType || 'bank');
   const [accountNumber, setAccountNumber] = useState('');
   const [currency, setCurrency] = useState('ETB');
   const [openingBalance, setOpeningBalance] = useState('');
   const [balanceAdjustment, setBalanceAdjustment] = useState('');
   const [assetDetails, setAssetDetails] = useState<{ key: string; value: string }[]>([]);
+  const [logo, setLogo] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 200 * 1024) {
+      toast.error('Logo too large', { description: 'Please use an image under 200KB.' });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setLogo(reader.result as string);
+    reader.readAsDataURL(file);
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -56,6 +74,7 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
         setCurrency(editAccount.currency || 'ETB');
         setOpeningBalance('');
         setBalanceAdjustment('');
+        setLogo(editAccount.logo || null);
         if (editAccount.asset_details && typeof editAccount.asset_details === 'object') {
           setAssetDetails(
             Object.entries(editAccount.asset_details).map(([key, value]) => ({
@@ -68,15 +87,16 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
         }
       } else {
         setName('');
-        setAccountType('bank');
+        setAccountType(defaultType || 'bank');
         setAccountNumber('');
-        setCurrency('ETB');
+        setCurrency(defaultType === 'asset_fx' ? 'USD' : 'ETB');
         setOpeningBalance('');
         setBalanceAdjustment('');
+        setLogo(null);
         setAssetDetails([]);
       }
     }
-  }, [isOpen, editAccount]);
+  }, [isOpen, editAccount, defaultType]);
 
   const selectedType = ACCOUNT_TYPES.find((t) => t.value === accountType);
   const isAssetType = selectedType?.isAsset ?? false;
@@ -122,6 +142,7 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
           account_number: accountNumber.trim() || null,
           currency: currency || 'ETB',
           asset_details: Object.keys(details).length > 0 ? details : null,
+          logo: logo ?? null,
           ...(balanceAdjustment ? { balance_adjustment: parseFloat(balanceAdjustment) } : {}),
         });
         toast.success('Account updated', { description: name });
@@ -134,6 +155,7 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
           opening_balance: openingBalance ? parseFloat(openingBalance) : 0,
           is_custom_asset: isAssetType,
           asset_details: Object.keys(details).length > 0 ? details : undefined,
+          logo: logo ?? undefined,
         });
         toast.success('Account created', { description: name });
       }
@@ -161,7 +183,7 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
   const inactiveStyle = 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
 
       <div className="relative w-full max-w-lg mx-4 bg-white dark:bg-[#0f1522] rounded-2xl shadow-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden animate-page-enter">
@@ -261,6 +283,87 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
                 />
               </div>
             )}
+          </div>
+
+          {/* Logo — Preset Picker + Custom Upload */}
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+              Bank / Account Logo (optional)
+            </label>
+
+            {/* Preset Bank Logo Grid */}
+            <div className="grid grid-cols-5 gap-1.5 mb-2.5">
+              {PRESET_BANK_LOGOS.map((preset) => {
+                const isSelected = logo === preset.dataUri;
+                return (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => setLogo(preset.dataUri)}
+                    className={`flex flex-col items-center gap-1 p-1.5 rounded-lg border-2 transition-all ${
+                      isSelected
+                        ? 'border-slate-900 dark:border-white bg-slate-50 dark:bg-slate-800 scale-105 shadow-sm'
+                        : 'border-transparent hover:border-slate-200 dark:hover:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`}
+                    title={preset.name}
+                  >
+                    <img
+                      src={preset.dataUri}
+                      alt={preset.shortCode}
+                      className="w-8 h-8 rounded-md object-cover"
+                    />
+                    <span className={`text-[8px] font-bold leading-tight ${
+                      isSelected ? 'text-slate-900 dark:text-white' : 'text-slate-400'
+                    }`}>
+                      {preset.shortCode}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Custom Upload */}
+            <div className="flex items-center gap-3">
+              {logo ? (
+                <img
+                  src={logo}
+                  alt="logo preview"
+                  className="w-10 h-10 rounded-xl object-cover bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-400">
+                  <ImagePlus className="w-4 h-4" />
+                </div>
+              )}
+              <div className="flex-1">
+                <input
+                  ref={logoInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoChange}
+                  className="hidden"
+                />
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => logoInputRef.current?.click()}
+                    className="h-7 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 text-[11px] font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                  >
+                    {logo ? 'Custom' : 'Upload'}
+                  </button>
+                  {logo && (
+                    <button
+                      type="button"
+                      onClick={() => setLogo(null)}
+                      className="text-[11px] text-rose-500 hover:text-rose-700 font-medium"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                <p className="text-[9px] text-slate-400 mt-0.5">Pick a preset above or upload custom · max 200KB</p>
+              </div>
+            </div>
           </div>
 
           {/* Currency + Opening Balance / Balance Adjustment */}

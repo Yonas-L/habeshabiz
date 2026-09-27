@@ -11,7 +11,6 @@ import {
   Home,
   Wrench,
   Loader2,
-  X,
   Receipt,
   TrendingDown,
   Sparkles,
@@ -20,12 +19,19 @@ import {
 import { MiniSparkline, MiniBarHistogram } from '../components/Charts';
 import { AnimatedNumber } from '../components/AnimatedNumber';
 import { ExpenseDrawer } from '../components/drawers/ExpenseDrawer';
+import { RecordExpenseModal } from '../components/RecordExpenseModal';
 
 interface ExpensesViewProps {
   accounts: FinancialAccount[];
+  initialShowRecordExpense?: boolean;
+  onClearInitialContext?: () => void;
 }
 
-export const ExpensesView: React.FC<ExpensesViewProps> = ({ accounts }) => {
+export const ExpensesView: React.FC<ExpensesViewProps> = ({
+  accounts,
+  initialShowRecordExpense,
+  onClearInitialContext,
+}) => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -34,26 +40,17 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ accounts }) => {
 
   // Record Expense Modal
   const [showModal, setShowModal] = useState(false);
-  const [category, setCategory] = useState('ride');
-  const [amount, setAmount] = useState('');
-  const [description, setDescription] = useState('');
-  const [accountId, setAccountId] = useState('');
-  const [isOwnerDraw, setIsOwnerDraw] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     loadExpenses();
   }, []);
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && showModal) {
-        setShowModal(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showModal]);
+    if (initialShowRecordExpense) {
+      setShowModal(true);
+      onClearInitialContext?.();
+    }
+  }, [initialShowRecordExpense, onClearInitialContext]);
 
   const loadExpenses = async () => {
     try {
@@ -64,36 +61,6 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ accounts }) => {
       toast.error('Failed to load expenses', { description: err.message });
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!amount || !description || !accountId) return;
-
-    try {
-      setSubmitting(true);
-      const isDraw = isOwnerDraw || category === 'personal_owner_draw';
-      await api.recordExpense({
-        financial_account_id: accountId,
-        category,
-        amount: parseFloat(amount),
-        is_owner_draw: isDraw,
-        description,
-      });
-
-      toast.success(isDraw ? 'Owner Personal Draw Recorded' : 'Operating Expense Recorded', {
-        description: `${parseFloat(amount).toLocaleString()} ETB • ${description}`,
-      });
-
-      setShowModal(false);
-      setAmount('');
-      setDescription('');
-      loadExpenses();
-    } catch (err: any) {
-      toast.error('Failed to record expense', { description: err.message });
-    } finally {
-      setSubmitting(false);
     }
   };
 
@@ -142,10 +109,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ accounts }) => {
         </div>
 
         <button
-          onClick={() => {
-            setShowModal(true);
-            setAccountId(accounts[0]?.id || '');
-          }}
+          onClick={() => setShowModal(true)}
           className="h-10 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs flex items-center gap-2 self-start sm:self-auto active:scale-[0.98]"
         >
           <Plus className="w-4 h-4 text-emerald-400 dark:text-emerald-600" />
@@ -275,8 +239,22 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ accounts }) => {
                       </div>
                     </td>
 
-                    <td className="py-3.5 px-5 text-slate-900 dark:text-white font-bold text-sm group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
-                      {exp.description}
+                    <td className="py-3.5 px-5">
+                      <div className="text-slate-900 dark:text-white font-bold text-sm group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                        {exp.description}
+                      </div>
+                      {exp.inventory_unit && (
+                        <div className="flex items-center gap-1.5 mt-1 text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                          <span className="font-semibold text-slate-700 dark:text-slate-300">
+                            {exp.inventory_unit.variant?.product?.name || 'Device'}
+                          </span>
+                          {exp.inventory_unit.imei_or_serial && (
+                            <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                              • IMEI: {exp.inventory_unit.imei_or_serial}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </td>
 
                     <td className="py-3.5 px-5 text-slate-600 dark:text-slate-400 font-medium">
@@ -320,137 +298,12 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ accounts }) => {
       />
 
       {/* Tactile Record Expense Modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className="fixed inset-0 bg-slate-950/40 dark:bg-black/60 backdrop-blur-xs animate-backdrop-enter"
-            onClick={() => setShowModal(false)}
-          />
-
-          <div className="relative z-10 bg-white dark:bg-[#131926] rounded-2xl border border-slate-100 dark:border-slate-800 shadow-2xl ring-1 ring-black/5 max-w-lg w-full p-6 space-y-4 animate-modal-enter">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
-              <div>
-                <h3 className="font-bold text-slate-900 dark:text-white text-base">Record Expense or Personal Draw</h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Segregate shop overhead from personal withdrawals to preserve accurate accounting
-                </p>
-              </div>
-              <button
-                onClick={() => setShowModal(false)}
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Expense Category
-                </label>
-                <select
-                  value={category}
-                  onChange={(e) => {
-                    const cat = e.target.value;
-                    setCategory(cat);
-                    setIsOwnerDraw(cat === 'personal_owner_draw');
-                  }}
-                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 focus:border-slate-900 dark:focus:border-slate-600"
-                >
-                  <option value="ride">RIDE / Transportation & Delivery</option>
-                  <option value="food">Food & Hospitality</option>
-                  <option value="rent">Shop Rent & Utilities</option>
-                  <option value="maintenance">Device Maintenance & Tooling</option>
-                  <option value="salary">Staff Daily Pay / Commission</option>
-                  <option value="personal_owner_draw">Personal Owner Draw (Yoni)</option>
-                  <option value="other">Other Operational Expense</option>
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Amount (ETB)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    placeholder="e.g. 350"
-                    className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono tabular-nums font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 focus:border-slate-900 dark:focus:border-slate-600"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Paid From Account
-                  </label>
-                  <select
-                    value={accountId}
-                    onChange={(e) => setAccountId(e.target.value)}
-                    className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 focus:border-slate-900 dark:focus:border-slate-600"
-                    required
-                  >
-                    {accounts
-                      .filter((a) => !a.is_custom_asset)
-                      .map((a) => (
-                        <option key={a.id} value={a.id}>
-                          {a.name} ({Number(a.current_balance).toLocaleString()} ETB)
-                        </option>
-                      ))}
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Description / Note
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Customer delivery ride to Bole Medhanialem"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 focus:border-slate-900 dark:focus:border-slate-600"
-                  required
-                />
-              </div>
-
-              <div className="flex items-center gap-3 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800">
-                <input
-                  type="checkbox"
-                  id="isOwnerDraw"
-                  checked={isOwnerDraw}
-                  onChange={(e) => setIsOwnerDraw(e.target.checked)}
-                  className="w-4 h-4 rounded text-purple-600 focus:ring-purple-500 border-slate-300 dark:border-slate-700 dark:bg-slate-800"
-                />
-                <label htmlFor="isOwnerDraw" className="text-xs text-slate-700 dark:text-slate-300 font-medium select-none">
-                  Mark as Owner Personal Draw (Does not reduce shop profit)
-                </label>
-              </div>
-
-              <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="h-10 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                >
-                  Cancel (Esc)
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="h-10 px-5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 disabled:opacity-50 transition-colors shadow-xs active:scale-[0.98]"
-                >
-                  {submitting ? 'Recording...' : 'Record Outflow'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <RecordExpenseModal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        accounts={accounts}
+        onSuccess={loadExpenses}
+      />
     </div>
   );
 };

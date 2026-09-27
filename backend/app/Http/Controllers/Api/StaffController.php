@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Models\Debt;
 use App\Models\SalesOrder;
 use App\Models\User;
 use App\Scopes\TenantScope;
@@ -63,6 +64,16 @@ class StaffController extends Controller
                     'sales_volume_week' => (float) $weekOrders->sum('total_amount'),
                     'sales_count_month' => $monthOrders->count(),
                     'sales_volume_month' => (float) $monthOrders->sum('total_amount'),
+                    'uncollected_bonus' => (float) Debt::where('salesperson_id', $staff->id)
+                        ->where('reference_type', 'salesperson_bonus')
+                        ->whereIn('status', ['open', 'partially_paid'])
+                        ->sum('remaining_amount'),
+                    'collected_bonus' => (float) Debt::where('salesperson_id', $staff->id)
+                        ->where('reference_type', 'salesperson_bonus')
+                        ->sum('paid_amount'),
+                    'total_bonus_earned' => (float) Debt::where('salesperson_id', $staff->id)
+                        ->where('reference_type', 'salesperson_bonus')
+                        ->sum('original_amount'),
                     'last_sale_at' => $lastSale?->order_date ?? $lastSale?->created_at,
                 ],
             ];
@@ -255,6 +266,14 @@ class StaffController extends Controller
                 $bonusAmount = 1000;
             }
 
+            $bonusDebts = Debt::where('salesperson_id', $staff->id)
+                ->where('reference_type', 'salesperson_bonus')
+                ->get();
+
+            $uncollectedBonus = (float) $bonusDebts->whereIn('status', ['open', 'partially_paid'])->sum('remaining_amount');
+            $collectedBonus = (float) $bonusDebts->sum('paid_amount');
+            $totalBonusEarned = (float) $bonusDebts->sum('original_amount');
+
             return [
                 'user_id' => $staff->id,
                 'name' => $staff->name,
@@ -265,6 +284,9 @@ class StaffController extends Controller
                 'month_volume' => $monthVolume,
                 'bonus_tier' => $bonusTier,
                 'bonus_amount' => $bonusAmount,
+                'uncollected_bonus' => $uncollectedBonus,
+                'collected_bonus' => $collectedBonus,
+                'total_bonus_earned' => $totalBonusEarned,
             ];
         })->sortByDesc('week_volume')->values();
 

@@ -1,0 +1,623 @@
+<?php
+
+namespace App\Actions;
+
+use App\Models\Contact;
+use App\Models\Debt;
+use App\Models\InventoryUnit;
+use App\Models\SalesOrder;
+use Carbon\Carbon;
+
+class GeneratePartnerStatementAction
+{
+    /**
+     * Generate an aggregated statement and ledger for a vendor/partner.
+     *
+     * @param  Contact  $contact
+     * @param  string|null  $startDateStr
+     * @param  string|null  $endDateStr
+     * @return array<string, mixed>
+     */
+    public function execute(Contact $contact, ?string $startDateStr = null, ?string $endDateStr = null): array
+    {
+        $startDate = $startDateStr ? Carbon::parse($startDateStr)->startOfDay() : null;
+        $endDate = $endDateStr ? Carbon::parse($endDateStr)->endOfDay() : null;
+
+        // Fetch all debts and payments linked to this contact
+        $debts = Debt::where('contact_id', $contact->id)
+            ->with(['payments.financialAccount'])
+            ->orderBy('created_at')
+            ->get();
+
+        // Preload associated SalesOrders and InventoryUnits for clean context descriptions
+        $orderIds = $debts->whereIn('reference_type', ['sales_order', 'consignment_sale', 'brokered_sourcing'])
+            ->pluck('reference_id')
+            ->filter()
+            ->unique()
+            ->values();
+
+        $orders = SalesOrder::whereIn('id', $orderIds)
+            ->with(['items.variant.product', 'items.inventoryUnit'])
+            ->get()
+            ->keyBy('id');
+
+        $unitIds = $debts->whereIn('reference_type', ['handover_holding', 'vendor_repair_reimbursement', 'repair_reimbursement', 'vendor_return_refund'])
+            ->pluck('reference_id')
+            ->filter()
+            ->unique()
+            ->values();
+
+        $inventoryUnits = InventoryUnit::whereIn('id', $unitIds)
+            ->with(['variant.product'])
+            ->get()
+            ->keyBy('id');
+
+        $rawEntries = [];
+
+        foreach ($debts as $debt) {
+            $debtCreatedDate = Carbon::parse($debt->created_at);
+            $order = ! empty($debt->reference_id) ? ($orders->get($debt->reference_id) ?? null) : null;
+
+            if ($debt->type === 'payable') {
+                if ($debt->reference_type === 'consignment_sale') {
+                    $itemDesc = 'Consignment Device';
+                    if ($order && $order->items->isNotEmpty()) {
+                        $itemDesc = $order->items->map(function ($it) {
+                            $pName = $it->variant?->product?->name ?? 'Device';
+                            $sn = $it->inventoryUnit?->imei_or_serial ? " (SN: {$it->inventoryUnit->imei_or_serial})" : '';
+                            $qty = $it->quantity > 1 ? " x{$it->quantity}" : '';
+                            return "{$pName}{$sn}{$qty}";
+                        })->join(', ');
+                    } elseif ($debt->notes) {
+                        $itemDesc = preg_replace('/^Order\s+#[^\s·]+\s*·?\s*/i', '', $debt->notes);
+                    }
+
+                    $rawEntries[] = [
+                        'id' => "debt-{$debt->id}",
+                        'date' => $debtCreatedDate,
+                        'type' => 'consignment_sale',
+                        'type_label' => 'Consignment Sale',
+                        'context' => $itemDesc,
+                        'payable' => (float) $debt->original_amount,
+                        'receivable' => 0.0,
+                        'balance_effect' => - (float) $debt->original_amount,
+                        'reference_number' => $order?->order_number ?? null,
+                    ];
+                } elseif ($debt->reference_type === 'brokered_sourcing') {
+                    $itemDesc = 'Brokered Item';
+                    if ($order && $order->items->isNotEmpty()) {
+                        $itemDesc = $order->items->map(function ($it) {
+                            $pName = $it->variant?->product?->name ?? 'Device';
+                            $sn = $it->inventoryUnit?->imei_or_serial ? " (SN: {$it->inventoryUnit->imei_or_serial})" : '';
+                            $qty = $it->quantity > 1 ? " x{$it->quantity}" : ' x1';
+                            return "{$pName}{$sn}{$qty}";
+                        })->join(', ');
+                    } elseif ($debt->notes) {
+                        $itemDesc = preg_replace('/^Order\s+#[^\s·]+\s*·?\s*/i', '', $debt->notes);
+                    }
+
+                    $rawEntries[] = [
+                        'id' => "debt-{$debt->id}",
+                        'date' => $debtCreatedDate,
+                        'type' => 'brokered_sourcing',
+                        'type_label' => 'Item Received',
+                        'context' => $itemDesc,
+                        'payable' => (float) $debt->original_amount,
+                        'receivable' => 0.0,
+                        'balance_effect' => - (float) $debt->original_amount,
+                        'reference_number' => $order?->order_number ?? null,
+                    ];
+                } elseif ($debt->reference_type === 'stock_intake') {
+                    $unit = ! empty($debt->reference_id) ? ($inventoryUnits->get($debt->reference_id) ?? null) : null;
+                    $pName = $unit?->variant?->product?->name ?? 'Device';
+                    $sn = $unit?->imei_or_serial ? " (SN: {$unit->imei_or_serial})" : '';
+                    $context = $unit ? "{$pName}{$sn}" : ($debt->notes ?: 'Stock Received');
+
+                    $rawEntries[] = [
+                        'id' => "debt-{$debt->id}",
+                        'date' => $debtCreatedDate,
+                        'type' => 'stock_intake',
+                        'type_label' => 'Item Received',
+                        'context' => $context,
+                        'payable' => (float) $debt->original_amount,
+                        'receivable' => 0.0,
+                        'balance_effect' => - (float) $debt->original_amount,
+                        'reference_number' => null,
+                    ];
+                } else {
+                    $rawEntries[] = [
+                        'id' => "debt-{$debt->id}",
+                        'date' => $debtCreatedDate,
+                        'type' => 'manual_payable',
+                        'type_label' => 'Payable',
+                        'context' => $debt->notes ?: 'Agreed payable balance',
+                        'payable' => (float) $debt->original_amount,
+                        'receivable' => 0.0,
+                        'balance_effect' => - (float) $debt->original_amount,
+                        'reference_number' => null,
+                    ];
+                }
+            } else {
+                // Receivable
+                if ($debt->reference_type === 'sales_order') {
+                    $itemDesc = 'Sales Credit';
+                    if ($order && $order->items->isNotEmpty()) {
+                        $itemDesc = $order->items->map(function ($it) {
+                            $pName = $it->variant?->product?->name ?? 'Device';
+                            $sn = $it->inventoryUnit?->imei_or_serial ? " (SN: {$it->inventoryUnit->imei_or_serial})" : '';
+                            $qty = $it->quantity > 1 ? " x{$it->quantity}" : ' x1';
+                            return "{$pName}{$sn}{$qty}";
+                        })->join(', ');
+                    } elseif ($debt->notes) {
+                        $itemDesc = preg_replace('/^Order\s+#[^\s·]+\s*·?\s*/i', '', $debt->notes);
+                    }
+
+                    $rawEntries[] = [
+                        'id' => "debt-{$debt->id}",
+                        'date' => $debtCreatedDate,
+                        'type' => 'sales_credit',
+                        'type_label' => 'Sales Credit',
+                        'context' => $itemDesc,
+                        'payable' => 0.0,
+                        'receivable' => (float) $debt->original_amount,
+                        'balance_effect' => (float) $debt->original_amount,
+                        'reference_number' => $order?->order_number ?? null,
+                    ];
+                } elseif ($debt->reference_type === 'handover_holding') {
+                    $unit = ! empty($debt->reference_id) ? ($inventoryUnits->get($debt->reference_id) ?? null) : null;
+                    if ($unit) {
+                        $pName = $unit->variant?->product?->name ?? 'Device';
+                        $sn = $unit->imei_or_serial ? " (SN: {$unit->imei_or_serial})" : '';
+                        $context = "{$pName}{$sn}";
+                    } elseif (preg_match('/(?:for\s+)([A-Za-z0-9_-]+)/i', $debt->notes ?? '', $m)) {
+                        $context = "Device Handover (SN: {$m[1]})";
+                    } else {
+                        $context = 'Device Handover';
+                    }
+
+                    $rawEntries[] = [
+                        'id' => "debt-{$debt->id}",
+                        'date' => $debtCreatedDate,
+                        'type' => 'handover_holding',
+                        'type_label' => 'Device Handover',
+                        'context' => $context,
+                        'payable' => 0.0,
+                        'receivable' => (float) $debt->original_amount,
+                        'balance_effect' => (float) $debt->original_amount,
+                        'reference_number' => null,
+                    ];
+
+                    if ($debt->payments->isEmpty() && str_contains($debt->notes ?? '', 'CANCELLED')) {
+                        $rawEntries[] = [
+                            'id' => "pay-cancel-{$debt->id}",
+                            'date' => $debt->updated_at ? Carbon::parse($debt->updated_at) : $debtCreatedDate,
+                            'type' => 'handover_return',
+                            'type_label' => 'Device Returned',
+                            'context' => 'Returned unsold to shop' . ($debt->notes ? " · {$debt->notes}" : ''),
+                            'payable' => 0.0,
+                            'receivable' => - (float) $debt->original_amount,
+                            'balance_effect' => - (float) $debt->original_amount,
+                            'reference_number' => 'RETURN-TO-SHOP',
+                        ];
+                    }
+                } elseif ($debt->reference_type === 'vendor_advance_payout') {
+                    // Handled uniformly in $directExpenses as "Payment Sent" with account details to avoid duplicate ledger entries
+                    continue;
+                } elseif ($debt->reference_type === 'repair_reimbursement' || $debt->reference_type === 'vendor_repair_reimbursement') {
+                    $unit = ! empty($debt->reference_id) ? ($inventoryUnits->get($debt->reference_id) ?? null) : null;
+                    $sn = $unit?->imei_or_serial ? " (SN: {$unit->imei_or_serial})" : '';
+                    $rawEntries[] = [
+                        'id' => "debt-{$debt->id}",
+                        'date' => $debtCreatedDate,
+                        'type' => 'repair_claim',
+                        'type_label' => 'Repair Claim',
+                        'context' => "Warranty repair claim{$sn}",
+                        'payable' => 0.0,
+                        'receivable' => (float) $debt->original_amount,
+                        'balance_effect' => (float) $debt->original_amount,
+                        'reference_number' => null,
+                    ];
+                } elseif ($debt->reference_type === 'vendor_return_refund') {
+                    $unit = ! empty($debt->reference_id) ? ($inventoryUnits->get($debt->reference_id) ?? null) : null;
+                    $pName = $unit?->variant?->product?->name ?? 'Device';
+                    $sn = $unit?->imei_or_serial ? " (SN: {$unit->imei_or_serial})" : '';
+                    $rawEntries[] = [
+                        'id' => "debt-{$debt->id}",
+                        'date' => $debtCreatedDate,
+                        'type' => 'vendor_return',
+                        'type_label' => 'Return Refund Claim',
+                        'context' => "Refund owed for returned {$pName}{$sn}",
+                        'payable' => 0.0,
+                        'receivable' => (float) $debt->original_amount,
+                        'balance_effect' => (float) $debt->original_amount,
+                        'reference_number' => 'RETURN-REFUND',
+                    ];
+                } else {
+                    $rawEntries[] = [
+                        'id' => "debt-{$debt->id}",
+                        'date' => $debtCreatedDate,
+                        'type' => 'manual_receivable',
+                        'type_label' => 'Receivable',
+                        'context' => $debt->notes ?: 'Agreed credit receivable',
+                        'payable' => 0.0,
+                        'receivable' => (float) $debt->original_amount,
+                        'balance_effect' => (float) $debt->original_amount,
+                        'reference_number' => null,
+                    ];
+                }
+            }
+
+            // Downstream payments for this debt
+            foreach ($debt->payments as $payment) {
+                $payDate = $payment->payment_date ? Carbon::parse($payment->payment_date) : Carbon::parse($payment->created_at);
+                $accountName = $payment->financialAccount?->name ?? 'Wire';
+
+                if ($payment->reference_number === 'RETURN-TO-VENDOR') {
+                    $rawEntries[] = [
+                        'id' => "pay-{$payment->id}",
+                        'date' => $payDate,
+                        'type' => 'vendor_return',
+                        'type_label' => 'Return',
+                        'context' => 'Returned to vendor' . ($debt->notes ? " · {$debt->notes}" : ''),
+                        'payable' => - (float) $payment->amount,
+                        'receivable' => 0.0,
+                        'balance_effect' => (float) $payment->amount,
+                        'reference_number' => 'RETURN-TO-VENDOR',
+                    ];
+                } elseif ($payment->reference_number === 'REPAIR-OFFSET') {
+                    $rawEntries[] = [
+                        'id' => "pay-{$payment->id}",
+                        'date' => $payDate,
+                        'type' => 'repair_offset',
+                        'type_label' => 'Repair Deduction',
+                        'context' => 'Repair cost deduction',
+                        'payable' => - (float) $payment->amount,
+                        'receivable' => 0.0,
+                        'balance_effect' => (float) $payment->amount,
+                        'reference_number' => 'REPAIR-OFFSET',
+                    ];
+                } elseif ($payment->reference_number === 'RETURN-TO-SHOP') {
+                    $rawEntries[] = [
+                        'id' => "pay-{$payment->id}",
+                        'date' => $payDate,
+                        'type' => 'handover_return',
+                        'type_label' => 'Device Returned',
+                        'context' => 'Returned unsold to shop' . ($debt->notes ? " · {$debt->notes}" : ''),
+                        'payable' => 0.0,
+                        'receivable' => - (float) $payment->amount,
+                        'balance_effect' => - (float) $payment->amount,
+                        'reference_number' => 'RETURN-TO-SHOP',
+                    ];
+                } elseif ($payment->reference_number === 'BILATERAL-OFFSET') {
+                    $rawEntries[] = [
+                        'id' => "pay-{$payment->id}",
+                        'date' => $payDate,
+                        'type' => 'bilateral_offset',
+                        'type_label' => 'Bilateral Offset',
+                        'context' => $payment->notes ?: 'Settled via bilateral offset / trade',
+                        'payable' => $debt->type === 'payable' ? - (float) $payment->amount : 0.0,
+                        'receivable' => $debt->type === 'receivable' ? - (float) $payment->amount : 0.0,
+                        'balance_effect' => $debt->type === 'payable' ? (float) $payment->amount : - (float) $payment->amount,
+                        'reference_number' => 'BILATERAL-OFFSET',
+                    ];
+                } elseif ($debt->type === 'payable') {
+                    $rawEntries[] = [
+                        'id' => "pay-{$payment->id}",
+                        'date' => $payDate,
+                        'type' => 'payment_sent',
+                        'type_label' => 'Payment Sent',
+                        'context' => "Wire payout ({$accountName})",
+                        'payable' => - (float) $payment->amount,
+                        'receivable' => 0.0,
+                        'balance_effect' => (float) $payment->amount,
+                        'reference_number' => $payment->reference_number,
+                    ];
+                } else {
+                    $isRepair = in_array($debt->reference_type, ['repair_reimbursement', 'vendor_repair_reimbursement']);
+                    $rawEntries[] = [
+                        'id' => "pay-{$payment->id}",
+                        'date' => $payDate,
+                        'type' => 'payment_received',
+                        'type_label' => $isRepair ? 'Repair Payment' : 'Payment Received',
+                        'context' => $isRepair ? "Repair payment ({$accountName})" : "Payment received ({$accountName})",
+                        'payable' => 0.0,
+                        'receivable' => - (float) $payment->amount,
+                        'balance_effect' => - (float) $payment->amount,
+                        'reference_number' => $payment->reference_number,
+                    ];
+                }
+            }
+        }
+
+        // Units supplied by this vendor that do not have an existing debt record (e.g. stocked directly)
+        $existingStockIntakeUnitIds = $debts->where('reference_type', 'stock_intake')->pluck('reference_id')->filter()->all();
+        $consignmentOrderIds = $debts->where('reference_type', 'consignment_sale')->pluck('reference_id')->filter()->all();
+        $soldUnitIdsWithDebt = \App\Models\SalesOrderItem::whereIn('sales_order_id', $consignmentOrderIds)
+            ->whereNotNull('inventory_unit_id')
+            ->pluck('inventory_unit_id')
+            ->all();
+
+        $allDebtedUnitIds = array_unique(array_merge($existingStockIntakeUnitIds, $soldUnitIdsWithDebt));
+
+        $vendorUnitsWithoutDebt = InventoryUnit::where('supplier_contact_id', $contact->id)
+            ->where('cost_basis', '>', 0)
+            ->whereNotIn('id', $allDebtedUnitIds)
+            ->with(['variant.product'])
+            ->get()
+            ->filter(function ($u) use ($debts) {
+                if ($u->imei_or_serial) {
+                    foreach ($debts as $d) {
+                        if ($d->notes && str_contains($d->notes, $u->imei_or_serial)) {
+                            return false;
+                        }
+                    }
+                }
+                return true;
+            });
+
+        foreach ($vendorUnitsWithoutDebt as $unit) {
+            $pName = $unit->variant?->product?->name ?? 'Device';
+            $sn = $unit->imei_or_serial ? " (SN: {$unit->imei_or_serial})" : '';
+            $rawEntries[] = [
+                'id' => "unit-intake-{$unit->id}",
+                'date' => Carbon::parse($unit->created_at),
+                'type' => 'stock_intake',
+                'type_label' => 'Item Received',
+                'context' => "{$pName}{$sn}",
+                'payable' => (float) $unit->cost_basis,
+                'receivable' => 0.0,
+                'balance_effect' => - (float) $unit->cost_basis,
+                'reference_number' => null,
+            ];
+
+            if ($unit->status === 'returned_to_vendor' && $unit->returned_at) {
+                $rawEntries[] = [
+                    'id' => "unit-return-{$unit->id}",
+                    'date' => Carbon::parse($unit->returned_at),
+                    'type' => 'vendor_return',
+                    'type_label' => 'Return',
+                    'context' => "Returned to vendor · {$pName}{$sn}",
+                    'payable' => - (float) $unit->cost_basis,
+                    'receivable' => 0.0,
+                    'balance_effect' => (float) $unit->cost_basis,
+                    'reference_number' => 'RETURN-TO-VENDOR',
+                ];
+            }
+        }
+
+        // Direct expenses paid to this vendor (if not already recorded as debt payment)
+        $directExpenses = \App\Models\Expense::where('tenant_id', $contact->tenant_id)
+            ->where('vendor_contact_id', $contact->id)
+            ->whereNull('inventory_unit_id')
+            ->with('financialAccount')
+            ->get();
+
+        $existingPayRefs = collect($rawEntries)
+            ->pluck('reference_number')
+            ->filter()
+            ->all();
+
+        foreach ($directExpenses as $exp) {
+            $expRef = "EXP-{$exp->id}";
+            if (! in_array($expRef, $existingPayRefs)) {
+                $acc = $exp->financialAccount?->name ?? 'Wire';
+                $rawEntries[] = [
+                    'id' => "exp-{$exp->id}",
+                    'date' => Carbon::parse($exp->date ?? $exp->created_at),
+                    'type' => 'payment_sent',
+                    'type_label' => 'Payment Sent',
+                    'context' => "Wire payout ({$acc})",
+                    'payable' => - (float) $exp->amount,
+                    'receivable' => 0.0,
+                    'balance_effect' => (float) $exp->amount,
+                    'reference_number' => $expRef,
+                ];
+            }
+        }
+
+        // Sort all raw transactions chronologically
+        usort($rawEntries, fn ($a, $b) => $a['date']->getTimestamp() <=> $b['date']->getTimestamp());
+
+        // Separate balance prior to $startDate vs within range
+        $openingBalance = 0.0;
+        $inRangeEntries = [];
+
+        foreach ($rawEntries as $entry) {
+            $entryDate = $entry['date'];
+
+            if ($startDate && $entryDate->lt($startDate)) {
+                $openingBalance += $entry['balance_effect'];
+            } elseif ($endDate && $entryDate->gt($endDate)) {
+                // Future beyond range, skip
+                continue;
+            } else {
+                $inRangeEntries[] = $entry;
+            }
+        }
+
+        // Calculate running balance through in-range entries
+        $runningBalance = $openingBalance;
+        $ledger = [];
+
+        if ($startDate && count($rawEntries) > 0) {
+            $ledger[] = [
+                'id' => 'opening-balance',
+                'date' => $startDate->toIso8601String(),
+                'formatted_date' => $startDate->format('M d, Y'),
+                'type' => 'opening_balance',
+                'type_label' => 'Balance Forward',
+                'context' => 'Opening balance brought forward prior to statement range',
+                'payable' => 0.0,
+                'receivable' => 0.0,
+                'balance_effect' => 0.0,
+                'running_balance' => round($openingBalance, 2),
+                'reference_number' => null,
+            ];
+        }
+
+        $rangePayableSum = 0.0;
+        $rangeReceivableSum = 0.0;
+        $rangePaidSentSum = 0.0;
+        $rangeReceivedSum = 0.0;
+
+        foreach ($inRangeEntries as $entry) {
+            $runningBalance += $entry['balance_effect'];
+
+            if ($entry['type'] === 'consignment_sale' || $entry['type'] === 'brokered_sourcing' || $entry['type'] === 'stock_intake' || $entry['type'] === 'manual_payable') {
+                $rangePayableSum += $entry['payable'];
+            } elseif ($entry['type'] === 'payment_sent' || $entry['type'] === 'repair_offset' || $entry['type'] === 'vendor_return') {
+                $rangePaidSentSum += abs($entry['payable']);
+            } elseif ($entry['type'] === 'sales_credit' || $entry['type'] === 'handover_holding' || $entry['type'] === 'repair_claim' || $entry['type'] === 'payout_advance' || $entry['type'] === 'manual_receivable') {
+                $rangeReceivableSum += $entry['receivable'];
+            } elseif ($entry['type'] === 'payment_received') {
+                $rangeReceivedSum += abs($entry['receivable']);
+            }
+
+            $ledger[] = [
+                'id' => $entry['id'],
+                'date' => $entry['date']->toIso8601String(),
+                'formatted_date' => $entry['date']->format('M d, Y'),
+                'type' => $entry['type'],
+                'type_label' => $entry['type_label'],
+                'context' => $entry['context'],
+                'payable' => round($entry['payable'], 2),
+                'receivable' => round($entry['receivable'], 2),
+                'balance_effect' => round($entry['balance_effect'], 2),
+                'running_balance' => round($runningBalance, 2),
+                'reference_number' => $entry['reference_number'],
+            ];
+        }
+
+        // Current overall status (all-time open)
+        $currentOpenPayable = (float) Debt::where('contact_id', $contact->id)
+            ->where('type', 'payable')
+            ->whereIn('status', ['open', 'partially_paid'])
+            ->sum('remaining_amount');
+
+        $unDebtStockPayable = (float) InventoryUnit::where('supplier_contact_id', $contact->id)
+            ->where('status', 'in_stock')
+            ->whereNotIn('id', $allDebtedUnitIds)
+            ->sum('cost_basis');
+
+        $currentOpenPayable += $unDebtStockPayable;
+
+        $currentOpenReceivable = (float) Debt::where('contact_id', $contact->id)
+            ->where('type', 'receivable')
+            ->whereIn('status', ['open', 'partially_paid'])
+            ->sum('remaining_amount');
+
+        $currentNetBalance = $currentOpenReceivable - $currentOpenPayable;
+
+        // Inventory Breakdown for Tabs
+        $suppliedUnits = InventoryUnit::where('supplier_contact_id', $contact->id)
+            ->with(['variant.product', 'salesOrderItem.salesOrder'])
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(function ($u) {
+                return [
+                    'id' => $u->id,
+                    'model' => $u->variant?->product?->name ?? 'Device',
+                    'specs' => array_filter([$u->variant?->storage, $u->variant?->color]),
+                    'imei_or_serial' => $u->imei_or_serial,
+                    'status' => $u->status,
+                    'location' => $u->location,
+                    'cost_basis' => (float) $u->cost_basis,
+                    'selling_price' => (float) $u->selling_price,
+                    'source_type' => $u->source_type,
+                    'created_at' => $u->created_at->toIso8601String(),
+                    'sold_at' => $u->sold_at?->toIso8601String(),
+                    'order_number' => $u->salesOrderItem?->salesOrder?->order_number,
+                ];
+            });
+
+        // Units out on handover with this partner
+        $handedOutUnits = InventoryUnit::where('handover_to', $contact->name)
+            ->where('status', 'out')
+            ->with(['variant.product'])
+            ->get()
+            ->map(function ($u) {
+                return [
+                    'id' => $u->id,
+                    'model' => $u->variant?->product?->name ?? 'Device',
+                    'specs' => array_filter([$u->variant?->storage, $u->variant?->color]),
+                    'imei_or_serial' => $u->imei_or_serial,
+                    'status' => $u->status,
+                    'location' => $u->location,
+                    'handed_out_at' => $u->handed_out_at?->toIso8601String(),
+                    'handover_payout' => (float) $u->handover_payout,
+                ];
+            });
+
+        // Units with vendor for repair/warranty
+        $vendorReturnUnits = InventoryUnit::where('supplier_contact_id', $contact->id)
+            ->whereIn('status', ['returned_to_vendor', 'fixed'])
+            ->with(['variant.product', 'maintenanceRecords'])
+            ->get()
+            ->map(function ($u) {
+                return [
+                    'id' => $u->id,
+                    'model' => $u->variant?->product?->name ?? 'Device',
+                    'specs' => array_filter([$u->variant?->storage, $u->variant?->color]),
+                    'imei_or_serial' => $u->imei_or_serial,
+                    'status' => $u->status,
+                    'return_reason' => $u->return_reason,
+                    'returned_at' => $u->returned_at?->toIso8601String(),
+                    'maintenance_cost' => (float) $u->maintenanceRecords->sum('cost'),
+                ];
+            });
+
+        return [
+            'contact' => [
+                'id' => $contact->id,
+                'name' => $contact->name,
+                'phone' => $contact->phone,
+                'alt_phone' => $contact->alt_phone,
+                'email' => $contact->email,
+                'roles' => $contact->roles ?? [],
+                'statement_token' => $contact->statement_token,
+            ],
+            'range' => [
+                'start_date' => $startDate?->toDateString(),
+                'end_date' => $endDate?->toDateString(),
+                'formatted_range' => ($startDate && $endDate)
+                    ? "{$startDate->format('M d, Y')} - {$endDate->format('M d, Y')}"
+                    : 'All Historical Records',
+            ],
+            'kpis' => [
+                'current_open_payable' => round($currentOpenPayable, 2),
+                'current_open_receivable' => round($currentOpenReceivable, 2),
+                'current_net_balance' => round($currentNetBalance, 2),
+                'balance_verdict' => $currentNetBalance > 0
+                    ? 'Receivable (Partner owes us)'
+                    : ($currentNetBalance < 0 ? 'Payable (We owe partner)' : 'Settled (0.00 ETB)'),
+
+                'range_opening_balance' => round($openingBalance, 2),
+                'range_closing_balance' => round($runningBalance, 2),
+                'range_payable_total' => round($rangePayableSum, 2),
+                'range_receivable_total' => round($rangeReceivableSum, 2),
+                'range_paid_to_vendor' => round($rangePaidSentSum, 2),
+                'range_received_from_vendor' => round($rangeReceivedSum, 2),
+
+                'supplied_units_count' => $suppliedUnits->count(),
+                'supplied_in_stock_count' => $suppliedUnits->where('status', 'in_stock')->count(),
+                'handed_out_count' => $handedOutUnits->count(),
+                'repairs_count' => $vendorReturnUnits->count(),
+            ],
+            'business' => [
+                'name' => 'HABESHABIZ ELECTRONICS',
+                'branch' => 'Bole Medhanialem, Addis Ababa',
+                'phone' => '+251 91 123 4567',
+                'email' => 'sales@habeshabiz.et',
+                'bank_accounts' => \App\Models\FinancialAccount::where('tenant_id', $contact->tenant_id)
+                    ->where('is_active', true)
+                    ->whereIn('type', ['bank', 'mobile_money'])
+                    ->get(['id', 'name', 'account_number', 'type'])
+                    ->toArray(),
+            ],
+            'ledger' => $ledger,
+            'supplied_units' => $suppliedUnits,
+            'handed_out_units' => $handedOutUnits,
+            'vendor_return_units' => $vendorReturnUnits,
+        ];
+    }
+}

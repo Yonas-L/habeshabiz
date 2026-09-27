@@ -168,6 +168,8 @@ class RealBusinessDataSeeder extends Seeder
             );
         }
 
+        $this->call(FinancialAccountLogosSeeder::class);
+
         // 5. Products and Variants
         $iphone16pm = Product::firstOrCreate(
             ['tenant_id' => $tenant->id, 'name' => 'iPhone 16 Pro Max'],

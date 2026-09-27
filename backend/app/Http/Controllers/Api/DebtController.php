@@ -75,16 +75,42 @@ class DebtController extends Controller
 
             // Resolve or create contact
             $contactId = $validated['contact_id'] ?? null;
+            $contactPhone = ! empty($validated['contact_phone']) ? trim($validated['contact_phone']) : null;
+            $contactName = ! empty($validated['contact_name']) ? trim($validated['contact_name']) : null;
+
             if (! $contactId) {
+                $existingContact = null;
+                if ($contactPhone) {
+                    $existingContact = Contact::where('tenant_id', $tenantId)
+                        ->where('phone', $contactPhone)
+                        ->first();
+                }
+                if (! $existingContact && $contactName) {
+                    $existingContact = Contact::where('tenant_id', $tenantId)
+                        ->where('name', $contactName)
+                        ->first();
+                }
+
                 $defaultRole = $validated['type'] === 'receivable' ? 'customer' : 'supplier';
-                $contact = Contact::create([
-                    'tenant_id' => $tenantId,
-                    'name' => trim($validated['contact_name']),
-                    'phone' => ! empty($validated['contact_phone']) ? trim($validated['contact_phone']) : null,
-                    'roles' => [$defaultRole],
-                    'is_active' => true,
-                ]);
-                $contactId = $contact->id;
+                if ($existingContact) {
+                    $contactId = $existingContact->id;
+                    $contact = $existingContact;
+                    $roles = $existingContact->roles ?? [];
+                    if (! in_array($defaultRole, $roles, true)) {
+                        $roles[] = $defaultRole;
+                        $existingContact->roles = $roles;
+                        $existingContact->save();
+                    }
+                } else {
+                    $contact = Contact::create([
+                        'tenant_id' => $tenantId,
+                        'name' => $contactName ?: 'Contact ('.$contactPhone.')',
+                        'phone' => $contactPhone,
+                        'roles' => [$defaultRole],
+                        'is_active' => true,
+                    ]);
+                    $contactId = $contact->id;
+                }
             } else {
                 $contact = Contact::find($contactId);
             }

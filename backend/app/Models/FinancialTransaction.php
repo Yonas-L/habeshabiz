@@ -38,17 +38,17 @@ class FinancialTransaction extends Model
 
     public function sourceAccount(): BelongsTo
     {
-        return $this->belongsTo(FinancialAccount::class, 'source_account_id');
+        return $this->belongsTo(FinancialAccount::class, 'source_account_id')->withTrashed();
     }
 
     public function destinationAccount(): BelongsTo
     {
-        return $this->belongsTo(FinancialAccount::class, 'destination_account_id');
+        return $this->belongsTo(FinancialAccount::class, 'destination_account_id')->withTrashed();
     }
 
     public function contact(): BelongsTo
     {
-        return $this->belongsTo(Contact::class);
+        return $this->belongsTo(Contact::class)->withTrashed();
     }
 
     public function creator(): BelongsTo

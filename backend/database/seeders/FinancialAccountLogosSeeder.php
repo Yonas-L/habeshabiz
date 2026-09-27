@@ -1,0 +1,53 @@
+<?php
+
+namespace Database\Seeders;
+
+use App\Models\FinancialAccount;
+use Illuminate\Database\Seeder;
+
+class FinancialAccountLogosSeeder extends Seeder
+{
+    public function run(): void
+    {
+        $cbeSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80"><defs><linearGradient id="cbeBg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#4a107a"/><stop offset="100%" stop-color="#2c064e"/></linearGradient><linearGradient id="cbeGold" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#fde047"/><stop offset="50%" stop-color="#f59e0b"/><stop offset="100%" stop-color="#d97706"/></linearGradient></defs><rect width="80" height="80" rx="18" fill="url(#cbeBg)"/><circle cx="40" cy="34" r="21" fill="none" stroke="url(#cbeGold)" stroke-width="2.5" opacity="0.8"/><circle cx="40" cy="34" r="16" fill="#3b0764" stroke="url(#cbeGold)" stroke-width="1.5"/><path d="M40 22 L42.5 30 L50.5 30 L44 35 L46.5 43 L40 38 L33.5 43 L36 35 L29.5 30 L37.5 30 Z" fill="url(#cbeGold)"/><text x="40" y="65" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="12" fill="#ffffff" letter-spacing="1.5">CBE</text></svg>';
+
+        $telebirrSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80"><defs><linearGradient id="tbBg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#0083cb"/><stop offset="100%" stop-color="#005a92"/></linearGradient><linearGradient id="tbYellow" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#fef08a"/><stop offset="100%" stop-color="#eab308"/></linearGradient></defs><rect width="80" height="80" rx="18" fill="url(#tbBg)"/><circle cx="40" cy="33" r="18" fill="none" stroke="url(#tbYellow)" stroke-width="3" stroke-dasharray="85 30" stroke-linecap="round"/><path d="M40 22 C32 22 26 27 26 34 C26 40 30 43 36 44 L39 44.5 C43 45 44 46.5 44 48 C44 50 42 51.5 38 51.5 C34 51.5 30 50 28 47.5" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"/><path d="M48 24 C51 27 52 30 52 34" fill="none" stroke="url(#tbYellow)" stroke-width="3" stroke-linecap="round"/><text x="40" y="66" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="800" font-size="10.5" fill="#ffffff" letter-spacing="0.5">telebirr</text></svg>';
+
+        $awashSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80"><defs><linearGradient id="awashBg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#14213d"/><stop offset="100%" stop-color="#0a1128"/></linearGradient><linearGradient id="awashOrange" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#fb923c"/><stop offset="100%" stop-color="#ea580c"/></linearGradient></defs><rect width="80" height="80" rx="18" fill="url(#awashBg)"/><path d="M40 18 L60 44 L49 44 L40 31 L31 44 L20 44 Z" fill="url(#awashOrange)"/><path d="M40 34 L52 50 L43 50 L40 45 L37 50 L28 50 Z" fill="#ffffff" opacity="0.9"/><text x="40" y="66" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="10.5" fill="#f97316" letter-spacing="1">AWASH</text></svg>';
+
+        $boaSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80"><defs><linearGradient id="boaBg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#0f172a"/><stop offset="100%" stop-color="#020617"/></linearGradient><linearGradient id="boaGold" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#fef08a"/><stop offset="50%" stop-color="#eab308"/><stop offset="100%" stop-color="#ca8a04"/></linearGradient></defs><rect width="80" height="80" rx="18" fill="url(#boaBg)"/><g transform="translate(40,32)"><circle cx="0" cy="0" r="18" fill="none" stroke="url(#boaGold)" stroke-width="1.5" stroke-dasharray="3 3"/><path d="M0 -15 L3 -5 L13 -9 L7 0 L15 5 L5 6 L6 16 L0 9 L-6 16 L-5 6 L-15 5 L-7 0 L-13 -9 L-3 -5 Z" fill="url(#boaGold)"/><circle cx="0" cy="0" r="4.5" fill="#0f172a" stroke="url(#boaGold)" stroke-width="1.5"/></g><text x="40" y="65" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="11.5" fill="url(#boaGold)" letter-spacing="1.5">BOA</text></svg>';
+
+        $zemenSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80"><defs><linearGradient id="zemenBg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#b91c1c"/><stop offset="100%" stop-color="#7f1d1d"/></linearGradient></defs><rect width="80" height="80" rx="18" fill="url(#zemenBg)"/><rect x="22" y="20" width="36" height="7" rx="3.5" fill="#ffffff"/><polygon points="56,23 30,46 22,46 48,23" fill="#fbbf24"/><polygon points="48,27 24,50 32,50 56,27" fill="#ffffff"/><rect x="22" y="45" width="36" height="7" rx="3.5" fill="#ffffff"/><text x="40" y="66" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="10.5" fill="#ffffff" letter-spacing="1.2">ZEMEN</text></svg>';
+
+        $dashenSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80"><defs><linearGradient id="dashenBg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#1e3a8a"/><stop offset="100%" stop-color="#172554"/></linearGradient><linearGradient id="dashenGold" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#fde047"/><stop offset="100%" stop-color="#f59e0b"/></linearGradient></defs><rect width="80" height="80" rx="18" fill="url(#dashenBg)"/><path d="M40 18 L58 43 L48 43 L40 31 L32 43 L22 43 Z" fill="url(#dashenGold)"/><path d="M40 29 L50 43 L43 43 L40 38 L37 43 L30 43 Z" fill="#ffffff"/><circle cx="40" cy="49" r="3.5" fill="url(#dashenGold)"/><text x="40" y="66" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="9.5" fill="#ffffff" letter-spacing="1">DASHEN</text></svg>';
+
+        $cashSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80"><defs><linearGradient id="cashBg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#059669"/><stop offset="100%" stop-color="#064e3b"/></linearGradient><linearGradient id="cashMint" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#a7f3d0"/><stop offset="100%" stop-color="#34d399"/></linearGradient></defs><rect width="80" height="80" rx="18" fill="url(#cashBg)"/><rect x="20" y="24" width="40" height="25" rx="4" fill="none" stroke="url(#cashMint)" stroke-width="2.5"/><circle cx="40" cy="36.5" r="6" fill="none" stroke="url(#cashMint)" stroke-width="2"/><circle cx="26" cy="30" r="1.5" fill="url(#cashMint)"/><circle cx="54" cy="30" r="1.5" fill="url(#cashMint)"/><circle cx="26" cy="43" r="1.5" fill="url(#cashMint)"/><circle cx="54" cy="43" r="1.5" fill="url(#cashMint)"/><text x="40" y="65" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="10" fill="#ffffff" letter-spacing="1.2">CASH</text></svg>';
+
+        $goldSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80"><defs><linearGradient id="goldBg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#78350f"/><stop offset="100%" stop-color="#451a03"/></linearGradient><linearGradient id="ingotGold" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#fef08a"/><stop offset="40%" stop-color="#facc15"/><stop offset="80%" stop-color="#ca8a04"/><stop offset="100%" stop-color="#854d0e"/></linearGradient></defs><rect width="80" height="80" rx="18" fill="url(#goldBg)"/><polygon points="26,38 54,38 50,47 22,47" fill="url(#ingotGold)" stroke="#fef08a" stroke-width="0.8"/><polygon points="22,47 50,47 48,51 20,51" fill="#a16207"/><polygon points="32,24 60,24 56,33 28,33" fill="url(#ingotGold)" stroke="#fef08a" stroke-width="0.8"/><polygon points="28,33 56,33 54,37 26,37" fill="#a16207"/><text x="44" y="30" font-family="system-ui, sans-serif" font-weight="900" font-size="5" fill="#78350f" letter-spacing="0.5">999.9</text><text x="36" y="44" font-family="system-ui, sans-serif" font-weight="900" font-size="5" fill="#78350f" letter-spacing="0.5">GOLD</text><text x="40" y="67" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="10.5" fill="#fde047" letter-spacing="1.2">RESERVE</text></svg>';
+
+        $forexSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80"><defs><linearGradient id="fxBg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#042f2e"/><stop offset="100%" stop-color="#115e59"/></linearGradient><linearGradient id="fxTeal" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#5eead4"/><stop offset="100%" stop-color="#14b8a6"/></linearGradient></defs><rect width="80" height="80" rx="18" fill="url(#fxBg)"/><circle cx="34" cy="32" r="14" fill="#0f766e" stroke="url(#fxTeal)" stroke-width="1.8"/><text x="34" y="37" text-anchor="middle" font-family="system-ui, sans-serif" font-weight="900" font-size="15" fill="#ffffff">$</text><circle cx="49" cy="38" r="11" fill="#042f2e" stroke="#2dd4bf" stroke-width="1.8"/><text x="49" y="42" text-anchor="middle" font-family="system-ui, sans-serif" font-weight="900" font-size="12" fill="#2dd4bf">₮</text><text x="40" y="66" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="9" fill="#ffffff" letter-spacing="1">FX · USDT</text></svg>';
+
+        $mapping = [
+            'Commercial Bank of Ethiopia' => 'data:image/svg+xml;utf8,'.rawurlencode($cbeSvg),
+            'Bank of Abyssinia' => 'data:image/svg+xml;utf8,'.rawurlencode($boaSvg),
+            'Awash Bank' => 'data:image/svg+xml;utf8,'.rawurlencode($awashSvg),
+            'TeleBirr' => 'data:image/svg+xml;utf8,'.rawurlencode($telebirrSvg),
+            'Zemen Bank' => 'data:image/svg+xml;utf8,'.rawurlencode($zemenSvg),
+            'Dashen Bank' => 'data:image/svg+xml;utf8,'.rawurlencode($dashenSvg),
+            'Cash on Hand' => 'data:image/svg+xml;utf8,'.rawurlencode($cashSvg),
+            'Physical Gold Reserve' => 'data:image/svg+xml;utf8,'.rawurlencode($goldSvg),
+            'Forex & USDT Reserve' => 'data:image/svg+xml;utf8,'.rawurlencode($forexSvg),
+        ];
+
+        $accounts = FinancialAccount::all();
+        foreach ($accounts as $acc) {
+            foreach ($mapping as $key => $logoUri) {
+                if (stripos($acc->name, $key) !== false) {
+                    $acc->logo = $logoUri;
+                    $acc->save();
+                    break;
+                }
+            }
+        }
+    }
+}

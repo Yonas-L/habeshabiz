@@ -17,6 +17,9 @@ class MaintenanceRecord extends Model
         'inventory_unit_id',
         'cost',
         'is_capitalized',
+        'billing_type',
+        'vendor_contact_id',
+        'vendor_debt_id',
         'financial_account_id',
         'description',
         'date',
@@ -38,6 +41,16 @@ class MaintenanceRecord extends Model
 
     public function financialAccount(): BelongsTo
     {
-        return $this->belongsTo(FinancialAccount::class);
+        return $this->belongsTo(FinancialAccount::class)->withTrashed();
+    }
+
+    public function vendorContact(): BelongsTo
+    {
+        return $this->belongsTo(Contact::class, 'vendor_contact_id')->withTrashed();
+    }
+
+    public function vendorDebt(): BelongsTo
+    {
+        return $this->belongsTo(Debt::class, 'vendor_debt_id');
     }
 }

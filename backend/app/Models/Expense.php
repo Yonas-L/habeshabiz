@@ -15,6 +15,9 @@ class Expense extends Model
     protected $fillable = [
         'tenant_id',
         'financial_account_id',
+        'inventory_unit_id',
+        'vendor_billing',
+        'vendor_contact_id',
         'category',
         'amount',
         'is_owner_draw',
@@ -34,7 +37,17 @@ class Expense extends Model
 
     public function financialAccount(): BelongsTo
     {
-        return $this->belongsTo(FinancialAccount::class);
+        return $this->belongsTo(FinancialAccount::class)->withTrashed();
+    }
+
+    public function inventoryUnit(): BelongsTo
+    {
+        return $this->belongsTo(InventoryUnit::class);
+    }
+
+    public function vendorContact(): BelongsTo
+    {
+        return $this->belongsTo(Contact::class, 'vendor_contact_id')->withTrashed();
     }
 
     public function creator(): BelongsTo

@@ -20,10 +20,13 @@ class SalesOrder extends Model
         'salesperson_id',
         'total_amount',
         'discount_amount',
+        'exchange_allowance',
+        'total_bonus_amount',
         'paid_amount',
         'payment_status',
         'payment_method',
         'financial_account_id',
+        'exchange_unit_id',
         'notes',
         'order_date',
     ];
@@ -33,6 +36,8 @@ class SalesOrder extends Model
         return [
             'total_amount' => 'decimal:2',
             'discount_amount' => 'decimal:2',
+            'exchange_allowance' => 'decimal:2',
+            'total_bonus_amount' => 'decimal:2',
             'paid_amount' => 'decimal:2',
             'order_date' => 'datetime',
         ];
@@ -40,7 +45,7 @@ class SalesOrder extends Model
 
     public function customer(): BelongsTo
     {
-        return $this->belongsTo(Contact::class, 'customer_id');
+        return $this->belongsTo(Contact::class, 'customer_id')->withTrashed();
     }
 
     public function salesperson(): BelongsTo
@@ -50,7 +55,12 @@ class SalesOrder extends Model
 
     public function financialAccount(): BelongsTo
     {
-        return $this->belongsTo(FinancialAccount::class, 'financial_account_id');
+        return $this->belongsTo(FinancialAccount::class, 'financial_account_id')->withTrashed();
+    }
+
+    public function exchangeUnit(): BelongsTo
+    {
+        return $this->belongsTo(InventoryUnit::class, 'exchange_unit_id')->withTrashed();
     }
 
     public function items(): HasMany

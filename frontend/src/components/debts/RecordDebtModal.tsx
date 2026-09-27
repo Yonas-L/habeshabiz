@@ -7,6 +7,7 @@ import {
   Loader2,
   ArrowDownLeft,
   ArrowUpRight,
+  ArrowLeftRight,
   UserPlus,
   Wallet,
   CalendarDays,
@@ -17,7 +18,8 @@ interface RecordDebtModalProps {
   isOpen: boolean;
   onClose: () => void;
   accounts: FinancialAccount[];
-  onCreated: () => void;
+  onCreated?: () => void;
+  onSuccess?: () => void;
   defaultType?: 'receivable' | 'payable';
 }
 
@@ -26,6 +28,7 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
   onClose,
   accounts,
   onCreated,
+  onSuccess,
   defaultType = 'receivable',
 }) => {
   const [debtType, setDebtType] = useState<'receivable' | 'payable'>(defaultType);
@@ -43,6 +46,8 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loadingContacts, setLoadingContacts] = useState(false);
 
+  const treasuryAccounts = accounts.filter((a) => !a.is_custom_asset);
+
   useEffect(() => {
     if (isOpen) {
       setDebtType(defaultType);
@@ -53,11 +58,21 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
       setAmount('');
       setDueDate('');
       setNotes('');
-      setDisburseAccountId('');
+      setDisburseAccountId(treasuryAccounts[0]?.id || '');
       setCashMovement(false);
       loadContacts();
     }
   }, [isOpen, defaultType]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   const loadContacts = async () => {
     try {
@@ -70,8 +85,6 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
       setLoadingContacts(false);
     }
   };
-
-  const treasuryAccounts = accounts.filter((a) => !a.is_custom_asset);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,7 +125,8 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
         }
       );
 
-      onCreated();
+      if (onCreated) onCreated();
+      if (onSuccess) onSuccess();
       onClose();
     } catch (err: any) {
       toast.error('Failed to record', { description: err.message });
@@ -124,81 +138,91 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div
+        className="fixed inset-0 bg-slate-950/40 dark:bg-black/60 backdrop-blur-xs animate-backdrop-enter"
+        onClick={onClose}
+      />
 
       {/* Modal */}
-      <div className="relative w-full max-w-lg mx-4 bg-white dark:bg-[#0f1522] rounded-2xl shadow-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden animate-page-enter">
+      <div className="relative z-10 w-full max-w-lg bg-white dark:bg-[#131926] rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden animate-modal-enter">
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-slate-800">
-          <div>
-            <h2 className="text-sm font-bold text-slate-900 dark:text-white">Record Receivable / Payable</h2>
-            <p className="text-[11px] text-slate-400 mt-0.5">Log customer credit, peer vendor payout, or loan entry</p>
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center shrink-0">
+              <ArrowLeftRight className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white leading-none">
+                Record Receivable / Payable
+              </h2>
+              <p className="text-[11px] text-slate-400 mt-1">
+                Log customer credit, peer vendor payout, or loan entry
+              </p>
+            </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
-            <X className="w-4 h-4 text-slate-400" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-5 max-h-[70vh] overflow-y-auto">
+        <form onSubmit={handleSubmit} className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
           {/* Type Selector */}
           <div>
-            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">
-              Type
+            <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
+              Transaction Direction
             </label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2.5">
               <button
                 type="button"
                 onClick={() => setDebtType('receivable')}
-                className={`flex items-center gap-2 p-3 rounded-xl border-2 transition-all text-left ${
+                className={`flex items-center gap-2.5 p-3 rounded-xl border text-left transition-all ${
                   debtType === 'receivable'
-                    ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/30'
-                    : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
+                    ? 'border-emerald-500/60 bg-emerald-50/60 dark:bg-emerald-950/30 text-emerald-950 dark:text-emerald-100 ring-1 ring-emerald-500/20'
+                    : 'border-slate-200 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-900/40 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700'
                 }`}
               >
-                <ArrowDownLeft
-                  className={`w-4 h-4 ${
-                    debtType === 'receivable' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'
+                <div
+                  className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                    debtType === 'receivable'
+                      ? 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
                   }`}
-                />
-                <div>
-                  <div
-                    className={`text-xs font-bold ${
-                      debtType === 'receivable' ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-300'
-                    }`}
-                  >
-                    Someone Owes Me
-                  </div>
-                  <div className="text-[10px] text-slate-400">Receivable</div>
+                >
+                  <ArrowDownLeft className="w-3.5 h-3.5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-xs font-bold truncate">Someone Owes Me</div>
+                  <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate">Customer credit · Receivable</div>
                 </div>
               </button>
+
               <button
                 type="button"
                 onClick={() => setDebtType('payable')}
-                className={`flex items-center gap-2 p-3 rounded-xl border-2 transition-all text-left ${
+                className={`flex items-center gap-2.5 p-3 rounded-xl border text-left transition-all ${
                   debtType === 'payable'
-                    ? 'border-rose-500 bg-rose-50/50 dark:bg-rose-950/30'
-                    : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
+                    ? 'border-rose-500/60 bg-rose-50/60 dark:bg-rose-950/30 text-rose-950 dark:text-rose-100 ring-1 ring-rose-500/20'
+                    : 'border-slate-200 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-900/40 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700'
                 }`}
               >
-                <ArrowUpRight
-                  className={`w-4 h-4 ${
-                    debtType === 'payable' ? 'text-rose-600 dark:text-rose-400' : 'text-slate-400'
+                <div
+                  className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                    debtType === 'payable'
+                      ? 'bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
                   }`}
-                />
-                <div>
-                  <div
-                    className={`text-xs font-bold ${
-                      debtType === 'payable' ? 'text-rose-700 dark:text-rose-400' : 'text-slate-700 dark:text-slate-300'
-                    }`}
-                  >
-                    I Owe Someone
-                  </div>
-                  <div className="text-[10px] text-slate-400">Payable</div>
+                >
+                  <ArrowUpRight className="w-3.5 h-3.5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-xs font-bold truncate">I Owe Someone</div>
+                  <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate">Vendor / Loan · Payable</div>
                 </div>
               </button>
             </div>
@@ -206,15 +230,15 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
 
           {/* Contact */}
           <div>
-            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">
-              Contact
+            <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+              Contact / Party
             </label>
             {/* Mode toggle */}
-            <div className="flex gap-2 mb-2.5">
+            <div className="flex gap-2 mb-2">
               <button
                 type="button"
                 onClick={() => setContactMode('new')}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                   contactMode === 'new'
                     ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
                     : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
@@ -226,7 +250,7 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
               <button
                 type="button"
                 onClick={() => setContactMode('existing')}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                   contactMode === 'existing'
                     ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
                     : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
@@ -243,7 +267,7 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
                   value={contactName}
                   onChange={(e) => setContactName(e.target.value)}
                   placeholder="Full Name *"
-                  className="h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+                  className="h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 focus:border-slate-900 dark:focus:border-slate-600"
                   required
                 />
                 <input
@@ -251,14 +275,14 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
                   value={contactPhone}
                   onChange={(e) => setContactPhone(e.target.value)}
                   placeholder="Phone (optional)"
-                  className="h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+                  className="h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 focus:border-slate-900 dark:focus:border-slate-600"
                 />
               </div>
             ) : (
               <select
                 value={contactId}
                 onChange={(e) => setContactId(e.target.value)}
-                className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 focus:border-slate-900 dark:focus:border-slate-600"
                 required
               >
                 <option value="">
@@ -276,7 +300,7 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
           {/* Amount + Due Date */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+              <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
                 Amount (ETB) *
               </label>
               <input
@@ -286,59 +310,65 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="0.00"
-                className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs font-mono font-bold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-bold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 focus:border-slate-900 dark:focus:border-slate-600"
                 required
               />
             </div>
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                <CalendarDays className="w-3 h-3 inline mr-1" />
+              <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                <CalendarDays className="w-3 h-3 inline mr-1 text-slate-400" />
                 Due Date
               </label>
               <input
                 type="date"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
-                className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 focus:border-slate-900 dark:focus:border-slate-600"
               />
             </div>
           </div>
 
           {/* Notes */}
           <div>
-            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-              <FileText className="w-3 h-3 inline mr-1" />
-              Notes
+            <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+              <FileText className="w-3 h-3 inline mr-1 text-slate-400" />
+              Notes / Reference
             </label>
-            <textarea
+            <input
+              type="text"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Reason, context, or reference..."
-              rows={2}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 resize-none"
+              placeholder="e.g. Credit for accessories, shop loan, or supply payout"
+              className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 focus:border-slate-900 dark:focus:border-slate-600"
             />
           </div>
 
           {/* Cash Movement Toggle */}
-          <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 space-y-2.5">
-            <label className="flex items-center gap-2 cursor-pointer">
+          <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 space-y-2.5">
+            <label className="flex items-start gap-2.5 cursor-pointer">
               <input
                 type="checkbox"
                 checked={cashMovement}
-                onChange={(e) => setCashMovement(e.target.checked)}
-                className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-slate-900 focus:ring-slate-500"
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  setCashMovement(checked);
+                  if (checked && !disburseAccountId && treasuryAccounts.length > 0) {
+                    setDisburseAccountId(treasuryAccounts[0].id);
+                  }
+                }}
+                className="w-4 h-4 mt-0.5 rounded border-slate-300 dark:border-slate-600 text-slate-900 focus:ring-slate-500"
               />
               <div>
-                <span className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                  <Wallet className="w-3.5 h-3.5 text-slate-500" />
+                <span className="text-xs font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <Wallet className="w-3.5 h-3.5 text-slate-400" />
                   {debtType === 'receivable'
-                    ? 'Cash was disbursed from an account'
-                    : 'Cash was received into an account'}
+                    ? 'Disburse cash now (deduct from account)'
+                    : 'Receive cash now (deposit into account)'}
                 </span>
-                <span className="text-[10px] text-slate-400 block mt-0.5">
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5">
                   {debtType === 'receivable'
-                    ? 'The money has already left your bank — deduct the balance now'
-                    : 'The borrowed money was deposited — increase the balance now'}
+                    ? 'Check if money left your account immediately as a cash or bank loan'
+                    : 'Check if borrowed funds were immediately deposited into your account'}
                 </span>
               </div>
             </label>
@@ -347,7 +377,7 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
               <select
                 value={disburseAccountId}
                 onChange={(e) => setDisburseAccountId(e.target.value)}
-                className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 focus:border-slate-900 dark:focus:border-slate-600"
                 required
               >
                 <option value="">— Select Account —</option>
@@ -362,29 +392,25 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
         </form>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2 p-5 border-t border-slate-100 dark:border-slate-800">
+        <div className="flex items-center justify-end gap-2.5 p-5 border-t border-slate-100 dark:border-slate-800">
           <button
             type="button"
             onClick={onClose}
-            className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="h-10 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
           >
             Cancel
           </button>
           <button
             onClick={handleSubmit}
             disabled={submitting}
-            className={`h-9 px-5 rounded-xl text-xs font-bold transition-all shadow-xs active:scale-[0.98] flex items-center gap-1.5 disabled:opacity-50 ${
-              debtType === 'receivable'
-                ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                : 'bg-rose-600 hover:bg-rose-700 text-white'
-            }`}
+            className="h-10 px-5 rounded-xl text-xs font-bold transition-all shadow-xs active:scale-[0.98] flex items-center gap-1.5 disabled:opacity-50 bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 cursor-pointer"
           >
             {submitting ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
             ) : debtType === 'receivable' ? (
-              <ArrowDownLeft className="w-3.5 h-3.5" />
+              <ArrowDownLeft className="w-3.5 h-3.5 text-emerald-400 dark:text-emerald-600" />
             ) : (
-              <ArrowUpRight className="w-3.5 h-3.5" />
+              <ArrowUpRight className="w-3.5 h-3.5 text-rose-400 dark:text-rose-600" />
             )}
             <span>
               {submitting
@@ -399,3 +425,4 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
     </div>
   );
 };
+

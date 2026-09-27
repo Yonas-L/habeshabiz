@@ -57,6 +57,22 @@ export interface Product {
   variants: ProductVariant[];
 }
 
+export interface MaintenanceRecord {
+  id: string;
+  inventory_unit_id: string;
+  cost: string | number;
+  is_capitalized: boolean;
+  billing_type?: 'shop' | 'vendor_deduct' | string;
+  vendor_contact_id?: string | null;
+  vendor_contact?: Contact;
+  vendor_debt_id?: string | null;
+  financial_account_id?: string | null;
+  description: string;
+  date: string;
+  created_at?: string;
+  financial_account?: FinancialAccount;
+}
+
 export interface InventoryUnit {
   id: string;
   variant_id: string;
@@ -66,9 +82,22 @@ export interface InventoryUnit {
   sim_type: 'physical' | 'esim' | 'dual' | 'na';
   condition: string;
   cost_basis?: string | number;
-  status: 'in_stock' | 'out' | 'sold' | 'returned' | 'returned_to_vendor' | 'reserved' | 'damaged';
-  source_type?: 'purchase' | 'consignment';
+  selling_price?: string | number | null;
+  status: 'in_stock' | 'out' | 'sold' | 'returned' | 'returned_to_vendor' | 'reserved' | 'damaged' | 'fixed';
+  customer_waiting?: boolean;
+  customer_waiting_at?: string | null;
+  is_repaired?: boolean;
+  is_swapped?: boolean;
+  swapped_at?: string | null;
+  swapped_sales_order_id?: string | null;
+  swapped_from_unit_id?: string | null;
+  swapped_replacement_unit_id?: string | null;
+  swapped_sales_order?: SalesOrder;
+  swapped_from_unit?: InventoryUnit;
+  swapped_replacement_unit?: InventoryUnit;
+  source_type?: 'purchase' | 'consignment' | 'exchange';
   supplier_contact_id?: string | null;
+  exchange_sales_order_id?: string | null;
   return_deadline?: string | null;
   handover_payout?: string | number | null;
   location: string;
@@ -78,8 +107,12 @@ export interface InventoryUnit {
   return_reason?: string | null;
   returned_at?: string | null;
   sold_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
   variant?: ProductVariant & { product?: Product };
   supplier?: Contact;
+  maintenance_records?: MaintenanceRecord[];
+  sales_order_item?: SalesOrderItem;
 }
 
 export interface Contact {
@@ -91,12 +124,116 @@ export interface Contact {
   roles: string[];
   notes?: string | null;
   is_active?: boolean;
+  statement_token?: string | null;
   created_at?: string;
   updated_at?: string;
   debts_count?: number;
   sales_orders_count?: number;
   brokered_items_count?: number;
   supplied_units_count?: number;
+  net_balance?: number;
+  open_receivable?: number;
+  open_payable?: number;
+}
+
+export interface StatementLedgerRow {
+  id: string;
+  date: string;
+  formatted_date: string;
+  type: string;
+  type_label: string;
+  context: string;
+  payable: number;
+  receivable: number;
+  balance_effect: number;
+  running_balance: number;
+  reference_number: string | null;
+}
+
+export interface StatementSuppliedUnit {
+  id: string;
+  model: string;
+  specs: string[];
+  imei_or_serial: string | null;
+  status: string;
+  location: string | null;
+  cost_basis: number;
+  selling_price: number;
+  source_type: string;
+  created_at: string;
+  sold_at: string | null;
+  order_number: string | null;
+}
+
+export interface StatementHandedOutUnit {
+  id: string;
+  model: string;
+  specs: string[];
+  imei_or_serial: string | null;
+  status: string;
+  location: string | null;
+  handed_out_at: string | null;
+  handover_payout: number;
+}
+
+export interface StatementVendorReturnUnit {
+  id: string;
+  model: string;
+  specs: string[];
+  imei_or_serial: string | null;
+  status: string;
+  return_reason: string | null;
+  returned_at: string | null;
+  maintenance_cost: number;
+}
+
+export interface PartnerStatementData {
+  contact: {
+    id: string;
+    name: string;
+    phone: string | null;
+    alt_phone?: string | null;
+    email?: string | null;
+    roles: string[];
+    statement_token: string;
+  };
+  range: {
+    start_date: string | null;
+    end_date: string | null;
+    formatted_range: string;
+  };
+  kpis: {
+    current_open_payable: number;
+    current_open_receivable: number;
+    current_net_balance: number;
+    balance_verdict: string;
+    range_opening_balance: number;
+    range_closing_balance: number;
+    range_payable_total: number;
+    range_receivable_total: number;
+    range_paid_to_vendor: number;
+    range_received_from_vendor: number;
+    supplied_units_count: number;
+    supplied_in_stock_count: number;
+    handed_out_count: number;
+    repairs_count: number;
+  };
+  business: {
+    name: string;
+    branch: string;
+    phone: string;
+    email: string;
+    bank_accounts: Array<{
+      id: string;
+      name: string;
+      account_number: string | null;
+      type: string;
+    }>;
+  };
+  ledger: StatementLedgerRow[];
+  supplied_units: StatementSuppliedUnit[];
+  handed_out_units: StatementHandedOutUnit[];
+  vendor_return_units: StatementVendorReturnUnit[];
 }
 
 export interface SalesOrderItem {
@@ -106,13 +243,16 @@ export interface SalesOrderItem {
   inventory_unit_id: string | null;
   quantity: number;
   unit_price: string | number;
+  setted_price?: string | number | null;
   unit_cost?: string | number;
   profit?: string | number;
+  bonus_amount?: string | number;
   sourcing_type: 'internal_stock' | 'brokered_neighbour';
   vendor_contact_id: string | null;
   vendor_contact?: Contact;
   variant?: ProductVariant & { product?: Product };
   inventory_unit?: InventoryUnit;
+  sales_order?: SalesOrder;
 }
 
 export interface SalesOrder {
@@ -124,10 +264,15 @@ export interface SalesOrder {
   salesperson?: User;
   total_amount: string | number;
   discount_amount: string | number;
+  exchange_allowance?: string | number;
+  exchange_unit_id?: string | null;
+  exchange_unit?: InventoryUnit;
+  total_bonus_amount?: string | number;
   paid_amount: string | number;
   payment_status: 'paid' | 'partially_paid' | 'unpaid';
   payment_method: string;
   order_date: string;
+  notes?: string | null;
   items: SalesOrderItem[];
 }
 
@@ -166,6 +311,43 @@ export interface FinancialAccount {
   is_custom_asset: boolean;
   is_active?: boolean;
   asset_details?: Record<string, any> | null;
+  logo?: string | null;
+}
+
+export interface AccountActivity {
+  id: string;
+  transaction_number: string;
+  date: string;
+  type: string;
+  type_label: string;
+  direction: 'inflow' | 'outflow';
+  amount: number;
+  fee: number;
+  inflow: number;
+  outflow: number;
+  net_effect: number;
+  balance_after: number;
+  reference_number: string | null;
+  contact_id: string | null;
+  counterparty: string | null;
+  description: string | null;
+  created_by: string | null;
+}
+
+export interface AccountActivitiesResponse {
+  account: FinancialAccount;
+  summary: {
+    current_balance: number;
+    total_inflow: number;
+    total_outflow: number;
+    net_flow: number;
+    filtered_inflow: number;
+    filtered_outflow: number;
+    filtered_net: number;
+    total_count: number;
+    filtered_count: number;
+  };
+  activities: AccountActivity[];
 }
 
 export interface Expense {
@@ -176,7 +358,41 @@ export interface Expense {
   amount: string | number;
   is_owner_draw: boolean;
   description: string;
+  inventory_unit_id?: string | null;
+  inventory_unit?: InventoryUnit;
+  vendor_billing?: 'shop' | 'vendor_deduct' | string | null;
+  vendor_contact_id?: string | null;
+  vendor_contact?: Contact;
   date: string;
+}
+
+export interface DashboardSalesChartPoint {
+  date: string;
+  day: string;
+  revenue: number;
+  profit: number;
+  orders: number;
+}
+
+export interface PartnerSettlementItem {
+  id: string;
+  name: string;
+  phone: string | null;
+  statement_token?: string | null;
+  open_receivable: number;
+  open_payable: number;
+  net_balance: number;
+  verdict: 'owes_us' | 'we_owe' | 'settled';
+  active_handovers_count: number;
+  supplied_in_stock_count: number;
+}
+
+export interface PartnerSettlementsOverview {
+  partners_owing_us_count: number;
+  total_owed_to_us_net: number;
+  partners_we_owe_count: number;
+  total_we_owe_net: number;
+  partners: PartnerSettlementItem[];
 }
 
 export interface DashboardData {
@@ -189,6 +405,7 @@ export interface DashboardData {
     payables: number;
   };
   monthly_performance: {
+    selected_month?: string;
     revenue: number;
     gross_profit: number;
     operating_expenses: number;
@@ -198,11 +415,17 @@ export interface DashboardData {
   counts: {
     in_stock_phones: number;
     open_receivables: number;
+    open_receivable_parties?: number;
     open_payables: number;
+    open_payable_parties?: number;
+    uncollected_staff_bonuses?: number;
+    pending_bonus_staff_count?: number;
   };
+  partner_settlements?: PartnerSettlementsOverview;
   recent_sales: SalesOrder[];
   top_receivables: Debt[];
   top_payables: Debt[];
+  sales_chart?: DashboardSalesChartPoint[];
 }
 
 export interface StaffMember {
@@ -219,6 +442,9 @@ export interface StaffMember {
     sales_volume_week: number;
     sales_count_month: number;
     sales_volume_month: number;
+    uncollected_bonus?: number;
+    collected_bonus?: number;
+    total_bonus_earned?: number;
     last_sale_at: string | null;
   };
 }
@@ -234,19 +460,45 @@ export interface LeaderboardItem {
   month_volume: number;
   bonus_tier: string;
   bonus_amount: number;
+  uncollected_bonus?: number;
+  collected_bonus?: number;
+  total_bonus_earned?: number;
 }
 
 export interface AuditLogItem {
   id: string;
   user_id: number | null;
-  user?: { id: number; name: string; email: string };
+  user?: { id: number; name: string; email: string; role?: string } | null;
   action: string;
   entity_type: string;
   entity_id: string | null;
   old_values?: any;
   new_values?: any;
-  ip_address?: string;
+  ip_address?: string | null;
   created_at: string;
+}
+
+export interface AuditLogsResponse {
+  items: AuditLogItem[];
+  pagination: {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    from: number | null;
+    to: number | null;
+    has_more: boolean;
+  };
+  summary: {
+    total_count: number;
+    today_count: number;
+    filtered_count: number;
+  };
+  filter_options: {
+    actions: string[];
+    entity_types: string[];
+    users: Array<{ id: number; name: string; role: string }>;
+  };
 }
 
 export interface StaffTask {
@@ -292,7 +544,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   if (!res.ok) {
     throw new Error(data.message || 'API request failed');
   }
-  return data.data;
+  return data.data !== undefined ? data.data : data;
 }
 
 export const api = {
@@ -304,7 +556,8 @@ export const api = {
   getMe: () => request<{ user: User; tenant: Tenant }>('/auth/me'),
   logout: () => request<void>('/auth/logout', { method: 'POST' }),
 
-  getDashboardSummary: () => request<DashboardData>('/dashboard/summary'),
+  getDashboardSummary: (month?: string) =>
+    request<DashboardData>(month ? `/dashboard/summary?month=${month}` : '/dashboard/summary'),
 
   // Categories & Taxonomy
   getCategories: () => request<ProductCategory[]>('/categories'),
@@ -335,11 +588,12 @@ export const api = {
     }),
 
   // Products & Variants Catalog
-  getProducts: (params?: { category?: string; category_id?: string; search?: string }) => {
+  getProducts: (params?: { category?: string; category_id?: string; search?: string; include_inactive?: boolean }) => {
     const query = new URLSearchParams();
     if (params?.category) query.set('category', params.category);
     if (params?.category_id) query.set('category_id', params.category_id);
     if (params?.search) query.set('search', params.search);
+    if (params?.include_inactive) query.set('include_inactive', '1');
     return request<Product[]>(`/products?${query.toString()}`);
   },
 
@@ -420,21 +674,25 @@ export const api = {
       method: 'DELETE',
     }),
 
-  getInventoryUnits: (params?: { status?: string; category_id?: string; category?: string; search?: string }) => {
+  getInventoryUnits: (params?: { status?: string; category_id?: string; category?: string; search?: string; variant_id?: string; product_id?: string }) => {
     const query = new URLSearchParams();
     if (params?.status) query.set('status', params.status);
     if (params?.category_id) query.set('category_id', params.category_id);
     if (params?.category) query.set('category', params.category);
     if (params?.search) query.set('search', params.search);
+    if (params?.variant_id) query.set('variant_id', params.variant_id);
+    if (params?.product_id) query.set('product_id', params.product_id);
     return request<InventoryUnit[]>(`/inventory/units?${query.toString()}`);
   },
 
-  getInventoryWithCounts: async (params?: { status?: string; category_id?: string; category?: string; search?: string }) => {
+  getInventoryWithCounts: async (params?: { status?: string; category_id?: string; category?: string; search?: string; variant_id?: string; product_id?: string }) => {
     const query = new URLSearchParams();
     if (params?.status) query.set('status', params.status);
     if (params?.category_id) query.set('category_id', params.category_id);
     if (params?.category) query.set('category', params.category);
     if (params?.search) query.set('search', params.search);
+    if (params?.variant_id) query.set('variant_id', params.variant_id);
+    if (params?.product_id) query.set('product_id', params.product_id);
     const token = getAuthToken();
     const res = await fetch(`${API_BASE}/inventory/units?${query.toString()}`, {
       headers: {
@@ -446,9 +704,10 @@ export const api = {
     if (!res.ok) throw new Error(json.message || 'API request failed');
     return {
       units: (json.data || []) as InventoryUnit[],
-      counts: (json.counts || { in_stock: 0, vendor_stock: 0, out: 0, sold: 0, returned: 0, returned_to_vendor: 0, all: 0 }) as {
+      counts: (json.counts || { in_stock: 0, vendor_stock: 0, exchange_stock: 0, out: 0, sold: 0, returned: 0, returned_to_vendor: 0, all: 0 }) as {
         in_stock: number;
         vendor_stock: number;
+        exchange_stock?: number;
         out: number;
         sold: number;
         returned: number;
@@ -480,8 +739,44 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
+  updateInventoryUnit: (
+    id: string,
+    data: {
+      imei_or_serial?: string | null;
+      condition?: string;
+      cost_basis?: number;
+      selling_price?: number | null;
+      battery_health?: number | null;
+      cycle_count?: number | null;
+      sim_type?: string;
+      location?: string;
+      notes?: string | null;
+      supplier_contact_id?: string | null;
+    }
+  ) =>
+    request<InventoryUnit>(`/inventory/units/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
   handoverInventoryUnit: (id: string, data: { handover_to: string; location?: string; notes?: string; return_deadline?: string; handover_payout?: number }) =>
     request<InventoryUnit>(`/inventory/units/${id}/handover`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  markHandoverSold: (
+    id: string,
+    data: {
+      settlement_type: 'paid' | 'offset' | 'credit';
+      selling_price?: number;
+      financial_account_id?: string;
+      payment_date?: string;
+      reference_number?: string;
+      notes?: string;
+    }
+  ) =>
+    request<InventoryUnit>(`/inventory/units/${id}/mark-handover-sold`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
@@ -491,8 +786,23 @@ export const api = {
       method: 'POST',
     }),
 
-  customerReturnInventoryUnit: (id: string, data: { return_reason: string; condition?: string; notes?: string }) =>
+  customerReturnInventoryUnit: (id: string, data: { return_reason: string; condition?: string; notes?: string; destination?: 'repair' | 'vendor'; customer_waiting?: boolean }) =>
     request<InventoryUnit>(`/inventory/units/${id}/customer-return`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  swapInventoryUnit: (
+    id: string,
+    data: {
+      replacement_unit_id: string;
+      swap_reason: string;
+      destination?: 'repair' | 'in_stock';
+      condition?: string;
+      notes?: string;
+    }
+  ) =>
+    request<{ old_unit: InventoryUnit; replacement_unit: InventoryUnit }>(`/inventory/units/${id}/swap`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
@@ -503,21 +813,98 @@ export const api = {
       body: JSON.stringify(data || {}),
     }),
 
-  repairedRestockInventoryUnit: (id: string, data?: { condition?: string; notes?: string }) =>
+  receiveFromVendor: (
+    id: string,
+    data: {
+      action: 'deliver_to_customer' | 'restock';
+      condition?: string;
+      battery_health?: number;
+      cycle_count?: number;
+      notes?: string;
+      new_selling_price?: number;
+      imei_or_serial?: string;
+    }
+  ) =>
+    request<{ success: boolean; message: string; data: InventoryUnit }>(`/inventory/units/${id}/receive-from-vendor`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  vendorSwap: (
+    id: string,
+    data: {
+      replacement_imei: string;
+      action: 'deliver_to_customer' | 'restock';
+      condition?: string;
+      battery_health?: number;
+      cycle_count?: number;
+      sim_type?: 'physical' | 'esim' | 'dual' | 'na';
+      notes?: string;
+      new_selling_price?: number;
+    }
+  ) =>
+    request<{ success: boolean; message: string; data: { old_unit: InventoryUnit; replacement_unit: InventoryUnit } }>(`/inventory/units/${id}/vendor-swap`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  repairedRestockInventoryUnit: (id: string, data?: { action?: 'restock' | 'deliver_to_customer'; condition?: string; notes?: string; new_selling_price?: number; cost_basis?: number; imei_or_serial?: string }) =>
     request<InventoryUnit>(`/inventory/units/${id}/repaired-restock`, {
       method: 'POST',
       body: JSON.stringify(data || {}),
     }),
 
-  getSales: (params?: { payment_status?: string; search?: string }) => {
+  getSales: (params?: { payment_status?: string; source_type?: string; search?: string }) => {
     const query = new URLSearchParams();
     if (params?.payment_status) query.set('payment_status', params.payment_status);
+    if (params?.source_type) query.set('source_type', params.source_type);
     if (params?.search) query.set('search', params.search);
     return request<SalesOrder[]>(`/sales?${query.toString()}`);
   },
 
+  getSalesWithCounts: async (params?: { payment_status?: string; source_type?: string; search?: string; per_page?: number | string }) => {
+    const query = new URLSearchParams();
+    if (params?.payment_status) query.set('payment_status', params.payment_status);
+    if (params?.source_type) query.set('source_type', params.source_type);
+    if (params?.search) query.set('search', params.search);
+    if (params?.per_page) query.set('per_page', String(params.per_page));
+    const token = getAuthToken();
+    const res = await fetch(`${API_BASE}/sales?${query.toString()}`, {
+      headers: {
+        Accept: 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.message || 'API request failed');
+    return {
+      sales: (json.data || []) as SalesOrder[],
+      counts: (json.counts || { all: 0, paid: 0, credit: 0, exchange: 0 }) as {
+        all: number;
+        paid: number;
+        credit: number;
+        exchange: number;
+      },
+      pagination: json.pagination,
+    };
+  },
+
   recordSale: (data: any) =>
     request<SalesOrder>('/sales', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  collectSalesPayment: (
+    orderId: string,
+    data: {
+      amount: number;
+      financial_account_id: string;
+      reference_number?: string;
+      notes?: string;
+    }
+  ) =>
+    request<{ success: boolean; message: string; data: SalesOrder }>(`/sales/${orderId}/collect`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
@@ -585,6 +972,7 @@ export const api = {
     opening_balance?: number;
     is_custom_asset?: boolean;
     asset_details?: Record<string, any>;
+    logo?: string | null;
   }) =>
     request<FinancialAccount>('/accounts', {
       method: 'POST',
@@ -600,6 +988,7 @@ export const api = {
     is_active?: boolean;
     asset_details?: Record<string, any> | null;
     balance_adjustment?: number;
+    logo?: string | null;
   }) =>
     request<FinancialAccount>(`/accounts/${id}`, {
       method: 'PUT',
@@ -610,6 +999,24 @@ export const api = {
     request<{ message: string; deactivated?: boolean }>(`/accounts/${id}`, {
       method: 'DELETE',
     }),
+
+  getAccountActivities: (
+    id: string,
+    params?: {
+      type?: string;
+      search?: string;
+      start_date?: string;
+      end_date?: string;
+    }
+  ) => {
+    const query = new URLSearchParams();
+    if (params?.type && params.type !== 'all') query.set('type', params.type);
+    if (params?.search) query.set('search', params.search);
+    if (params?.start_date) query.set('start_date', params.start_date);
+    if (params?.end_date) query.set('end_date', params.end_date);
+    const qs = query.toString();
+    return request<AccountActivitiesResponse>(`/accounts/${id}/activities${qs ? `?${qs}` : ''}`);
+  },
 
   getContacts: (params?: { role?: string; search?: string; is_active?: boolean }) => {
     const query = new URLSearchParams();
@@ -647,6 +1054,22 @@ export const api = {
       method: 'DELETE',
     }),
 
+  getPartnerStatement: (id: string, params?: { start_date?: string; end_date?: string }) => {
+    const query = new URLSearchParams();
+    if (params?.start_date) query.set('start_date', params.start_date);
+    if (params?.end_date) query.set('end_date', params.end_date);
+    const qs = query.toString();
+    return request<PartnerStatementData>(`/contacts/${id}/statement${qs ? `?${qs}` : ''}`);
+  },
+
+  getPublicStatement: (token: string, params?: { start_date?: string; end_date?: string }) => {
+    const query = new URLSearchParams();
+    if (params?.start_date) query.set('start_date', params.start_date);
+    if (params?.end_date) query.set('end_date', params.end_date);
+    const qs = query.toString();
+    return request<PartnerStatementData>(`/public/statement/${token}${qs ? `?${qs}` : ''}`);
+  },
+
   getExpenses: (params?: { is_owner_draw?: boolean; category?: string }) => {
     const query = new URLSearchParams();
     if (params?.is_owner_draw !== undefined) query.set('is_owner_draw', String(params.is_owner_draw));
@@ -654,7 +1077,7 @@ export const api = {
     return request<Expense[]>(`/expenses?${query.toString()}`);
   },
 
-  recordExpense: (data: { financial_account_id: string; category: string; amount: number; is_owner_draw?: boolean; description: string }) =>
+  recordExpense: (data: { financial_account_id: string; inventory_unit_id?: string; category: string; amount: number; is_owner_draw?: boolean; vendor_billing?: 'shop' | 'vendor_deduct' | 'vendor_reimburse'; vendor_contact_id?: string; description: string; date?: string }) =>
     request<Expense>('/expenses', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -682,7 +1105,28 @@ export const api = {
   getLeaderboard: () =>
     request<{ leaderboard: LeaderboardItem[]; top_seller: LeaderboardItem | null }>('/staff/leaderboard'),
 
-  getAuditLogs: () => request<AuditLogItem[]>('/staff/audit-logs'),
+  getAuditLogs: (params?: {
+    page?: number;
+    per_page?: number;
+    search?: string;
+    action?: string;
+    entity_type?: string;
+    user_id?: string | number;
+    start_date?: string;
+    end_date?: string;
+  }) => {
+    const query = new URLSearchParams();
+    if (params?.page) query.set('page', String(params.page));
+    if (params?.per_page) query.set('per_page', String(params.per_page));
+    if (params?.search) query.set('search', params.search);
+    if (params?.action && params.action !== 'all') query.set('action', params.action);
+    if (params?.entity_type && params.entity_type !== 'all') query.set('entity_type', params.entity_type);
+    if (params?.user_id && params.user_id !== 'all') query.set('user_id', String(params.user_id));
+    if (params?.start_date) query.set('start_date', params.start_date);
+    if (params?.end_date) query.set('end_date', params.end_date);
+    const qs = query.toString();
+    return request<AuditLogsResponse>(qs ? `/staff/audit-logs?${qs}` : '/staff/audit-logs');
+  },
 
   // Staff Tasks & Targets Checklist
   getTasks: () => request<StaffTask[]>('/tasks'),

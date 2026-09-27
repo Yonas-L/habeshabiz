@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\GeneratePartnerStatementAction;
 use App\Http\Controllers\Controller;
 use App\Models\Contact;
+use App\Scopes\TenantScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class ContactController extends Controller
 {
@@ -59,9 +62,17 @@ class ContactController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        $tenantId = TenantScope::getActiveTenantId() ?? $request->user()?->tenant_id;
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:50'],
+            'phone' => [
+                'nullable',
+                'string',
+                'max:50',
+                Rule::unique('contacts', 'phone')
+                    ->where(fn ($query) => $query->where('tenant_id', $tenantId)->whereNull('deleted_at')),
+            ],
             'alt_phone' => ['nullable', 'string', 'max:50'],
             'email' => ['nullable', 'email'],
             'roles' => ['required', 'array', 'min:1'],
@@ -83,10 +94,18 @@ class ContactController extends Controller
     public function update(Request $request, string $id): JsonResponse
     {
         $contact = Contact::findOrFail($id);
+        $tenantId = TenantScope::getActiveTenantId() ?? $contact->tenant_id;
 
         $validated = $request->validate([
             'name' => ['sometimes', 'required', 'string', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:50'],
+            'phone' => [
+                'nullable',
+                'string',
+                'max:50',
+                Rule::unique('contacts', 'phone')
+                    ->where(fn ($query) => $query->where('tenant_id', $tenantId)->whereNull('deleted_at'))
+                    ->ignore($contact->id),
+            ],
             'alt_phone' => ['nullable', 'string', 'max:50'],
             'email' => ['nullable', 'email'],
             'roles' => ['sometimes', 'required', 'array', 'min:1'],
@@ -105,24 +124,58 @@ class ContactController extends Controller
 
     public function destroy(string $id): JsonResponse
     {
-        $contact = Contact::withCount(['debts', 'salesOrders', 'brokeredItems', 'suppliedUnits'])
-            ->findOrFail($id);
+        $contact = Contact::findOrFail($id);
 
-        $linkedCount = $contact->debts_count + $contact->sales_orders_count + $contact->brokered_items_count + $contact->supplied_units_count;
-
-        if ($linkedCount > 0) {
-            return response()->json([
-                'success' => false,
-                'message' => "Cannot remove partner '{$contact->name}' because they have {$linkedCount} associated transaction/inventory record(s). Deactivate them instead to preserve financial history.",
-                'can_deactivate' => true,
-            ], 422);
-        }
-
+        // Soft-delete: sets deleted_at, row stays in DB for FK integrity.
+        // All historical debts, sales orders, brokered items, and inventory
+        // records continue to resolve the partner name via withTrashed().
+        $contact->update(['is_active' => false]);
         $contact->delete();
 
         return response()->json([
             'success' => true,
-            'message' => "Partner '{$contact->name}' removed successfully.",
+            'message' => "Partner '{$contact->name}' removed successfully. All historical records are preserved.",
+        ]);
+    }
+
+    public function statement(Request $request, string $id, GeneratePartnerStatementAction $action): JsonResponse
+    {
+        $contact = Contact::findOrFail($id);
+        $startDate = $request->query('start_date');
+        $endDate = $request->query('end_date');
+
+        if (empty($contact->statement_token)) {
+            $contact->update(['statement_token' => \Illuminate\Support\Str::random(32)]);
+        }
+
+        $data = $action->execute($contact, $startDate, $endDate);
+
+        return response()->json([
+            'success' => true,
+            'data' => $data,
+        ]);
+    }
+
+    public function publicStatement(Request $request, string $token, GeneratePartnerStatementAction $action): JsonResponse
+    {
+        $contact = Contact::withoutGlobalScopes()
+            ->where('statement_token', $token)
+            ->firstOrFail();
+
+        $startDate = $request->query('start_date');
+        $endDate = $request->query('end_date');
+
+        TenantScope::setForcedTenantId($contact->tenant_id);
+
+        try {
+            $data = $action->execute($contact, $startDate, $endDate);
+        } finally {
+            TenantScope::setForcedTenantId(null);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $data,
         ]);
     }
 }

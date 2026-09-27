@@ -108,7 +108,31 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
     }
   };
 
-  const totalOutstanding = debts.reduce((sum, d) => sum + parseFloat(String(d.remaining_amount)), 0);
+  // Gross sum of individual ledger records
+  const grossTotal = debts.reduce((sum, d) => sum + parseFloat(String(d.remaining_amount)), 0);
+
+  // Group contacts to calculate true bilateral netted collectible/payable position
+  const contactsMap = new Map<string, { name: string; net_balance: number; open_receivable: number; open_payable: number }>();
+  debts.forEach((d) => {
+    if (d.contact && !contactsMap.has(d.contact.id)) {
+      contactsMap.set(d.contact.id, {
+        name: d.contact.name,
+        net_balance: Number(d.contact.net_balance ?? 0),
+        open_receivable: Number(d.contact.open_receivable ?? 0),
+        open_payable: Number(d.contact.open_payable ?? 0),
+      });
+    }
+  });
+
+  const distinctContacts = Array.from(contactsMap.values());
+  const distinctPartiesCount = distinctContacts.length;
+
+  const netPosition = debtType === 'receivable'
+    ? distinctContacts.reduce((sum, c) => sum + Math.max(0, c.net_balance), 0)
+    : distinctContacts.reduce((sum, c) => sum + Math.max(0, -c.net_balance), 0);
+
+  const totalOffsets = Math.max(0, grossTotal - netPosition);
+  const hasOffsets = totalOffsets > 0.01;
 
   const formatDueDate = (dateStr: string | null) => {
     if (!dateStr) return null;
@@ -176,21 +200,37 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
       {/* Summary Total Bar */}
       <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-100 dark:border-slate-800/80 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
         <div>
-          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-            Total Outstanding {debtType === 'receivable' ? 'Receivables & Holdings' : 'Payables & Payouts'}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+              {debtType === 'receivable' ? 'Net Collectible Position' : 'Net Payable Due'}
+            </span>
+            {hasOffsets && (
+              <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                Bilaterally Netted
+              </span>
+            )}
+          </div>
           <div
             className={`text-3xl font-extrabold font-mono tabular-nums tracking-tight mt-1 ${
               debtType === 'receivable' ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400'
             }`}
           >
-            <AnimatedNumber value={totalOutstanding} />{' '}
+            <AnimatedNumber value={netPosition} />{' '}
             <span className="text-sm font-normal text-slate-400 font-sans">ETB</span>
           </div>
+          {hasOffsets && (
+            <div className="text-[11px] text-slate-400 mt-1 flex items-center gap-2 flex-wrap">
+              <span>Gross records: <span className="font-mono font-medium">{grossTotal.toLocaleString()} ETB</span></span>
+              <span>·</span>
+              <span>Offsetting {debtType === 'receivable' ? 'payables' : 'receivables'}: <span className="font-mono font-medium text-rose-600/80 dark:text-rose-400/80">−{totalOffsets.toLocaleString()} ETB</span></span>
+            </div>
+          )}
         </div>
         <div className="text-left sm:text-right text-xs text-slate-400">
-          <div className="font-bold text-slate-800 dark:text-slate-200 text-sm">{debts.length} active ledger records</div>
-          <div className="text-[11px] text-slate-400">Click any row to open focused workspace</div>
+          <div className="font-bold text-slate-800 dark:text-slate-200 text-sm">
+            {debts.length} active records across {distinctPartiesCount} {distinctPartiesCount === 1 ? 'party' : 'parties'}
+          </div>
+          <div className="text-[11px] text-slate-400">Click any row to open focused workspace or settle</div>
         </div>
       </div>
 
@@ -232,6 +272,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
                   const due = formatDueDate(debt.due_date);
                   const isManual = debt.reference_type === 'direct_credit';
                   const hasPayments = parseFloat(String(debt.paid_amount)) > 0;
+                  const hasOffset = debt.contact && ((debt.contact.open_payable ?? 0) > 0 && (debt.contact.open_receivable ?? 0) > 0);
 
                   return (
                     <tr
@@ -240,17 +281,29 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
                       className="hover:bg-slate-50/90 dark:hover:bg-slate-800/40 transition-colors cursor-pointer group"
                     >
                       <td className="py-3.5 px-5">
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="font-bold text-slate-900 dark:text-white text-sm group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
                             {debt.contact?.name}
                           </span>
                           {debt.reference_type === 'handover_holding' && (
                             <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50 dark:border-amber-800/50">
-                              Handover Holding
+                              Handover
+                            </span>
+                          )}
+                          {debt.reference_type === 'vendor_return_refund' && (
+                            <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-400 border border-teal-200/50 dark:border-teal-800/50">
+                              Return Refund
                             </span>
                           )}
                         </div>
-                        <div className="text-[11px] text-slate-400">{debt.contact?.phone || 'No phone'}</div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-[11px] text-slate-400">{debt.contact?.phone || 'No phone'}</span>
+                          {hasOffset && (
+                            <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                              · Net: {(debt.contact?.net_balance ?? 0) > 0 ? `+${Number(debt.contact?.net_balance).toLocaleString()} ETB (Owes us)` : (debt.contact?.net_balance ?? 0) < 0 ? `−${Math.abs(Number(debt.contact?.net_balance)).toLocaleString()} ETB (We owe)` : 'Settled'}
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       <td className="py-3.5 px-5 font-mono text-slate-500 dark:text-slate-400">

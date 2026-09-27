@@ -9,6 +9,7 @@ import {
   X,
   Check,
   ChevronRight,
+  ArrowLeft,
   Smartphone,
   Battery,
   CreditCard,
@@ -21,7 +22,13 @@ import {
   Plus,
   Minus,
   Handshake,
+  Sparkles,
+  Repeat,
+  Wrench,
 } from 'lucide-react';
+import { AccountLogo } from '../utils/bankLogos';
+import { ExchangeDeviceModal, type ExchangeDevicePayload } from '../components/counter/ExchangeDeviceModal';
+import type { ProductCategory } from '../api/client';
 
 interface CounterViewProps {
   user: User | null;
@@ -48,6 +55,7 @@ const StepBadge: React.FC<{ num: number; label: string; active: boolean; done: b
 
 export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contacts, onSaleSuccess }) => {
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [availableUnits, setAvailableUnits] = useState<InventoryUnit[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -72,7 +80,14 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
   const [paymentMethod, setPaymentMethod] = useState<string>('telebirr');
   const [financialAccountId, setFinancialAccountId] = useState<string>('');
   const [customerId, setCustomerId] = useState<string>('');
+  const [customerMode, setCustomerMode] = useState<'walk_in' | 'new' | 'existing'>('walk_in');
+  const [customerName, setCustomerName] = useState<string>('');
+  const [customerPhone, setCustomerPhone] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
+
+  // Exchange / Trade-In State
+  const [exchangeDevice, setExchangeDevice] = useState<ExchangeDevicePayload | null>(null);
+  const [isExchangeModalOpen, setIsExchangeModalOpen] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -91,12 +106,14 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
   const loadData = async () => {
     try {
       setLoading(true);
-      const [prods, units] = await Promise.all([
+      const [prods, units, cats] = await Promise.all([
         api.getProducts(),
         api.getInventoryUnits({ status: 'in_stock' }),
+        api.getCategories(),
       ]);
       setProducts(prods);
       setAvailableUnits(units);
+      setCategories(cats);
 
       const defaultAcc = accounts.find((a) => a.type === 'mobile_money' || a.type === 'cash');
       if (defaultAcc) {
@@ -175,9 +192,24 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
   }, [discountType, rawDiscountVal, grossSubtotal]);
 
   const totalAfterDiscount = Math.max(0, grossSubtotal - calculatedDiscountAmount);
+  const tradeInAllowance = exchangeDevice ? Number(exchangeDevice.trade_in_value || 0) : 0;
+  const netCashDue = Math.max(0, totalAfterDiscount - tradeInAllowance);
   const paidNum = parseFloat(paidAmount) || 0;
-  const balanceDue = Math.max(0, totalAfterDiscount - paidNum);
+  const balanceDue = Math.max(0, netCashDue - paidNum);
   const isCredit = balanceDue > 0;
+
+  // Upsell bonus calculation
+  const currentVariant = useMemo(() => {
+    return products.flatMap((p) => p.variants).find((v) => v.id === selectedVariantId) || null;
+  }, [products, selectedVariantId]);
+  const selectedSingleUnit = useMemo(() => {
+    return selectedUnitIds.length === 1 ? availableUnits.find((u) => u.id === selectedUnitIds[0]) || null : null;
+  }, [selectedUnitIds, availableUnits]);
+  const settedPrice = Number(selectedSingleUnit?.selling_price || currentVariant?.default_selling_price || 0);
+  const isUpsell = settedPrice > 0 && unitPriceNum > settedPrice;
+  const upsellBonusPerUnit = isUpsell ? unitPriceNum - settedPrice : 0;
+  const rawTotalBonus = upsellBonusPerUnit * quantity;
+  const netEstimatedBonus = Math.max(0, rawTotalBonus - calculatedDiscountAmount);
 
   const isSerialRequired = !!selectedProduct?.has_serials;
   const hasSelectedSerials = selectedUnitIds.length > 0;
@@ -188,6 +220,21 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
       return u?.source_type === 'consignment';
     });
   }, [selectedUnitIds, availableUnits]);
+
+  const selectedUnitsHaveExchange = useMemo(() => {
+    return selectedUnitIds.some((uId) => {
+      const u = availableUnits.find((unit) => unit.id === uId);
+      return u?.source_type === 'exchange' || Boolean(u?.exchange_sales_order_id);
+    });
+  }, [selectedUnitIds, availableUnits]);
+
+  const outgoingUnitCost = useMemo(() => {
+    if (selectedUnitIds.length > 0) {
+      const u = availableUnits.find((unit) => unit.id === selectedUnitIds[0]);
+      if (u && Number(u.cost_basis || 0) > 0) return Number(u.cost_basis);
+    }
+    return Number(selectedVariant?.stock?.average_cost || 0);
+  }, [selectedUnitIds, availableUnits, selectedVariant]);
 
   // Step progress
   const step1Done = !!selectedProductId;
@@ -208,7 +255,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
     }) || (vList.length > 0 ? vList[0] : undefined);
 
     if (preferredVariant) {
-      handleSelectVariant(preferredVariant);
+      handleSelectVariant(preferredVariant, prod);
     } else {
       setSelectedVariantId('');
       setSelectedUnitIds([]);
@@ -220,16 +267,40 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
     setProductSearch('');
   };
 
-  const handleSelectVariant = (variant: ProductVariant) => {
+  const handleSelectVariant = (variant: ProductVariant, prodOverride?: Product) => {
     setSelectedVariantId(variant.id);
-    setSelectedUnitIds([]);
+    const prod = prodOverride || selectedProduct || products.find((p) => p.variants.some((v) => v.id === variant.id));
+
+    // Auto-select the first in-stock unit if product requires serials
+    const vUnits = availableUnits.filter((u) => u.variant_id === variant.id);
+    const inStockUnits = vUnits.length > 0 ? vUnits : (variant.inventory_units || []).filter((u) => u.status === 'in_stock');
+    if (prod?.has_serials && inStockUnits.length > 0) {
+      setSelectedUnitIds([inStockUnits[0].id]);
+    } else {
+      setSelectedUnitIds([]);
+    }
+
     setQuantity(1);
-    if (variant.default_selling_price) {
-      const priceStr = String(variant.default_selling_price);
+    const firstUnit = inStockUnits[0];
+    const initialPrice = firstUnit?.selling_price || variant.default_selling_price;
+    if (initialPrice) {
+      const priceStr = String(initialPrice);
       setUnitSellingPrice(priceStr);
-      setPaidAmount(priceStr);
+      const remCash = exchangeDevice ? Math.max(0, Number(priceStr) - exchangeDevice.trade_in_value) : Number(priceStr);
+      setPaidAmount(String(remCash));
     }
   };
+
+  // Auto-select first in-stock unit for serial products if none selected yet
+  useEffect(() => {
+    if (selectedProduct?.has_serials && selectedVariantId && unitsForVariant.length > 0 && selectedUnitIds.length === 0) {
+      const first = unitsForVariant[0];
+      setSelectedUnitIds([first.id]);
+      if (first.selling_price) {
+        setUnitSellingPrice(String(first.selling_price));
+      }
+    }
+  }, [selectedProduct?.has_serials, selectedVariantId, unitsForVariant, selectedUnitIds.length]);
 
   const handleToggleUnit = (unitId: string) => {
     setSelectedUnitIds((prev) => {
@@ -241,13 +312,23 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
       const next = isRemoving ? prev.filter((id) => id !== unitId) : [...prev, unitId];
       const newQty = next.length > 0 ? next.length : 1;
       setQuantity(newQty);
+
+      if (next.length === 1) {
+        const single = availableUnits.find((u) => u.id === next[0]);
+        const targetPrice = single?.selling_price || selectedVariant?.default_selling_price;
+        if (targetPrice) {
+          setUnitSellingPrice(String(targetPrice));
+        }
+      }
+
       if (unitPriceNum > 0) {
         const newGross = unitPriceNum * newQty;
         const discountAmt = discountType === 'percent'
           ? (newGross * Math.min(100, rawDiscountVal)) / 100
           : Math.min(newGross, rawDiscountVal);
         const newTotal = Math.max(0, newGross - discountAmt);
-        setPaidAmount(String(newTotal));
+        const remCash = tradeInAllowance > 0 ? Math.max(0, newTotal - tradeInAllowance) : newTotal;
+        setPaidAmount(String(remCash));
       }
       return next;
     });
@@ -271,7 +352,8 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
         ? (newGross * Math.min(100, rawDiscountVal)) / 100
         : Math.min(newGross, rawDiscountVal);
       const newTotal = Math.max(0, newGross - discountAmt);
-      setPaidAmount(String(newTotal));
+      const remCash = tradeInAllowance > 0 ? Math.max(0, newTotal - tradeInAllowance) : newTotal;
+      setPaidAmount(String(remCash));
     }
   };
 
@@ -283,7 +365,8 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
       ? (newGross * Math.min(100, rawDiscountVal)) / 100
       : Math.min(newGross, rawDiscountVal);
     const newTotal = Math.max(0, newGross - discountAmt);
-    setPaidAmount(String(newTotal));
+    const remCash = tradeInAllowance > 0 ? Math.max(0, newTotal - tradeInAllowance) : newTotal;
+    setPaidAmount(String(remCash));
   };
 
   const handleDiscountChange = (val: string, type: 'percent' | 'fixed') => {
@@ -302,7 +385,26 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
       ? (grossSubtotal * Math.min(100, d)) / 100
       : Math.min(grossSubtotal, d);
     const newTotal = Math.max(0, grossSubtotal - discountAmt);
-    setPaidAmount(String(newTotal));
+    const remCash = tradeInAllowance > 0 ? Math.max(0, newTotal - tradeInAllowance) : newTotal;
+    setPaidAmount(String(remCash));
+  };
+
+  const handlePaidAmountChange = (val: string) => {
+    setPaidAmount(val);
+    const paidVal = parseFloat(val) || 0;
+
+    // Total gross customer value: cash paid + trade-in allowance + applied discount
+    const totalCustomerValue = paidVal + tradeInAllowance + calculatedDiscountAmount;
+    const perUnitReceived = quantity > 0 ? totalCustomerValue / quantity : totalCustomerValue;
+
+    // Dynamic upsell: if customer pays above the baseline set selling price, raise unitSellingPrice so upsell bonus triggers
+    if (settedPrice > 0) {
+      if (perUnitReceived > settedPrice) {
+        setUnitSellingPrice(String(perUnitReceived));
+      } else if (unitPriceNum > settedPrice && perUnitReceived <= settedPrice) {
+        setUnitSellingPrice(String(settedPrice));
+      }
+    }
   };
 
   const resetForm = () => {
@@ -314,8 +416,26 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
     setDiscountValue('');
     setPaidAmount('');
     setCustomerId('');
+    setCustomerName('');
+    setCustomerPhone('');
+    setCustomerMode('walk_in');
     setNotes('');
     setProductSearch('');
+    setExchangeDevice(null);
+  };
+
+  const handleBackToProducts = () => {
+    setSelectedProductId('');
+    setSelectedVariantId('');
+    setSelectedUnitIds([]);
+    setQuantity(1);
+    setUnitSellingPrice('');
+    setDiscountValue('');
+    setPaidAmount('');
+    setProductSearch('');
+    setTimeout(() => {
+      searchRef.current?.focus();
+    }, 50);
   };
 
   const handleSubmitSale = async () => {
@@ -360,6 +480,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
         inventory_unit_id: string | null;
         quantity: number;
         unit_price: number;
+        setted_price?: number;
         sourcing_type: 'internal_stock';
         vendor_contact_id: string | null;
         vendor_cost: number | null;
@@ -371,6 +492,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
           inventory_unit_id: uId,
           quantity: 1,
           unit_price: unitPriceNum,
+          setted_price: settedPrice > 0 ? settedPrice : undefined,
           sourcing_type: 'internal_stock',
           vendor_contact_id: null,
           vendor_cost: null,
@@ -382,6 +504,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
             inventory_unit_id: null,
             quantity: quantity,
             unit_price: unitPriceNum,
+            setted_price: settedPrice > 0 ? settedPrice : undefined,
             sourcing_type: 'internal_stock',
             vendor_contact_id: null,
             vendor_cost: null,
@@ -389,8 +512,10 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
         ];
       }
 
-      const salePayload = {
-        customer_id: customerId || null,
+      const salePayload: any = {
+        customer_id: customerMode === 'existing' ? (customerId || null) : null,
+        customer_name: customerMode === 'new' && customerName.trim() ? customerName.trim() : null,
+        customer_phone: customerMode === 'new' && customerPhone.trim() ? customerPhone.trim() : null,
         discount_amount: calculatedDiscountAmount,
         paid_amount: paidNum,
         payment_method: paymentMethod,
@@ -399,9 +524,30 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
         items: itemsPayload,
       };
 
+      if (exchangeDevice && exchangeDevice.trade_in_value > 0) {
+        salePayload.exchange = {
+          variant_id: exchangeDevice.variant_id,
+          trade_in_value: exchangeDevice.trade_in_value,
+          imei_or_serial: exchangeDevice.imei_or_serial || null,
+          condition: exchangeDevice.condition,
+          battery_health: exchangeDevice.battery_health ?? null,
+          cycle_count: exchangeDevice.cycle_count ?? null,
+          sim_type: exchangeDevice.sim_type || 'physical',
+          location: exchangeDevice.location || 'Shop Counter',
+          notes: exchangeDevice.notes || null,
+        };
+      }
+
       const order = await api.recordSale(salePayload);
 
-      toast.success(`Sale recorded: Order #${order.order_number}`);
+      const bonusEarned = Number(order.total_bonus_amount || 0);
+      if (bonusEarned > 0) {
+        toast.success(`Sale recorded: Order #${order.order_number}`, {
+          description: `+${bonusEarned.toLocaleString()} ETB bonus earned — marked uncollected on your dashboard.`,
+        });
+      } else {
+        toast.success(`Sale recorded: Order #${order.order_number}`);
+      }
 
       resetForm();
       loadData();
@@ -429,20 +575,23 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
   }
 
   return (
-    <div className="animate-page-enter">
-      {/* ─── Top Bar ─── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200/60 dark:border-emerald-800/60 flex items-center justify-center">
-            <ShoppingBag className="w-4.5 h-4.5 text-emerald-600 dark:text-emerald-400" />
-          </div>
-          <div>
-            <h2 className="font-black text-slate-900 dark:text-white text-base tracking-tight">Point of Sale</h2>
-            <p className="text-[11px] text-slate-400 font-medium">Checkout &amp; Sales Entry</p>
-          </div>
-        </div>
-
-        {/* Step Progress */}
+    <div className="animate-page-enter space-y-4">
+      {/* Step progress & Back Navigation */}
+      <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
+        {selectedProductId && (
+          <>
+            <button
+              type="button"
+              onClick={handleBackToProducts}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-xs font-bold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800 shadow-2xs active:scale-95 transition-all cursor-pointer group"
+              title="Return to product selection"
+            >
+              <ArrowLeft className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors" />
+              <span>Back to Products</span>
+            </button>
+            <div className="h-4 w-px bg-slate-200 dark:bg-slate-800 hidden sm:block" />
+          </>
+        )}
         <div className="flex items-center gap-3 sm:gap-4">
           <StepBadge num={1} label="Product" active={currentStep >= 1} done={step1Done} />
           <ChevronRight className="w-3 h-3 text-slate-300 dark:text-slate-600" />
@@ -476,7 +625,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
               {selectedProductId && (
                 <button
                   onClick={resetForm}
-                  className="h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 text-[11px] font-semibold text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-1"
+                  className="h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 text-[11px] font-semibold text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-1 cursor-pointer"
                 >
                   <X className="w-3 h-3" />
                   Clear
@@ -499,21 +648,21 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                         <button
                           key={p.id}
                           onClick={() => handleSelectProduct(p.id)}
-                          className="p-3 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900/50 hover:border-slate-400 dark:hover:border-slate-600 hover:shadow-sm transition-all text-left group"
+                          className="p-3 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900/50 hover:border-slate-400 dark:hover:border-slate-600 transition-all text-left group cursor-pointer"
                         >
-                          <div className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors leading-tight">
+                          <div className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors leading-tight truncate" title={p.name}>
                             {p.name}
                           </div>
                           <div className="flex items-center justify-between mt-1.5">
-                            <span className="text-[10px] text-slate-400 font-medium truncate">
+                            <span className="text-[10px] text-slate-400 truncate">
                               {p.brand || cat}
                             </span>
-                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+                            <span className={`text-[10px] font-bold font-mono ${
                               p.stockCount > 0
-                                ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400'
-                                : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
+                                ? 'text-emerald-600 dark:text-emerald-400'
+                                : 'text-slate-400'
                             }`}>
-                              {p.stockCount} in stock
+                              {p.stockCount}
                             </span>
                           </div>
                         </button>
@@ -528,24 +677,25 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
             {selectedProduct && (
               <div className="p-4">
                 <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-2">
-                    <Smartphone className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                    <span className="text-sm font-bold text-slate-900 dark:text-white">{selectedProduct.name}</span>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Smartphone className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <span className="text-sm font-bold text-slate-900 dark:text-white truncate max-w-[200px] sm:max-w-xs" title={selectedProduct.name}>
+                      {selectedProduct.name}
+                    </span>
                     {selectedProduct.brand && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-medium">
+                      <span className="text-[10px] text-slate-400 font-medium">
                         {selectedProduct.brand}
                       </span>
                     )}
                   </div>
                   <button
-                    onClick={() => {
-                      setSelectedProductId('');
-                      setSelectedVariantId('');
-                      setSelectedUnitIds([]);
-                    }}
-                    className="text-[11px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 font-semibold"
+                    type="button"
+                    onClick={handleBackToProducts}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white active:scale-95 transition-all cursor-pointer"
+                    title="Change selected product"
                   >
-                    Change
+                    <ArrowLeft className="w-3 h-3" />
+                    <span>Change Product</span>
                   </button>
                 </div>
 
@@ -564,14 +714,14 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                         <button
                           key={v.id}
                           onClick={() => handleSelectVariant(v)}
-                          className={`px-3 py-2 rounded-xl border-2 text-xs font-semibold transition-all ${
+                          className={`px-3 py-2 rounded-xl border text-xs font-semibold transition-all ${
                             isSelected
                               ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400'
                               : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-400 dark:hover:border-slate-500'
                           }`}
                         >
-                          <span>{variantLabel(v)}</span>
-                          <span className={`ml-1.5 text-[10px] font-bold ${
+                          {variantLabel(v)}
+                          <span className={`ml-1.5 text-[10px] font-bold font-mono ${
                             vStock > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500 dark:text-rose-400'
                           }`}>
                             ({vStock})
@@ -589,9 +739,16 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
           {selectedVariant && selectedProduct?.has_serials && (
             <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800/90 p-4 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                  Serial Units ({unitsForVariant.length} in stock)
-                </span>
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                    {tradeInAllowance > 0 ? 'Outgoing Device to Hand Over' : 'Serial Units'} ({unitsForVariant.length} in stock)
+                  </span>
+                  {tradeInAllowance > 0 && (
+                    <span className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">
+                      Select the stock unit to give to customer
+                    </span>
+                  )}
+                </div>
                 {selectedUnitIds.length > 0 && (
                   <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
                     {selectedUnitIds.length} selected
@@ -600,61 +757,69 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
               </div>
 
               {unitsForVariant.length === 0 ? (
-                <div className="p-3.5 rounded-xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-800/50 text-xs text-amber-700 dark:text-amber-400 flex items-center gap-2">
+                <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400">
                   <AlertTriangle className="w-4 h-4 shrink-0" />
                   <span>Out of stock in shop inventory.</span>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {unitsForVariant.map((u) => {
-                    const isSelected = selectedUnitIds.includes(u.id);
-                    return (
-                      <button
-                        key={u.id}
-                        type="button"
-                        onClick={() => handleToggleUnit(u.id)}
-                        className={`p-3 rounded-xl border-2 text-left text-xs transition-all ${
-                          isSelected
-                            ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/20 shadow-sm'
-                            : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="font-mono font-bold text-slate-900 dark:text-white text-[11px]">
-                              {u.imei_or_serial || 'No Serial'}
-                            </span>
-                            {u.source_type === 'consignment' && (
-                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50 dark:border-amber-800/50">
-                                <Handshake className="w-2.5 h-2.5" />
-                                Vendor
+                <div className="max-h-52 overflow-y-auto pr-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {unitsForVariant.map((u) => {
+                      const isSelected = selectedUnitIds.includes(u.id);
+                      const isExchange = u.source_type === 'exchange';
+                      return (
+                        <button
+                          key={u.id}
+                          type="button"
+                          onClick={() => handleToggleUnit(u.id)}
+                          className={`p-2.5 rounded-xl border text-left text-xs transition-all ${
+                            isSelected
+                              ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/20'
+                              : isExchange
+                                ? 'border-purple-300 dark:border-purple-800/80 bg-purple-50/20 dark:bg-purple-950/10 hover:border-purple-400 dark:hover:border-purple-600'
+                                : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                              <span className="font-mono font-bold text-slate-900 dark:text-white text-[11px] truncate">
+                                {u.imei_or_serial || 'No Serial'}
                               </span>
-                            )}
+                              {u.battery_health && (
+                                <span className="inline-flex items-center gap-0.5 text-[10px] font-mono font-medium text-slate-500 dark:text-slate-400">
+                                  <Battery className="w-3 h-3 text-slate-400 shrink-0" />
+                                  {u.battery_health}%
+                                </span>
+                              )}
+                              {u.source_type === 'consignment' && (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400">
+                                  <Handshake className="w-2.5 h-2.5" />
+                                  Vendor
+                                </span>
+                              )}
+                              {isExchange && (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/50">
+                                  <Repeat className="w-2.5 h-2.5" />
+                                  Exchanged
+                                </span>
+                              )}
+                              {(u.is_repaired || (u.maintenance_records && u.maintenance_records.length > 0)) && (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 border border-teal-200/60 dark:border-teal-800/50">
+                                  <Wrench className="w-2.5 h-2.5" />
+                                  Repaired
+                                </span>
+                              )}
+                            </div>
+                            <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${
+                              isSelected ? 'bg-emerald-500 text-white' : 'border border-slate-300 dark:border-slate-700'
+                            }`}>
+                              {isSelected && <Check className="w-2.5 h-2.5" />}
+                            </div>
                           </div>
-                          <div className={`w-5 h-5 rounded-full flex items-center justify-center ${
-                            isSelected ? 'bg-emerald-500 text-white' : 'border border-slate-300 dark:border-slate-700'
-                          }`}>
-                            {isSelected && <Check className="w-3 h-3" />}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 mt-1.5 text-[10px] text-slate-500 dark:text-slate-400">
-                          {u.battery_health && (
-                            <span className="inline-flex items-center gap-0.5">
-                              <Battery className="w-3 h-3" />
-                              {u.battery_health}%
-                            </span>
-                          )}
-                          {u.cycle_count !== null && <span>{u.cycle_count} cc</span>}
-                          <span className="capitalize">{u.condition.replace(/_/g, ' ')}</span>
-                          {u.sim_type && u.sim_type !== 'na' && (
-                            <span className="px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-800 font-mono uppercase text-[9px] font-bold">
-                              {u.sim_type}
-                            </span>
-                          )}
-                        </div>
-                      </button>
-                    );
-                  })}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>
@@ -665,78 +830,68 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
             <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800/90 p-4 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] space-y-4">
               
               {/* ── Quantity Stepper Section ── */}
-              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                        Quantity
-                      </span>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                        maxAvailableStock > 0
-                          ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60'
-                          : 'bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-400 border border-rose-200/60 dark:border-rose-800/60'
-                      }`}>
-                        {maxAvailableStock > 0 ? `${maxAvailableStock} Available` : 'Out of Stock'}
-                      </span>
-                    </div>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Qty</span>
+                  <span className={`text-[10px] font-semibold ${
+                    maxAvailableStock > 0
+                      ? 'text-emerald-600 dark:text-emerald-400'
+                      : 'text-rose-500 dark:text-rose-400'
+                  }`}>
+                    {maxAvailableStock > 0 ? `${maxAvailableStock} available` : 'Out of stock'}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div className="inline-flex items-center rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-1">
+                    <button
+                      type="button"
+                      onClick={() => handleQuantityChange(quantity - 1)}
+                      disabled={quantity <= 1 || maxAvailableStock <= 0}
+                      className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-30 transition-colors"
+                    >
+                      <Minus className="w-3.5 h-3.5" />
+                    </button>
+                    <input
+                      type="number"
+                      min="1"
+                      max={maxAvailableStock > 0 ? maxAvailableStock : 1}
+                      value={quantity}
+                      onChange={(e) => handleQuantityChange(parseInt(e.target.value) || 1)}
+                      disabled={maxAvailableStock <= 0}
+                      className="w-12 text-center font-mono font-black text-sm text-slate-900 dark:text-white bg-transparent focus:outline-none disabled:opacity-30"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleQuantityChange(quantity + 1)}
+                      disabled={quantity >= maxAvailableStock}
+                      className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-30 transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
                   </div>
 
-                  {/* Stepper + Quick count chips */}
-                  <div className="flex items-center gap-2">
-                    <div className="inline-flex items-center rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-1 shadow-2xs">
-                      <button
-                        type="button"
-                        onClick={() => handleQuantityChange(quantity - 1)}
-                        disabled={quantity <= 1 || maxAvailableStock <= 0}
-                        className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-30 transition-colors"
-                      >
-                        <Minus className="w-3.5 h-3.5" />
-                      </button>
-
-                      <input
-                        type="number"
-                        min="1"
-                        max={maxAvailableStock > 0 ? maxAvailableStock : 1}
-                        value={quantity}
-                        onChange={(e) => handleQuantityChange(parseInt(e.target.value) || 1)}
-                        disabled={maxAvailableStock <= 0}
-                        className="w-12 text-center font-mono font-black text-sm text-slate-900 dark:text-white bg-transparent focus:outline-none disabled:opacity-30"
-                      />
-
-                      <button
-                        type="button"
-                        onClick={() => handleQuantityChange(quantity + 1)}
-                        disabled={quantity >= maxAvailableStock}
-                        className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-30 transition-colors"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-
-                    {/* Quick Count Preset Chips */}
-                    <div className="hidden sm:flex items-center gap-1">
-                      {[1, 2, 3, 5, 10].map((count) => {
-                        const isOverStock = count > maxAvailableStock;
-                        return (
-                          <button
-                            key={count}
-                            type="button"
-                            onClick={() => handleQuantityChange(count)}
-                            disabled={isOverStock}
-                            className={`h-8 px-2.5 rounded-lg text-xs font-mono font-bold transition-all ${
-                              quantity === count
-                                ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-2xs'
-                                : isOverStock
-                                ? 'bg-slate-100 dark:bg-slate-900 text-slate-300 dark:text-slate-600 cursor-not-allowed opacity-40'
-                                : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-400'
-                            }`}
-                          >
-                            {count}
-                          </button>
-                        );
-                      })}
-                    </div>
+                  <div className="hidden sm:flex items-center gap-1">
+                    {[1, 2, 3, 5, 10].map((count) => {
+                      const isOverStock = count > maxAvailableStock;
+                      return (
+                        <button
+                          key={count}
+                          type="button"
+                          onClick={() => handleQuantityChange(count)}
+                          disabled={isOverStock}
+                          className={`h-8 px-2.5 rounded-lg text-xs font-mono font-bold transition-all ${
+                            quantity === count
+                              ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
+                              : isOverStock
+                              ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed opacity-40'
+                              : 'border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-400'
+                          }`}
+                        >
+                          {count}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -745,10 +900,17 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {/* 1. Unit Price */}
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                    <Tag className="w-3 h-3 inline mr-0.5" />
-                    Unit Price (ETB) *
-                  </label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      <Tag className="w-3 h-3 inline mr-0.5" />
+                      Unit Price (ETB) *
+                    </label>
+                    {settedPrice > 0 && (
+                      <span className="text-[10px] font-mono text-slate-400">
+                        Base: <strong className="text-slate-600 dark:text-slate-300 font-medium">{settedPrice.toLocaleString()} ETB</strong>
+                      </span>
+                    )}
+                  </div>
                   <input
                     type="number"
                     step="0.01"
@@ -762,6 +924,14 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                     <span className="text-[10px] text-slate-400 mt-1 block font-mono">
                       Subtotal: {grossSubtotal.toLocaleString()} ETB
                     </span>
+                  )}
+                  {isUpsell && (
+                    <div className="mt-1.5 flex items-center gap-1.5 px-2 py-1 rounded-lg bg-purple-50 dark:bg-purple-950/40 border border-purple-200/60 dark:border-purple-800/40 text-[10px] text-purple-700 dark:text-purple-300 font-bold">
+                      <Sparkles className="w-3 h-3 text-purple-600 dark:text-purple-400 shrink-0" />
+                      <span>
+                        +{netEstimatedBonus.toLocaleString()} ETB Bonus (+{upsellBonusPerUnit.toLocaleString()} above set {settedPrice.toLocaleString()})
+                      </span>
+                    </div>
                   )}
                 </div>
 
@@ -829,25 +999,88 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
 
                 {/* 3. Paid Now */}
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                    Amount Paid (ETB)
-                  </label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Amount Paid (ETB)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setIsExchangeModalOpen(true)}
+                      className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md transition-colors ${
+                        exchangeDevice
+                          ? 'bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
+                          : 'bg-slate-100 dark:bg-slate-800 hover:bg-purple-50 dark:hover:bg-purple-950/40 text-slate-600 dark:text-slate-300 hover:text-purple-600'
+                      }`}
+                    >
+                      <Repeat className="w-3 h-3 text-purple-500" />
+                      {exchangeDevice ? 'Exchange Added' : 'Exchange'}
+                    </button>
+                  </div>
                   <input
                     type="number"
                     step="0.01"
                     value={paidAmount}
-                    onChange={(e) => setPaidAmount(e.target.value)}
+                    onChange={(e) => handlePaidAmountChange(e.target.value)}
                     placeholder="0.00"
                     className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-sm font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10"
                     required
                   />
-                  {totalAfterDiscount > 0 && paidNum !== totalAfterDiscount && (
+
+                  {/* Active Exchange Chip (Minimal 1-line) */}
+                  {exchangeDevice ? (
+                    <div className="mt-2 px-2.5 py-1.5 rounded-lg bg-purple-50/80 dark:bg-purple-950/40 border border-purple-200/70 dark:border-purple-800/50 flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-1.5 min-w-0 pr-2">
+                        <Repeat className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
+                        <span className="font-semibold text-purple-900 dark:text-purple-200 truncate">
+                          Exchange: {exchangeDevice.product_name}
+                        </span>
+                        {exchangeDevice.imei_or_serial && (
+                          <span className="text-[10px] text-purple-600/80 dark:text-purple-400/80 font-mono truncate">
+                            ({exchangeDevice.imei_or_serial})
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setIsExchangeModalOpen(true)}
+                          className="text-[10px] font-bold text-purple-700 dark:text-purple-300 hover:underline px-1"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setExchangeDevice(null);
+                            setPaidAmount(String(totalAfterDiscount));
+                          }}
+                          className="w-5 h-5 rounded flex items-center justify-center text-purple-400 hover:text-purple-700 hover:bg-purple-100 dark:hover:bg-purple-900/50 transition-colors"
+                          title="Remove exchange"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {/* Warning if total trade-in credit + cash does not cover outgoing unit cost */}
+                  {exchangeDevice && outgoingUnitCost > 0 && (Number(exchangeDevice.trade_in_value) + paidNum < outgoingUnitCost) && (
+                    <div className="mt-1.5 flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/60 text-red-700 dark:text-red-300 text-[11px] font-semibold">
+                      <span className="flex items-center gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0" />
+                        Below shop cost by {(outgoingUnitCost - (Number(exchangeDevice.trade_in_value) + paidNum)).toLocaleString()} ETB
+                      </span>
+                      <span className="text-[10px] font-bold text-red-600 dark:text-red-400 font-mono uppercase">Loss Deal</span>
+                    </div>
+                  )}
+
+                  {netCashDue >= 0 && paidNum !== netCashDue && (
                     <button
                       type="button"
-                      onClick={() => setPaidAmount(String(totalAfterDiscount))}
+                      onClick={() => setPaidAmount(String(netCashDue))}
                       className="text-[10px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 mt-1 block font-medium underline"
                     >
-                      Set full ({totalAfterDiscount.toLocaleString()} ETB)
+                      Set extra cash customer pays ({netCashDue.toLocaleString()} ETB)
                     </button>
                   )}
                 </div>
@@ -864,7 +1097,6 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                     { value: 'cash', label: 'Cash', icon: Banknote },
                     { value: 'cbe', label: 'CBE Transfer', icon: CreditCard },
                     { value: 'bank_transfer', label: 'Other Bank', icon: Wallet },
-                    { value: 'credit', label: 'Credit Sale', icon: Receipt },
                   ].map((m) => {
                     const Icon = m.icon;
                     const isSelected = paymentMethod === m.value;
@@ -874,11 +1106,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                         type="button"
                         onClick={() => {
                           setPaymentMethod(m.value);
-                          if (m.value === 'credit') {
-                            setPaidAmount('0');
-                          } else {
-                            setPaidAmount(String(totalAfterDiscount));
-                          }
+                          setPaidAmount(String(totalAfterDiscount));
                         }}
                         className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border-2 text-[11px] font-semibold transition-all ${
                           isSelected
@@ -896,45 +1124,127 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                 </div>
               </div>
 
-              {/* Account & Customer Row */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+              {/* Receiving Account */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
                     Receiving Account
                   </label>
-                  <select
-                    value={financialAccountId}
-                    onChange={(e) => setFinancialAccountId(e.target.value)}
-                    className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
-                  >
-                    <option value="">— Select Account —</option>
-                    {treasuryAccounts.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {user?.role === 'owner' && a.current_balance !== null
-                          ? `${a.name} (${Number(a.current_balance).toLocaleString()} ETB)`
-                          : a.name}
-                      </option>
-                    ))}
-                  </select>
+                  {(() => {
+                    const sel = treasuryAccounts.find((a) => a.id === financialAccountId);
+                    return sel ? <AccountLogo account={sel} size="xs" /> : null;
+                  })()}
                 </div>
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                    <UserIcon className="w-3 h-3 inline mr-0.5" />
+                <select
+                  value={financialAccountId}
+                  onChange={(e) => setFinancialAccountId(e.target.value)}
+                  className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+                >
+                  <option value="">— Select Account —</option>
+                  {treasuryAccounts.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {user?.role === 'owner' && a.current_balance !== null
+                        ? `${a.name} (${Number(a.current_balance).toLocaleString()} ETB)`
+                        : a.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Customer Selection / New Customer */}
+              <div className="space-y-2 pt-1 border-t border-slate-100 dark:border-slate-800/80">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    <UserIcon className="w-3 h-3 inline mr-1" />
                     Customer
                   </label>
+
+                  {/* Customer Mode Pills */}
+                  <div className="flex bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg text-[10px] font-semibold">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCustomerMode('walk_in');
+                        setCustomerId('');
+                        setCustomerName('');
+                        setCustomerPhone('');
+                      }}
+                      className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                        customerMode === 'walk_in'
+                          ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-bold'
+                          : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                    >
+                      Walk-in
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCustomerMode('new');
+                        setCustomerId('');
+                      }}
+                      className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                        customerMode === 'new'
+                          ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-bold'
+                          : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                    >
+                      + New
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCustomerMode('existing')}
+                      className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                        customerMode === 'existing'
+                          ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-bold'
+                          : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                    >
+                      Existing ({customerList.length})
+                    </button>
+                  </div>
+                </div>
+
+                {customerMode === 'walk_in' && (
+                  <div className="h-9 px-3 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 flex items-center justify-between text-xs text-slate-500">
+                    <span>Walk-in Customer (Anonymous)</span>
+                    <span className="text-[10px] text-slate-400">Default</span>
+                  </div>
+                )}
+
+                {customerMode === 'new' && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      placeholder="Customer Name (optional)"
+                      className="h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+                    />
+                    <input
+                      type="text"
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      placeholder="Phone (optional, 09...)"
+                      className="h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+                    />
+                  </div>
+                )}
+
+                {customerMode === 'existing' && (
                   <select
                     value={customerId}
                     onChange={(e) => setCustomerId(e.target.value)}
                     className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
                   >
-                    <option value="">Walk-in Customer</option>
+                    <option value="">— Select Existing Customer —</option>
                     {customerList.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.name} {c.phone ? `(${c.phone})` : ''}
                       </option>
                     ))}
                   </select>
-                </div>
+                )}
               </div>
 
               {/* Notes */}
@@ -953,13 +1263,11 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
         <div className="lg:col-span-2">
           <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800/90 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] sticky top-4 overflow-hidden">
             {/* Receipt Header */}
-            <div className="p-4 bg-slate-50/70 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                <Receipt className="w-4 h-4 text-slate-400" />
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  Sale Summary
-                </span>
-              </div>
+            <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
+              <Receipt className="w-3.5 h-3.5 text-slate-400" />
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Summary
+              </span>
             </div>
 
             <div className="p-4 space-y-4">
@@ -972,8 +1280,8 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
               ) : (
                 <>
                   {/* Product Line Item */}
-                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800">
-                    <div className="flex items-start justify-between">
+                  <div className="py-3 border-b border-slate-100 dark:border-slate-800">
+                    <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
                           {selectedProduct.name}
@@ -988,13 +1296,24 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                             {selectedUnitIds.map((uId) => {
                               const u = availableUnits.find((unit) => unit.id === uId);
                               return (
-                                <div key={uId} className="flex items-center gap-1.5 flex-wrap">
+                                <div key={uId} className="flex items-center gap-1.5">
                                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                                  <span>SN: {u?.imei_or_serial || 'Unknown'}</span>
+                                  <span>{u?.imei_or_serial || 'Unknown'}</span>
                                   {u?.source_type === 'consignment' && (
-                                    <span className="inline-flex items-center gap-0.5 px-1 py-0.2 rounded text-[9px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50 dark:border-amber-800/50">
+                                    <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-600 dark:text-amber-400">
                                       <Handshake className="w-2.5 h-2.5" />
                                       Vendor
+                                    </span>
+                                  )}
+                                  {(u?.source_type === 'exchange' || Boolean(u?.exchange_sales_order_id)) && (
+                                    <span className="text-[9px] text-slate-400 font-sans">
+                                      (Exchanged)
+                                    </span>
+                                  )}
+                                  {(u?.is_repaired || (u?.maintenance_records && u.maintenance_records.length > 0)) && (
+                                    <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-teal-600 dark:text-teal-400">
+                                      <Wrench className="w-2.5 h-2.5" />
+                                      Repaired
                                     </span>
                                   )}
                                 </div>
@@ -1003,33 +1322,50 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                           </div>
                         )}
                         {selectedUnitsHaveConsignment && (
-                          <div className="inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/30 text-[10px] font-bold text-amber-700 dark:text-amber-400 border border-amber-200/50 dark:border-amber-800/40">
-                            <Handshake className="w-2.5 h-2.5" />
-                            Consignment Unit (Vendor cut auto-payable)
+                          <div className="text-[10px] text-amber-600 dark:text-amber-400 font-medium mt-1">
+                            Vendor consignment unit
+                          </div>
+                        )}
+                        {selectedUnitsHaveExchange && (
+                          <div className="text-[10px] text-slate-400 font-medium mt-0.5">
+                            Exchanged stock unit
                           </div>
                         )}
                       </div>
-                      <div className="text-right ml-3 shrink-0">
-                        <span className="text-xs font-mono font-bold text-slate-900 dark:text-white px-2 py-0.5 rounded-md bg-slate-200/70 dark:bg-slate-700">
-                          × {quantity}
-                        </span>
-                      </div>
+                      <span className="text-xs font-mono font-bold text-slate-500 dark:text-slate-400 shrink-0">
+                        ×{quantity}
+                      </span>
                     </div>
                   </div>
 
-                  {/* Out of Stock Warning Banner */}
+                  {/* Out of Stock Warning */}
                   {selectedVariant && maxAvailableStock <= 0 && (
-                    <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 text-xs text-rose-700 dark:text-rose-300 flex items-center gap-2">
-                      <AlertTriangle className="w-4 h-4 shrink-0" />
-                      <span>Item is out of stock in shop inventory.</span>
+                    <div className="flex items-center gap-2 text-xs text-rose-600 dark:text-rose-400">
+                      <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                      <span>Out of stock in shop inventory.</span>
                     </div>
                   )}
 
                   {/* Price Breakdown */}
                   <div className="space-y-2 text-xs">
+                    {/* Customer in Summary */}
+                    {((customerMode === 'new' && (customerName.trim() || customerPhone.trim())) || (customerMode === 'existing' && customerId)) ? (
+                      <div className="flex justify-between items-center text-slate-600 dark:text-slate-400 pb-1.5 border-b border-slate-100 dark:border-slate-800">
+                        <span className="flex items-center gap-1 text-[11px]">
+                          <UserIcon className="w-3 h-3 text-slate-400" />
+                          Customer
+                        </span>
+                        <span className="font-semibold text-slate-900 dark:text-white truncate max-w-[160px] text-right">
+                          {customerMode === 'new'
+                            ? `${customerName.trim() || 'Customer'}${customerPhone.trim() ? ` · ${customerPhone.trim()}` : ''}`
+                            : (customerList.find((c) => c.id === customerId)?.name || 'Walk-in')}
+                        </span>
+                      </div>
+                    ) : null}
+
                     <div className="flex justify-between text-slate-600 dark:text-slate-400">
                       <span>Unit Price</span>
-                      <span className="font-mono font-bold text-slate-900 dark:text-white">
+                      <span className="font-mono font-bold text-slate-900 dark:text-white whitespace-nowrap">
                         {unitPriceNum > 0 ? unitPriceNum.toLocaleString() : '—'} ETB
                       </span>
                     </div>
@@ -1037,7 +1373,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                     {quantity > 1 && (
                       <div className="flex justify-between text-slate-600 dark:text-slate-400">
                         <span>Subtotal ({quantity}x)</span>
-                        <span className="font-mono font-bold text-slate-900 dark:text-white">
+                        <span className="font-mono font-bold text-slate-900 dark:text-white whitespace-nowrap">
                           {grossSubtotal > 0 ? grossSubtotal.toLocaleString() : '—'} ETB
                         </span>
                       </div>
@@ -1048,24 +1384,35 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                         <span>
                           Discount {discountType === 'percent' ? `(${rawDiscountVal}%)` : ''}
                         </span>
-                        <span className="font-mono font-bold">
+                        <span className="font-mono font-bold whitespace-nowrap">
                           -{calculatedDiscountAmount.toLocaleString()} ETB
                         </span>
                       </div>
                     )}
 
+                    {tradeInAllowance > 0 && (
+                      <div className="flex justify-between text-slate-700 dark:text-slate-300 font-medium">
+                        <span>Exchanged Device</span>
+                        <span className="font-mono font-bold whitespace-nowrap text-purple-600 dark:text-purple-400">
+                          −{tradeInAllowance.toLocaleString()} ETB
+                        </span>
+                      </div>
+                    )}
+
                     <div className="flex justify-between pt-2 border-t border-dashed border-slate-200 dark:border-slate-700">
-                      <span className="font-bold text-slate-900 dark:text-white">Net Total</span>
-                      <span className="font-mono font-black text-base text-slate-900 dark:text-white">
-                        {totalAfterDiscount > 0 ? totalAfterDiscount.toLocaleString() : '—'} ETB
+                      <span className="font-bold text-slate-900 dark:text-white">
+                        {tradeInAllowance > 0 ? 'Cash Difference to Pay' : 'Net Total'}
+                      </span>
+                      <span className="font-mono font-black text-base text-slate-900 dark:text-white whitespace-nowrap">
+                        {netCashDue > 0 ? netCashDue.toLocaleString() : '0'} ETB
                       </span>
                     </div>
 
                     {unitPriceNum > 0 && (
                       <>
                         <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
-                          <span>Amount Paid</span>
-                          <span className="font-mono font-bold">{paidNum.toLocaleString()} ETB</span>
+                          <span>Cash/Transfer Paid</span>
+                          <span className="font-mono font-bold whitespace-nowrap">{paidNum.toLocaleString()} ETB</span>
                         </div>
 
                         {isCredit && (
@@ -1074,7 +1421,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                               <AlertTriangle className="w-3 h-3" />
                               Balance Due (Credit)
                             </span>
-                            <span className="font-mono">{balanceDue.toLocaleString()} ETB</span>
+                            <span className="font-mono whitespace-nowrap">{balanceDue.toLocaleString()} ETB</span>
                           </div>
                         )}
                       </>
@@ -1115,11 +1462,13 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                     : maxAvailableStock <= 0
                     ? 'Out of Stock'
                     : isSerialRequired && !hasSelectedSerials
-                    ? 'Select IMEI / Serial Unit'
+                    ? (tradeInAllowance > 0 ? 'Select Outgoing Device IMEI' : 'Select IMEI / Serial Unit')
                     : isSerialRequired && selectedUnitIds.length < quantity
                     ? `Select ${quantity - selectedUnitIds.length} More Serial(s)`
                     : unitPriceNum <= 0
                     ? 'Enter Unit Price'
+                    : tradeInAllowance > 0
+                    ? `Complete Exchange (${quantity}x) — ${paidNum > 0 ? `Customer Pays ${paidNum.toLocaleString()} ETB Cash` : 'Direct Exchange'}`
                     : `Complete Sale (${quantity}x) — ${totalAfterDiscount.toLocaleString()} ETB`}
                 </span>
               </button>
@@ -1127,6 +1476,34 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
           </div>
         </div>
       </div>
+
+      {/* Exchange Device Modal */}
+      <ExchangeDeviceModal
+        isOpen={isExchangeModalOpen}
+        onClose={() => setIsExchangeModalOpen(false)}
+        categories={categories}
+        products={products}
+        availableUnits={availableUnits}
+        outgoingUnitCost={outgoingUnitCost}
+        outgoingUnitPrice={unitPriceNum}
+        currentPaidCash={paidNum}
+        initialExchange={exchangeDevice}
+        onReloadProducts={loadData}
+        onConfirmExchange={(payload) => {
+          const oldDiff = exchangeDevice ? Math.max(0, totalAfterDiscount - Number(exchangeDevice.trade_in_value)) : -1;
+          const newDiff = Math.max(0, totalAfterDiscount - payload.trade_in_value);
+          setExchangeDevice(payload);
+          if (
+            !paidAmount ||
+            Number(paidAmount) === 0 ||
+            Number(paidAmount) === totalAfterDiscount ||
+            Number(paidAmount) === oldDiff
+          ) {
+            setPaidAmount(String(newDiff));
+          }
+          toast.success(`Exchange attached: ${payload.product_name}`);
+        }}
+      />
     </div>
   );
 };

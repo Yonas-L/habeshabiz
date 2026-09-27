@@ -3,13 +3,16 @@
 namespace App\Actions;
 
 use App\Models\AuditLog;
+use App\Models\Contact;
 use App\Models\Debt;
 use App\Models\FinancialAccount;
 use App\Models\FinancialTransaction;
 use App\Models\InventoryStock;
 use App\Models\InventoryUnit;
+use App\Models\ProductVariant;
 use App\Models\SalesOrder;
 use App\Models\SalesOrderItem;
+use App\Models\User;
 use App\Scopes\TenantScope;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -46,16 +49,108 @@ class RecordSaleAction
             $discount = (float) ($data['discount_amount'] ?? 0);
             $paidAmount = (float) $data['paid_amount'];
 
-            // Compute total price across items
-            $totalAmount = 0.0;
-            foreach ($data['items'] as $itemData) {
-                $qty = (int) ($itemData['quantity'] ?? 1);
-                $totalAmount += (float) $itemData['unit_price'] * $qty;
+            // Resolve or create customer contact if provided
+            $customerId = $data['customer_id'] ?? null;
+            $customerName = isset($data['customer_name']) ? trim((string) $data['customer_name']) : '';
+            $customerPhone = isset($data['customer_phone']) && trim((string) $data['customer_phone']) !== ''
+                ? trim((string) $data['customer_phone'])
+                : null;
+
+            if (! $customerId && ($customerName !== '' || $customerPhone !== null)) {
+                if ($customerName === '' && $customerPhone !== null) {
+                    $customerName = 'Customer ('.$customerPhone.')';
+                }
+
+                // Check if a contact already exists with this phone or exact name in this tenant
+                $existingContact = null;
+                if ($customerPhone) {
+                    $existingContact = Contact::where('tenant_id', $tenantId)
+                        ->where('phone', $customerPhone)
+                        ->first();
+                }
+                if (! $existingContact && $customerName !== '') {
+                    $existingContact = Contact::where('tenant_id', $tenantId)
+                        ->where('name', $customerName)
+                        ->first();
+                }
+
+                if ($existingContact) {
+                    $customerId = $existingContact->id;
+                    $roles = $existingContact->roles ?? [];
+                    $needsUpdate = false;
+                    if (! in_array('customer', $roles, true)) {
+                        $roles[] = 'customer';
+                        $existingContact->roles = $roles;
+                        $needsUpdate = true;
+                    }
+                    if ($customerPhone && empty($existingContact->phone)) {
+                        $existingContact->phone = $customerPhone;
+                        $needsUpdate = true;
+                    }
+                    if ($needsUpdate) {
+                        $existingContact->save();
+                    }
+                } else {
+                    $newContact = Contact::create([
+                        'tenant_id' => $tenantId,
+                        'name' => $customerName,
+                        'phone' => $customerPhone,
+                        'roles' => ['customer'],
+                        'is_active' => true,
+                    ]);
+                    $customerId = $newContact->id;
+                }
             }
 
-            $netPayable = max(0, $totalAmount - $discount);
+            // If customer paid more than entered total price (e.g. salesperson entered final selling price into paid_amount)
+            $preliminaryTotal = 0.0;
+            foreach ($data['items'] as $itemData) {
+                $qty = (int) ($itemData['quantity'] ?? 1);
+                $preliminaryTotal += (float) $itemData['unit_price'] * $qty;
+            }
+            if ($paidAmount + $discount > $preliminaryTotal && count($data['items']) === 1) {
+                $firstKey = array_key_first($data['items']);
+                $itemQty = max(1, (int) ($data['items'][$firstKey]['quantity'] ?? 1));
+                $data['items'][$firstKey]['unit_price'] = ($paidAmount + $discount) / $itemQty;
+            }
+
+            // Compute total price and upsell bonus across items
+            $totalAmount = 0.0;
+            $rawItemBonuses = [];
+            $settedPrices = [];
+            foreach ($data['items'] as $idx => $itemData) {
+                $qty = (int) ($itemData['quantity'] ?? 1);
+                $unitPrice = (float) $itemData['unit_price'];
+                $totalAmount += $unitPrice * $qty;
+
+                $variant = ProductVariant::find($itemData['variant_id']);
+                $unit = ! empty($itemData['inventory_unit_id']) ? InventoryUnit::find($itemData['inventory_unit_id']) : null;
+                $benchmarkPrice = (float) ($unit?->selling_price ?? $variant?->default_selling_price ?? 0);
+                $settedPrice = isset($itemData['setted_price']) && (float) $itemData['setted_price'] > 0
+                    ? (float) $itemData['setted_price']
+                    : $benchmarkPrice;
+
+                if ($settedPrice <= 0) {
+                    $settedPrice = $unitPrice;
+                }
+
+                $settedPrices[$idx] = $settedPrice;
+                $rawItemBonuses[$idx] = $unitPrice > $settedPrice ? ($unitPrice - $settedPrice) * $qty : 0.0;
+            }
+
+            $totalRawBonus = array_sum($rawItemBonuses);
+            $netOrderBonus = max(0.0, $totalRawBonus - $discount);
+
+            $exchangeData = $data['exchange'] ?? null;
+            $exchangeAllowance = 0.0;
+            if (! empty($exchangeData) && ! empty($exchangeData['trade_in_value'])) {
+                $exchangeAllowance = (float) $exchangeData['trade_in_value'];
+            }
+
+            // Net payable is order total minus discount minus trade-in exchange allowance
+            $netPayable = max(0, $totalAmount - $discount - $exchangeAllowance);
             $paymentStatus = 'paid';
-            if ($paidAmount <= 0) {
+            if ($netPayable > 0 && $paidAmount <= 0) {
                 $paymentStatus = 'unpaid';
             } elseif ($paidAmount < $netPayable) {
                 $paymentStatus = 'partially_paid';
@@ -64,10 +159,12 @@ class RecordSaleAction
             $order = SalesOrder::create([
                 'tenant_id' => $tenantId,
                 'order_number' => $orderNumber,
-                'customer_id' => $data['customer_id'] ?? null,
+                'customer_id' => $customerId,
                 'salesperson_id' => $data['salesperson_id'] ?? null,
                 'total_amount' => $totalAmount,
                 'discount_amount' => $discount,
+                'exchange_allowance' => $exchangeAllowance,
+                'total_bonus_amount' => $netOrderBonus,
                 'paid_amount' => $paidAmount,
                 'payment_status' => $paymentStatus,
                 'payment_method' => $data['payment_method'] ?? 'cash',
@@ -76,7 +173,82 @@ class RecordSaleAction
                 'order_date' => now(),
             ]);
 
-            foreach ($data['items'] as $itemData) {
+            // If an exchange device was traded in, create the incoming inventory unit
+            if (! empty($exchangeData) && ! empty($exchangeData['variant_id']) && $exchangeAllowance > 0) {
+                $exchangeVariant = ProductVariant::with('product')->findOrFail($exchangeData['variant_id']);
+                $exchangeImei = ! empty($exchangeData['imei_or_serial']) ? trim($exchangeData['imei_or_serial']) : null;
+
+                if ($exchangeImei) {
+                    $alreadyExists = InventoryUnit::where('tenant_id', $tenantId)
+                        ->whereIn('status', ['in_stock', 'reserved', 'out'])
+                        ->where('imei_or_serial', $exchangeImei)
+                        ->exists();
+
+                    if ($alreadyExists) {
+                        throw new InvalidArgumentException("Traded-in device IMEI/Serial '{$exchangeImei}' is already present in active shop inventory.");
+                    }
+                }
+
+                $exchangeUnit = InventoryUnit::create([
+                    'tenant_id' => $tenantId,
+                    'variant_id' => $exchangeVariant->id,
+                    'imei_or_serial' => $exchangeImei,
+                    'condition' => $exchangeData['condition'] ?? 'used_clean',
+                    'battery_health' => isset($exchangeData['battery_health']) && $exchangeData['battery_health'] !== '' ? (int) $exchangeData['battery_health'] : null,
+                    'cycle_count' => isset($exchangeData['cycle_count']) && $exchangeData['cycle_count'] !== '' ? (int) $exchangeData['cycle_count'] : null,
+                    'sim_type' => $exchangeData['sim_type'] ?? 'physical',
+                    'cost_basis' => $exchangeAllowance,
+                    'status' => 'in_stock',
+                    'source_type' => 'exchange',
+                    'supplier_contact_id' => $customerId,
+                    'exchange_sales_order_id' => $order->id,
+                    'location' => $exchangeData['location'] ?? 'Shop Counter',
+                    'notes' => ! empty($exchangeData['notes'])
+                        ? $exchangeData['notes']
+                        : "Exchanged/Traded-in against Order #{$order->order_number}",
+                ]);
+
+                // Update order reference to the exchange unit
+                $order->update(['exchange_unit_id' => $exchangeUnit->id]);
+
+                // Increment in-stock count in aggregated InventoryStock
+                $stock = InventoryStock::firstOrCreate(
+                    [
+                        'tenant_id' => $tenantId,
+                        'variant_id' => $exchangeVariant->id,
+                    ],
+                    [
+                        'quantity_on_hand' => 0,
+                        'average_cost' => $exchangeAllowance,
+                    ]
+                );
+
+                $currentQty = $stock->quantity_on_hand;
+                $newQty = $currentQty + 1;
+                $newAvgCost = $currentQty > 0
+                    ? (($stock->average_cost * $currentQty) + $exchangeAllowance) / $newQty
+                    : $exchangeAllowance;
+
+                $stock->update([
+                    'quantity_on_hand' => $newQty,
+                    'average_cost' => round($newAvgCost, 2),
+                ]);
+
+                AuditLog::record(
+                    action: 'exchange_device_received',
+                    entityType: 'InventoryUnit',
+                    entityId: (string) $exchangeUnit->id,
+                    newValues: [
+                        'order_number' => $order->order_number,
+                        'variant_id' => $exchangeVariant->id,
+                        'imei_or_serial' => $exchangeUnit->imei_or_serial,
+                        'trade_in_value' => $exchangeAllowance,
+                    ],
+                    userId: $data['salesperson_id'] ?? auth()->id()
+                );
+            }
+
+            foreach ($data['items'] as $idx => $itemData) {
                 $qty = (int) ($itemData['quantity'] ?? 1);
                 $unitPrice = (float) $itemData['unit_price'];
                 $sourcingType = $itemData['sourcing_type'] ?? 'internal_stock';
@@ -128,9 +300,15 @@ class RecordSaleAction
                             $vendorCost = $unitCost;
                             $sourcingType = 'brokered_neighbour';
 
+                            // Check if a payable debt was already created when the unit was stocked (stock intake)
+                            $hasExistingDebt = Debt::where('contact_id', $unit->supplier_contact_id)
+                                ->where('reference_type', 'stock_intake')
+                                ->where('reference_id', $unit->id)
+                                ->exists();
+
                             $payableAmount = $unitCost * $qty;
-                            if ($payableAmount > 0) {
-                                Debt::create([
+                            if (! $hasExistingDebt && $payableAmount > 0) {
+                                $newPayable = Debt::create([
                                     'tenant_id' => $tenantId,
                                     'contact_id' => $unit->supplier_contact_id,
                                     'type' => 'payable',
@@ -143,6 +321,8 @@ class RecordSaleAction
                                     'status' => 'open',
                                     'notes' => "Vendor stock payout for SN: " . ($unit->imei_or_serial ?: 'Unit') . " in Order #{$order->order_number}. Agreed vendor cut.",
                                 ]);
+
+                                Debt::applyOpenAdvancesToPayable($newPayable);
                             }
                         }
 
@@ -182,6 +362,9 @@ class RecordSaleAction
                         // Also mark matching InventoryUnit records as sold if any exist
                         if ($inStockUnits->isNotEmpty()) {
                             $unitsToMarkSold = $inStockUnits->take($qty);
+                            if ($qty === 1 && $unitsToMarkSold->count() === 1 && empty($itemData['inventory_unit_id'])) {
+                                $itemData['inventory_unit_id'] = $unitsToMarkSold->first()->id;
+                            }
                             foreach ($unitsToMarkSold as $u) {
                                 $u->update([
                                     'status' => 'sold',
@@ -189,26 +372,40 @@ class RecordSaleAction
                                 ]);
 
                                 if ($u->source_type === 'consignment' && $u->supplier_contact_id && (float) $u->cost_basis > 0) {
-                                    Debt::create([
-                                        'tenant_id' => $tenantId,
-                                        'contact_id' => $u->supplier_contact_id,
-                                        'type' => 'payable',
-                                        'reference_type' => 'consignment_sale',
-                                        'reference_id' => $order->id,
-                                        'original_amount' => (float) $u->cost_basis,
-                                        'paid_amount' => 0.0,
-                                        'remaining_amount' => (float) $u->cost_basis,
-                                        'due_date' => now()->addDays(7),
-                                        'status' => 'open',
-                                        'notes' => "Vendor stock payout for unit in Order #{$order->order_number}. Agreed vendor cut.",
-                                    ]);
+                                    $hasExistingDebt = Debt::where('contact_id', $u->supplier_contact_id)
+                                        ->where('reference_type', 'stock_intake')
+                                        ->where('reference_id', $u->id)
+                                        ->exists();
+
+                                    if (! $hasExistingDebt) {
+                                        $bulkPayable = Debt::create([
+                                            'tenant_id' => $tenantId,
+                                            'contact_id' => $u->supplier_contact_id,
+                                            'type' => 'payable',
+                                            'reference_type' => 'consignment_sale',
+                                            'reference_id' => $order->id,
+                                            'original_amount' => (float) $u->cost_basis,
+                                            'paid_amount' => 0.0,
+                                            'remaining_amount' => (float) $u->cost_basis,
+                                            'due_date' => now()->addDays(7),
+                                            'status' => 'open',
+                                            'notes' => "Vendor stock payout for unit in Order #{$order->order_number}. Agreed vendor cut.",
+                                        ]);
+
+                                        Debt::applyOpenAdvancesToPayable($bulkPayable);
+                                    }
                                 }
                             }
                         }
                     }
                 }
 
-                $profit = ($unitPrice - $unitCost) * $qty;
+                $rawBonus = $rawItemBonuses[$idx] ?? 0.0;
+                $itemBonus = $totalRawBonus > 0 ? round(($rawBonus / $totalRawBonus) * $netOrderBonus, 2) : 0.0;
+                $itemSettedPrice = $settedPrices[$idx] ?? $unitPrice;
+
+                // Profit earned by the shop (net of salesperson bonus)
+                $profit = max(0.0, (($unitPrice - $unitCost) * $qty) - $itemBonus);
 
                 SalesOrderItem::create([
                     'tenant_id' => $tenantId,
@@ -217,20 +414,71 @@ class RecordSaleAction
                     'inventory_unit_id' => $itemData['inventory_unit_id'] ?? null,
                     'quantity' => $qty,
                     'unit_price' => $unitPrice,
+                    'setted_price' => $itemSettedPrice,
                     'unit_cost' => $unitCost,
                     'profit' => $profit,
+                    'bonus_amount' => $itemBonus,
                     'sourcing_type' => $sourcingType,
                     'vendor_contact_id' => $vendorContactId,
                     'vendor_cost' => $vendorCost,
                 ]);
             }
 
+            // Record salesperson bonus payable if bonus was earned
+            if ($netOrderBonus > 0 && ! empty($order->salesperson_id)) {
+                $salesperson = User::find($order->salesperson_id);
+                if ($salesperson) {
+                    $staffContact = Contact::firstOrCreate(
+                        [
+                            'tenant_id' => $tenantId,
+                            'name' => $salesperson->name,
+                        ],
+                        [
+                            'phone' => $salesperson->phone ?? null,
+                            'email' => $salesperson->email ?? null,
+                            'roles' => ['staff', 'salesperson'],
+                            'is_active' => true,
+                        ]
+                    );
+
+                    Debt::create([
+                        'tenant_id' => $tenantId,
+                        'contact_id' => $staffContact->id,
+                        'salesperson_id' => $salesperson->id,
+                        'type' => 'payable',
+                        'reference_type' => 'salesperson_bonus',
+                        'reference_id' => $order->id,
+                        'original_amount' => $netOrderBonus,
+                        'paid_amount' => 0.0,
+                        'remaining_amount' => $netOrderBonus,
+                        'due_date' => now()->addDays(7),
+                        'status' => 'open',
+                        'notes' => "Sales bonus for Order #{$order->order_number} by {$salesperson->name}",
+                    ]);
+                }
+            }
+
             // Record customer receivable if partially paid or unpaid
             $unpaidBalance = $netPayable - $paidAmount;
-            if ($unpaidBalance > 0 && ! empty($data['customer_id'])) {
+            if ($unpaidBalance > 0) {
+                if (empty($customerId)) {
+                    $walkIn = Contact::firstOrCreate(
+                        [
+                            'tenant_id' => $tenantId,
+                            'name' => 'Walk-in Customer',
+                        ],
+                        [
+                            'roles' => ['customer'],
+                            'is_active' => true,
+                        ]
+                    );
+                    $customerId = $walkIn->id;
+                    $order->update(['customer_id' => $customerId]);
+                }
+
                 Debt::create([
                     'tenant_id' => $tenantId,
-                    'contact_id' => $data['customer_id'],
+                    'contact_id' => $customerId,
                     'type' => 'receivable',
                     'reference_type' => 'sales_order',
                     'reference_id' => $order->id,
@@ -254,7 +502,7 @@ class RecordSaleAction
                     'destination_account_id' => $account->id,
                     'type' => 'customer_payment',
                     'amount' => $paidAmount,
-                    'contact_id' => $data['customer_id'] ?? null,
+                    'contact_id' => $customerId,
                     'description' => "Payment received for Order #{$order->order_number}",
                     'date' => now(),
                     'created_by' => auth()->id(),
@@ -275,7 +523,15 @@ class RecordSaleAction
                 userId: $data['salesperson_id'] ?? auth()->id()
             );
 
-            return $order->load(['items', 'customer', 'salesperson']);
+            return $order->load([
+                'customer',
+                'salesperson',
+                'financialAccount',
+                'exchangeUnit.variant.product',
+                'items.variant.product',
+                'items.inventoryUnit',
+                'items.vendorContact',
+            ]);
         });
     }
 }

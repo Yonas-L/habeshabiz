@@ -3,7 +3,7 @@ import type { User, Tenant } from '../api/client';
 import {
   LayoutDashboard,
   ShoppingCart,
-  Smartphone,
+  Package,
   Receipt,
   CreditCard,
   Landmark,
@@ -13,6 +13,7 @@ import {
   Users,
   Settings,
   Handshake,
+  ScrollText,
 } from 'lucide-react';
 
 export type NavTab =
@@ -24,7 +25,8 @@ export type NavTab =
   | 'debts'
   | 'treasury'
   | 'expenses'
-  | 'staff';
+  | 'staff'
+  | 'logs';
 
 interface SidebarProps {
   activeTab: NavTab;
@@ -38,6 +40,7 @@ interface SidebarProps {
   isOpenMobile: boolean;
   onCloseMobile: () => void;
   onOpenProfile?: () => void;
+  onOpenQuickSearch?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -51,6 +54,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isOpenMobile,
   onCloseMobile,
   onOpenProfile,
+  onOpenQuickSearch,
 }) => {
   const isOwner = user?.role === 'owner';
 
@@ -61,14 +65,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
     badge?: number;
     shortcut?: string;
   }[] = [
-    { id: 'overview', label: 'Overview', icon: LayoutDashboard, shortcut: '⌘1' },
+    { id: 'overview', label: 'Dashboard', icon: LayoutDashboard, shortcut: '⌘1' },
     { id: 'counter', label: 'Sales', icon: ShoppingCart, shortcut: '⌘2' },
-    { id: 'inventory', label: 'Inventory', icon: Smartphone, shortcut: '⌘3' },
+    { id: 'inventory', label: 'Stock', icon: Package, shortcut: '⌘3' },
     { id: 'sales', label: 'Sales History', icon: Receipt, shortcut: '⌘4' },
     ...(isOwner
       ? [
-          { id: 'partners' as NavTab, label: 'Partners & Brokers', icon: Handshake, shortcut: '⌘5' },
-          { id: 'staff' as NavTab, label: 'Staff & Team', icon: Users, shortcut: '⌘9' },
+          { id: 'partners' as NavTab, label: 'Vendors', icon: Handshake, shortcut: '⌘5' },
+          { id: 'staff' as NavTab, label: 'Staff', icon: Users, shortcut: '⌘9' },
         ]
       : []),
   ];
@@ -82,7 +86,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }[] = [
     { id: 'debts', label: 'Receivable & Payable', icon: CreditCard, badge: openDebtsCount, shortcut: '⌘6' },
     { id: 'treasury', label: 'Treasury & Cash', icon: Landmark, shortcut: '⌘7' },
-    { id: 'expenses', label: 'Expenses & Draws', icon: DollarSign, shortcut: '⌘8' },
+    { id: 'expenses', label: 'Expenses', icon: DollarSign, shortcut: '⌘8' },
   ];
 
   const sidebarInner = (
@@ -107,15 +111,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Quick Search Trigger */}
         <div className="my-3 px-1">
-          <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-800 text-xs text-slate-400 dark:text-slate-500">
+          <button
+            type="button"
+            onClick={onOpenQuickSearch}
+            className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/50 dark:hover:bg-slate-800 border border-slate-200/60 dark:border-slate-800 text-xs text-slate-400 dark:text-slate-500 transition-colors cursor-pointer group select-none text-left"
+          >
             <div className="flex items-center gap-2">
-              <Search className="w-3.5 h-3.5 text-slate-400" />
-              <span className="text-[11px]">Quick search...</span>
+              <Search className="size-3.5 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors" />
+              <span className="text-[11px] group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors">Quick search...</span>
             </div>
             <kbd className="px-1.5 py-0.5 rounded bg-white dark:bg-slate-900 text-[10px] font-mono border border-slate-200 dark:border-slate-700 text-slate-500 shadow-xs">
               ⌘K
             </kbd>
-          </div>
+          </button>
         </div>
 
         {/* Navigation Group 1: MAIN MENU */}
@@ -197,6 +205,34 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </button>
               );
             })}
+          </div>
+        )}
+
+        {/* Navigation Group 3: SECURITY & AUDIT (Owner only) */}
+        {isOwner && (
+          <div className="space-y-0.5 mt-3 pt-3 border-t border-slate-100/80 dark:border-slate-800/80">
+            <div className="px-2.5 py-1 text-[10px] font-bold tracking-wider uppercase text-slate-400 dark:text-slate-500">
+              System & Security
+            </div>
+            <button
+              onClick={() => {
+                onChangeTab('logs');
+                onCloseMobile();
+              }}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+                activeTab === 'logs'
+                  ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800/50'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <ScrollText className={`size-4 ${activeTab === 'logs' ? 'text-emerald-400 dark:text-emerald-600' : 'text-slate-400 dark:text-slate-500'}`} />
+                <span>Audit Logs</span>
+              </div>
+              <span className={`text-[10px] font-mono ${activeTab === 'logs' ? 'text-slate-400 dark:text-slate-600' : 'text-slate-300 dark:text-slate-600'}`}>
+                ⌘0
+              </span>
+            </button>
           </div>
         )}
       </div>

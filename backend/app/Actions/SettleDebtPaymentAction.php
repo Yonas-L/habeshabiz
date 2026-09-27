@@ -68,15 +68,19 @@ class SettleDebtPaymentAction
             if ($debt->reference_type === 'handover_holding' && $status === 'settled' && ! empty($debt->reference_id)) {
                 $unit = InventoryUnit::find($debt->reference_id);
                 if ($unit && $unit->status === 'out') {
+                    $vendorName = $unit->handover_to ?? 'Vendor/Broker';
                     $unit->update([
                         'status' => 'sold',
                         'sold_at' => now(),
+                        'location' => "Sold by {$vendorName}",
                     ]);
 
                     $stock = InventoryStock::where('variant_id', $unit->variant_id)->first();
                     if ($stock && $stock->quantity_on_hand > 0) {
                         $stock->decrement('quantity_on_hand', 1);
                     }
+
+                    (new \App\Actions\SynchronizeInventoryStockAction())->execute();
 
                     AuditLog::record(
                         action: 'unit_sold_via_debt_collection',
@@ -88,6 +92,19 @@ class SettleDebtPaymentAction
                             'settled_amount' => $newPaid,
                         ]
                     );
+                }
+            }
+
+            // If linked to a sales order, keep sales order paid_amount and payment_status in sync
+            if ($debt->reference_type === 'sales_order' && ! empty($debt->reference_id)) {
+                $order = \App\Models\SalesOrder::find($debt->reference_id);
+                if ($order) {
+                    $orderPaid = (float) $order->paid_amount + $amount;
+                    $orderRemaining = max(0, (float) $order->total_amount - $orderPaid);
+                    $order->update([
+                        'paid_amount' => $orderPaid,
+                        'payment_status' => $orderRemaining <= 0 ? 'paid' : 'partial',
+                    ]);
                 }
             }
 

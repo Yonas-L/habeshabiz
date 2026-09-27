@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import type { Product, ProductCategory, ProductVariant } from '../../api/client';
 import { api } from '../../api/client';
 import { toast } from 'sonner';
@@ -6,12 +6,13 @@ import {
   X,
   Loader2,
   Package,
-  Save,
   Plus,
   Trash2,
   AlertTriangle,
   ChevronDown,
   Sparkles,
+  Edit2,
+  Check,
 } from 'lucide-react';
 import { getCategoryIcon } from './CategoryManagementModal';
 
@@ -22,6 +23,34 @@ interface EditProductModalProps {
   categories: ProductCategory[];
   onProductUpdated: () => void;
   onProductDeleted?: () => void;
+}
+
+type CategoryArchetype =
+  | 'phone_tablet'
+  | 'laptop'
+  | 'screen_protector'
+  | 'charger_cable'
+  | 'smartwatch'
+  | 'general';
+
+function getCategoryArchetype(slug?: string, name?: string): CategoryArchetype {
+  const s = ((slug || '') + ' ' + (name || '')).toLowerCase();
+  if (s.includes('protector') || s.includes('tempered') || s.includes('glass')) {
+    return 'screen_protector';
+  }
+  if (s.includes('charger') || s.includes('adapter') || s.includes('cable') || s.includes('power')) {
+    return 'charger_cable';
+  }
+  if (s.includes('watch') || s.includes('band')) {
+    return 'smartwatch';
+  }
+  if (s.includes('laptop') || s.includes('macbook') || s.includes('computer')) {
+    return 'laptop';
+  }
+  if (s.includes('phone') || s.includes('tablet') || s.includes('ipad') || s.includes('smartphone')) {
+    return 'phone_tablet';
+  }
+  return 'general';
 }
 
 export const EditProductModal: React.FC<EditProductModalProps> = ({
@@ -39,26 +68,31 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
   const [isActive, setIsActive] = useState(true);
   const [variants, setVariants] = useState<ProductVariant[]>([]);
 
-  // Loading states
-  const [savingGeneral, setSavingGeneral] = useState(false);
+  // Action states
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingProduct, setDeletingProduct] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  // Add Variant State
+  // Add Variant Form State
   const [showAddVariant, setShowAddVariant] = useState(false);
+  const [addingVariant, setAddingVariant] = useState(false);
   const [newStorage, setNewStorage] = useState('');
   const [newRam, setNewRam] = useState('');
   const [newColor, setNewColor] = useState('');
-  const [newSku, setNewSku] = useState('');
+  const [newProcessor, setNewProcessor] = useState('');
+  const [newCompatibility, setNewCompatibility] = useState('');
+  const [newGlassType, setNewGlassType] = useState('');
+  const [newWattage, setNewWattage] = useState('');
+  const [newCaseSize, setNewCaseSize] = useState('');
+  const [newGeneralSpec, setNewGeneralSpec] = useState('');
   const [newPrice, setNewPrice] = useState('');
-  const [addingVariant, setAddingVariant] = useState(false);
 
-  // Edit Variant Inline State
+  // Inline Edit Variant State
   const [editingVariantId, setEditingVariantId] = useState<string | null>(null);
-  const [editPrice, setEditPrice] = useState('');
   const [editStorage, setEditStorage] = useState('');
   const [editRam, setEditRam] = useState('');
   const [editColor, setEditColor] = useState('');
+  const [editPrice, setEditPrice] = useState('');
   const [savingVariant, setSavingVariant] = useState(false);
   const [deletingVariantId, setDeletingVariantId] = useState<string | null>(null);
 
@@ -73,23 +107,54 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
       setShowAddVariant(false);
       setEditingVariantId(null);
       setShowDeleteConfirm(false);
+      resetNewVariantInputs();
     }
   }, [product, categories]);
 
+  // Handle ESC key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  const currentCategory = useMemo(() => {
+    return categories.find((c) => c.id === categoryId) || categories.find((c) => c.slug === product?.category);
+  }, [categories, categoryId, product]);
+
+  const activeArchetype = useMemo(() => {
+    return getCategoryArchetype(currentCategory?.slug, currentCategory?.name);
+  }, [currentCategory]);
+
+  const resetNewVariantInputs = () => {
+    setNewStorage('');
+    setNewRam('');
+    setNewColor('');
+    setNewProcessor('');
+    setNewCompatibility('');
+    setNewGlassType('');
+    setNewWattage('');
+    setNewCaseSize('');
+    setNewGeneralSpec('');
+    setNewPrice('');
+  };
+
   if (!isOpen || !product) return null;
 
-  const currentCategory = categories.find((c) => c.id === categoryId);
-
-  // Handle Save General Info
-  const handleSaveGeneral = async (e: React.FormEvent) => {
+  // Handle Save Main Product Details
+  const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
-      toast.error('Product name is required');
+      toast.error('Product model name is required');
       return;
     }
 
     try {
-      setSavingGeneral(true);
+      setIsSubmitting(true);
       const res = await api.updateProduct(product.id, {
         name: name.trim(),
         brand: brand.trim() || undefined,
@@ -98,14 +163,16 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
         is_active: isActive,
       });
 
-      toast.success('Product Updated', {
-        description: `'${res.data.name}' details have been saved successfully.`,
+      const updatedName = (res as any)?.name || (res as any)?.data?.name || name.trim();
+      toast.success('Product updated', {
+        description: `'${updatedName}' details have been saved.`,
       });
       onProductUpdated();
+      onClose();
     } catch (err: any) {
       toast.error('Failed to update product', { description: err.message });
     } finally {
-      setSavingGeneral(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -114,34 +181,70 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
     e.preventDefault();
     try {
       setAddingVariant(true);
-      const res = await api.addVariant(product.id, {
-        storage: newStorage.trim() || undefined,
-        ram: newRam.trim() || undefined,
-        color: newColor.trim() || undefined,
-        sku: newSku.trim() || undefined,
+
+      const payload: any = {
         default_selling_price: newPrice ? parseFloat(newPrice) : undefined,
-      });
+      };
 
-      toast.success('Variant Added', {
-        description: `New variant added to ${product.name}.`,
-      });
+      switch (activeArchetype) {
+        case 'laptop':
+          payload.storage = newStorage.trim() || undefined;
+          payload.ram = newRam.trim() || undefined;
+          payload.color = newColor.trim() || undefined;
+          if (newProcessor.trim()) {
+            payload.specs = { processor: newProcessor.trim() };
+          }
+          break;
+        case 'screen_protector':
+          payload.specs = {
+            compatible_model: newCompatibility.trim() || undefined,
+            glass_type: newGlassType.trim() || undefined,
+          };
+          payload.storage = newCompatibility.trim() || undefined;
+          payload.color = newGlassType.trim() || undefined;
+          break;
+        case 'charger_cable':
+          payload.specs = {
+            wattage: newWattage.trim() || undefined,
+          };
+          payload.storage = newWattage.trim() || undefined;
+          payload.color = newColor.trim() || undefined;
+          break;
+        case 'smartwatch':
+          payload.specs = {
+            case_size: newCaseSize.trim() || undefined,
+          };
+          payload.storage = newCaseSize.trim() || undefined;
+          payload.color = newColor.trim() || undefined;
+          break;
+        case 'phone_tablet':
+          payload.storage = newStorage.trim() || undefined;
+          payload.ram = newRam.trim() || undefined;
+          payload.color = newColor.trim() || undefined;
+          break;
+        default:
+          payload.storage = newGeneralSpec.trim() || undefined;
+          payload.color = newColor.trim() || undefined;
+          break;
+      }
 
-      setVariants((prev) => [...prev, res]);
-      setNewStorage('');
-      setNewRam('');
-      setNewColor('');
-      setNewSku('');
-      setNewPrice('');
+      const res = await api.addVariant(product.id, payload);
+      const newVar = (res as any)?.id ? res : (res as any)?.data;
+      if (newVar) {
+        setVariants((prev) => [...prev, newVar]);
+      }
+      toast.success('Specification Added');
       setShowAddVariant(false);
+      resetNewVariantInputs();
       onProductUpdated();
     } catch (err: any) {
-      toast.error('Failed to add variant', { description: err.message });
+      toast.error('Failed to add specification', { description: err.message });
     } finally {
       setAddingVariant(false);
     }
   };
 
-  // Handle Update Variant
+  // Handle Save Variant
   const handleSaveVariant = async (variantId: string) => {
     try {
       setSavingVariant(true);
@@ -152,14 +255,15 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
         default_selling_price: editPrice ? parseFloat(editPrice) : undefined,
       });
 
-      toast.success('Variant Updated');
+      const updated = (res as any)?.id ? res : (res as any)?.data || { id: variantId };
       setVariants((prev) =>
-        prev.map((v) => (v.id === variantId ? { ...v, ...res.data } : v))
+        prev.map((v) => (v.id === variantId ? { ...v, ...updated } : v))
       );
+      toast.success('Specification updated');
       setEditingVariantId(null);
       onProductUpdated();
     } catch (err: any) {
-      toast.error('Failed to update variant', { description: err.message });
+      toast.error('Failed to update specification', { description: err.message });
     } finally {
       setSavingVariant(false);
     }
@@ -167,35 +271,27 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
 
   // Handle Delete Variant
   const handleDeleteVariant = async (variantId: string) => {
-    if (!window.confirm('Are you sure you want to remove this variant specification?')) return;
-
     try {
       setDeletingVariantId(variantId);
       await api.deleteVariant(variantId);
-      toast.success('Variant Removed');
+      toast.success('Specification removed');
       setVariants((prev) => prev.filter((v) => v.id !== variantId));
       onProductUpdated();
     } catch (err: any) {
-      toast.error('Cannot remove variant', { description: err.message });
+      toast.error('Cannot remove specification', { description: err.message });
     } finally {
       setDeletingVariantId(null);
     }
   };
 
-  // Handle Delete / Archive Product
+  // Handle Delete Product
   const handleDeleteProduct = async () => {
     try {
       setDeletingProduct(true);
       const res = await api.deleteProduct(product.id);
-      if (res.deactivated) {
-        toast.success('Product Archived', {
-          description: res.message,
-        });
-      } else {
-        toast.success('Product Deleted', {
-          description: res.message,
-        });
-      }
+      toast.success('Product Removed', {
+        description: (res as any)?.message || 'Product removed. Historical sales and records remain preserved.',
+      });
       onClose();
       if (onProductDeleted) {
         onProductDeleted();
@@ -203,11 +299,29 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
         onProductUpdated();
       }
     } catch (err: any) {
-      toast.error('Cannot delete product', { description: err.message });
+      toast.error('Failed to remove product', { description: err.message });
     } finally {
       setDeletingProduct(false);
       setShowDeleteConfirm(false);
     }
+  };
+
+  const getVariantDisplayLabel = (v: ProductVariant) => {
+    const parts = [
+      v.storage,
+      v.ram ? `${v.ram} RAM` : null,
+      v.color,
+    ].filter(Boolean);
+
+    if (v.specs) {
+      if (v.specs.processor && !parts.includes(v.specs.processor)) parts.push(v.specs.processor);
+      if (v.specs.compatible_model && !parts.includes(v.specs.compatible_model)) parts.push(v.specs.compatible_model);
+      if (v.specs.glass_type && !parts.includes(v.specs.glass_type)) parts.push(v.specs.glass_type);
+      if (v.specs.wattage && !parts.includes(v.specs.wattage)) parts.push(v.specs.wattage);
+      if (v.specs.case_size && !parts.includes(v.specs.case_size)) parts.push(v.specs.case_size);
+    }
+
+    return parts.length > 0 ? parts.join(' • ') : 'Standard Specification';
   };
 
   return (
@@ -218,82 +332,66 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
         onClick={onClose}
       />
 
-      {/* Modal Card */}
-      <div className="relative z-10 bg-white dark:bg-[#131926] rounded-2xl border border-slate-100 dark:border-slate-800 shadow-2xl ring-1 ring-black/5 max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-modal-enter">
+      {/* Modal Surface */}
+      <div className="relative z-10 w-full max-w-xl bg-white dark:bg-[#131926] rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden animate-modal-enter flex flex-col max-h-[88vh]">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60 flex items-center justify-center text-slate-700 dark:text-slate-300">
-              {currentCategory?.icon ? getCategoryIcon(currentCategory.icon, 'w-5 h-5') : <Package className="w-5 h-5" />}
+        <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-slate-800">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center shrink-0">
+              {currentCategory?.icon ? (
+                getCategoryIcon(currentCategory.icon, 'w-4 h-4')
+              ) : (
+                <Package className="w-4 h-4" />
+              )}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-bold text-slate-900 dark:text-white text-base">
-                  {product.name}
-                </h3>
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white leading-none">
+                  Edit Product
+                </h2>
                 <span
-                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                  className={`inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold ${
                     isActive
                       ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-800/50'
                       : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
                   }`}
                 >
-                  {isActive ? 'Active Catalog' : 'Archived'}
+                  {isActive ? 'Active' : 'Archived'}
                 </span>
               </div>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Manage product details, variant specifications, and catalog visibility
+              <p className="text-[11px] text-slate-400 mt-1">
+                Update model name, category, and specifications
               </p>
             </div>
           </div>
-
           <button
+            type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Scrollable Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* Form 1: General Product Details */}
-          <form onSubmit={handleSaveGeneral} className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                General Product Information
-              </span>
-              <button
-                type="submit"
-                disabled={savingGeneral}
-                className="h-8 px-3 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-2xs flex items-center gap-1.5 disabled:opacity-50 active:scale-95 cursor-pointer"
-              >
-                {savingGeneral ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Save className="w-3.5 h-3.5 text-emerald-400 dark:text-emerald-600" />
-                )}
-                <span>Save Info</span>
-              </button>
+        {/* Scrollable Form Body */}
+        <form id="edit-product-form" onSubmit={handleSaveProduct} className="flex-1 overflow-y-auto p-5 space-y-5">
+          {/* Main Info Fields */}
+          <div className="space-y-3.5">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                Product Model Name *
+              </label>
+              <input
+                type="text"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. MacBook Pro M5, iPhone 16 Pro Max"
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700"
+              />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-              {/* Product Name */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Product Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. iPhone 12 Pro"
-                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700"
-                />
-              </div>
-
-              {/* Brand */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                   Brand / Manufacturer
@@ -302,12 +400,11 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                   type="text"
                   value={brand}
                   onChange={(e) => setBrand(e.target.value)}
-                  placeholder="e.g. Apple, Sony, Samsung"
+                  placeholder="e.g. Apple, Samsung, Sony"
                   className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700"
                 />
               </div>
 
-              {/* Category */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                   Category
@@ -327,55 +424,24 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                   <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2.5 top-3 pointer-events-none" />
                 </div>
               </div>
-
-              {/* Serialization Tracking */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Tracking Model
-                </label>
-                <div className="grid grid-cols-2 gap-2 h-10">
-                  <button
-                    type="button"
-                    onClick={() => setHasSerials(true)}
-                    className={`h-full rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all border ${
-                      hasSerials
-                        ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-transparent shadow-2xs'
-                        : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/40'
-                    }`}
-                  >
-                    <span>Serialized</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setHasSerials(false)}
-                    className={`h-full rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all border ${
-                      !hasSerials
-                        ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-transparent shadow-2xs'
-                        : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/40'
-                    }`}
-                  >
-                    <span>Batch / Bulk</span>
-                  </button>
-                </div>
-              </div>
             </div>
 
-            {/* Catalog Active Status Switch */}
-            <div className="pt-2 flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800">
-              <div className="space-y-0.5">
-                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                  Catalog Visibility
+            {/* Visibility Toggle */}
+            <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
+              <div>
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+                  Catalog Status
                 </span>
-                <p className="text-[11px] text-slate-400">
+                <span className="text-[11px] text-slate-400">
                   {isActive
-                    ? 'Product is active and selectable in stock intake and sales checkout.'
-                    : 'Archived. Hidden from active dropdowns while preserving ledger integrity.'}
-                </p>
+                    ? 'Active in catalog and selectable during stock intake & sales checkout.'
+                    : 'Archived. Hidden from active dropdowns while preserving ledger history.'}
+                </span>
               </div>
               <button
                 type="button"
                 onClick={() => setIsActive(!isActive)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   isActive
                     ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
                     : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
@@ -384,141 +450,311 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                 {isActive ? 'Active' : 'Archived'}
               </button>
             </div>
-          </form>
+          </div>
 
-          {/* Form 2: Variants & Specifications */}
-          <div className="space-y-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+          {/* Variants & Specifications Section */}
+          <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                  Variants & Specifications ({variants.length})
+                <span className="text-xs font-bold text-slate-900 dark:text-white block">
+                  Specifications & Variants ({variants.length})
                 </span>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Configure storage, colors, RAM, and benchmark selling prices
-                </p>
+                <span className="text-[11px] text-slate-400">
+                  Setting a benchmark selling price is optional; actual unit costs and prices are set upon intake.
+                </span>
               </div>
               <button
                 type="button"
                 onClick={() => setShowAddVariant(!showAddVariant)}
-                className="h-8 px-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-2xs flex items-center gap-1.5"
+                className="h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer shrink-0"
               >
                 <Plus className="w-3.5 h-3.5 text-emerald-500" />
                 <span>{showAddVariant ? 'Cancel' : 'Add Variant'}</span>
               </button>
             </div>
 
-            {/* Add Variant Form Drawer */}
+            {/* Inline Add Variant Drawer */}
             {showAddVariant && (
-              <form
-                onSubmit={handleAddVariant}
-                className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200/80 dark:border-slate-800 space-y-3 animate-page-enter"
-              >
+              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200/80 dark:border-slate-800 space-y-3 animate-page-enter">
                 <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
-                  <span>Add New Variant Spec</span>
+                  <span>New Specification</span>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                      Storage
-                    </label>
-                    <input
-                      type="text"
-                      value={newStorage}
-                      onChange={(e) => setNewStorage(e.target.value)}
-                      placeholder="e.g. 256GB"
-                      className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
-                    />
+                {/* Context-aware dynamic fields */}
+                {activeArchetype === 'laptop' && (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                        Storage
+                      </label>
+                      <input
+                        type="text"
+                        value={newStorage}
+                        onChange={(e) => setNewStorage(e.target.value)}
+                        placeholder="e.g. 512GB, 1TB"
+                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                        RAM
+                      </label>
+                      <input
+                        type="text"
+                        value={newRam}
+                        onChange={(e) => setNewRam(e.target.value)}
+                        placeholder="e.g. 16GB, 32GB"
+                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                        Color
+                      </label>
+                      <input
+                        type="text"
+                        value={newColor}
+                        onChange={(e) => setNewColor(e.target.value)}
+                        placeholder="e.g. Space Black"
+                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                        Chip / CPU
+                      </label>
+                      <input
+                        type="text"
+                        value={newProcessor}
+                        onChange={(e) => setNewProcessor(e.target.value)}
+                        placeholder="e.g. M5, M5 Pro"
+                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
+                      />
+                    </div>
                   </div>
+                )}
 
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                      RAM
-                    </label>
-                    <input
-                      type="text"
-                      value={newRam}
-                      onChange={(e) => setNewRam(e.target.value)}
-                      placeholder="e.g. 8GB"
-                      className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
-                    />
+                {activeArchetype === 'phone_tablet' && (
+                  <div className="grid grid-cols-3 gap-2.5">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                        Storage
+                      </label>
+                      <input
+                        type="text"
+                        value={newStorage}
+                        onChange={(e) => setNewStorage(e.target.value)}
+                        placeholder="e.g. 128GB, 256GB"
+                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                        RAM (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={newRam}
+                        onChange={(e) => setNewRam(e.target.value)}
+                        placeholder="e.g. 8GB"
+                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                        Color
+                      </label>
+                      <input
+                        type="text"
+                        value={newColor}
+                        onChange={(e) => setNewColor(e.target.value)}
+                        placeholder="e.g. Natural Titanium"
+                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
+                      />
+                    </div>
                   </div>
+                )}
 
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                      Color
-                    </label>
-                    <input
-                      type="text"
-                      value={newColor}
-                      onChange={(e) => setNewColor(e.target.value)}
-                      placeholder="e.g. Pacific Blue"
-                      className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
-                    />
+                {activeArchetype === 'screen_protector' && (
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                        Compatible Phone Model
+                      </label>
+                      <input
+                        type="text"
+                        value={newCompatibility}
+                        onChange={(e) => setNewCompatibility(e.target.value)}
+                        placeholder="e.g. iPhone 16 Pro Max, S24 Ultra"
+                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                        Glass Type / Finish
+                      </label>
+                      <input
+                        type="text"
+                        value={newGlassType}
+                        onChange={(e) => setNewGlassType(e.target.value)}
+                        placeholder="e.g. Privacy Glass, Clear HD"
+                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
+                      />
+                    </div>
                   </div>
+                )}
 
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                      Selling Price (ETB)
-                    </label>
-                    <input
-                      type="number"
-                      step="any"
-                      value={newPrice}
-                      onChange={(e) => setNewPrice(e.target.value)}
-                      placeholder="e.g. 54000"
-                      className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-xs font-medium font-mono text-slate-900 dark:text-white focus:outline-none"
-                    />
+                {activeArchetype === 'charger_cable' && (
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                        Wattage / Spec
+                      </label>
+                      <input
+                        type="text"
+                        value={newWattage}
+                        onChange={(e) => setNewWattage(e.target.value)}
+                        placeholder="e.g. 65W GaN, 20W USB-C"
+                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                        Color / Finish
+                      </label>
+                      <input
+                        type="text"
+                        value={newColor}
+                        onChange={(e) => setNewColor(e.target.value)}
+                        placeholder="e.g. White, Braided Black"
+                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
+                      />
+                    </div>
                   </div>
+                )}
+
+                {activeArchetype === 'smartwatch' && (
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                        Case Size
+                      </label>
+                      <input
+                        type="text"
+                        value={newCaseSize}
+                        onChange={(e) => setNewCaseSize(e.target.value)}
+                        placeholder="e.g. 45mm, 49mm"
+                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                        Color / Material
+                      </label>
+                      <input
+                        type="text"
+                        value={newColor}
+                        onChange={(e) => setNewColor(e.target.value)}
+                        placeholder="e.g. Midnight Aluminum"
+                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {activeArchetype === 'general' && (
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                        Specification / Option
+                      </label>
+                      <input
+                        type="text"
+                        value={newGeneralSpec}
+                        onChange={(e) => setNewGeneralSpec(e.target.value)}
+                        placeholder="e.g. 1TB Edition, Large"
+                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                        Color
+                      </label>
+                      <input
+                        type="text"
+                        value={newColor}
+                        onChange={(e) => setNewColor(e.target.value)}
+                        placeholder="e.g. Black"
+                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Benchmark Price (Explicitly marked as Optional) */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      Benchmark Selling Price (Optional)
+                    </label>
+                    <span className="text-[10px] text-slate-400">ETB</span>
+                  </div>
+                  <input
+                    type="number"
+                    step="any"
+                    value={newPrice}
+                    onChange={(e) => setNewPrice(e.target.value)}
+                    placeholder="e.g. 120,000 (leave blank if dynamic)"
+                    className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium font-mono text-slate-900 dark:text-white focus:outline-none"
+                  />
                 </div>
 
                 <div className="flex justify-end gap-2 pt-1">
                   <button
                     type="button"
-                    onClick={() => setShowAddVariant(false)}
-                    className="h-8 px-3 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                    onClick={() => {
+                      setShowAddVariant(false);
+                      resetNewVariantInputs();
+                    }}
+                    className="h-7 px-2.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
                   >
                     Cancel
                   </button>
                   <button
-                    type="submit"
+                    type="button"
+                    onClick={handleAddVariant}
                     disabled={addingVariant}
-                    className="h-8 px-3 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all flex items-center gap-1.5 disabled:opacity-50"
+                    className="h-7 px-3 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
                   >
-                    {addingVariant ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                    {addingVariant ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
                     <span>Add Variant</span>
                   </button>
                 </div>
-              </form>
+              </div>
             )}
 
             {/* Existing Variants List */}
-            <div className="divide-y divide-slate-100 dark:divide-slate-800/80 rounded-xl border border-slate-200/80 dark:border-slate-800 overflow-hidden">
+            <div className="divide-y divide-slate-100 dark:divide-slate-800 rounded-xl border border-slate-200/80 dark:border-slate-800 overflow-hidden">
               {variants.length === 0 ? (
                 <div className="p-4 text-center text-xs text-slate-400">
-                  No variants defined yet. Add at least one specification.
+                  No specifications defined yet. Click "+ Add Variant" to specify storage or options.
                 </div>
               ) : (
-                variants.map((variant) => {
-                  const isEditing = editingVariantId === variant.id;
-                  const specItems = [
-                    variant.storage,
-                    variant.ram ? `${variant.ram} RAM` : null,
-                    variant.color,
-                  ].filter(Boolean);
+                variants.map((v) => {
+                  const isEditing = editingVariantId === v.id;
 
                   return (
                     <div
-                      key={variant.id}
-                      className="p-3.5 bg-white dark:bg-[#131926] hover:bg-slate-50/60 dark:hover:bg-slate-900/40 transition-colors"
+                      key={v.id}
+                      className="p-3 bg-white dark:bg-[#131926] hover:bg-slate-50/60 dark:hover:bg-slate-900/40 transition-colors"
                     >
                       {isEditing ? (
-                        <div className="space-y-3">
+                        <div className="space-y-2.5">
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                             <div>
                               <label className="text-[10px] text-slate-400 font-semibold block mb-0.5">
-                                Storage
+                                Storage / Spec
                               </label>
                               <input
                                 type="text"
@@ -551,13 +787,14 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                             </div>
                             <div>
                               <label className="text-[10px] text-slate-400 font-semibold block mb-0.5">
-                                Default Price (ETB)
+                                Benchmark Price
                               </label>
                               <input
                                 type="number"
                                 step="any"
                                 value={editPrice}
                                 onChange={(e) => setEditPrice(e.target.value)}
+                                placeholder="Optional"
                                 className="w-full h-8 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono text-slate-900 dark:text-white"
                               />
                             </div>
@@ -572,57 +809,57 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleSaveVariant(variant.id)}
+                              onClick={() => handleSaveVariant(v.id)}
                               disabled={savingVariant}
-                              className="h-7 px-3 rounded-md bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold flex items-center gap-1"
+                              className="h-7 px-3 rounded-md bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold flex items-center gap-1 cursor-pointer"
                             >
-                              {savingVariant ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                              {savingVariant ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
                               <span>Save</span>
                             </button>
                           </div>
                         </div>
                       ) : (
                         <div className="flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-bold text-slate-900 dark:text-white text-xs">
-                              {specItems.length > 0 ? specItems.join(' • ') : 'Standard Specification'}
+                          <div className="min-w-0">
+                            <span className="font-bold text-slate-900 dark:text-white text-xs block truncate">
+                              {getVariantDisplayLabel(v)}
                             </span>
-                            {variant.sku && (
-                              <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500">
-                                {variant.sku}
-                              </span>
-                            )}
                           </div>
 
-                          <div className="flex items-center gap-3 shrink-0">
-                            <span className="font-mono font-bold text-xs text-slate-900 dark:text-white">
-                              {variant.default_selling_price
-                                ? `${Number(variant.default_selling_price).toLocaleString()} ETB`
-                                : 'No default price'}
+                          <div className="flex items-center gap-2.5 shrink-0">
+                            <span className="font-mono text-xs text-slate-700 dark:text-slate-300">
+                              {v.default_selling_price ? (
+                                <span className="font-bold text-slate-900 dark:text-white">
+                                  {Number(v.default_selling_price).toLocaleString()} <span className="text-[10px] text-slate-400 font-normal">ETB</span>
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 italic text-[11px]">No price set</span>
+                              )}
                             </span>
 
                             <button
                               type="button"
                               onClick={() => {
-                                setEditingVariantId(variant.id);
-                                setEditStorage(variant.storage || '');
-                                setEditRam(variant.ram || '');
-                                setEditColor(variant.color || '');
-                                setEditPrice(variant.default_selling_price ? String(variant.default_selling_price) : '');
+                                setEditingVariantId(v.id);
+                                setEditStorage(v.storage || '');
+                                setEditRam(v.ram || '');
+                                setEditColor(v.color || '');
+                                setEditPrice(v.default_selling_price ? String(v.default_selling_price) : '');
                               }}
-                              className="px-2 py-1 rounded text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                              title="Edit specification"
                             >
-                              Edit
+                              <Edit2 className="w-3.5 h-3.5" />
                             </button>
 
                             <button
                               type="button"
-                              onClick={() => handleDeleteVariant(variant.id)}
-                              disabled={deletingVariantId === variant.id}
-                              className="p-1 rounded text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
-                              title="Delete variant (only if 0 active units)"
+                              onClick={() => handleDeleteVariant(v.id)}
+                              disabled={deletingVariantId === v.id}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                              title="Remove specification"
                             >
-                              {deletingVariantId === variant.id ? (
+                              {deletingVariantId === v.id ? (
                                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
                               ) : (
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -637,60 +874,75 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
               )}
             </div>
           </div>
+        </form>
 
-          {/* Section 3: Danger Zone / Safe Deletion & Archival */}
-          <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
-            <div className="p-4 rounded-xl bg-rose-50/50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/40 space-y-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="space-y-0.5">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-rose-900 dark:text-rose-300">
-                    <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
-                    <span>Archive or Remove Product</span>
-                  </div>
-                  <p className="text-[11px] text-rose-700/80 dark:text-rose-400/80">
-                    If this product has historical sales or units, it will be safely deactivated/archived
-                    to preserve sales logs and financial ledger balance. If it has 0 units and 0 sales, it
-                    will be permanently removed.
-                  </p>
-                </div>
-
-                {!showDeleteConfirm ? (
-                  <button
-                    type="button"
-                    onClick={() => setShowDeleteConfirm(true)}
-                    className="h-8 px-3 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all shadow-2xs shrink-0 flex items-center gap-1.5 active:scale-95"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Delete Product</span>
-                  </button>
-                ) : (
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setShowDeleteConfirm(false)}
-                      className="h-8 px-2.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleDeleteProduct}
-                      disabled={deletingProduct}
-                      className="h-8 px-3 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 active:scale-95"
-                    >
-                      {deletingProduct ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <Trash2 className="w-3.5 h-3.5" />
-                      )}
-                      <span>Confirm Delete</span>
-                    </button>
-                  </div>
-                )}
-              </div>
+        {/* Delete Confirmation Overlay (If triggered) */}
+        {showDeleteConfirm && (
+          <div className="p-4 bg-rose-50 dark:bg-rose-950/40 border-t border-rose-200/60 dark:border-rose-900/60 space-y-2 animate-page-enter">
+            <div className="flex items-center gap-2 text-rose-900 dark:text-rose-300 font-bold text-xs">
+              <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
+              <span>Remove "{product.name}" from catalog?</span>
+            </div>
+            <p className="text-[11px] text-rose-700/90 dark:text-rose-400/90 leading-relaxed">
+              Any unsold units in stock will be archived. All historical sales invoices, payments, and audit logs linked to this model remain safe and intact.
+            </p>
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(false)}
+                className="h-8 px-3 rounded-lg text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-800"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteProduct}
+                disabled={deletingProduct}
+                className="h-8 px-3.5 rounded-lg bg-rose-600 text-white text-xs font-bold hover:bg-rose-700 transition-colors shadow-2xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                {deletingProduct ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                <span>Confirm Delete</span>
+              </button>
             </div>
           </div>
-        </div>
+        )}
+
+        {/* Unified Bottom Action Bar */}
+        {!showDeleteConfirm && (
+          <div className="flex items-center justify-between p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/20">
+            <button
+              type="button"
+              onClick={() => setShowDeleteConfirm(true)}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 transition-colors cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Delete Product</span>
+            </button>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="edit-product-form"
+                disabled={isSubmitting}
+                className="h-9 px-5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs flex items-center gap-1.5 active:scale-[0.98] cursor-pointer disabled:opacity-50"
+              >
+                {isSubmitting ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Check className="w-3.5 h-3.5 text-emerald-400 dark:text-emerald-500" />
+                )}
+                <span>Save Changes</span>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
