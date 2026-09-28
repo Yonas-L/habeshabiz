@@ -135,7 +135,7 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
     e.preventDefault();
     if (!amount || !description || !accountId) return;
     if (category === 'vendor_payout' && !selectedVendorContactId) {
-      toast.error('Please select the partner or vendor receiving this wire payout');
+      toast.error('Please select the partner or vendor receiving this transfer');
       return;
     }
 
@@ -163,7 +163,7 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
         isDraw
           ? 'Owner Personal Draw Recorded'
           : category === 'vendor_payout'
-          ? 'Vendor Wire Payout Recorded (Debts Auto-Settled)'
+          ? 'Vendor Transfer Recorded (Debts Auto-Settled)'
           : vendorBilling === 'vendor_deduct' && hasVendor
           ? 'Vendor-Deductible Repair Logged (Offset on Debt)'
           : vendorBilling === 'vendor_reimburse' && hasVendor
@@ -211,7 +211,7 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
                 Record Expense / Outflow
               </h3>
               <p className="text-xs text-slate-400 mt-1">
-                Wire payouts to vendors, operating overhead &amp; owner draws
+                Transfers to vendors, operating overhead &amp; owner draws
               </p>
             </div>
           </div>
@@ -235,12 +235,12 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
                 setCategory(cat);
                 setIsOwnerDraw(cat === 'personal_owner_draw');
                 if (cat === 'vendor_payout' && !description) {
-                  setDescription('Wire transfer payout to vendor');
+                  setDescription('Transfer to vendor');
                 }
               }}
               className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 focus:border-slate-900 dark:focus:border-slate-600 cursor-pointer"
             >
-              <option value="vendor_payout">Vendor Settlement / Wire Transfer Payout</option>
+              <option value="vendor_payout">Vendor Settlement / Transfer</option>
               <option value="ride">RIDE / Transportation & Delivery</option>
               <option value="food">Food & Hospitality</option>
               <option value="rent">Shop Rent & Utilities</option>
@@ -269,7 +269,7 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
                   setSelectedVendorContactId(cid);
                   const c = contacts.find((item) => item.id === cid);
                   if (c) {
-                    setDescription(`Wire payout to ${c.name}`);
+                    setDescription(`Transferred to ${c.name}`);
                   }
                 }}
                 required
@@ -284,7 +284,7 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
               </select>
 
               <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-                This wire payout directly decreases what you owe this partner on their ledger statement. If it exceeds your open payables, the remainder is logged as an advance credit.
+                This transfer directly decreases what you owe this partner on their ledger statement. If it exceeds your open payables, the remainder is logged as an advance credit.
               </p>
             </div>
           )}

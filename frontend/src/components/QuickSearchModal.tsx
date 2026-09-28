@@ -293,7 +293,7 @@ export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({
         id: 'act-new-expense',
         type: 'action',
         title: 'Record Expense',
-        subtitle: 'Log operational expense, rent, wire payout or draw',
+        subtitle: 'Log operational expense, rent, transfer or draw',
         icon: DollarSign,
         onSelect: () => onNavigate({ tab: 'expenses', action: 'new_expense' }),
       });

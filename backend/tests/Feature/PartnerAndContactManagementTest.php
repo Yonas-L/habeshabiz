@@ -726,6 +726,99 @@ test('traded in exchange unit does not inflate partner statement or dashboard wi
     expect(count($statementRes->json('data.ledger')))->toBe(0);
 });
 
+test('partner statement preserves confidentiality by omitting order ids, presenting clean sold product context, and using Transferred for payouts', function () {
+    $partner = Contact::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Abebe Partner',
+        'roles' => ['staff', 'salesperson', 'supplier'],
+        'is_active' => true,
+    ]);
+
+    $category = \App\Models\Category::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Phones',
+        'slug' => 'phones-' . uniqid(),
+    ]);
+
+    $product = \App\Models\Product::create([
+        'tenant_id' => $this->tenant->id,
+        'category_id' => $category->id,
+        'name' => 'Samsung S24 Ultra',
+        'brand' => 'Samsung',
+    ]);
+
+    $variant = \App\Models\ProductVariant::create([
+        'tenant_id' => $this->tenant->id,
+        'product_id' => $product->id,
+        'storage' => '256GB',
+        'color' => 'Titanium Gray',
+        'default_selling_price' => 150000.00,
+    ]);
+
+    $order = \App\Models\SalesOrder::create([
+        'tenant_id' => $this->tenant->id,
+        'order_number' => 'ORD-CONFIDENTIAL-999',
+        'total_amount' => 150000.00,
+        'paid_amount' => 150000.00,
+        'payment_status' => 'paid',
+        'payment_method' => 'cash',
+        'order_date' => now(),
+    ]);
+
+    \App\Models\SalesOrderItem::create([
+        'tenant_id' => $this->tenant->id,
+        'sales_order_id' => $order->id,
+        'variant_id' => $variant->id,
+        'quantity' => 1,
+        'unit_price' => 150000.00,
+        'unit_cost' => 130000.00,
+        'profit' => 20000.00,
+    ]);
+
+    // Create a bonus payable debt with internal order notes
+    $debt = Debt::create([
+        'tenant_id' => $this->tenant->id,
+        'contact_id' => $partner->id,
+        'type' => 'payable',
+        'reference_type' => 'salesperson_bonus',
+        'reference_id' => $order->id,
+        'original_amount' => 15000.00,
+        'paid_amount' => 15000.00,
+        'remaining_amount' => 0.00,
+        'due_date' => now()->addDays(7),
+        'status' => 'settled',
+        'notes' => "Sales bonus for Order #{$order->order_number} by {$partner->name}",
+    ]);
+
+    // Settle with a payment sent
+    \App\Models\DebtPayment::create([
+        'tenant_id' => $this->tenant->id,
+        'debt_id' => $debt->id,
+        'financial_account_id' => $this->cbe->id,
+        'amount' => 15000.00,
+        'payment_date' => now(),
+        'reference_number' => 'TXN-CONFIDENTIAL-001',
+    ]);
+
+    $res = $this->actingAs($this->user, 'sanctum')->getJson("/api/v1/contacts/{$partner->id}/statement");
+    $res->assertOk();
+
+    $ledger = $res->json('data.ledger');
+    expect(count($ledger))->toBe(2);
+
+    // 1st entry: Bonus / Sale payout
+    expect($ledger[0]['context'])->toContain('Sold: Samsung S24 Ultra');
+    expect($ledger[0]['context'])->not->toContain('ORD-');
+    expect($ledger[0]['context'])->not->toContain('Order #');
+    expect($ledger[0]['context'])->not->toContain('by Abebe Partner');
+    expect($ledger[0]['reference_number'])->toBeNull();
+
+    // 2nd entry: Payment sent
+    expect($ledger[1]['context'])->toContain('Transferred');
+    expect($ledger[1]['context'])->not->toContain('Wire payout');
+    expect($ledger[1]['context'])->toContain($this->cbe->name);
+});
+
 
 
 

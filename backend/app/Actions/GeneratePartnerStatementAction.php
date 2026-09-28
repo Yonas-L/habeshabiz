@@ -11,6 +11,27 @@ use Carbon\Carbon;
 class GeneratePartnerStatementAction
 {
     /**
+     * Sanitize ledger context to ensure confidentiality and clear, minimal language:
+     * - Replaces "Wire payout" with "Transferred"
+     * - Strips internal sales order IDs (e.g. #ORD-KZSX2PEF, Order #...)
+     * - Replaces internal staff/bonus phrases with clean sold item summaries
+     */
+    protected function sanitizeContext(string $text): string
+    {
+        $text = preg_replace('/wire\s+payout/i', 'Transferred', $text);
+        $text = preg_replace('/(?:in|for|from)?\s*Order\s*#[A-Za-z0-9_-]+/i', '', $text);
+        $text = preg_replace('/#ORD-[A-Za-z0-9_-]+/i', '', $text);
+        $text = preg_replace('/\bORD-[A-Za-z0-9_-]+\b/i', '', $text);
+        $text = preg_replace('/\s+by\s+[A-Za-z0-9\s]+$/i', '', $text);
+        $text = preg_replace('/^Sales\s+bonus\s*(?:for)?/i', 'Sold product', $text);
+        $text = preg_replace('/Vendor stock payout for\s*/i', 'Sold: ', $text);
+        $text = preg_replace('/\.?\s*Agreed vendor cut\.?/i', '', $text);
+        $text = preg_replace('/\s+/', ' ', $text);
+
+        return trim($text, " \t\n\r\0\x0B·-:,.") ?: 'Transaction entry';
+    }
+
+    /**
      * Generate an aggregated statement and ledger for a vendor/partner.
      *
      * @param  Contact  $contact
@@ -30,7 +51,7 @@ class GeneratePartnerStatementAction
             ->get();
 
         // Preload associated SalesOrders and InventoryUnits for clean context descriptions
-        $orderIds = $debts->whereIn('reference_type', ['sales_order', 'consignment_sale', 'brokered_sourcing'])
+        $orderIds = $debts->whereIn('reference_type', ['sales_order', 'consignment_sale', 'brokered_sourcing', 'salesperson_bonus'])
             ->pluck('reference_id')
             ->filter()
             ->unique()
@@ -69,31 +90,59 @@ class GeneratePartnerStatementAction
                             return "{$pName}{$sn}{$qty}";
                         })->join(', ');
                     } elseif ($debt->notes) {
-                        $itemDesc = preg_replace('/^Order\s+#[^\s·]+\s*·?\s*/i', '', $debt->notes);
+                        $itemDesc = $this->sanitizeContext($debt->notes);
                     }
+
+                    $cleanContext = str_starts_with(strtolower($itemDesc), 'sold') ? $itemDesc : "Sold: {$itemDesc}";
 
                     $rawEntries[] = [
                         'id' => "debt-{$debt->id}",
                         'date' => $debtCreatedDate,
                         'type' => 'consignment_sale',
                         'type_label' => 'Consignment Sale',
-                        'context' => $itemDesc,
+                        'context' => $cleanContext,
                         'payable' => (float) $debt->original_amount,
                         'receivable' => 0.0,
                         'balance_effect' => - (float) $debt->original_amount,
-                        'reference_number' => $order?->order_number ?? null,
+                        'reference_number' => null,
+                    ];
+                } elseif ($debt->reference_type === 'salesperson_bonus') {
+                    $itemDesc = 'Sold Product';
+                    if ($order && $order->items->isNotEmpty()) {
+                        $itemDesc = $order->items->map(function ($it) {
+                            $pName = $it->variant?->product?->name ?? 'Device';
+                            $sn = $it->inventoryUnit?->imei_or_serial ? " (SN: {$it->inventoryUnit->imei_or_serial})" : '';
+                            $qty = $it->quantity > 1 ? " x{$it->quantity}" : '';
+                            return "{$pName}{$sn}{$qty}";
+                        })->join(', ');
+                    } elseif ($debt->notes) {
+                        $itemDesc = $this->sanitizeContext($debt->notes);
+                    }
+
+                    $cleanContext = str_starts_with(strtolower($itemDesc), 'sold') ? $itemDesc : "Sold: {$itemDesc}";
+
+                    $rawEntries[] = [
+                        'id' => "debt-{$debt->id}",
+                        'date' => $debtCreatedDate,
+                        'type' => 'salesperson_bonus',
+                        'type_label' => 'Payable',
+                        'context' => $cleanContext,
+                        'payable' => (float) $debt->original_amount,
+                        'receivable' => 0.0,
+                        'balance_effect' => - (float) $debt->original_amount,
+                        'reference_number' => null,
                     ];
                 } elseif ($debt->reference_type === 'brokered_sourcing') {
                     $itemDesc = 'Brokered Item';
                     if ($order && $order->items->isNotEmpty()) {
                         $itemDesc = $order->items->map(function ($it) {
                             $pName = $it->variant?->product?->name ?? 'Device';
-                            $sn = $it->inventoryUnit?->imei_or_serial ? " (SN: {$it->inventoryUnit->imei_or_serial})" : '';
-                            $qty = $it->quantity > 1 ? " x{$it->quantity}" : ' x1';
+                            $sn = $it->inventoryUnit?->imei_or_serial ? " (SN: {$it->inventoryUnit->imei_or_serial})" : ' x1';
+                            $qty = $it->quantity > 1 ? " x{$it->quantity}" : '';
                             return "{$pName}{$sn}{$qty}";
                         })->join(', ');
                     } elseif ($debt->notes) {
-                        $itemDesc = preg_replace('/^Order\s+#[^\s·]+\s*·?\s*/i', '', $debt->notes);
+                        $itemDesc = $this->sanitizeContext($debt->notes);
                     }
 
                     $rawEntries[] = [
@@ -105,13 +154,13 @@ class GeneratePartnerStatementAction
                         'payable' => (float) $debt->original_amount,
                         'receivable' => 0.0,
                         'balance_effect' => - (float) $debt->original_amount,
-                        'reference_number' => $order?->order_number ?? null,
+                        'reference_number' => null,
                     ];
                 } elseif ($debt->reference_type === 'stock_intake') {
                     $unit = ! empty($debt->reference_id) ? ($inventoryUnits->get($debt->reference_id) ?? null) : null;
                     $pName = $unit?->variant?->product?->name ?? 'Device';
                     $sn = $unit?->imei_or_serial ? " (SN: {$unit->imei_or_serial})" : '';
-                    $context = $unit ? "{$pName}{$sn}" : ($debt->notes ?: 'Stock Received');
+                    $context = $unit ? "{$pName}{$sn}" : ($debt->notes ? $this->sanitizeContext($debt->notes) : 'Stock Received');
 
                     $rawEntries[] = [
                         'id' => "debt-{$debt->id}",
@@ -130,7 +179,7 @@ class GeneratePartnerStatementAction
                         'date' => $debtCreatedDate,
                         'type' => 'manual_payable',
                         'type_label' => 'Payable',
-                        'context' => $debt->notes ?: 'Agreed payable balance',
+                        'context' => $debt->notes ? $this->sanitizeContext($debt->notes) : 'Agreed payable balance',
                         'payable' => (float) $debt->original_amount,
                         'receivable' => 0.0,
                         'balance_effect' => - (float) $debt->original_amount,
@@ -149,7 +198,7 @@ class GeneratePartnerStatementAction
                             return "{$pName}{$sn}{$qty}";
                         })->join(', ');
                     } elseif ($debt->notes) {
-                        $itemDesc = preg_replace('/^Order\s+#[^\s·]+\s*·?\s*/i', '', $debt->notes);
+                        $itemDesc = $this->sanitizeContext($debt->notes);
                     }
 
                     $rawEntries[] = [
@@ -161,7 +210,7 @@ class GeneratePartnerStatementAction
                         'payable' => 0.0,
                         'receivable' => (float) $debt->original_amount,
                         'balance_effect' => (float) $debt->original_amount,
-                        'reference_number' => $order?->order_number ?? null,
+                        'reference_number' => null,
                     ];
                 } elseif ($debt->reference_type === 'handover_holding') {
                     $unit = ! empty($debt->reference_id) ? ($inventoryUnits->get($debt->reference_id) ?? null) : null;
@@ -301,16 +350,18 @@ class GeneratePartnerStatementAction
                         'reference_number' => 'BILATERAL-OFFSET',
                     ];
                 } elseif ($debt->type === 'payable') {
+                    $accText = ($accountName && $accountName !== 'Wire') ? " ({$accountName})" : '';
+                    $cleanPayRef = ($payment->reference_number && !str_starts_with($payment->reference_number, 'ORD-')) ? $payment->reference_number : null;
                     $rawEntries[] = [
                         'id' => "pay-{$payment->id}",
                         'date' => $payDate,
                         'type' => 'payment_sent',
                         'type_label' => 'Payment Sent',
-                        'context' => "Wire payout ({$accountName})",
+                        'context' => "Transferred{$accText}",
                         'payable' => - (float) $payment->amount,
                         'receivable' => 0.0,
                         'balance_effect' => (float) $payment->amount,
-                        'reference_number' => $payment->reference_number,
+                        'reference_number' => $cleanPayRef,
                     ];
                 } else {
                     $isRepair = in_array($debt->reference_type, ['repair_reimbursement', 'vendor_repair_reimbursement']);
@@ -405,17 +456,19 @@ class GeneratePartnerStatementAction
         foreach ($directExpenses as $exp) {
             $expRef = "EXP-{$exp->id}";
             if (! in_array($expRef, $existingPayRefs)) {
-                $acc = $exp->financialAccount?->name ?? 'Wire';
+                $acc = $exp->financialAccount?->name ?? '';
+                $accText = ($acc && $acc !== 'Wire') ? " ({$acc})" : '';
+                $expDesc = $exp->description ? $this->sanitizeContext($exp->description) : "Transferred{$accText}";
                 $rawEntries[] = [
                     'id' => "exp-{$exp->id}",
                     'date' => Carbon::parse($exp->date ?? $exp->created_at),
                     'type' => 'payment_sent',
                     'type_label' => 'Payment Sent',
-                    'context' => "Wire payout ({$acc})",
+                    'context' => $expDesc,
                     'payable' => - (float) $exp->amount,
                     'receivable' => 0.0,
                     'balance_effect' => (float) $exp->amount,
-                    'reference_number' => $expRef,
+                    'reference_number' => null,
                 ];
             }
         }
@@ -533,7 +586,7 @@ class GeneratePartnerStatementAction
                     'source_type' => $u->source_type,
                     'created_at' => $u->created_at->toIso8601String(),
                     'sold_at' => $u->sold_at?->toIso8601String(),
-                    'order_number' => $u->salesOrderItem?->salesOrder?->order_number,
+                    'order_number' => null,
                 ];
             });
 
