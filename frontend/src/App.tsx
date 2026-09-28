@@ -495,6 +495,7 @@ export default function App() {
 
           {activeTab === 'treasury' && user?.role === 'owner' && (
             <TreasuryView
+              accounts={accounts}
               initialSelectedAccount={navContext.account}
               onClearInitialContext={handleClearNavContext}
             />
@@ -503,6 +504,7 @@ export default function App() {
           {activeTab === 'expenses' && user?.role === 'owner' && (
             <ExpensesView
               accounts={accounts}
+              user={user}
               initialShowRecordExpense={navContext.showRecordExpense}
               onClearInitialContext={handleClearNavContext}
             />

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import type { InventoryUnit, User, Contact } from '../../api/client';
+import type { InventoryUnit, User, Contact, SalesOrder } from '../../api/client';
 import { api } from '../../api/client';
 import { SlideOverDrawer } from './SlideOverDrawer';
 import { AnimatedNumber } from '../AnimatedNumber';
@@ -24,6 +24,9 @@ import {
   Edit3,
   X,
   ArrowLeftRight,
+  Repeat,
+  Receipt,
+  ExternalLink,
 } from 'lucide-react';
 
 interface InventoryUnitDrawerProps {
@@ -41,7 +44,22 @@ interface InventoryUnitDrawerProps {
   onOpenVendorSwap?: (unit: InventoryUnit) => void;
   onOpenMarkSold?: (unit: InventoryUnit) => void;
   onUnitUpdated?: (updatedUnit: InventoryUnit) => void;
+  onViewSalesOrder?: (order: SalesOrder) => void;
 }
+
+const formatPaymentMethod = (method?: string) => {
+  if (!method) return 'Cash';
+  const map: Record<string, string> = {
+    telebirr: 'Telebirr',
+    cbe_birr: 'CBE Birr',
+    cbe: 'Commercial Bank of Ethiopia (CBE)',
+    cash: 'Cash on Hand',
+    bank_transfer: 'Bank Transfer',
+    amole: 'Amole',
+    credit: 'Customer Credit',
+  };
+  return map[method.toLowerCase()] || method.replace(/_/g, ' ');
+};
 
 export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
   unit,
@@ -58,6 +76,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
   onOpenVendorSwap,
   onOpenMarkSold,
   onUnitUpdated,
+  onViewSalesOrder,
 }) => {
   const [currentUnit, setCurrentUnit] = useState<InventoryUnit | null>(unit);
   const [copiedImei, setCopiedImei] = useState(false);
@@ -1054,8 +1073,21 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
                   <>
                     <div>
                       <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">Sales Order:</span>
-                      <div className="font-mono font-bold text-purple-700 dark:text-purple-300 mt-0.5">
-                        #{currentUnit.sales_order_item.sales_order.order_number}
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="font-mono font-bold text-purple-700 dark:text-purple-300">
+                          #{currentUnit.sales_order_item.sales_order.order_number}
+                        </span>
+                        {onViewSalesOrder && (
+                          <button
+                            type="button"
+                            onClick={() => onViewSalesOrder(currentUnit.sales_order_item!.sales_order!)}
+                            className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-purple-700 dark:text-purple-300 hover:underline cursor-pointer"
+                            title="View Sales Order Receipt"
+                          >
+                            <ExternalLink className="w-2.5 h-2.5" />
+                            <span>View</span>
+                          </button>
+                        )}
                       </div>
                     </div>
 
@@ -1084,6 +1116,93 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
                   </>
                 )}
               </div>
+
+              {/* Trade-In and Settlement Details */}
+              {currentUnit.sales_order_item?.sales_order && (() => {
+                const so = currentUnit.sales_order_item.sales_order;
+                const exchangeAllowance = Number(so.exchange_allowance || 0);
+                const hasExchange = exchangeAllowance > 0 || Boolean(so.exchange_unit_id) || Boolean(so.exchange_unit);
+                const exUnit = so.exchange_unit;
+                const paidCash = Number(so.paid_amount || 0);
+                const totalOrderPrice = Number(so.total_amount || currentUnit.sales_order_item.unit_price || 0);
+                const isPaid = so.payment_status === 'paid' || (hasExchange && (paidCash + exchangeAllowance >= totalOrderPrice));
+
+                return (
+                  <div className="pt-2.5 border-t border-purple-200/70 dark:border-purple-800/50 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-purple-800 dark:text-purple-300 flex items-center gap-1">
+                        {hasExchange ? <Repeat className="w-3 h-3 text-purple-600 dark:text-purple-400" /> : <Receipt className="w-3 h-3 text-purple-600 dark:text-purple-400" />}
+                        {hasExchange ? 'Trade-In Settlement Breakdown' : 'Payment Method & Settlement'}
+                      </span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isPaid ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'}`}>
+                        {isPaid ? 'Settled in Full' : 'Credit Balance Due'}
+                      </span>
+                    </div>
+
+                    <div className="bg-white/80 dark:bg-slate-900/60 rounded-xl p-2.5 border border-purple-200/50 dark:border-purple-800/40 space-y-2 text-[11px]">
+                      {hasExchange && (
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">Customer Traded-In Device:</span>
+                            <div className="font-bold text-purple-900 dark:text-purple-200 flex items-center gap-1 flex-wrap">
+                              <span>{exUnit?.variant?.product?.name || 'Customer Trade-in Device'}</span>
+                              {[exUnit?.variant?.storage, exUnit?.variant?.color].filter(Boolean).length > 0 && (
+                                <span className="font-normal text-slate-500 text-[10px]">
+                                  ({[exUnit?.variant?.storage, exUnit?.variant?.color].filter(Boolean).join(' • ')})
+                                </span>
+                              )}
+                            </div>
+                            {exUnit?.imei_or_serial && (
+                              <div className="font-mono text-[10px] text-purple-700 dark:text-purple-400 mt-0.5">
+                                SN: {exUnit.imei_or_serial}
+                              </div>
+                            )}
+                          </div>
+                          <div className="text-right shrink-0">
+                            <div className="font-mono font-bold text-purple-700 dark:text-purple-300 text-xs">
+                              −{exchangeAllowance.toLocaleString()} ETB
+                            </div>
+                            <span className="text-[9px] text-purple-600 dark:text-purple-400 font-medium">Trade Allowance</span>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className={`flex items-start justify-between gap-2 ${hasExchange ? 'pt-2 border-t border-slate-100 dark:border-slate-800' : ''}`}>
+                        <div>
+                          <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">
+                            {hasExchange ? 'Cash / Transfer Settlement:' : 'Direct Payment:'}
+                          </span>
+                          <div className="font-semibold text-slate-900 dark:text-white mt-0.5">
+                            {formatPaymentMethod(so.payment_method)}
+                          </div>
+                          {so.financial_account?.name && (
+                            <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                              Account: {so.financial_account.name}
+                            </div>
+                          )}
+                        </div>
+                        <div className="text-right shrink-0">
+                          <div className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-xs">
+                            +{paidCash.toLocaleString()} ETB
+                          </div>
+                          <span className="text-[9px] text-emerald-600/80 dark:text-emerald-400/80 font-medium">
+                            {hasExchange ? 'Cash Difference' : 'Amount Paid'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {hasExchange && (
+                        <div className="flex items-center justify-between pt-1.5 border-t border-purple-100 dark:border-purple-800/40 text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                          <span>Settlement Formula:</span>
+                          <span className="font-mono text-slate-700 dark:text-slate-300">
+                            {exchangeAllowance.toLocaleString()} trade + {paidCash.toLocaleString()} cash = {(exchangeAllowance + paidCash).toLocaleString()} ETB
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
 

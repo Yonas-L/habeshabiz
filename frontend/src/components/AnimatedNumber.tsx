@@ -7,6 +7,7 @@ interface AnimatedNumberProps {
   prefix?: string;
   suffix?: string;
   className?: string;
+  animateOnMount?: boolean;
 }
 
 export const AnimatedNumber: React.FC<AnimatedNumberProps> = ({
@@ -16,29 +17,39 @@ export const AnimatedNumber: React.FC<AnimatedNumberProps> = ({
   prefix = '',
   suffix = '',
   className = '',
+  animateOnMount = true,
 }) => {
-  const [displayValue, setDisplayValue] = useState<number>(value);
-  const prevValueRef = useRef<number>(value);
+  const numericValue = typeof value === 'number' && !isNaN(value) ? value : 0;
+
+  // Check for user preference for reduced motion
+  const prefersReducedMotion =
+    typeof window !== 'undefined' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // If animateOnMount is true and not reduced motion, start display at 0 for initial count-up
+  const [displayValue, setDisplayValue] = useState<number>(() => {
+    if (prefersReducedMotion || !animateOnMount) {
+      return numericValue;
+    }
+    return 0;
+  });
+
+  const prevValueRef = useRef<number>(prefersReducedMotion || !animateOnMount ? numericValue : 0);
   const requestRef = useRef<number | null>(null);
   const startTimeRef = useRef<number | null>(null);
 
   useEffect(() => {
-    // Check for user preference for reduced motion
-    const prefersReducedMotion =
-      typeof window !== 'undefined' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
     if (prefersReducedMotion || duration <= 0) {
-      setDisplayValue(value);
-      prevValueRef.current = value;
+      setDisplayValue(numericValue);
+      prevValueRef.current = numericValue;
       return;
     }
 
     const startValue = prevValueRef.current;
-    const change = value - startValue;
+    const change = numericValue - startValue;
 
     if (change === 0) {
-      setDisplayValue(value);
+      setDisplayValue(numericValue);
       return;
     }
 
@@ -59,8 +70,8 @@ export const AnimatedNumber: React.FC<AnimatedNumberProps> = ({
       if (progress < 1) {
         requestRef.current = requestAnimationFrame(animate);
       } else {
-        setDisplayValue(value);
-        prevValueRef.current = value;
+        setDisplayValue(numericValue);
+        prevValueRef.current = numericValue;
       }
     };
 
@@ -71,7 +82,7 @@ export const AnimatedNumber: React.FC<AnimatedNumberProps> = ({
         cancelAnimationFrame(requestRef.current);
       }
     };
-  }, [value, duration]);
+  }, [numericValue, duration, prefersReducedMotion]);
 
   const formatted = displayValue.toLocaleString('en-US', {
     minimumFractionDigits: decimals,

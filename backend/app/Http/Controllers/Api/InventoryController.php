@@ -24,6 +24,8 @@ class InventoryController extends Controller
             'maintenanceRecords.financialAccount',
             'salesOrderItem.salesOrder.customer',
             'salesOrderItem.salesOrder.salesperson',
+            'salesOrderItem.salesOrder.financialAccount',
+            'salesOrderItem.salesOrder.exchangeUnit.variant.product',
             'swappedSalesOrder',
             'swappedFromUnit.variant.product',
             'swappedReplacementUnit.variant.product',
@@ -401,6 +403,8 @@ class InventoryController extends Controller
             'maintenanceRecords.financialAccount',
             'salesOrderItem.salesOrder.customer',
             'salesOrderItem.salesOrder.salesperson',
+            'salesOrderItem.salesOrder.financialAccount',
+            'salesOrderItem.salesOrder.exchangeUnit.variant.product',
         ]);
 
         return response()->json([

@@ -40,7 +40,7 @@ export const ExpenseDrawer: React.FC<ExpenseDrawerProps> = ({
       case 'maintenance':
         return <Wrench className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />;
       case 'personal_owner_draw':
-        return <UserMinus className="w-4 h-4 text-purple-600 dark:text-purple-400" />;
+        return <UserMinus className="w-4 h-4 text-slate-700 dark:text-slate-300" />;
       default:
         return <DollarSign className="w-4 h-4 text-slate-600 dark:text-slate-300" />;
     }
@@ -60,7 +60,7 @@ export const ExpenseDrawer: React.FC<ExpenseDrawerProps> = ({
         <span
           className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
             isOwnerDraw
-              ? 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/60'
+              ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200/50 dark:border-amber-800/50'
               : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
           }`}
         >
@@ -98,7 +98,7 @@ export const ExpenseDrawer: React.FC<ExpenseDrawerProps> = ({
       {/* Progressive Section 1: Classification & Accounting Rule */}
       <ProgressiveSection
         title="Ledger Segregation & Classification"
-        icon={<Receipt className="w-4 h-4 text-purple-500" />}
+        icon={<Receipt className="w-4 h-4 text-rose-500" />}
         defaultOpen={true}
       >
         <div className="space-y-2 text-xs">
@@ -113,7 +113,7 @@ export const ExpenseDrawer: React.FC<ExpenseDrawerProps> = ({
             <span className="text-slate-400">Impact on Shop Profit</span>
             <span
               className={`font-semibold ${
-                isOwnerDraw ? 'text-purple-600 dark:text-purple-400' : 'text-rose-600 dark:text-rose-400'
+                isOwnerDraw ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'
               }`}
             >
               {isOwnerDraw

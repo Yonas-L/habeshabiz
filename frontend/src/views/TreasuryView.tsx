@@ -20,19 +20,67 @@ import { AccountLedgerDrawer } from '../components/drawers/AccountLedgerDrawer';
 import { AccountLogo } from '../utils/bankLogos';
 
 interface TreasuryViewProps {
+  accounts?: FinancialAccount[];
   initialSelectedAccount?: FinancialAccount | null;
   onClearInitialContext?: () => void;
 }
 
 export const TreasuryView: React.FC<TreasuryViewProps> = ({
+  accounts,
   initialSelectedAccount,
   onClearInitialContext,
 }) => {
-  const [treasuryAccounts, setTreasuryAccounts] = useState<FinancialAccount[]>([]);
-  const [assetAccounts, setAssetAccounts] = useState<FinancialAccount[]>([]);
-  const [totalTreasury, setTotalTreasury] = useState(0);
-  const [totalAssets, setTotalAssets] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const initialTreasury = React.useMemo(
+    () => (accounts || []).filter((a) => a.type === 'bank' || a.type === 'cash' || a.type === 'mobile_money'),
+    [accounts]
+  );
+  const initialAssets = React.useMemo(
+    () => (accounts || []).filter((a) => a.type === 'asset_gold' || a.type === 'custom' || a.type.startsWith('asset_')),
+    [accounts]
+  );
+
+  const [treasuryAccounts, setTreasuryAccounts] = useState<FinancialAccount[]>(initialTreasury);
+  const [assetAccounts, setAssetAccounts] = useState<FinancialAccount[]>(initialAssets);
+  const [totalTreasury, setTotalTreasury] = useState(() =>
+    initialTreasury.reduce((sum, a) => sum + Number(a.current_balance), 0)
+  );
+  const [totalAssets, setTotalAssets] = useState(() =>
+    initialAssets.reduce((sum, a) => sum + Number(a.current_balance), 0)
+  );
+  const [loading, setLoading] = useState(!accounts || accounts.length === 0);
+
+  // Sync state when accounts prop updates
+  useEffect(() => {
+    if (accounts && accounts.length > 0) {
+      const treas = accounts.filter((a) => a.type === 'bank' || a.type === 'cash' || a.type === 'mobile_money');
+      const asts = accounts.filter((a) => a.type === 'asset_gold' || a.type === 'custom' || a.type.startsWith('asset_'));
+      setTreasuryAccounts(treas);
+      setAssetAccounts(asts);
+      setTotalTreasury(treas.reduce((sum, a) => sum + Number(a.current_balance), 0));
+      setTotalAssets(asts.reduce((sum, a) => sum + Number(a.current_balance), 0));
+      setLoading(false);
+    }
+  }, [accounts]);
+
+  // Dynamic distributions for KPI micro-charts grounded in real account balances
+  const treasuryDistribution = React.useMemo(() => {
+    if (treasuryAccounts.length === 0) return [0, 0, 0, 0, 0];
+    const vals = treasuryAccounts.map((a) => Number(a.current_balance));
+    return vals.length >= 2 ? vals : [0, ...vals];
+  }, [treasuryAccounts]);
+
+  const assetsDistribution = React.useMemo(() => {
+    if (assetAccounts.length === 0 || totalAssets === 0) return [0, 0, 0, 0, 0];
+    const vals = assetAccounts.map((a) => Number(a.current_balance));
+    return vals.length >= 2 ? vals : [0, ...vals];
+  }, [assetAccounts, totalAssets]);
+
+  const combinedDistribution = React.useMemo(() => {
+    const all = [...treasuryAccounts, ...assetAccounts];
+    if (all.length === 0) return [0, 0, 0, 0, 0];
+    const vals = all.map((a) => Number(a.current_balance));
+    return vals.length >= 2 ? vals : [0, ...vals];
+  }, [treasuryAccounts, assetAccounts]);
 
   // Dedicated Ledger Drawer
   const [selectedAccountForLedger, setSelectedAccountForLedger] = useState<FinancialAccount | null>(null);
@@ -209,59 +257,80 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
         </button>
       </div>
 
-      {/* Summary strip */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="bg-white dark:bg-[#131926] rounded-xl border border-slate-200/80 dark:border-slate-800/90 p-4 flex flex-col justify-between">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Cash & Banks</span>
-            <Landmark className="w-4 h-4 text-blue-500 dark:text-blue-400" />
+      {/* Summary Matrix (3 Consistent Emerald Asset Cards with Embedded Micro-Charts) */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* 1. Cash and Banks */}
+        <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-100 dark:border-slate-800/80 p-5 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                Liquid Cash and Banks
+              </span>
+              <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/40 flex items-center justify-center">
+                <Landmark className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              </div>
+            </div>
+            <div className="text-2xl font-black text-slate-900 dark:text-white font-mono tabular-nums tracking-tight mt-2">
+              <AnimatedNumber value={totalTreasury} decimals={2} />{' '}
+              <span className="text-xs font-bold text-slate-400 font-sans">ETB</span>
+            </div>
           </div>
-          <div className="text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
-            <AnimatedNumber value={totalTreasury} />
-            <span className="text-[10px] font-medium text-slate-400 ml-1 font-sans">ETB</span>
-          </div>
-          <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-end justify-between">
-            <span className="text-[10px] text-slate-400">Liquid working cash</span>
-            <MiniBarHistogram values={[25, 40, 32, 55, 48, 62, 70]} color="blue" />
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-[#131926] rounded-xl border border-slate-200/80 dark:border-slate-800/90 p-4 flex flex-col justify-between">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Hedge Reserves</span>
-            <Coins className="w-4 h-4 text-amber-500 dark:text-amber-400" />
-          </div>
-          <div className="text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
-            <AnimatedNumber value={totalAssets} />
-            <span className="text-[10px] font-medium text-slate-400 ml-1 font-sans">ETB</span>
-          </div>
-          <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-end justify-between">
-            <span className="text-[10px] text-slate-400">Gold & Forex</span>
-            <MiniSparkline values={[110, 115, 114, 120, 125, 128, 132]} color="amber" />
+          <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-end justify-between">
+            <span className="text-[11px] text-slate-400 font-medium">Active liquid working cash</span>
+            <MiniBarHistogram values={treasuryDistribution} color="emerald" />
           </div>
         </div>
 
-        <div className="bg-white dark:bg-[#131926] rounded-xl border border-slate-200/80 dark:border-slate-800/90 p-4 flex flex-col justify-between">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Total</span>
-            <TrendingUp className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
+        {/* 2. Hedge Reserves */}
+        <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-100 dark:border-slate-800/80 p-5 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                Hedge Reserves
+              </span>
+              <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/40 flex items-center justify-center">
+                <Coins className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              </div>
+            </div>
+            <div className="text-2xl font-black text-slate-900 dark:text-white font-mono tabular-nums tracking-tight mt-2">
+              <AnimatedNumber value={totalAssets} decimals={2} />{' '}
+              <span className="text-xs font-bold text-slate-400 font-sans">ETB</span>
+            </div>
           </div>
-          <div className="text-2xl font-black text-emerald-700 dark:text-emerald-400 font-mono tracking-tight">
-            <AnimatedNumber value={totalTreasury + totalAssets} />
-            <span className="text-[10px] font-medium text-emerald-500 ml-1 font-sans">ETB</span>
+          <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-end justify-between">
+            <span className="text-[11px] text-slate-400 font-medium">Gold and foreign currency</span>
+            <MiniSparkline values={assetsDistribution} color="emerald" />
           </div>
-          <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-end justify-between">
-            <span className="text-[10px] text-slate-400">All balances combined</span>
-            <MiniSparkline values={[220, 230, 225, 240, 255, 260, 275]} color="emerald" />
+        </div>
+
+        {/* 3. Combined Total */}
+        <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-100 dark:border-slate-800/80 p-5 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                Total Combined Treasury
+              </span>
+              <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/40 flex items-center justify-center">
+                <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              </div>
+            </div>
+            <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono tabular-nums tracking-tight mt-2">
+              <AnimatedNumber value={totalTreasury + totalAssets} decimals={2} />{' '}
+              <span className="text-xs font-bold text-emerald-500/80 font-sans">ETB</span>
+            </div>
+          </div>
+          <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-end justify-between">
+            <span className="text-[11px] text-slate-400 font-medium">All balances combined</span>
+            <MiniSparkline values={combinedDistribution} color="emerald" />
           </div>
         </div>
       </div>
 
-      {/* Bank Accounts & Wallets */}
+      {/* Bank Accounts & Mobile Wallets */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-            Bank Accounts & Wallets
+            Bank Accounts and Mobile Wallets
           </span>
           <span className="text-[10px] text-slate-400">{treasuryAccounts.length} accounts</span>
         </div>
@@ -273,10 +342,10 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
               <div
                 key={acc.id}
                 onClick={() => setSelectedAccountForLedger(acc)}
-                className={`bg-white dark:bg-[#131926] rounded-xl border p-4 transition-all flex flex-col justify-between cursor-pointer group hover:shadow-md ${
+                className={`bg-white dark:bg-[#131926] rounded-2xl border p-5 transition-all flex flex-col justify-between cursor-pointer group shadow-[0_4px_20px_-4px_rgba(0,0,0,0.03)] hover:shadow-lg ${
                   isInactive
                     ? 'border-slate-200/50 dark:border-slate-800/50 opacity-60'
-                    : 'border-slate-200/80 dark:border-slate-800/90 hover:border-slate-400 dark:hover:border-slate-600'
+                    : 'border-slate-100 dark:border-slate-800/80 hover:border-emerald-500/30 dark:hover:border-emerald-500/20'
                 }`}
               >
                 <div>
@@ -284,7 +353,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                     <div className="flex items-center gap-2.5">
                       <AccountLogo account={acc} size="md" />
                       <div>
-                        <div className="font-bold text-slate-900 dark:text-white text-sm leading-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{acc.name}</div>
+                        <div className="font-bold text-slate-900 dark:text-white text-sm leading-tight group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">{acc.name}</div>
                         <span className="text-[10px] text-slate-400 capitalize">{acc.type.replace(/_/g, ' ')}</span>
                       </div>
                     </div>
@@ -296,7 +365,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                         <span className={`w-1.5 h-1.5 rounded-full ${isInactive ? 'bg-slate-400' : 'bg-emerald-500 animate-pulse'}`} />
                         {isInactive ? 'Inactive' : 'Live'}
                       </span>
-                      <span className="text-[10px] font-bold text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors ml-0.5 hidden group-hover:inline-flex items-center">
+                      <span className="text-[10px] font-bold text-slate-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors ml-0.5 hidden group-hover:inline-flex items-center">
                         Ledger &rarr;
                       </span>
                     </div>
@@ -344,9 +413,9 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                         e.stopPropagation();
                         handleOpenTransfer(acc.id);
                       }}
-                      className="h-7 px-2.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all flex items-center gap-1 active:scale-95"
+                      className="h-7 px-2.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-700 dark:hover:text-emerald-300 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all flex items-center gap-1 active:scale-95"
                     >
-                      <ArrowRightLeft className="w-3 h-3" />
+                      <ArrowRightLeft className="w-3 h-3 text-emerald-500" />
                       Transfer
                     </button>
                   </div>
@@ -360,20 +429,23 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
       {/* Asset Reserves */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-            Hedge Reserves (Gold & Forex)
-          </span>
+          <div>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+              Hedge Reserves
+            </span>
+            <span className="text-[11px] text-slate-400">Gold and foreign currency reserves</span>
+          </div>
           <button
             onClick={() => handleOpenCreate('asset_gold')}
-            className="h-7 px-3 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 text-xs font-bold hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-all flex items-center gap-1.5 active:scale-95"
+            className="h-8 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-xs"
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Plus className="w-3.5 h-3.5 text-emerald-500" />
             Add Reserve
           </button>
         </div>
 
         {assetAccounts.length === 0 ? (
-          <div className="bg-white dark:bg-[#131926] rounded-xl border border-dashed border-slate-200 dark:border-slate-800 p-8 text-center">
+          <div className="bg-white dark:bg-[#131926] rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 p-8 text-center">
             <Coins className="w-7 h-7 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
             <p className="text-xs text-slate-400">No asset reserves yet</p>
             <p className="text-[11px] text-slate-400 mt-0.5">Add gold, USD, USDT, or other hedge assets</p>
@@ -387,19 +459,19 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                 <div
                   key={acc.id}
                   onClick={() => setSelectedAccountForLedger(acc)}
-                  className={`bg-white dark:bg-[#131926] rounded-xl border p-4 transition-all cursor-pointer group hover:shadow-md ${
+                  className={`bg-white dark:bg-[#131926] rounded-2xl border p-5 transition-all cursor-pointer group shadow-[0_4px_20px_-4px_rgba(0,0,0,0.03)] hover:shadow-lg ${
                     isInactive
                       ? 'border-slate-200/50 dark:border-slate-800/50 opacity-60'
-                      : 'border-slate-200/80 dark:border-slate-800/90 hover:border-slate-400 dark:hover:border-slate-600'
+                      : 'border-slate-100 dark:border-slate-800/80 hover:border-emerald-500/30 dark:hover:border-emerald-500/20'
                   }`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
                       <AccountLogo account={acc} size="md" />
                       <div>
-                        <div className="font-bold text-slate-900 dark:text-white text-sm group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{acc.name}</div>
+                        <div className="font-bold text-slate-900 dark:text-white text-sm group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">{acc.name}</div>
                         <span className="text-[10px] text-slate-400">
-                          {isGold ? 'Gold' : acc.type === 'custom' ? 'Custom' : 'Forex / USDT'}
+                          {isGold ? 'Gold' : acc.type === 'custom' ? 'Custom' : 'Foreign Currency and USDT'}
                           {isInactive ? ' · Inactive' : ''}
                         </span>
                       </div>
@@ -517,7 +589,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
               <div>
                 <h3 className="font-bold text-slate-900 dark:text-white text-base">Inter-Account Transfer</h3>
                 <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
-                  Shift balances between accounts without false income/expense
+                  Shift balances between accounts without affecting income or expense ledgers
                 </p>
               </div>
               <button
@@ -532,7 +604,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Source Account (From)
+                    Source Account
                   </label>
                   <select
                     value={sourceAccountId}
@@ -543,7 +615,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                     <option value="">-- Choose Source --</option>
                     {allAccounts.map((a) => (
                       <option key={a.id} value={a.id}>
-                        {a.name} ({Number(a.current_balance).toLocaleString()} ETB)
+                        {a.name} — {Number(a.current_balance).toLocaleString()} ETB
                       </option>
                     ))}
                   </select>
@@ -551,7 +623,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Destination Account (To)
+                    Destination Account
                   </label>
                   <select
                     value={destAccountId}
@@ -564,7 +636,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                       .filter((a) => a.id !== sourceAccountId)
                       .map((a) => (
                         <option key={a.id} value={a.id}>
-                          {a.name} ({Number(a.current_balance).toLocaleString()} ETB)
+                          {a.name} — {Number(a.current_balance).toLocaleString()} ETB
                         </option>
                       ))}
                   </select>
@@ -594,7 +666,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Transfer Amount (ETB)
+                    Transfer Amount ETB
                   </label>
                   <input
                     type="number"
@@ -609,7 +681,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Bank Fee (Optional)
+                    Bank Fee ETB
                   </label>
                   <input
                     type="number"
@@ -624,7 +696,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Memo / Note
+                  Transfer Note
                 </label>
                 <input
                   type="text"

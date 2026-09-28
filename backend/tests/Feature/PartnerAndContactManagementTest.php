@@ -670,6 +670,63 @@ test('vendor advance payout via expense is synced across contact, dashboard, and
     expect((float) $statementRes->json('data.kpis.range_closing_balance'))->toBe(300000.0);
 });
 
+test('traded in exchange unit does not inflate partner statement or dashboard with phantom payable', function () {
+    $partner = Contact::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Exchange Partner',
+        'roles' => ['peer_vendor', 'customer'],
+        'is_active' => true,
+    ]);
+
+    $product = \App\Models\Product::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Trade In Phone',
+        'category' => 'smartphones',
+        'has_serials' => true,
+        'is_active' => true,
+    ]);
+    $variant = \App\Models\ProductVariant::create([
+        'tenant_id' => $this->tenant->id,
+        'product_id' => $product->id,
+        'storage' => '256GB',
+        'color' => 'Black',
+        'default_selling_price' => 100000,
+    ]);
+
+    $salesOrder = \App\Models\SalesOrder::create([
+        'tenant_id' => $this->tenant->id,
+        'order_number' => 'ORD-EXCHANGE-TEST',
+        'salesperson_id' => $this->user->id,
+        'customer_id' => $partner->id,
+        'total_amount' => 500000.00,
+        'paid_amount' => 100000.00,
+        'payment_status' => 'paid',
+        'payment_method' => 'cash',
+        'exchange_allowance' => 400000.00,
+        'order_date' => now(),
+    ]);
+
+    $unit = \App\Models\InventoryUnit::create([
+        'tenant_id' => $this->tenant->id,
+        'variant_id' => $variant->id,
+        'imei_or_serial' => 'EXCHANGE-SN-999',
+        'status' => 'sold',
+        'cost_basis' => 400000.00,
+        'source_type' => 'exchange',
+        'supplier_contact_id' => $partner->id,
+        'exchange_sales_order_id' => $salesOrder->id,
+    ]);
+
+    $statementRes = $this->actingAs($this->user, 'sanctum')->getJson("/api/v1/contacts/{$partner->id}/statement");
+    $statementRes->assertOk();
+
+    expect((float) $statementRes->json('data.kpis.range_closing_balance'))->toBe(0.0);
+    expect((float) $statementRes->json('data.kpis.current_net_balance'))->toBe(0.0);
+    expect((float) $statementRes->json('data.kpis.current_open_payable'))->toBe(0.0);
+    expect(count($statementRes->json('data.ledger')))->toBe(0);
+});
+
+
 
 
 

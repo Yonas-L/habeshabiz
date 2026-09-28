@@ -239,6 +239,9 @@ export interface PartnerStatementData {
     branch: string;
     phone: string;
     email: string;
+    logo_url?: string | null;
+    tin_number?: string | null;
+    footer_note?: string | null;
     bank_accounts: Array<{
       id: string;
       name: string;
@@ -287,6 +290,8 @@ export interface SalesOrder {
   paid_amount: string | number;
   payment_status: 'paid' | 'partially_paid' | 'unpaid';
   payment_method: string;
+  financial_account_id?: string | null;
+  financial_account?: FinancialAccount;
   order_date: string;
   notes?: string | null;
   items: SalesOrderItem[];

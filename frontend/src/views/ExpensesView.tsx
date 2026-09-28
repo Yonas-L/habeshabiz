@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import type { Expense, FinancialAccount } from '../api/client';
+import React, { useState, useEffect, useMemo } from 'react';
+import type { Expense, FinancialAccount, User } from '../api/client';
 import { api } from '../api/client';
 import { toast } from 'sonner';
 import {
@@ -23,12 +23,14 @@ import { Pagination } from '../components/Pagination';
 
 interface ExpensesViewProps {
   accounts: FinancialAccount[];
+  user?: User | null;
   initialShowRecordExpense?: boolean;
   onClearInitialContext?: () => void;
 }
 
 export const ExpensesView: React.FC<ExpensesViewProps> = ({
   accounts,
+  user,
   initialShowRecordExpense,
   onClearInitialContext,
 }) => {
@@ -68,13 +70,36 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
 
   const pagedExpenses = expenses.slice((currentPage - 1) * 6, currentPage * 6);
 
-  const operatingTotal = expenses
-    .filter((e) => !e.is_owner_draw)
-    .reduce((sum, e) => sum + parseFloat(String(e.amount)), 0);
+  const operatingExpenses = useMemo(() => expenses.filter((e) => !e.is_owner_draw), [expenses]);
+  const ownerDraws = useMemo(() => expenses.filter((e) => e.is_owner_draw), [expenses]);
 
-  const ownerDrawsTotal = expenses
-    .filter((e) => e.is_owner_draw)
-    .reduce((sum, e) => sum + parseFloat(String(e.amount)), 0);
+  const operatingTotal = useMemo(
+    () => operatingExpenses.reduce((sum, e) => sum + parseFloat(String(e.amount)), 0),
+    [operatingExpenses]
+  );
+
+  const ownerDrawsTotal = useMemo(
+    () => ownerDraws.reduce((sum, e) => sum + parseFloat(String(e.amount)), 0),
+    [ownerDraws]
+  );
+
+  const operatingTrend = useMemo(() => {
+    if (operatingExpenses.length === 0) return [0, 0, 0, 0, 0];
+    const vals = operatingExpenses.slice(0, 7).map((e) => Number(e.amount)).reverse();
+    return vals.length >= 2 ? vals : [0, ...vals];
+  }, [operatingExpenses]);
+
+  const drawsTrend = useMemo(() => {
+    if (ownerDraws.length === 0) return [0, 0, 0, 0, 0];
+    const vals = ownerDraws.slice(0, 7).map((e) => Number(e.amount)).reverse();
+    return vals.length >= 2 ? vals : [0, ...vals];
+  }, [ownerDraws]);
+
+  const outflowTrend = useMemo(() => {
+    if (expenses.length === 0) return [0, 0, 0, 0, 0];
+    const vals = expenses.slice(0, 7).map((e) => Number(e.amount)).reverse();
+    return vals.length >= 2 ? vals : [0, ...vals];
+  }, [expenses]);
 
   const getCategoryIcon = (cat: string) => {
     switch (cat) {
@@ -87,7 +112,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
       case 'maintenance':
         return <Wrench className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />;
       case 'personal_owner_draw':
-        return <UserMinus className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />;
+        return <UserMinus className="w-3.5 h-3.5 text-slate-700 dark:text-slate-300" />;
       default:
         return <DollarSign className="w-3.5 h-3.5 text-slate-600 dark:text-slate-300" />;
     }
@@ -102,8 +127,8 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
             <h2 className="font-bold text-slate-900 dark:text-white text-lg tracking-tight">
               Operating Expenses & Owner Draws
             </h2>
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/60">
-              Uncommingled Ledgers
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700">
+              Segregated Ledgers
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-0.5">
@@ -113,7 +138,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
 
         <button
           onClick={() => setShowModal(true)}
-          className="h-10 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs flex items-center gap-2 self-start sm:self-auto active:scale-[0.98]"
+          className="h-10 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs flex items-center gap-2 self-start sm:self-auto active:scale-[0.98] cursor-pointer"
         >
           <Plus className="w-4 h-4 text-emerald-400 dark:text-emerald-600" />
           <span>Record Expense</span>
@@ -129,8 +154,8 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
                 Shop Operating Expenses
               </span>
-              <div className="w-8 h-8 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/60 flex items-center justify-center">
-                <Receipt className="w-4 h-4 text-slate-700 dark:text-slate-300" />
+              <div className="w-8 h-8 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-100 dark:border-rose-900/40 flex items-center justify-center">
+                <Receipt className="w-4 h-4 text-rose-600 dark:text-rose-400" />
               </div>
             </div>
             <div className="text-2xl font-black text-slate-900 dark:text-white font-mono tabular-nums tracking-tight mt-2">
@@ -140,7 +165,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
           </div>
           <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-end justify-between">
             <span className="text-[11px] text-slate-400 font-medium">Deducted from Net Profit</span>
-            <MiniBarHistogram values={[12, 18, 15, 24, 20, 28, 30]} color="indigo" />
+            <MiniBarHistogram values={operatingTrend} color="rose" />
           </div>
         </div>
 
@@ -148,21 +173,21 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
         <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-100 dark:border-slate-800/80 p-5 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">
-                Owner Personal Draws (Yoni)
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                Owner Personal Draws{user?.name ? ` (${user.name})` : ''}
               </span>
-              <div className="w-8 h-8 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-100 dark:border-purple-800/60 flex items-center justify-center">
-                <UserMinus className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+              <div className="w-8 h-8 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60 flex items-center justify-center">
+                <UserMinus className="w-4 h-4 text-slate-700 dark:text-slate-300" />
               </div>
             </div>
-            <div className="text-2xl font-black text-purple-700 dark:text-purple-400 font-mono tabular-nums tracking-tight mt-2">
+            <div className="text-2xl font-black text-slate-900 dark:text-white font-mono tabular-nums tracking-tight mt-2">
               <AnimatedNumber value={ownerDrawsTotal} decimals={2} />{' '}
-              <span className="text-xs font-bold text-purple-400 font-sans">ETB</span>
+              <span className="text-xs font-bold text-slate-400 font-sans">ETB</span>
             </div>
           </div>
           <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-end justify-between">
-            <span className="text-[11px] text-purple-500 font-medium">Does not distort shop margins</span>
-            <MiniSparkline values={[20, 22, 25, 24, 30, 32, 35]} color="purple" />
+            <span className="text-[11px] text-slate-400 font-medium">Does not distort shop margins</span>
+            <MiniSparkline values={drawsTrend} color="rose" />
           </div>
         </div>
 
@@ -173,8 +198,8 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
                 Total Cash Outflows
               </span>
-              <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-100 dark:border-amber-800/60 flex items-center justify-center">
-                <TrendingDown className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+              <div className="w-8 h-8 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-100 dark:border-rose-900/40 flex items-center justify-center">
+                <TrendingDown className="w-4 h-4 text-rose-600 dark:text-rose-400" />
               </div>
             </div>
             <div className="text-2xl font-black text-slate-900 dark:text-white font-mono tabular-nums tracking-tight mt-2">
@@ -184,7 +209,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
           </div>
           <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-end justify-between">
             <span className="text-[11px] text-slate-400 font-medium">{expenses.length} Records In Ledger</span>
-            <MiniSparkline values={[32, 40, 40, 48, 50, 60, 65]} color="amber" />
+            <MiniSparkline values={outflowTrend} color="rose" />
           </div>
         </div>
       </div>
@@ -243,7 +268,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
                     </td>
 
                     <td className="py-3.5 px-5">
-                      <div className="text-slate-900 dark:text-white font-bold text-sm group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                      <div className="text-slate-900 dark:text-white font-bold text-sm group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
                         {exp.description}
                       </div>
                       {exp.inventory_unit && (
@@ -274,7 +299,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
                       <span
                         className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold ${
                           exp.is_owner_draw
-                            ? 'bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200/50 dark:border-purple-800/50'
+                            ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200/50 dark:border-amber-800/50'
                             : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
                         }`}
                       >

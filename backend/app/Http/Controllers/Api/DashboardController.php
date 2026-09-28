@@ -188,6 +188,8 @@ class DashboardController extends Controller
             $unDebtStockPayable = (float) InventoryUnit::where('supplier_contact_id', $p->id)
                 ->where('created_at', '<=', $endOfMonth)
                 ->where('status', 'in_stock')
+                ->where('source_type', '!=', 'exchange')
+                ->whereNull('exchange_sales_order_id')
                 ->whereNotIn('id', $allDebtedUnitIds)
                 ->sum('cost_basis');
 
@@ -211,6 +213,8 @@ class DashboardController extends Controller
                 $suppliedInStockCount = InventoryUnit::where('supplier_contact_id', $p->id)
                     ->where('created_at', '<=', $endOfMonth)
                     ->where('status', 'in_stock')
+                    ->where('source_type', '!=', 'exchange')
+                    ->whereNull('exchange_sales_order_id')
                     ->count();
 
                 $partnerSettlements[] = [

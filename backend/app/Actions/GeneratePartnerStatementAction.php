@@ -341,10 +341,15 @@ class GeneratePartnerStatementAction
 
         $vendorUnitsWithoutDebt = InventoryUnit::where('supplier_contact_id', $contact->id)
             ->where('cost_basis', '>', 0)
+            ->where('source_type', '!=', 'exchange')
+            ->whereNull('exchange_sales_order_id')
             ->whereNotIn('id', $allDebtedUnitIds)
             ->with(['variant.product'])
             ->get()
             ->filter(function ($u) use ($debts) {
+                if ($u->source_type === 'exchange' || ! empty($u->exchange_sales_order_id)) {
+                    return false;
+                }
                 if ($u->imei_or_serial) {
                     foreach ($debts as $d) {
                         if ($d->notes && str_contains($d->notes, $u->imei_or_serial)) {
@@ -496,6 +501,8 @@ class GeneratePartnerStatementAction
 
         $unDebtStockPayable = (float) InventoryUnit::where('supplier_contact_id', $contact->id)
             ->where('status', 'in_stock')
+            ->where('source_type', '!=', 'exchange')
+            ->whereNull('exchange_sales_order_id')
             ->whereNotIn('id', $allDebtedUnitIds)
             ->sum('cost_basis');
 
@@ -603,17 +610,40 @@ class GeneratePartnerStatementAction
                 'handed_out_count' => $handedOutUnits->count(),
                 'repairs_count' => $vendorReturnUnits->count(),
             ],
-            'business' => [
-                'name' => 'HABESHABIZ ELECTRONICS',
-                'branch' => 'Bole Medhanialem, Addis Ababa',
-                'phone' => '+251 91 123 4567',
-                'email' => 'sales@habeshabiz.et',
-                'bank_accounts' => \App\Models\FinancialAccount::where('tenant_id', $contact->tenant_id)
-                    ->where('is_active', true)
-                    ->whereIn('type', ['bank', 'mobile_money'])
-                    ->get(['id', 'name', 'account_number', 'type'])
-                    ->toArray(),
-            ],
+            'business' => (function () use ($contact) {
+                $tenant = $contact->tenant;
+                if (! $tenant && ! empty($contact->tenant_id)) {
+                    $tenant = \App\Models\Tenant::find($contact->tenant_id);
+                }
+                $tenantSettings = $tenant?->settings ?? [];
+                $ownerUser = $tenant?->users()->where('role', 'owner')->first();
+
+                $addressParts = array_filter([
+                    $tenantSettings['address'] ?? null,
+                    $tenantSettings['city'] ?? null,
+                ]);
+                $branch = ! empty($addressParts) ? implode(', ', $addressParts) : ($tenant?->business_type ? ucfirst($tenant->business_type) : 'Addis Ababa');
+
+                $businessName = ! empty($tenant?->name) ? $tenant->name : 'HabeshaBiz Electronics';
+                $businessPhone = ! empty($tenant?->phone) ? $tenant->phone : '+251 91 123 4567';
+                $businessEmail = ! empty($ownerUser?->email) ? $ownerUser->email : 'sales@habeshabiz.et';
+                $businessLogo = $tenantSettings['logo_url'] ?? null;
+
+                return [
+                    'name' => $businessName,
+                    'branch' => $branch,
+                    'phone' => $businessPhone,
+                    'email' => $businessEmail,
+                    'logo_url' => $businessLogo,
+                    'tin_number' => $tenantSettings['tin_number'] ?? null,
+                    'footer_note' => $tenantSettings['footer_note'] ?? null,
+                    'bank_accounts' => \App\Models\FinancialAccount::where('tenant_id', $contact->tenant_id)
+                        ->where('is_active', true)
+                        ->whereIn('type', ['bank', 'mobile_money'])
+                        ->get(['id', 'name', 'account_number', 'type'])
+                        ->toArray(),
+                ];
+            })(),
             'ledger' => $ledger,
             'supplied_units' => $suppliedUnits,
             'handed_out_units' => $handedOutUnits,

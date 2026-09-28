@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import type { InventoryUnit, Product, ProductCategory, Contact, User, FinancialAccount } from '../api/client';
+import type { InventoryUnit, Product, ProductCategory, Contact, User, FinancialAccount, SalesOrder } from '../api/client';
 import { api } from '../api/client';
 import { toast } from 'sonner';
 import {
@@ -32,6 +32,7 @@ import {
   DollarSign,
 } from 'lucide-react';
 import { InventoryUnitDrawer } from '../components/drawers/InventoryUnitDrawer';
+import { SalesOrderDrawer } from '../components/drawers/SalesOrderDrawer';
 import { Pagination } from '../components/Pagination';
 import { StockIntakeModal } from '../components/inventory/StockIntakeModal';
 import { CategoryManagementModal, getCategoryIcon } from '../components/inventory/CategoryManagementModal';
@@ -71,6 +72,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [statusFilter, setStatusFilter] = useState<TabType>('in_stock');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
   const [selectedUnit, setSelectedUnit] = useState<InventoryUnit | null>(null);
+  const [viewingSalesOrder, setViewingSalesOrder] = useState<SalesOrder | null>(null);
 
   const [counts, setCounts] = useState<{
     in_stock: number;
@@ -1716,13 +1718,13 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
       {/* Handover Modal (Mark In-Stock Device as Out for Sale) */}
       {handoverTargetUnit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 md:p-8 pt-20 sm:pt-24 pb-8 overflow-y-auto">
           <div
             className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs animate-backdrop-enter"
             onClick={() => setHandoverTargetUnit(null)}
           />
 
-          <div className="relative z-10 bg-white dark:bg-[#131926] rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-2xl max-w-md w-full p-6 space-y-4 animate-modal-enter">
+          <div className="relative z-10 bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xl max-w-md w-full p-6 space-y-4 animate-modal-enter max-h-[calc(100vh-7rem)] my-auto overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center">
@@ -1739,7 +1741,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               </div>
               <button
                 onClick={() => setHandoverTargetUnit(null)}
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1750,7 +1752,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 {handoverTargetUnit.variant?.product?.name}
               </div>
               <div className="text-[11px] text-slate-400 font-mono mt-0.5">
-                Serial/IMEI: {handoverTargetUnit.imei_or_serial || 'Standard stock'}
+                Serial IMEI: {handoverTargetUnit.imei_or_serial || 'Standard stock'}
               </div>
             </div>
 
@@ -1758,12 +1760,12 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                    Handed Out To (Partner / Vendor / Staff) *
+                    Handed Out To *
                   </label>
-                  <span className="text-[10px] text-slate-400 font-medium">Select partner or type name</span>
+                  <span className="text-[10px] text-slate-400 font-medium">Select partner or enter name</span>
                 </div>
 
-                {/* Minimal Partner Dropdown */}
+                {/* Partner Dropdown */}
                 <select
                   value={contacts.some((c) => c.name.toLowerCase() === handoverTo.toLowerCase()) ? contacts.find((c) => c.name.toLowerCase() === handoverTo.toLowerCase())?.name : ''}
                   onChange={(e) => {
@@ -1773,12 +1775,12 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   }}
                   className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700 cursor-pointer mb-2"
                 >
-                  <option value="">-- Choose Partner / Peer Vendor --</option>
+                  <option value="">-- Choose Partner or Vendor --</option>
                   {contacts
                     .filter((c) => c.is_active !== false)
                     .map((c) => (
                       <option key={c.id} value={c.name}>
-                        {c.name} {c.phone ? `(${c.phone})` : ''} {c.roles?.includes('peer_vendor') ? '• Broker' : c.roles?.includes('supplier') ? '• Supplier' : ''}
+                        {c.name} {c.phone ? `· ${c.phone}` : ''} {c.roles?.includes('peer_vendor') ? '· Broker' : c.roles?.includes('supplier') ? '· Supplier' : ''}
                       </option>
                     ))}
                 </select>
@@ -1790,42 +1792,24 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     required
                     value={handoverTo}
                     onChange={(e) => setHandoverTo(e.target.value)}
-                    placeholder="Or enter staff / merchant name..."
+                    placeholder="Or enter recipient name..."
                     className="w-full h-9 px-3 pr-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700 placeholder:text-slate-400"
                   />
                   {handoverTo && (
                     <button
                       type="button"
                       onClick={() => setHandoverTo('')}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs px-1"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs px-1 cursor-pointer"
                     >
                       ×
                     </button>
                   )}
                 </div>
-
-                {/* Quick Staff / Peer Pills */}
-                <div className="flex flex-wrap gap-1.5 mt-2">
-                  {['Husa (Lead Sales)', 'Kalid', 'Neju'].map((name) => (
-                    <button
-                      key={name}
-                      type="button"
-                      onClick={() => setHandoverTo(name)}
-                      className={`px-2 py-0.5 rounded-lg text-[10px] font-semibold transition-colors cursor-pointer ${
-                        handoverTo === name
-                          ? 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700'
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                      }`}
-                    >
-                      {name}
-                    </button>
-                  ))}
-                </div>
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Destination / Location (Optional)
+                  Destination Location
                 </label>
                 <input
                   type="text"
@@ -1853,7 +1837,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Agreed Vendor Payout (ETB)
+                    Agreed Vendor Payout ETB
                   </label>
                   <input
                     type="number"
@@ -1908,10 +1892,10 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                               : 'text-slate-600 dark:text-slate-400'
                           }`}>
                             {(selectedPartner.net_balance ?? 0) > 0
-                              ? `+${(selectedPartner.net_balance ?? 0).toLocaleString()} ETB (Owes us)`
+                              ? `+${(selectedPartner.net_balance ?? 0).toLocaleString()} ETB · Owes us`
                               : (selectedPartner.net_balance ?? 0) < 0
-                              ? `${(selectedPartner.net_balance ?? 0).toLocaleString()} ETB (We owe)`
-                              : '0.00 ETB (Settled)'}
+                              ? `${(selectedPartner.net_balance ?? 0).toLocaleString()} ETB · Shop owes`
+                              : '0.00 ETB · Settled'}
                           </span>
                         </div>
                         {payoutNum > 0 && (
@@ -1928,10 +1912,10 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                                     : 'text-slate-600 dark:text-slate-400'
                                 }`}>
                                   {newBal > 0
-                                    ? `+${newBal.toLocaleString()} ETB (Partner will owe us)`
+                                    ? `+${newBal.toLocaleString()} ETB · Partner owes`
                                     : newBal < 0
-                                    ? `${newBal.toLocaleString()} ETB (Reduces what we owe)`
-                                    : '0.00 ETB (Fully balanced)'}
+                                    ? `${newBal.toLocaleString()} ETB · Reduces debt`
+                                    : '0.00 ETB · Balanced'}
                                 </span>
                               );
                             })()}
@@ -1951,7 +1935,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Handover Note (Optional)
+                  Handover Note
                 </label>
                 <textarea
                   value={handoverNotes}
@@ -3298,6 +3282,15 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           setVendorSwapPrice(p ? String(p) : '');
         }}
         onOpenMarkSold={(unit) => openMarkSoldModal(unit)}
+        onViewSalesOrder={(order) => setViewingSalesOrder(order)}
+      />
+
+      {/* Transaction Detail Workspace Drawer for Sold Units */}
+      <SalesOrderDrawer
+        order={viewingSalesOrder}
+        isOpen={viewingSalesOrder !== null}
+        onClose={() => setViewingSalesOrder(null)}
+        user={user}
       />
 
       {/* Warranty Swap Modal */}

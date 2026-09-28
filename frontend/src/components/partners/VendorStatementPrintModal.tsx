@@ -24,17 +24,24 @@ export const VendorStatementPrintModal: React.FC<VendorStatementPrintModalProps>
   const isPayable = netTotal < 0;
 
   const handlePrint = () => {
+    const originalTitle = document.title;
+    const sanitizedContact = (contact.name || 'Partner').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const sanitizedRange = (range.formatted_range || 'Statement').replace(/[^a-zA-Z0-9_-]/g, '_');
+    document.title = `Statement_${sanitizedContact}_${sanitizedRange}`;
     window.print();
+    setTimeout(() => {
+      document.title = originalTitle;
+    }, 1000);
   };
 
   const handleCopySummary = () => {
     const text = [
       `${business.name} — Vendor Account Statement`,
-      `Partner: ${contact.name} (${contact.phone || 'No phone'})`,
+      `Partner: ${contact.name}${contact.phone ? ` · ${contact.phone}` : ''}`,
       `Statement Range: ${range.formatted_range}`,
       `Date Generated: ${new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`,
       `----------------------------------------`,
-      `NET TOTAL: ${Math.abs(netTotal).toLocaleString()} ETB ${isReceivable ? '(You owe us)' : isPayable ? '(We owe you)' : '(Settled)'}`,
+      `NET TOTAL: ${Math.abs(netTotal).toLocaleString()} ETB ${isReceivable ? '· Partner owes' : isPayable ? '· Shop owes' : '· Settled'}`,
       `----------------------------------------`,
       ...ledger.map(
         (row) =>
@@ -49,9 +56,9 @@ export const VendorStatementPrintModal: React.FC<VendorStatementPrintModalProps>
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/60 backdrop-blur-xs animate-in fade-in overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 sm:pt-24 pb-8 px-3 sm:px-6 bg-black/60 backdrop-blur-xs overflow-y-auto printable-modal-backdrop">
       <div
-        className="relative w-full max-w-3xl bg-white dark:bg-[#101622] rounded-2xl shadow-2xl border border-slate-200/90 dark:border-slate-800 my-auto overflow-hidden animate-receipt"
+        className="relative w-full max-w-4xl bg-white dark:bg-[#101622] rounded-2xl shadow-2xl border border-slate-200/90 dark:border-slate-800 my-auto overflow-hidden printable-modal-card animate-modal-spring"
         role="dialog"
         aria-modal="true"
       >
@@ -76,9 +83,10 @@ export const VendorStatementPrintModal: React.FC<VendorStatementPrintModalProps>
               type="button"
               onClick={handlePrint}
               className="h-8 px-3.5 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+              title="Print document or download as PDF"
             >
               <Printer className="w-3.5 h-3.5" />
-              <span>Print Statement</span>
+              <span>Print or Download PDF</span>
             </button>
             <button
               type="button"
@@ -94,15 +102,34 @@ export const VendorStatementPrintModal: React.FC<VendorStatementPrintModalProps>
         <div id="printable-statement" className="p-6 sm:p-8 space-y-6 text-slate-900 dark:text-slate-100">
           {/* Header Branding */}
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-5 border-b border-slate-200 dark:border-slate-800">
-            <div>
-              <div className="font-black text-base sm:text-lg tracking-tight uppercase text-slate-900 dark:text-white">
-                {business.name}
-              </div>
-              <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                {business.branch} · {business.phone}
-              </div>
-              <div className="text-[11px] text-slate-400 font-mono mt-0.5">
-                {business.email}
+            <div className="flex items-center gap-3.5">
+              {business.logo_url ? (
+                <img
+                  src={business.logo_url}
+                  alt={business.name}
+                  className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl object-contain border border-slate-200/80 dark:border-slate-800 p-1 bg-white shrink-0 shadow-2xs"
+                />
+              ) : (
+                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 flex items-center justify-center font-black text-lg sm:text-xl shrink-0 shadow-2xs">
+                  {(business.name || 'H').charAt(0).toUpperCase()}
+                </div>
+              )}
+              <div>
+                <div className="font-black text-base sm:text-lg tracking-tight uppercase text-slate-900 dark:text-white leading-tight">
+                  {business.name}
+                </div>
+                <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  {business.branch} · {business.phone}
+                </div>
+                <div className="text-[11px] text-slate-400 font-mono mt-0.5 flex items-center gap-2">
+                  <span>{business.email}</span>
+                  {business.tin_number && (
+                    <>
+                      <span>·</span>
+                      <span>TIN: {business.tin_number}</span>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -164,7 +191,7 @@ export const VendorStatementPrintModal: React.FC<VendorStatementPrintModalProps>
           >
             <div>
               <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
-                NET TOTAL (STATEMENT RANGE)
+                NET STATEMENT TOTAL
               </span>
               <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
                 {isReceivable
@@ -259,7 +286,7 @@ export const VendorStatementPrintModal: React.FC<VendorStatementPrintModalProps>
                           <td className="py-2.5 px-3 text-right tabular-nums text-slate-700 dark:text-slate-300">
                             {row.payable !== 0 ? (
                               <span className={row.payable < 0 ? 'text-blue-600 dark:text-blue-400' : ''}>
-                                {row.payable > 0 ? row.payable.toLocaleString(undefined, { minimumFractionDigits: 2 }) : `(${Math.abs(row.payable).toLocaleString(undefined, { minimumFractionDigits: 2 })})`}
+                                {row.payable > 0 ? row.payable.toLocaleString(undefined, { minimumFractionDigits: 2 }) : `-${Math.abs(row.payable).toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
                               </span>
                             ) : (
                               <span className="text-slate-400 font-normal">—</span>
@@ -268,7 +295,7 @@ export const VendorStatementPrintModal: React.FC<VendorStatementPrintModalProps>
                           <td className="py-2.5 px-3 text-right tabular-nums text-slate-700 dark:text-slate-300">
                             {row.receivable !== 0 ? (
                               <span className={row.receivable < 0 ? 'text-emerald-600 dark:text-emerald-400' : ''}>
-                                {row.receivable > 0 ? row.receivable.toLocaleString(undefined, { minimumFractionDigits: 2 }) : `(${Math.abs(row.receivable).toLocaleString(undefined, { minimumFractionDigits: 2 })})`}
+                                {row.receivable > 0 ? row.receivable.toLocaleString(undefined, { minimumFractionDigits: 2 }) : `-${Math.abs(row.receivable).toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
                               </span>
                             ) : (
                               <span className="text-slate-400 font-normal">—</span>
@@ -330,7 +357,7 @@ export const VendorStatementPrintModal: React.FC<VendorStatementPrintModalProps>
                 <span>Verified Official Financial Statement</span>
               </div>
               <p className="text-[10px] text-slate-400 max-w-sm">
-                Generated automatically by HabeshaBiz Electronics ERP. Confidential partner accounting statement.
+                {business.footer_note || `Generated automatically by ${business.name} ERP. Confidential partner accounting statement.`}
               </p>
             </div>
 

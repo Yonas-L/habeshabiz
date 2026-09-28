@@ -9,8 +9,10 @@ import {
   X,
   Check,
   ChevronRight,
+  ChevronDown,
   ArrowLeft,
   Smartphone,
+  Package,
   Battery,
   CreditCard,
   Wallet,
@@ -65,6 +67,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
   const [selectedUnitIds, setSelectedUnitIds] = useState<string[]>([]);
   const [quantity, setQuantity] = useState<number>(1);
   const [productSearch, setProductSearch] = useState('');
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
 
   const [liveContacts, setLiveContacts] = useState<Contact[]>(contacts);
 
@@ -155,11 +158,25 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
   const customerList = liveContacts.filter((c) => c.roles.includes('customer') || c.roles.includes('debtor'));
   const treasuryAccounts = accounts.filter((a) => !a.is_custom_asset);
 
-  // Products filtered by search, with in-stock count
+  // Products filtered by search and category, with in-stock count
   const filteredProducts = useMemo(() => {
     const q = productSearch.toLowerCase().trim();
     return products
       .filter((p) => {
+        if (selectedCategoryFilter !== 'all') {
+          const pCatId = p.category_id || p.category_rel?.id;
+          const pCatSlug = p.category_rel?.slug || p.category;
+          const catObj = categories.find((c) => c.id === selectedCategoryFilter);
+          const matchesId = pCatId === selectedCategoryFilter;
+          const matchesSlug = pCatSlug === selectedCategoryFilter ||
+            (catObj && (
+              pCatSlug?.toLowerCase() === catObj.slug?.toLowerCase() ||
+              pCatSlug?.toLowerCase() === catObj.name?.toLowerCase()
+            ));
+          if (!matchesId && !matchesSlug) {
+            return false;
+          }
+        }
         if (!q) return true;
         const cat = p.category_rel?.name || p.category || '';
         return (
@@ -175,7 +192,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
         const stockCount = p.has_serials ? serialUnitsCount : Math.max(serialUnitsCount, nonSerialCount);
         return { ...p, stockCount };
       });
-  }, [products, productSearch, availableUnits]);
+  }, [products, productSearch, availableUnits, selectedCategoryFilter, categories]);
 
   // Pricing & Discount calculations
   const unitPriceNum = parseFloat(unitSellingPrice) || 0;
@@ -609,66 +626,116 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
         <div className="lg:col-span-3 space-y-5">
 
           {/* ── STEP 1: Product Search & Selection ── */}
-          <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800/90 overflow-hidden shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
-            <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-3">
-              <div className="relative flex-1">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                <input
-                  ref={searchRef}
-                  type="text"
-                  value={productSearch}
-                  onChange={(e) => setProductSearch(e.target.value)}
-                  placeholder="Search products by name, brand, or category..."
-                  className="w-full h-9 pl-9 pr-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
-                />
-              </div>
-              {selectedProductId && (
-                <button
-                  onClick={resetForm}
-                  className="h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 text-[11px] font-semibold text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-1 cursor-pointer"
-                >
-                  <X className="w-3 h-3" />
-                  Clear
-                </button>
-              )}
-            </div>
-
-            {/* Product Grid */}
+          <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-xs">
+            {/* Search & Action Bar with Minimal Category Dropdown */}
             {!selectedProductId && (
-              <div className="p-3 max-h-[320px] overflow-y-auto">
+              <div className="p-3 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2 sm:gap-2.5">
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    ref={searchRef}
+                    type="text"
+                    value={productSearch}
+                    onChange={(e) => setProductSearch(e.target.value)}
+                    placeholder="Search products by model, brand, or serial..."
+                    className="w-full h-9 sm:h-10 pl-9 pr-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/60 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                  />
+                  {productSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setProductSearch('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                      title="Clear search"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Minimal Category Dropdown */}
+                {categories.length > 0 && (
+                  <div className="relative shrink-0">
+                    <select
+                      value={selectedCategoryFilter}
+                      onChange={(e) => setSelectedCategoryFilter(e.target.value)}
+                      className="h-9 sm:h-10 pl-3 pr-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/60 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-800/80 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all appearance-none cursor-pointer max-w-[130px] sm:max-w-[180px] truncate dark:[&>option]:bg-slate-900 dark:[&>option]:text-white"
+                      aria-label="Filter products by category"
+                    >
+                      <option value="all">All Categories</option>
+                      {categories.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Product List Subheader */}
+            {!selectedProductId && (
+              <div className="px-4 py-2 bg-slate-50/50 dark:bg-slate-900/40 border-b border-slate-100 dark:border-slate-800/60 flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                <span>Product</span>
+                <span>Availability</span>
+              </div>
+            )}
+
+            {/* Clean Flat Product List */}
+            {!selectedProductId && (
+              <div className="divide-y divide-slate-100 dark:divide-slate-800/60 max-h-[460px] overflow-y-auto">
                 {filteredProducts.length === 0 ? (
-                  <div className="py-8 text-center text-xs text-slate-400">
-                    No products found
+                  <div className="py-12 text-center text-xs text-slate-400 dark:text-slate-500">
+                    No products found matching your filter
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {filteredProducts.map((p) => {
-                      const cat = p.category_rel?.name || p.category || '';
-                      return (
-                        <button
-                          key={p.id}
-                          onClick={() => handleSelectProduct(p.id)}
-                          className="p-3 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900/50 hover:border-slate-400 dark:hover:border-slate-600 transition-all text-left group cursor-pointer"
-                        >
-                          <div className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors leading-tight truncate" title={p.name}>
-                            {p.name}
+                  filteredProducts.map((p) => {
+                    const cat = p.category_rel?.name || p.category || '';
+                    const hasStock = p.stockCount > 0;
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => handleSelectProduct(p.id)}
+                        className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors text-left group focus:outline-none focus:bg-slate-50 dark:focus:bg-slate-800/40 cursor-pointer"
+                      >
+                        <div className="flex items-center gap-3 min-w-0 pr-3">
+                          <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 flex items-center justify-center shrink-0 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                            {p.has_serials ? (
+                              <Smartphone className="w-4 h-4" />
+                            ) : (
+                              <Package className="w-4 h-4" />
+                            )}
                           </div>
-                          <div className="flex items-center justify-between mt-1.5">
-                            <span className="text-[10px] text-slate-400 truncate">
-                              {p.brand || cat}
-                            </span>
-                            <span className={`text-[10px] font-bold font-mono ${
-                              p.stockCount > 0
+                          <div className="min-w-0">
+                            <div className="text-xs font-semibold text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors truncate">
+                              {p.name}
+                            </div>
+                            <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 truncate">
+                              {p.brand ? `${p.brand} · ` : ''}{cat}{p.has_serials ? ' · Serialized IMEI' : ''}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 shrink-0">
+                          <div className="text-right">
+                            <div className={`text-xs font-bold font-mono ${
+                              hasStock
                                 ? 'text-emerald-600 dark:text-emerald-400'
-                                : 'text-slate-400'
+                                : 'text-slate-400 dark:text-slate-500 font-normal'
                             }`}>
-                              {p.stockCount}
-                            </span>
+                              {hasStock ? `${p.stockCount} in stock` : 'Out of stock'}
+                            </div>
+                            <div className="text-[10px] text-slate-400 dark:text-slate-500">
+                              {p.variants?.length ? `${p.variants.length} variant${p.variants.length > 1 ? 's' : ''}` : 'Standard'}
+                            </div>
                           </div>
-                        </button>
-                      );
-                    })}
-                  </div>
+                          <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:text-slate-600 dark:group-hover:text-slate-300 group-hover:translate-x-0.5 transition-all" />
+                        </div>
+                      </button>
+                    );
+                  })
                 )}
               </div>
             )}
@@ -677,32 +744,38 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
             {selectedProduct && (
               <div className="p-4">
                 <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Smartphone className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                    <span className="text-sm font-bold text-slate-900 dark:text-white truncate max-w-[200px] sm:max-w-xs" title={selectedProduct.name}>
-                      {selectedProduct.name}
-                    </span>
-                    {selectedProduct.brand && (
-                      <span className="text-[10px] text-slate-400 font-medium">
-                        {selectedProduct.brand}
-                      </span>
-                    )}
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                      {selectedProduct.has_serials ? (
+                        <Smartphone className="w-4 h-4" />
+                      ) : (
+                        <Package className="w-4 h-4" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-sm font-bold text-slate-900 dark:text-white truncate" title={selectedProduct.name}>
+                        {selectedProduct.name}
+                      </div>
+                      <div className="text-[11px] text-slate-400 dark:text-slate-500">
+                        {selectedProduct.brand ? `${selectedProduct.brand} · ` : ''}{selectedProduct.category_rel?.name || selectedProduct.category || ''}
+                      </div>
+                    </div>
                   </div>
                   <button
                     type="button"
                     onClick={handleBackToProducts}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white active:scale-95 transition-all cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white active:scale-95 transition-all cursor-pointer shrink-0"
                     title="Change selected product"
                   >
-                    <ArrowLeft className="w-3 h-3" />
+                    <ArrowLeft className="w-3.5 h-3.5" />
                     <span>Change Product</span>
                   </button>
                 </div>
 
                 {/* ── STEP 2: Variant Chips ── */}
-                <div className="mt-3">
+                <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2 block">
-                    Variant
+                    Choose Variant
                   </span>
                   <div className="flex flex-wrap gap-2">
                     {variants.map((v) => {
@@ -713,18 +786,21 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                       return (
                         <button
                           key={v.id}
+                          type="button"
                           onClick={() => handleSelectVariant(v)}
-                          className={`px-3 py-2 rounded-xl border text-xs font-semibold transition-all ${
+                          className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                             isSelected
-                              ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400'
-                              : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-400 dark:hover:border-slate-500'
+                              ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
                           }`}
                         >
-                          {variantLabel(v)}
-                          <span className={`ml-1.5 text-[10px] font-bold font-mono ${
-                            vStock > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500 dark:text-rose-400'
+                          <span>{variantLabel(v)}</span>
+                          <span className={`ml-2 text-[10px] font-mono font-bold ${
+                            isSelected
+                              ? 'text-emerald-400 dark:text-emerald-600'
+                              : vStock > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'
                           }`}>
-                            ({vStock})
+                            {vStock > 0 ? `${vStock} in stock` : '0 in stock'}
                           </span>
                         </button>
                       );
@@ -741,7 +817,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
               <div className="flex items-center justify-between mb-3">
                 <div>
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                    {tradeInAllowance > 0 ? 'Outgoing Device to Hand Over' : 'Serial Units'} ({unitsForVariant.length} in stock)
+                    {tradeInAllowance > 0 ? 'Outgoing Device to Hand Over' : 'Serial Units'} · {unitsForVariant.length} in stock
                   </span>
                   {tradeInAllowance > 0 && (
                     <span className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">
@@ -1106,7 +1182,10 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                         type="button"
                         onClick={() => {
                           setPaymentMethod(m.value);
-                          setPaidAmount(String(totalAfterDiscount));
+                          const cashDue = exchangeDevice
+                            ? Math.max(0, totalAfterDiscount - Number(exchangeDevice.trade_in_value || 0))
+                            : totalAfterDiscount;
+                          setPaidAmount(String(cashDue));
                         }}
                         className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border-2 text-[11px] font-semibold transition-all ${
                           isSelected

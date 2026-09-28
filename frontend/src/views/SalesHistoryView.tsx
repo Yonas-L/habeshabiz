@@ -461,6 +461,15 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
                               </div>
                             );
                           })}
+                          {exchange > 0 && (
+                            <div className="mt-1 pt-1 border-t border-purple-100 dark:border-purple-900/40 flex items-center gap-1 text-[10px] text-purple-700 dark:text-purple-300 font-medium">
+                              <Repeat className="w-3 h-3 text-purple-500 shrink-0" />
+                              <span className="truncate">
+                                Trade-In: {order.exchange_unit?.variant?.product?.name || 'Device'}
+                                {order.exchange_unit?.imei_or_serial ? ` (${order.exchange_unit.imei_or_serial})` : ''}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </td>
 
@@ -480,8 +489,17 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
                       {/* Col 5: Total */}
                       <td className="py-2.5 px-3.5 text-right whitespace-nowrap">
                         <div className="font-mono font-bold text-slate-900 dark:text-white text-xs">
-                          {netPayable.toLocaleString()} <span className="text-[10px] font-normal text-slate-400 font-sans">ETB</span>
+                          {gross.toLocaleString()} <span className="text-[10px] font-normal text-slate-400 font-sans">ETB</span>
                         </div>
+                        {exchange > 0 ? (
+                          <div className="text-[10px] text-purple-700 dark:text-purple-300 font-mono mt-0.5">
+                            {netPayable.toLocaleString()} cash + {exchange.toLocaleString()} trade
+                          </div>
+                        ) : disc > 0 ? (
+                          <div className="text-[10px] text-rose-600 dark:text-rose-400 font-mono mt-0.5">
+                            −{disc.toLocaleString()} disc ({netPayable.toLocaleString()} net)
+                          </div>
+                        ) : null}
                       </td>
 
                       {/* Col 6: Status (Border-free minimal colored text) */}

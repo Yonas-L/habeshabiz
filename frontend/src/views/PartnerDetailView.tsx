@@ -597,7 +597,7 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
                               <span className={row.payable < 0 ? 'text-blue-600 dark:text-blue-400 font-bold' : ''}>
                                 {row.payable > 0
                                   ? row.payable.toLocaleString(undefined, { minimumFractionDigits: 2 })
-                                  : `(${Math.abs(row.payable).toLocaleString(undefined, { minimumFractionDigits: 2 })})`}
+                                  : `-${Math.abs(row.payable).toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
                               </span>
                             ) : (
                               <span className="text-slate-400 font-normal">—</span>
@@ -608,7 +608,7 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
                               <span className={row.receivable < 0 ? 'text-emerald-600 dark:text-emerald-400 font-bold' : ''}>
                                 {row.receivable > 0
                                   ? row.receivable.toLocaleString(undefined, { minimumFractionDigits: 2 })
-                                  : `(${Math.abs(row.receivable).toLocaleString(undefined, { minimumFractionDigits: 2 })})`}
+                                  : `-${Math.abs(row.receivable).toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
                               </span>
                             ) : (
                               <span className="text-slate-400 font-normal">—</span>

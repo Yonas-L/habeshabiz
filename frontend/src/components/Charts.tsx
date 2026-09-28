@@ -290,7 +290,7 @@ export const InteractiveSalesWaveChart: React.FC<{
 export const MiniSparkline: React.FC<{
   data?: number[];
   values?: number[];
-  color?: 'emerald' | 'indigo' | 'amber' | 'rose' | 'purple' | 'blue';
+  color?: 'emerald' | 'indigo' | 'amber' | 'rose' | 'purple' | 'blue' | 'slate';
 }> = ({ data, values, color = 'emerald' }) => {
   const chartData = data ?? values ?? [10, 20, 15, 30];
   const w = 72;
@@ -318,6 +318,8 @@ export const MiniSparkline: React.FC<{
       ? '#f43f5e'
       : color === 'purple'
       ? '#a855f7'
+      : color === 'slate'
+      ? '#64748b'
       : '#3b82f6';
 
   return (
@@ -338,7 +340,7 @@ export const MiniSparkline: React.FC<{
 export const MiniBarHistogram: React.FC<{
   bars?: number[];
   values?: number[];
-  color?: 'emerald' | 'indigo' | 'amber' | 'slate' | 'blue' | 'purple';
+  color?: 'emerald' | 'indigo' | 'amber' | 'slate' | 'blue' | 'purple' | 'rose';
 }> = ({ bars, values, color = 'emerald' }) => {
   const chartBars = bars ?? values ?? [10, 20, 30, 40];
   const max = Math.max(...chartBars, 1);
@@ -349,6 +351,8 @@ export const MiniBarHistogram: React.FC<{
       ? 'bg-indigo-500 dark:bg-indigo-400'
       : color === 'amber'
       ? 'bg-amber-500 dark:bg-amber-400'
+      : color === 'rose'
+      ? 'bg-rose-500 dark:bg-rose-400'
       : color === 'blue'
       ? 'bg-blue-500 dark:bg-blue-400'
       : color === 'purple'

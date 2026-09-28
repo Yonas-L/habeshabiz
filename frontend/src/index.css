@@ -298,6 +298,31 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   animation: fluidFadeInUp 0.46s cubic-bezier(0.16, 1, 0.3, 1) 0.48s both;
 }
 
+@keyframes liquidSpringIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.93) translateY(14px);
+    filter: blur(4px);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.018) translateY(-2px);
+    filter: blur(0);
+  }
+  82% {
+    transform: scale(0.995) translateY(1px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: blur(0);
+  }
+}
+
+.animate-modal-spring {
+  animation: liquidSpringIn 0.42s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-fluid-sidebar,
   .animate-fluid-topbar,
@@ -306,7 +331,8 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   .animate-stagger-3,
   .animate-stagger-4,
   .animate-stagger-5,
-  .animate-stagger-6 {
+  .animate-stagger-6,
+  .animate-modal-spring {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
@@ -314,12 +340,22 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   }
 }
 
-/* Dedicated Print Stylesheet for Professional Invoices */
+/* Dedicated Print Stylesheet for Professional Invoices and Account Statements */
 @media print {
-  body {
+  @page {
+    size: A4 portrait;
+    margin: 10mm 12mm 12mm 12mm;
+  }
+
+  html, body {
     background: #ffffff !important;
     color: #0f172a !important;
     overflow: visible !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   body * {
@@ -327,23 +363,55 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   }
 
   #printable-invoice,
-  #printable-invoice * {
+  #printable-invoice *,
+  #printable-statement,
+  #printable-statement * {
     visibility: visible;
   }
 
-  #printable-invoice {
+  /* Unclip modal wrappers when printing */
+  .printable-modal-backdrop {
+    position: static !important;
+    background: transparent !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    display: block !important;
+    height: auto !important;
+    width: 100% !important;
+    max-height: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  .printable-modal-card {
+    position: static !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+    border: none !important;
+    max-height: none !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    overflow: visible !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  #printable-invoice,
+  #printable-statement {
     position: absolute !important;
     left: 0 !important;
     top: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
     margin: 0 !important;
-    padding: 28px !important;
+    padding: 16px 20px !important;
     border: none !important;
     background: #ffffff !important;
     color: #0f172a !important;
     box-shadow: none !important;
     border-radius: 0 !important;
+    overflow: visible !important;
   }
 
   .no-print {
@@ -352,16 +420,37 @@ html.dark ::-webkit-scrollbar-thumb:hover {
 
   /* Force optimal ink contrast and remove dark backgrounds in print */
   #printable-invoice .text-white,
-  #printable-invoice [class*="dark:text-white"] {
+  #printable-invoice [class*="dark:text-white"],
+  #printable-statement .text-white,
+  #printable-statement [class*="dark:text-white"] {
     color: #0f172a !important;
   }
 
-  #printable-invoice [class*="dark:bg-"] {
+  #printable-invoice [class*="dark:bg-"],
+  #printable-statement [class*="dark:bg-"] {
     background-color: transparent !important;
   }
 
-  #printable-invoice [class*="dark:border-"] {
-    border-color: #e2e8f0 !important;
+  #printable-invoice [class*="dark:border-"],
+  #printable-statement [class*="dark:border-"] {
+    border-color: #cbd5e1 !important;
+  }
+
+  /* Table print optimization */
+  #printable-statement table,
+  #printable-invoice table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  #printable-statement tr,
+  #printable-invoice tr {
+    page-break-inside: avoid !important;
+  }
+
+  #printable-statement thead,
+  #printable-invoice thead {
+    display: table-header-group !important;
   }
 }
 
