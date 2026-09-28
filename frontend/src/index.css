@@ -323,6 +323,21 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   animation: liquidSpringIn 0.42s cubic-bezier(0.34, 1.4, 0.64, 1) both;
 }
 
+@keyframes crispModalEnter {
+  0% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-modal-crisp {
+  animation: crispModalEnter 0.15s ease-out both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-fluid-sidebar,
   .animate-fluid-topbar,
@@ -344,7 +359,7 @@ html.dark ::-webkit-scrollbar-thumb:hover {
 @media print {
   @page {
     size: A4 portrait;
-    margin: 10mm 12mm 12mm 12mm;
+    margin: 8mm 10mm 10mm 10mm;
   }
 
   html, body {
@@ -399,19 +414,18 @@ html.dark ::-webkit-scrollbar-thumb:hover {
 
   #printable-invoice,
   #printable-statement {
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
+    position: static !important;
     width: 100% !important;
     max-width: 100% !important;
     margin: 0 !important;
-    padding: 16px 20px !important;
+    padding: 0 !important;
     border: none !important;
     background: #ffffff !important;
     color: #0f172a !important;
     box-shadow: none !important;
     border-radius: 0 !important;
     overflow: visible !important;
+    box-sizing: border-box !important;
   }
 
   .no-print {
@@ -436,21 +450,74 @@ html.dark ::-webkit-scrollbar-thumb:hover {
     border-color: #cbd5e1 !important;
   }
 
-  /* Table print optimization */
+  #printable-statement .overflow-x-auto,
+  #printable-invoice .overflow-x-auto {
+    overflow: visible !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Table print optimization - prevent right column (Balance) from being cut off */
   #printable-statement table,
   #printable-invoice table {
     width: 100% !important;
+    max-width: 100% !important;
+    table-layout: fixed !important;
     border-collapse: collapse !important;
+    font-size: 10px !important;
+    line-height: 1.3 !important;
+  }
+
+  #printable-statement th,
+  #printable-invoice th {
+    font-size: 9px !important;
+    padding-top: 5px !important;
+    padding-bottom: 5px !important;
+    padding-left: 5px !important;
+    padding-right: 5px !important;
+    letter-spacing: 0.05em !important;
+    text-transform: uppercase !important;
+  }
+
+  #printable-statement td,
+  #printable-invoice td {
+    padding-top: 4px !important;
+    padding-bottom: 4px !important;
+    padding-left: 5px !important;
+    padding-right: 5px !important;
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+    font-size: 10px !important;
+    line-height: 1.3 !important;
+  }
+
+  /* Prevent stacked inline or vertically overlapping badge boxes in print */
+  #printable-statement td span[class*="rounded-md"],
+  #printable-invoice td span[class*="rounded-md"] {
+    background-color: transparent !important;
+    padding: 0 !important;
+    color: #0f172a !important;
+    font-weight: 700 !important;
+    display: inline !important;
   }
 
   #printable-statement tr,
   #printable-invoice tr {
     page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 
   #printable-statement thead,
   #printable-invoice thead {
     display: table-header-group !important;
+  }
+
+  /* tfoot must appear ONLY ONCE at the end of the table on the last page, never repeated on page breaks */
+  #printable-statement tfoot,
+  #printable-invoice tfoot {
+    display: table-row-group !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 }
 

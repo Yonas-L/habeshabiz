@@ -105,11 +105,15 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
   const handleCopyPublicLink = () => {
     if (!statementData?.contact.statement_token) return;
     const origin = window.location.origin;
-    const url = `${origin}/statement/${statementData.contact.statement_token}`;
+    const params = new URLSearchParams();
+    if (statementData.range.start_date) params.set('start_date', statementData.range.start_date);
+    if (statementData.range.end_date) params.set('end_date', statementData.range.end_date);
+    const qs = params.toString();
+    const url = `${origin}/statement/${statementData.contact.statement_token}${qs ? `?${qs}` : ''}`;
     navigator.clipboard.writeText(url);
     setCopiedLink(true);
     toast.success('Public statement link copied to clipboard', {
-      description: 'Anyone with this secure link can view this verified read-only statement.',
+      description: 'Vendor will see this exact statement for the selected period.',
     });
     setTimeout(() => setCopiedLink(false), 2500);
   };
