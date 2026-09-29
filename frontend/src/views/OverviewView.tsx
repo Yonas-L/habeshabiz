@@ -11,9 +11,6 @@ import { DebtDrawer } from '../components/drawers/DebtDrawer';
 import { RecordExpenseModal } from '../components/RecordExpenseModal';
 import { RecordDebtModal } from '../components/debts/RecordDebtModal';
 import {
-  AlertCircle,
-  Clock,
-  ArrowRight,
   ChevronRight,
   TrendingUp,
   Plus,
@@ -22,7 +19,9 @@ import {
   Landmark,
   ArrowDownLeft,
   ArrowUpRight,
-  ShieldCheck,
+  ArrowDown,
+  ArrowUp,
+  Coins,
 } from 'lucide-react';
 
 interface OverviewViewProps {
@@ -48,6 +47,13 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [isDebtModalOpen, setIsDebtModalOpen] = useState(false);
   const [debtModalDefaultType, setDebtModalDefaultType] = useState<'receivable' | 'payable'>('receivable');
+  const [isBarAnimated, setIsBarAnimated] = useState(false);
+
+  useEffect(() => {
+    setIsBarAnimated(false);
+    const t = setTimeout(() => setIsBarAnimated(true), 100);
+    return () => clearTimeout(t);
+  }, [data]);
 
   useEffect(() => {
     if (user?.role === 'owner') {
@@ -78,11 +84,16 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   const { capital_overview, monthly_performance, counts, top_receivables, top_payables } = data;
   const canViewCost = user?.can_view_costs ?? false;
 
-  const receivableParties = counts.open_receivable_parties ?? counts.open_receivables;
-  const payableParties = counts.open_payable_parties ?? counts.open_payables;
+  /* ─── Gross assets and proportional breakdown for mobile visual bar ─── */
+  const grossAssets = (capital_overview.stock_value || 0) +
+    (capital_overview.cash_and_banks || 0) +
+    (capital_overview.receivables || 0) +
+    (capital_overview.custom_assets || 0);
 
-  const hasReceivablesAlert = counts.open_receivables > 0 && capital_overview.receivables > 0;
-  const hasPayablesAlert = counts.open_payables > 0 && capital_overview.payables > 0;
+  const stockPct = grossAssets > 0 ? Math.round(((capital_overview.stock_value || 0) / grossAssets) * 100) : 0;
+  const cashPct = grossAssets > 0 ? Math.round(((capital_overview.cash_and_banks || 0) / grossAssets) * 100) : 0;
+  const recPct = grossAssets > 0 ? Math.round(((capital_overview.receivables || 0) / grossAssets) * 100) : 0;
+  const assetPct = grossAssets > 0 ? Math.max(0, 100 - stockPct - cashPct - recPct) : 0;
 
   /* ─── Capital metrics for the unified strip ─── */
   const capitalMetrics: {
@@ -125,10 +136,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     },
     {
       key: 'reserves',
-      label: 'Reserves',
+      label: 'Other Assets',
       value: capital_overview.custom_assets,
       prefix: '',
-      icon: <ShieldCheck className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />,
+      icon: <Coins className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />,
       colorBg: 'bg-amber-50 dark:bg-amber-950/60',
       onClick: () => setSelectedVital('reserves'),
     },
@@ -147,48 +158,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   return (
     <div className="space-y-4">
 
-      {/* ── 1. Inline Alerts (only when action needed) ── */}
-      {(hasReceivablesAlert || hasPayablesAlert) && (
-        <div className="flex flex-col sm:flex-row flex-wrap gap-2 animate-stagger-1">
-          {hasReceivablesAlert && (
-            <button
-              onClick={() => setSelectedVital('receivables')}
-              className="w-full sm:w-auto inline-flex items-center justify-between sm:justify-start gap-2.5 px-3.5 py-2.5 sm:py-2 rounded-xl sm:rounded-lg bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-200/70 dark:border-emerald-800/50 text-emerald-900 dark:text-emerald-200 text-xs font-medium hover:border-emerald-300 dark:hover:border-emerald-600 transition-all active:scale-[0.99] cursor-pointer"
-            >
-              <div className="flex items-center gap-2 min-w-0">
-                <AlertCircle className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-                <span className="truncate">
-                  <span className="font-bold text-emerald-800 dark:text-emerald-300">Owed to you:</span>{' '}
-                  <span className="font-semibold">{receivableParties}</span> {receivableParties === 1 ? 'party owes' : 'parties owe'}{' '}
-                  <span className="font-mono font-bold text-emerald-950 dark:text-emerald-100">{capital_overview.receivables.toLocaleString()}</span> ETB
-                </span>
-              </div>
-              <ChevronRight className="w-3.5 h-3.5 opacity-60 shrink-0 sm:hidden" />
-              <ArrowRight className="w-3 h-3 opacity-50 shrink-0 hidden sm:block" />
-            </button>
-          )}
-
-          {hasPayablesAlert && (
-            <button
-              onClick={() => setSelectedVital('payables')}
-              className="w-full sm:w-auto inline-flex items-center justify-between sm:justify-start gap-2.5 px-3.5 py-2.5 sm:py-2 rounded-xl sm:rounded-lg bg-rose-50/70 dark:bg-rose-950/20 border border-rose-200/50 dark:border-rose-800/40 text-rose-800 dark:text-rose-300 text-xs font-medium hover:border-rose-300 dark:hover:border-rose-700 transition-all active:scale-[0.99] cursor-pointer"
-            >
-              <div className="flex items-center gap-2 min-w-0">
-                <Clock className="w-4 h-4 shrink-0 text-rose-600 dark:text-rose-400 opacity-80" />
-                <span className="truncate">
-                  <span className="font-bold text-rose-800 dark:text-rose-300">You owe:</span>{' '}
-                  <span className="font-semibold">{payableParties}</span> {payableParties === 1 ? 'party' : 'parties'}{' '}
-                  <span className="font-mono font-bold text-rose-900 dark:text-rose-200">{capital_overview.payables.toLocaleString()}</span> ETB
-                </span>
-              </div>
-              <ChevronRight className="w-3.5 h-3.5 opacity-60 shrink-0 sm:hidden" />
-              <ArrowRight className="w-3 h-3 opacity-50 shrink-0 hidden sm:block" />
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* ── 2. Capital Strip — single compact row on desktop, tactile native cards on mobile ── */}
+      {/* ── 1. Capital Strip — single compact row on desktop, tactile native cards on mobile ── */}
       {/* Desktop view (>= sm) */}
       <div className="hidden sm:grid sm:grid-cols-5 gap-px bg-slate-200/60 dark:bg-slate-800/50 rounded-xl overflow-hidden animate-stagger-2">
         {capitalMetrics.map((m) => (
@@ -208,34 +178,202 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         ))}
       </div>
 
-      {/* Mobile view (< sm) */}
-      <div className="grid grid-cols-2 gap-2 sm:hidden animate-stagger-2">
-        {capitalMetrics.map((m, idx) => (
-          <button
-            key={m.key}
-            onClick={m.onClick}
-            className={`p-3 rounded-2xl bg-white dark:bg-[#131926] border border-slate-200/70 dark:border-slate-800/70 shadow-2xs text-left active:scale-[0.98] transition-all flex flex-col justify-between cursor-pointer ${
-              idx === 4 ? 'col-span-2' : ''
-            }`}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                {m.label}
+      {/* ── Mobile Capital Hero + Action Cards (< sm) ── */}
+      <div className="sm:hidden space-y-2.5 animate-stagger-2">
+        {/* Working Capital Hero Card — Obsidian Black with Emerald Accents */}
+        <div className="rounded-2xl bg-slate-900 dark:bg-black p-4 border border-slate-800/90 dark:border-slate-800 shadow-sm text-white relative overflow-hidden">
+          {/* Subtle ambient emerald glow */}
+          <div className="absolute -top-12 -right-12 w-28 h-28 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
+
+          {/* Top header row */}
+          <div className="flex items-center justify-between relative z-10">
+            <div className="flex items-center gap-1.5">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
               </span>
-              <div className={`w-6 h-6 rounded-lg ${m.colorBg} flex items-center justify-center shrink-0`}>
-                {m.icon}
+              <span className="text-[10px] font-bold tracking-wider uppercase text-slate-400">
+                Working Capital
+              </span>
+            </div>
+          </div>
+
+          {/* Primary Balance */}
+          <div className="mt-2.5 relative z-10 flex items-baseline gap-1.5">
+            <span className="text-2xl font-extrabold font-mono tracking-tight text-white">
+              <AnimatedNumber value={capital_overview.net_capital} />
+            </span>
+            <span className="text-xs font-bold text-emerald-400 font-sans">ETB</span>
+          </div>
+
+          {/* Asset Allocation Proportional Distribution Bar — Fatter with smooth load animation */}
+          <div className="mt-3.5 relative z-10">
+            <div className="h-3.5 w-full rounded-full bg-white/10 overflow-hidden flex gap-1 p-0.5 shadow-inner">
+              {stockPct > 0 && (
+                <div
+                  style={{
+                    width: isBarAnimated ? `${stockPct}%` : '0%',
+                    transition: 'width 900ms cubic-bezier(0.16, 1, 0.3, 1)',
+                    transitionDelay: '40ms',
+                  }}
+                  className="h-full bg-slate-400 rounded-full"
+                  title={`Stock: ${stockPct}%`}
+                />
+              )}
+              {cashPct > 0 && (
+                <div
+                  style={{
+                    width: isBarAnimated ? `${cashPct}%` : '0%',
+                    transition: 'width 900ms cubic-bezier(0.16, 1, 0.3, 1)',
+                    transitionDelay: '90ms',
+                  }}
+                  className="h-full bg-blue-400 rounded-full"
+                  title={`Cash: ${cashPct}%`}
+                />
+              )}
+              {recPct > 0 && (
+                <div
+                  style={{
+                    width: isBarAnimated ? `${recPct}%` : '0%',
+                    transition: 'width 900ms cubic-bezier(0.16, 1, 0.3, 1)',
+                    transitionDelay: '140ms',
+                  }}
+                  className="h-full bg-emerald-400 rounded-full"
+                  title={`Receivables: ${recPct}%`}
+                />
+              )}
+              {assetPct > 0 && (
+                <div
+                  style={{
+                    width: isBarAnimated ? `${assetPct}%` : '0%',
+                    transition: 'width 900ms cubic-bezier(0.16, 1, 0.3, 1)',
+                    transitionDelay: '190ms',
+                  }}
+                  className="h-full bg-amber-400 rounded-full"
+                  title={`Other Assets: ${assetPct}%`}
+                />
+              )}
+            </div>
+
+            {/* Micro legend chips */}
+            <div className="flex items-center justify-between flex-wrap gap-y-1 text-[10px] text-slate-300 font-medium mt-2 pt-1.5 border-t border-white/10">
+              <div className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />
+                <span>Stock {stockPct}%</span>
               </div>
+              <div className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
+                <span>Cash {cashPct}%</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                <span>Owed {recPct}%</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                <span>Other {assetPct}%</span>
+              </div>
+              {capital_overview.payables > 0 && (
+                <div className="flex items-center gap-1 text-rose-400">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-400 shrink-0" />
+                  <span>Owe −{capital_overview.payables.toLocaleString()}</span>
+                </div>
+              )}
             </div>
-            <div className={`text-base font-bold font-mono tracking-tight ${m.accent || 'text-slate-900 dark:text-slate-100'}`}>
-              {m.prefix}<AnimatedNumber value={m.value} />
-              <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 ml-1 font-sans">ETB</span>
+          </div>
+        </div>
+
+        {/* Cardless Native Financial Action Row (< sm) */}
+        <div className="grid grid-cols-5 gap-1.5 pt-1.5 pb-1">
+          {/* 1. Stock */}
+          <button
+            onClick={() => setSelectedVital('inventory')}
+            className="flex flex-col items-center text-center group cursor-pointer active:scale-90 transition-transform"
+            title={`Stock: ${capital_overview.stock_value.toLocaleString()} ETB`}
+          >
+            <div className="w-13 h-13 rounded-2xl bg-slate-900 dark:bg-black border border-slate-800/80 dark:border-slate-800 shadow-xs flex items-center justify-center text-emerald-400 group-hover:bg-slate-800 dark:group-hover:bg-slate-900 transition-colors mx-auto">
+              <Package className="w-7 h-7 text-emerald-400 stroke-[2]" />
             </div>
+            <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-1.5 truncate max-w-full block">
+              Stock
+            </span>
+            <span className="text-[10px] sm:text-[11px] font-bold font-mono tracking-tight text-slate-900 dark:text-slate-100 mt-0.5 truncate max-w-full block">
+              <AnimatedNumber value={capital_overview.stock_value} />
+            </span>
           </button>
-        ))}
+
+          {/* 2. Bank */}
+          <button
+            onClick={() => setSelectedVital('cash')}
+            className="flex flex-col items-center text-center group cursor-pointer active:scale-90 transition-transform"
+            title={`Bank: ${capital_overview.cash_and_banks.toLocaleString()} ETB`}
+          >
+            <div className="w-13 h-13 rounded-2xl bg-slate-900 dark:bg-black border border-slate-800/80 dark:border-slate-800 shadow-xs flex items-center justify-center text-emerald-400 group-hover:bg-slate-800 dark:group-hover:bg-slate-900 transition-colors mx-auto">
+              <Landmark className="w-7 h-7 text-emerald-400 stroke-[2]" />
+            </div>
+            <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-1.5 truncate max-w-full block">
+              Bank
+            </span>
+            <span className="text-[10px] sm:text-[11px] font-bold font-mono tracking-tight text-slate-900 dark:text-slate-100 mt-0.5 truncate max-w-full block">
+              <AnimatedNumber value={capital_overview.cash_and_banks} />
+            </span>
+          </button>
+
+          {/* 3. Owed to You (green down arrow) */}
+          <button
+            onClick={() => setSelectedVital('receivables')}
+            className="flex flex-col items-center text-center group cursor-pointer active:scale-90 transition-transform"
+            title={`Owed to You: ${capital_overview.receivables.toLocaleString()} ETB`}
+          >
+            <div className="w-13 h-13 rounded-2xl bg-slate-900 dark:bg-black border border-slate-800/80 dark:border-slate-800 shadow-xs flex items-center justify-center text-emerald-400 group-hover:bg-slate-800 dark:group-hover:bg-slate-900 transition-colors mx-auto">
+              <ArrowDown className="w-7 h-7 text-emerald-400 stroke-[2.2]" />
+            </div>
+            <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-1.5 truncate max-w-full block">
+              Owed
+            </span>
+            <span className="text-[10px] sm:text-[11px] font-bold font-mono tracking-tight text-emerald-600 dark:text-emerald-400 mt-0.5 truncate max-w-full block">
+              +<AnimatedNumber value={capital_overview.receivables} />
+            </span>
+          </button>
+
+          {/* 4. You Owe (red up arrow) */}
+          <button
+            onClick={() => setSelectedVital('payables')}
+            className="flex flex-col items-center text-center group cursor-pointer active:scale-90 transition-transform"
+            title={`You Owe: ${capital_overview.payables.toLocaleString()} ETB`}
+          >
+            <div className="w-13 h-13 rounded-2xl bg-slate-900 dark:bg-black border border-slate-800/80 dark:border-slate-800 shadow-xs flex items-center justify-center text-emerald-400 group-hover:bg-slate-800 dark:group-hover:bg-slate-900 transition-colors mx-auto">
+              <ArrowUp className="w-7 h-7 text-emerald-400 stroke-[2.2]" />
+            </div>
+            <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-1.5 truncate max-w-full block">
+              You Owe
+            </span>
+            <span className="text-[10px] sm:text-[11px] font-bold font-mono tracking-tight text-rose-600 dark:text-rose-400 mt-0.5 truncate max-w-full block">
+              −<AnimatedNumber value={capital_overview.payables} />
+            </span>
+          </button>
+
+          {/* 5. Other Assets */}
+          <button
+            onClick={() => setSelectedVital('reserves')}
+            className="flex flex-col items-center text-center group cursor-pointer active:scale-90 transition-transform"
+            title={`Other Assets: ${capital_overview.custom_assets.toLocaleString()} ETB`}
+          >
+            <div className="w-13 h-13 rounded-2xl bg-slate-900 dark:bg-black border border-slate-800/80 dark:border-slate-800 shadow-xs flex items-center justify-center text-emerald-400 group-hover:bg-slate-800 dark:group-hover:bg-slate-900 transition-colors mx-auto">
+              <Coins className="w-7 h-7 text-emerald-400 stroke-[2]" />
+            </div>
+            <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-1.5 truncate max-w-full block">
+              Other
+            </span>
+            <span className="text-[10px] sm:text-[11px] font-bold font-mono tracking-tight text-slate-900 dark:text-slate-100 mt-0.5 truncate max-w-full block">
+              <AnimatedNumber value={capital_overview.custom_assets} />
+            </span>
+          </button>
+        </div>
       </div>
 
-      {/* ── 3. Charts — Sales trajectory + Capital allocation, side by side ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 animate-stagger-3">
+      {/* ── 3. Charts — Sales trajectory + Capital allocation, visible ONLY on desktop ── */}
+      <div className="hidden sm:grid grid-cols-1 lg:grid-cols-12 gap-4 animate-stagger-3">
         <div className="lg:col-span-7 bg-white dark:bg-[#131926] rounded-2xl sm:rounded-xl border border-slate-200/60 dark:border-slate-800/60 p-4 sm:p-5">
           <InteractiveSalesWaveChart
             data={data.sales_chart || []}
@@ -245,7 +383,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           />
         </div>
 
-        <div className="lg:col-span-5 bg-white dark:bg-[#131926] rounded-2xl sm:rounded-xl border border-slate-200/60 dark:border-slate-800/60 p-4 sm:p-5 flex flex-col justify-between">
+        {/* Asset Allocation Donut Chart — visible on desktop (lg), hidden on mobile where it's shown above */}
+        <div className="hidden lg:flex lg:col-span-5 bg-white dark:bg-[#131926] rounded-2xl sm:rounded-xl border border-slate-200/60 dark:border-slate-800/60 p-4 sm:p-5 flex-col justify-between">
           <div>
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800/60 mb-3.5">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
@@ -318,13 +457,16 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           </div>
         </div>
 
-        <div className={`grid grid-cols-2 ${canViewCost ? 'sm:grid-cols-3 lg:grid-cols-5' : 'sm:grid-cols-3'} gap-2.5 sm:gap-6 pt-4`}>
+        <div className={`grid grid-cols-2 ${canViewCost ? 'sm:grid-cols-3 lg:grid-cols-5' : 'sm:grid-cols-3'} gap-2 sm:gap-6 pt-3.5`}>
           {/* Revenue */}
-          <div className="p-3 sm:p-0 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 sm:bg-transparent border border-slate-100/90 dark:border-slate-800/60 sm:border-0 flex flex-col justify-between">
-            <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 block">
-              Revenue
-            </span>
-            <div className="text-lg sm:text-2xl font-bold font-mono tracking-tight text-slate-900 dark:text-white mt-1">
+          <div className="p-3 sm:p-0 rounded-2xl sm:rounded-none bg-slate-50/80 dark:bg-[#0c1017] sm:bg-transparent border border-slate-200/60 dark:border-slate-800/80 sm:border-0 flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                Revenue
+              </span>
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-400 sm:hidden" />
+            </div>
+            <div className="text-base sm:text-2xl font-bold font-mono tracking-tight text-slate-900 dark:text-white mt-1.5">
               <AnimatedNumber value={monthly_performance.revenue} />
               <span className="text-[10px] sm:text-xs font-medium text-slate-400 dark:text-slate-500 ml-1 font-sans">ETB</span>
             </div>
@@ -334,16 +476,19 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           </div>
 
           {canViewCost && (
-            <div className="p-3 sm:p-0 rounded-xl bg-emerald-50/40 dark:bg-emerald-950/20 sm:bg-transparent border border-emerald-100/80 dark:border-emerald-900/30 sm:border-0 flex flex-col justify-between">
-              <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 block">
-                Gross Margin
-              </span>
-              <div className="text-lg sm:text-2xl font-bold font-mono tracking-tight text-emerald-700 dark:text-emerald-400 mt-1">
+            <div className="p-3 sm:p-0 rounded-2xl sm:rounded-none bg-slate-50/80 dark:bg-[#0c1017] sm:bg-transparent border border-slate-200/60 dark:border-slate-800/80 sm:border-0 flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                  Gross Margin
+                </span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 sm:hidden" />
+              </div>
+              <div className="text-base sm:text-2xl font-bold font-mono tracking-tight text-emerald-700 dark:text-emerald-400 mt-1.5">
                 +<AnimatedNumber value={monthly_performance.gross_profit} />
                 <span className="text-[10px] sm:text-xs font-medium text-emerald-600/70 dark:text-emerald-400/70 ml-1 font-sans">ETB</span>
               </div>
               <span className="text-[10px] text-emerald-600/80 dark:text-emerald-500/80 mt-1 block">
-                Sales minus unit cost
+                Sales − unit cost
               </span>
             </div>
           )}
@@ -352,48 +497,54 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           <button
             onClick={() => setIsExpenseModalOpen(true)}
             title="Click to record an expense or personal draw"
-            className="p-3 sm:p-0 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 sm:bg-transparent border border-slate-100/90 dark:border-slate-800/60 sm:border-0 text-left group cursor-pointer sm:-m-2 sm:p-2 sm:rounded-xl hover:bg-slate-100/80 dark:hover:bg-slate-800/60 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/30 active:scale-[0.98] sm:active:scale-100 flex flex-col justify-between"
+            className="p-3 sm:p-0 rounded-2xl sm:rounded-none bg-slate-50/80 dark:bg-[#0c1017] sm:bg-transparent border border-slate-200/60 dark:border-slate-800/80 sm:border-0 text-left group cursor-pointer sm:-m-2 sm:p-2 sm:rounded-xl hover:bg-slate-100/80 dark:hover:bg-slate-800/60 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/30 active:scale-[0.98] sm:active:scale-100 flex flex-col justify-between"
           >
             <div className="flex items-center justify-between">
-              <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 group-hover:text-slate-700 dark:group-hover:text-slate-300 transition-colors">
+              <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 group-hover:text-slate-700 dark:group-hover:text-slate-300 transition-colors">
                 Expenses
               </span>
-              <span className="text-[9px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded sm:hidden flex items-center gap-0.5">
+              <span className="text-[9px] font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 px-1.5 py-0.5 rounded-md sm:hidden flex items-center gap-0.5">
                 <Plus className="w-2.5 h-2.5" /> Record
               </span>
             </div>
-            <div className="text-lg sm:text-2xl font-bold font-mono tracking-tight text-slate-800 dark:text-slate-200 mt-1">
+            <div className="text-base sm:text-2xl font-bold font-mono tracking-tight text-slate-800 dark:text-slate-200 mt-1.5">
               −<AnimatedNumber value={monthly_performance.operating_expenses} />
               <span className="text-[10px] sm:text-xs font-medium text-slate-400 dark:text-slate-500 ml-1 font-sans">ETB</span>
             </div>
             <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 block group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-              Rent, ride, food · <span className="underline decoration-dotted sm:inline hidden">Record +</span>
+              Rent, ride, bills · <span className="underline decoration-dotted sm:inline hidden">Record +</span>
             </span>
           </button>
 
           {canViewCost && (
-            <div className="p-3 sm:p-0 rounded-xl bg-emerald-50/40 dark:bg-emerald-950/20 sm:bg-transparent border border-emerald-100/80 dark:border-emerald-900/30 sm:border-0 flex flex-col justify-between">
-              <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 block">
-                Net Profit
-              </span>
-              <div className="text-lg sm:text-2xl font-bold font-mono tracking-tight text-emerald-700 dark:text-emerald-400 mt-1">
+            <div className="p-3 sm:p-0 rounded-2xl sm:rounded-none bg-slate-50/80 dark:bg-[#0c1017] sm:bg-transparent border border-slate-200/60 dark:border-slate-800/80 sm:border-0 flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                  Net Profit
+                </span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 sm:hidden" />
+              </div>
+              <div className="text-base sm:text-2xl font-bold font-mono tracking-tight text-emerald-700 dark:text-emerald-400 mt-1.5">
                 +<AnimatedNumber value={monthly_performance.net_profit} />
                 <span className="text-[10px] sm:text-xs font-medium text-emerald-600/70 dark:text-emerald-400/70 ml-1 font-sans">ETB</span>
               </div>
               <span className="text-[10px] text-emerald-600/80 dark:text-emerald-500/80 mt-1 block">
-                Clean operating profit
+                Operating profit
               </span>
             </div>
           )}
 
           {/* Draws */}
-          <div className={`p-3 sm:p-0 rounded-xl bg-purple-50/40 dark:bg-purple-950/20 sm:bg-transparent border border-purple-100/80 dark:border-purple-900/30 sm:border-0 flex flex-col justify-between ${
+          <div className={`p-3 sm:p-0 rounded-2xl sm:rounded-none bg-slate-50/80 dark:bg-[#0c1017] sm:bg-transparent border border-slate-200/60 dark:border-slate-800/80 sm:border-0 flex flex-col justify-between ${
             canViewCost ? 'col-span-2 sm:col-span-1' : ''
           }`}>
-            <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-purple-600 dark:text-purple-400 block">
-              Owner Draws
-            </span>
-            <div className="text-lg sm:text-2xl font-bold font-mono tracking-tight text-purple-700 dark:text-purple-300 mt-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">
+                Owner Draws
+              </span>
+              <span className="w-1.5 h-1.5 rounded-full bg-purple-500 sm:hidden" />
+            </div>
+            <div className="text-base sm:text-2xl font-bold font-mono tracking-tight text-purple-700 dark:text-purple-300 mt-1.5">
               <AnimatedNumber value={monthly_performance.owner_draws} />
               <span className="text-[10px] sm:text-xs font-medium text-purple-400 ml-1 font-sans">ETB</span>
             </div>
@@ -405,15 +556,12 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       </div>
 
       {/* ── 5. Debt Ledgers — compact side-by-side tables ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-stagger-5">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5 sm:gap-4 animate-stagger-5">
         {/* Receivables */}
-        <div className="bg-white dark:bg-[#131926] rounded-2xl sm:rounded-xl border border-slate-200/60 dark:border-slate-800/60 p-4">
-          <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100 dark:border-slate-800/60">
+        <div className="bg-white dark:bg-[#131926] rounded-2xl sm:rounded-xl border border-slate-200/80 dark:border-slate-800/80 p-3.5 sm:p-4 shadow-xs">
+          <div className="flex items-center justify-between mb-2.5 pb-2.5 border-b border-slate-100 dark:border-slate-800/60">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-slate-900 dark:text-white">Owed to You</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-800/50">
-                +{capital_overview.receivables.toLocaleString()} ETB
-              </span>
+              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">Owed to You</span>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -438,22 +586,22 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           </div>
 
           {top_receivables.length === 0 ? (
-            <div className="py-6 text-center text-xs text-slate-400 dark:text-slate-500">
+            <div className="py-6 text-center text-xs text-slate-400 dark:text-slate-500 bg-slate-50/50 dark:bg-[#0c1017]/40 sm:bg-transparent rounded-xl border border-dashed border-slate-200/60 dark:border-slate-800/60 sm:border-0">
               No outstanding receivables
             </div>
           ) : (
-            <div className="space-y-1">
+            <div className="space-y-1.5 sm:space-y-1">
               {top_receivables.map((debt) => (
                 <button
                   key={debt.id}
                   onClick={() => setSelectedDebt(debt)}
-                  className="w-full flex items-center justify-between min-h-[44px] py-2 px-2.5 sm:px-2 rounded-xl sm:rounded-lg text-xs hover:bg-slate-50 dark:hover:bg-slate-800/40 active:bg-slate-100 dark:active:bg-slate-800/70 transition-all group text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 cursor-pointer"
+                  className="w-full flex items-center justify-between min-h-[46px] p-2.5 sm:py-2 sm:px-2 rounded-xl sm:rounded-lg text-xs bg-slate-50/70 dark:bg-[#0c1017]/70 sm:bg-transparent border border-slate-100/90 dark:border-slate-800/70 sm:border-0 hover:bg-slate-100/80 dark:hover:bg-slate-800/60 sm:hover:bg-slate-50 sm:dark:hover:bg-slate-800/40 active:scale-[0.99] sm:active:scale-100 transition-all group text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 cursor-pointer"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div className={`w-8 h-8 sm:w-7 sm:h-7 rounded-xl sm:rounded-lg font-semibold flex items-center justify-center text-[10px] uppercase shrink-0 border ${
                       debt.reference_type === 'handover_holding'
                         ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border-amber-200/60 dark:border-amber-800/50'
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-transparent'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200/60 dark:border-slate-700/60'
                     }`}>
                       {debt.reference_type === 'handover_holding' ? 'HH' : (debt.contact?.name?.slice(0, 2) || 'CU')}
                     </div>
@@ -476,10 +624,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0 pl-2">
-                    <span className="font-semibold text-emerald-600 dark:text-emerald-400 font-mono">
+                    <span className="font-semibold text-emerald-600 dark:text-emerald-400 font-mono tracking-tight">
                       +{Number(debt.remaining_amount).toLocaleString()}
                     </span>
-                    <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all" />
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0" />
                   </div>
                 </button>
               ))}
@@ -488,13 +636,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         </div>
 
         {/* Payables */}
-        <div className="bg-white dark:bg-[#131926] rounded-2xl sm:rounded-xl border border-slate-200/60 dark:border-slate-800/60 p-4">
-          <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100 dark:border-slate-800/60">
+        <div className="bg-white dark:bg-[#131926] rounded-2xl sm:rounded-xl border border-slate-200/80 dark:border-slate-800/80 p-3.5 sm:p-4 shadow-xs">
+          <div className="flex items-center justify-between mb-2.5 pb-2.5 border-b border-slate-100 dark:border-slate-800/60">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-slate-900 dark:text-white">You Owe</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-bold bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-200/50 dark:border-rose-800/50">
-                −{capital_overview.payables.toLocaleString()} ETB
-              </span>
+              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">You Owe</span>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -519,30 +664,35 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           </div>
 
           {top_payables.length === 0 ? (
-            <div className="py-6 text-center text-xs text-slate-400 dark:text-slate-500">
-              All settled
+            <div className="py-6 text-center text-xs text-slate-400 dark:text-slate-500 bg-slate-50/50 dark:bg-[#0c1017]/40 sm:bg-transparent rounded-xl border border-dashed border-slate-200/60 dark:border-slate-800/60 sm:border-0">
+              No outstanding payables
             </div>
           ) : (
-            <div className="space-y-0.5">
+            <div className="space-y-1.5 sm:space-y-1">
               {top_payables.map((debt) => (
                 <button
                   key={debt.id}
                   onClick={() => setSelectedDebt(debt)}
-                  className="w-full flex items-center justify-between min-h-[44px] py-2 px-2.5 sm:px-2 rounded-xl sm:rounded-lg text-xs hover:bg-slate-50 dark:hover:bg-slate-800/40 active:bg-slate-100 dark:active:bg-slate-800/70 transition-all group text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/40 cursor-pointer"
+                  className="w-full flex items-center justify-between min-h-[46px] p-2.5 sm:py-2 sm:px-2 rounded-xl sm:rounded-lg text-xs bg-slate-50/70 dark:bg-[#0c1017]/70 sm:bg-transparent border border-slate-100/90 dark:border-slate-800/70 sm:border-0 hover:bg-slate-100/80 dark:hover:bg-slate-800/60 sm:hover:bg-slate-50 sm:dark:hover:bg-slate-800/40 active:scale-[0.99] sm:active:scale-100 transition-all group text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/40 cursor-pointer"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-8 h-8 sm:w-7 sm:h-7 rounded-xl sm:rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold flex items-center justify-center text-[10px] uppercase shrink-0">
+                    <div className="w-8 h-8 sm:w-7 sm:h-7 rounded-xl sm:rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold flex items-center justify-center text-[10px] uppercase shrink-0 border border-slate-200/60 dark:border-slate-700/60">
                       {debt.contact?.name?.slice(0, 2) || 'SP'}
                     </div>
-                    <span className="font-medium text-slate-700 dark:text-slate-300 truncate">
-                      {debt.contact?.name}
-                    </span>
+                    <div className="truncate">
+                      <span className="font-semibold text-slate-900 dark:text-white truncate block">
+                        {debt.contact?.name}
+                      </span>
+                      <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
+                        {debt.notes || 'Supplier payable balance'}
+                      </div>
+                    </div>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0 pl-2">
-                    <span className="font-semibold text-rose-600/80 dark:text-rose-400/70 font-mono">
+                    <span className="font-semibold text-rose-600 dark:text-rose-400 font-mono tracking-tight">
                       −{Number(debt.remaining_amount).toLocaleString()}
                     </span>
-                    <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all" />
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0" />
                   </div>
                 </button>
               ))}

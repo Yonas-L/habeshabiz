@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AnimatedNumber } from './AnimatedNumber';
+import { BarChart3, LineChart } from 'lucide-react';
 
 
 export interface DataPoint {
@@ -25,6 +26,7 @@ export const InteractiveSalesWaveChart: React.FC<{
 }) => {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const [metric, setMetric] = useState<'revenue' | 'profit'>('revenue');
+  const [chartType, setChartType] = useState<'wave' | 'bar'>('wave');
   const [isLoaded, setIsLoaded] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const touchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -36,7 +38,7 @@ export const InteractiveSalesWaveChart: React.FC<{
       return () => clearTimeout(t);
     });
     return () => cancelAnimationFrame(raf);
-  }, [data, metric]);
+  }, [data, metric, chartType]);
 
   const width = 640;
   const height = 180;
@@ -117,7 +119,7 @@ export const InteractiveSalesWaveChart: React.FC<{
             <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
               {activePoint !== null
                 ? `${activePoint.day} ${metric === 'revenue' ? 'Sales' : 'Margin'}`
-                : (metric === 'revenue' ? 'Monthly Sales Trajectory' : 'Gross Margin Trend')}
+                : (metric === 'revenue' ? 'Sales Trajectory' : 'Gross Margin Trend')}
             </span>
             {activePoint !== null && (
               <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium">
@@ -131,37 +133,66 @@ export const InteractiveSalesWaveChart: React.FC<{
           </div>
         </div>
 
-        {/* Metric Selector Pills */}
-        {canViewCost && (
-          <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl text-xs font-medium self-start sm:self-auto shadow-2xs">
+        {/* View Switcher: Bar vs Wave & Metric Selector Pills */}
+        <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+          {/* Chart View Toggle: Bar vs Wave */}
+          <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl text-xs shadow-2xs">
             <button
-              onClick={() => {
-                setMetric('revenue');
-                setHoverIndex(null);
-              }}
-              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                metric === 'revenue'
-                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs font-bold'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              onClick={() => setChartType('bar')}
+              title="Bar Chart Histogram"
+              className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                chartType === 'bar'
+                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                  : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
               }`}
             >
-              Gross Sales
+              <BarChart3 className="w-3.5 h-3.5" />
             </button>
             <button
-              onClick={() => {
-                setMetric('profit');
-                setHoverIndex(null);
-              }}
-              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                metric === 'profit'
-                  ? 'bg-white dark:bg-slate-700 text-emerald-700 dark:text-emerald-400 shadow-xs font-bold'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              onClick={() => setChartType('wave')}
+              title="Wave Area Curve"
+              className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                chartType === 'wave'
+                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                  : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
               }`}
             >
-              Gross Margin
+              <LineChart className="w-3.5 h-3.5" />
             </button>
           </div>
-        )}
+
+          {/* Metric Selector Pills */}
+          {canViewCost && (
+            <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl text-xs font-medium shadow-2xs">
+              <button
+                onClick={() => {
+                  setMetric('revenue');
+                  setHoverIndex(null);
+                }}
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                  metric === 'revenue'
+                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs font-bold'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                Sales
+              </button>
+              <button
+                onClick={() => {
+                  setMetric('profit');
+                  setHoverIndex(null);
+                }}
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                  metric === 'profit'
+                    ? 'bg-white dark:bg-slate-700 text-emerald-700 dark:text-emerald-400 shadow-xs font-bold'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                Margin
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* SVG Canvas Container */}
@@ -232,8 +263,8 @@ export const InteractiveSalesWaveChart: React.FC<{
             strokeWidth="1"
           />
 
-          {/* Shaded Area */}
-          {areaPath && (
+          {/* Wave Mode: Shaded Area */}
+          {chartType === 'wave' && areaPath && (
             <path
               d={areaPath}
               fill={metric === 'revenue' ? 'url(#indigoWave)' : 'url(#emeraldWave)'}
@@ -245,8 +276,8 @@ export const InteractiveSalesWaveChart: React.FC<{
             />
           )}
 
-          {/* Bezier Stroke Curve */}
-          {curvePath && (
+          {/* Wave Mode: Bezier Stroke Curve */}
+          {chartType === 'wave' && curvePath && (
             <path
               d={curvePath}
               fill="none"
@@ -263,8 +294,8 @@ export const InteractiveSalesWaveChart: React.FC<{
             />
           )}
 
-          {/* Interactive Guides & Points */}
-          {points.map((pt, i) => (
+          {/* Wave Mode: Interactive Guides & Points */}
+          {chartType === 'wave' && points.map((pt, i) => (
             <g key={i}>
               {hoverIndex === i && (
                 <line
@@ -295,6 +326,49 @@ export const InteractiveSalesWaveChart: React.FC<{
               />
             </g>
           ))}
+
+          {/* Bar Mode: Interactive Modern Rounded Bar Columns */}
+          {chartType === 'bar' && points.map((pt, i) => {
+            const barCount = Math.max(points.length, 1);
+            const barW = Math.max(6, Math.min(22, (chartW / barCount) * 0.72));
+            const barH = Math.max(4, (pt.val / maxVal) * chartH);
+            const barY = height - padY - barH;
+            const barX = pt.x - barW / 2;
+            const isHovered = hoverIndex === i;
+            const isRev = metric === 'revenue';
+
+            return (
+              <g key={i}>
+                {isHovered && (
+                  <line
+                    x1={pt.x}
+                    y1={padY}
+                    x2={pt.x}
+                    y2={height - padY}
+                    stroke="#94a3b8"
+                    strokeWidth="1"
+                    strokeDasharray="3 3"
+                    className="opacity-70"
+                  />
+                )}
+                <rect
+                  x={barX}
+                  y={isLoaded ? barY : height - padY}
+                  width={barW}
+                  height={isLoaded ? barH : 0}
+                  rx={Math.min(barW / 2.5, 4)}
+                  fill={isHovered ? (isRev ? '#6366f1' : '#10b981') : (isRev ? '#818cf8' : '#34d399')}
+                  opacity={hoverIndex === null ? 0.85 : isHovered ? 1 : 0.35}
+                  style={{
+                    transition: 'all 280ms cubic-bezier(0.16, 1, 0.3, 1)',
+                  }}
+                  className="cursor-pointer"
+                  onMouseEnter={() => setHoverIndex(i)}
+                  onMouseLeave={() => setHoverIndex(null)}
+                />
+              </g>
+            );
+          })}
         </svg>
 
         {/* Floating Tooltip Pill */}
@@ -429,7 +503,8 @@ export const DonutCapitalChart: React.FC<{
   assets: number;
   payables?: number;
   netCapital: number;
-}> = ({ stock, receivables, treasury, assets, payables = 0, netCapital }) => {
+  showLegend?: boolean;
+}> = ({ stock, receivables, treasury, assets, payables = 0, netCapital, showLegend = true }) => {
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
@@ -460,9 +535,9 @@ export const DonutCapitalChart: React.FC<{
   const payableOffset = circum * (stockPct + recPct + treasPct + assetPct);
 
   return (
-    <div className="flex flex-col sm:flex-row lg:flex-col xl:flex-row items-center justify-center gap-5 sm:gap-6">
+    <div className={showLegend ? "flex flex-col sm:flex-row lg:flex-col xl:flex-row items-center justify-center gap-5 sm:gap-6" : "flex items-center justify-center"}>
       {/* SVG Ring (Enlarged) */}
-      <div className="relative w-44 h-44 sm:w-48 sm:h-48 shrink-0">
+      <div className={`relative ${showLegend ? 'w-44 h-44 sm:w-48 sm:h-48' : 'w-40 h-40 sm:w-44 sm:h-44'} shrink-0`}>
         <svg
           viewBox="0 0 160 160"
           className="w-full h-full transition-all duration-1000 ease-out"
@@ -578,68 +653,70 @@ export const DonutCapitalChart: React.FC<{
         </div>
       </div>
 
-      {/* Legend Grid */}
-      <div className="grid grid-cols-2 gap-2 sm:gap-x-4 sm:gap-y-3 text-xs w-full">
-        <div className="flex items-start gap-2 p-2 sm:p-0 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 sm:bg-transparent border border-slate-100 dark:border-slate-800/50 sm:border-0">
-          <span className="w-2.5 h-2.5 rounded-full bg-slate-500 shrink-0 mt-1 sm:mt-0.5" />
-          <div className="min-w-0 flex-1">
-            <span className="text-slate-400 dark:text-slate-500 block text-[10px] font-medium truncate">
-              Stock ({(stockPct * 100).toFixed(0)}%)
-            </span>
-            <span className="font-bold text-slate-900 dark:text-slate-100 font-mono text-xs truncate block mt-0.5">
-              <AnimatedNumber value={stock} /> <span className="text-[10px] font-normal text-slate-400">ETB</span>
-            </span>
+      {/* Legend Grid (only when showLegend is true) */}
+      {showLegend && (
+        <div className="grid grid-cols-2 gap-2 sm:gap-x-4 sm:gap-y-3 text-xs w-full">
+          <div className="flex items-start gap-2 p-2 sm:p-0 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 sm:bg-transparent border border-slate-100 dark:border-slate-800/50 sm:border-0">
+            <span className="w-2.5 h-2.5 rounded-full bg-slate-500 shrink-0 mt-1 sm:mt-0.5" />
+            <div className="min-w-0 flex-1">
+              <span className="text-slate-400 dark:text-slate-500 block text-[10px] font-medium truncate">
+                Stock ({(stockPct * 100).toFixed(0)}%)
+              </span>
+              <span className="font-bold text-slate-900 dark:text-slate-100 font-mono text-xs truncate block mt-0.5">
+                <AnimatedNumber value={stock} /> <span className="text-[10px] font-normal text-slate-400">ETB</span>
+              </span>
+            </div>
           </div>
-        </div>
 
-        <div className="flex items-start gap-2 p-2 sm:p-0 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 sm:bg-transparent border border-slate-100 dark:border-slate-800/50 sm:border-0">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0 mt-1 sm:mt-0.5" />
-          <div className="min-w-0 flex-1">
-            <span className="text-slate-400 dark:text-slate-500 block text-[10px] font-medium truncate">
-              Receivables ({(recPct * 100).toFixed(0)}%)
-            </span>
-            <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono text-xs truncate block mt-0.5">
-              +<AnimatedNumber value={receivables} /> <span className="text-[10px] font-normal text-slate-400">ETB</span>
-            </span>
+          <div className="flex items-start gap-2 p-2 sm:p-0 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 sm:bg-transparent border border-slate-100 dark:border-slate-800/50 sm:border-0">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0 mt-1 sm:mt-0.5" />
+            <div className="min-w-0 flex-1">
+              <span className="text-slate-400 dark:text-slate-500 block text-[10px] font-medium truncate">
+                Receivables ({(recPct * 100).toFixed(0)}%)
+              </span>
+              <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono text-xs truncate block mt-0.5">
+                +<AnimatedNumber value={receivables} /> <span className="text-[10px] font-normal text-slate-400">ETB</span>
+              </span>
+            </div>
           </div>
-        </div>
 
-        <div className="flex items-start gap-2 p-2 sm:p-0 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 sm:bg-transparent border border-slate-100 dark:border-slate-800/50 sm:border-0">
-          <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0 mt-1 sm:mt-0.5" />
-          <div className="min-w-0 flex-1">
-            <span className="text-slate-400 dark:text-slate-500 block text-[10px] font-medium truncate">
-              Cash ({(treasPct * 100).toFixed(0)}%)
-            </span>
-            <span className="font-bold text-slate-900 dark:text-slate-100 font-mono text-xs truncate block mt-0.5">
-              +<AnimatedNumber value={treasury} /> <span className="text-[10px] font-normal text-slate-400">ETB</span>
-            </span>
+          <div className="flex items-start gap-2 p-2 sm:p-0 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 sm:bg-transparent border border-slate-100 dark:border-slate-800/50 sm:border-0">
+            <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0 mt-1 sm:mt-0.5" />
+            <div className="min-w-0 flex-1">
+              <span className="text-slate-400 dark:text-slate-500 block text-[10px] font-medium truncate">
+                Cash ({(treasPct * 100).toFixed(0)}%)
+              </span>
+              <span className="font-bold text-slate-900 dark:text-slate-100 font-mono text-xs truncate block mt-0.5">
+                +<AnimatedNumber value={treasury} /> <span className="text-[10px] font-normal text-slate-400">ETB</span>
+              </span>
+            </div>
           </div>
-        </div>
 
-        <div className="flex items-start gap-2 p-2 sm:p-0 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 sm:bg-transparent border border-slate-100 dark:border-slate-800/50 sm:border-0">
-          <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0 mt-1 sm:mt-0.5" />
-          <div className="min-w-0 flex-1">
-            <span className="text-slate-400 dark:text-slate-500 block text-[10px] font-medium truncate">
-              Gold/FX ({(assetPct * 100).toFixed(0)}%)
-            </span>
-            <span className="font-bold text-slate-900 dark:text-slate-100 font-mono text-xs truncate block mt-0.5">
-              +<AnimatedNumber value={assets} /> <span className="text-[10px] font-normal text-slate-400">ETB</span>
-            </span>
+          <div className="flex items-start gap-2 p-2 sm:p-0 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 sm:bg-transparent border border-slate-100 dark:border-slate-800/50 sm:border-0">
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0 mt-1 sm:mt-0.5" />
+            <div className="min-w-0 flex-1">
+              <span className="text-slate-400 dark:text-slate-500 block text-[10px] font-medium truncate">
+                Other Assets ({(assetPct * 100).toFixed(0)}%)
+              </span>
+              <span className="font-bold text-slate-900 dark:text-slate-100 font-mono text-xs truncate block mt-0.5">
+                +<AnimatedNumber value={assets} /> <span className="text-[10px] font-normal text-slate-400">ETB</span>
+              </span>
+            </div>
           </div>
-        </div>
 
-        <div className="flex items-start gap-2 p-2 sm:p-0 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 sm:bg-transparent border border-slate-100 dark:border-slate-800/50 sm:border-0 col-span-2 sm:col-span-1">
-          <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0 mt-1 sm:mt-0.5" />
-          <div className="min-w-0 flex-1">
-            <span className="text-slate-400 dark:text-slate-500 block text-[10px] font-medium truncate">
-              Payables ({payables > 0 ? (payablePct * 100).toFixed(0) : '0'}%)
-            </span>
-            <span className="font-bold text-rose-600 dark:text-rose-400 font-mono text-xs truncate block mt-0.5">
-              −<AnimatedNumber value={payables} /> <span className="text-[10px] font-normal text-slate-400">ETB</span>
-            </span>
+          <div className="flex items-start gap-2 p-2 sm:p-0 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 sm:bg-transparent border border-slate-100 dark:border-slate-800/50 sm:border-0 col-span-2 sm:col-span-1">
+            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0 mt-1 sm:mt-0.5" />
+            <div className="min-w-0 flex-1">
+              <span className="text-slate-400 dark:text-slate-500 block text-[10px] font-medium truncate">
+                Payables ({payables > 0 ? (payablePct * 100).toFixed(0) : '0'}%)
+              </span>
+              <span className="font-bold text-rose-600 dark:text-rose-400 font-mono text-xs truncate block mt-0.5">
+                −<AnimatedNumber value={payables} /> <span className="text-[10px] font-normal text-slate-400">ETB</span>
+              </span>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

@@ -91,12 +91,12 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
       actionLabel: 'Open Inventory Catalog',
     },
     reserves: {
-      title: 'Store Reserves',
-      subtitle: 'Physical Gold Bars and Foreign Currency',
+      title: 'Other Assets',
+      subtitle: 'Physical gold, foreign currency, and custom assets',
       amount: capital_overview.custom_assets,
       icon: Coins,
       targetTab: 'treasury',
-      actionLabel: 'Manage Asset Reserves',
+      actionLabel: 'Manage Other Assets',
     },
   };
 
