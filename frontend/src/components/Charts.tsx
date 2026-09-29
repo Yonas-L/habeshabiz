@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { AnimatedNumber } from './AnimatedNumber';
 
 
@@ -26,6 +26,8 @@ export const InteractiveSalesWaveChart: React.FC<{
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const [metric, setMetric] = useState<'revenue' | 'profit'>('revenue');
   const [isLoaded, setIsLoaded] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const touchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setIsLoaded(false);
@@ -81,17 +83,49 @@ export const InteractiveSalesWaveChart: React.FC<{
   const activePoint = hoverIndex !== null && points[hoverIndex] ? points[hoverIndex] : null;
   const displayVal = activePoint !== null ? activePoint.val : totalVal;
 
+  const handlePointerInteraction = (clientX: number) => {
+    if (!containerRef.current || points.length === 0) return;
+    if (touchTimerRef.current) {
+      clearTimeout(touchTimerRef.current);
+      touchTimerRef.current = null;
+    }
+    const rect = containerRef.current.getBoundingClientRect();
+    const relX = clientX - rect.left;
+    const paddingOffset = (padX / width) * rect.width;
+    const usableW = rect.width - paddingOffset * 2;
+    if (usableW <= 0) return;
+    const pct = Math.max(0, Math.min(1, (relX - paddingOffset) / usableW));
+    const targetIdx = Math.round(pct * (points.length - 1));
+    if (targetIdx >= 0 && targetIdx < points.length) {
+      setHoverIndex(targetIdx);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (touchTimerRef.current) clearTimeout(touchTimerRef.current);
+    touchTimerRef.current = setTimeout(() => {
+      setHoverIndex(null);
+    }, 2200);
+  };
+
   return (
     <div className="w-full">
       {/* Top Bar of Chart */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <div>
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-            {activePoint !== null
-              ? `${activePoint.day} ${metric === 'revenue' ? 'Sales' : 'Margin'}`
-              : (metric === 'revenue' ? 'Sales' : 'Gross Margin')}
-          </span>
-          <div className="text-xl font-bold text-slate-900 dark:text-white font-mono tracking-tight mt-0.5">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              {activePoint !== null
+                ? `${activePoint.day} ${metric === 'revenue' ? 'Sales' : 'Margin'}`
+                : (metric === 'revenue' ? 'Monthly Sales Trajectory' : 'Gross Margin Trend')}
+            </span>
+            {activePoint !== null && (
+              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium">
+                {activePoint.orders} {activePoint.orders === 1 ? 'order' : 'orders'}
+              </span>
+            )}
+          </div>
+          <div className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white font-mono tracking-tight mt-0.5">
             <AnimatedNumber value={displayVal} />{' '}
             <span className="text-xs font-medium text-slate-400 dark:text-slate-500 font-sans">{currency}</span>
           </div>
@@ -99,7 +133,7 @@ export const InteractiveSalesWaveChart: React.FC<{
 
         {/* Metric Selector Pills */}
         {canViewCost && (
-          <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl text-xs font-medium self-start sm:self-auto">
+          <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl text-xs font-medium self-start sm:self-auto shadow-2xs">
             <button
               onClick={() => {
                 setMetric('revenue');
@@ -131,7 +165,19 @@ export const InteractiveSalesWaveChart: React.FC<{
       </div>
 
       {/* SVG Canvas Container */}
-      <div className="relative w-full h-[180px] bg-gradient-to-b from-slate-50/50 to-transparent dark:from-slate-800/20 dark:to-transparent rounded-xl border border-slate-100/90 dark:border-slate-800/80 overflow-hidden">
+      <div
+        ref={containerRef}
+        onTouchStart={(e) => {
+          if (e.touches[0]) handlePointerInteraction(e.touches[0].clientX);
+        }}
+        onTouchMove={(e) => {
+          if (e.touches[0]) handlePointerInteraction(e.touches[0].clientX);
+        }}
+        onTouchEnd={handleTouchEnd}
+        onMouseMove={(e) => handlePointerInteraction(e.clientX)}
+        onMouseLeave={() => setHoverIndex(null)}
+        className="relative w-full h-[170px] sm:h-[180px] bg-gradient-to-b from-slate-50/50 to-transparent dark:from-slate-800/20 dark:to-transparent rounded-xl border border-slate-100/90 dark:border-slate-800/80 overflow-hidden touch-none select-none cursor-crosshair"
+      >
         {points.length === 0 && (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-xs text-slate-400 font-medium z-10">
             <span>No sales recorded for this month</span>
@@ -256,7 +302,7 @@ export const InteractiveSalesWaveChart: React.FC<{
           <div
             className="absolute z-10 pointer-events-none -translate-x-1/2 -translate-y-full bg-slate-900 dark:bg-slate-800 text-white px-3 py-1.5 rounded-xl shadow-xl text-xs font-mono whitespace-nowrap animate-modal-enter border border-slate-700/50"
             style={{
-              left: `${(points[hoverIndex].x / width) * 100}%`,
+              left: `${Math.max(12, Math.min(88, (points[hoverIndex].x / width) * 100))}%`,
               top: `${Math.max(points[hoverIndex].y - 12, 10)}px`,
             }}
           >
@@ -264,7 +310,7 @@ export const InteractiveSalesWaveChart: React.FC<{
             <div className="text-[10px] text-slate-300 font-sans flex items-center gap-1.5 mt-0.5">
               <span>{points[hoverIndex].day}</span>
               <span>&bull;</span>
-              <span>{points[hoverIndex].orders} orders</span>
+              <span>{points[hoverIndex].orders} {points[hoverIndex].orders === 1 ? 'order' : 'orders'}</span>
             </div>
           </div>
         )}
@@ -533,63 +579,63 @@ export const DonutCapitalChart: React.FC<{
       </div>
 
       {/* Legend Grid */}
-      <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs w-full">
-        <div className="flex items-start gap-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-slate-500 shrink-0 mt-0.5" />
-          <div className="min-w-0">
-            <span className="text-slate-400 dark:text-slate-500 block text-[10px] font-medium">
+      <div className="grid grid-cols-2 gap-2 sm:gap-x-4 sm:gap-y-3 text-xs w-full">
+        <div className="flex items-start gap-2 p-2 sm:p-0 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 sm:bg-transparent border border-slate-100 dark:border-slate-800/50 sm:border-0">
+          <span className="w-2.5 h-2.5 rounded-full bg-slate-500 shrink-0 mt-1 sm:mt-0.5" />
+          <div className="min-w-0 flex-1">
+            <span className="text-slate-400 dark:text-slate-500 block text-[10px] font-medium truncate">
               Stock ({(stockPct * 100).toFixed(0)}%)
             </span>
-            <span className="font-bold text-slate-900 dark:text-slate-100 font-mono text-xs truncate block">
-              <AnimatedNumber value={stock} /> ETB
+            <span className="font-bold text-slate-900 dark:text-slate-100 font-mono text-xs truncate block mt-0.5">
+              <AnimatedNumber value={stock} /> <span className="text-[10px] font-normal text-slate-400">ETB</span>
             </span>
           </div>
         </div>
 
-        <div className="flex items-start gap-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0 mt-0.5" />
-          <div className="min-w-0">
-            <span className="text-slate-400 dark:text-slate-500 block text-[10px] font-medium">
+        <div className="flex items-start gap-2 p-2 sm:p-0 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 sm:bg-transparent border border-slate-100 dark:border-slate-800/50 sm:border-0">
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0 mt-1 sm:mt-0.5" />
+          <div className="min-w-0 flex-1">
+            <span className="text-slate-400 dark:text-slate-500 block text-[10px] font-medium truncate">
               Receivables ({(recPct * 100).toFixed(0)}%)
             </span>
-            <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono text-xs truncate block">
-              +<AnimatedNumber value={receivables} /> ETB
+            <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono text-xs truncate block mt-0.5">
+              +<AnimatedNumber value={receivables} /> <span className="text-[10px] font-normal text-slate-400">ETB</span>
             </span>
           </div>
         </div>
 
-        <div className="flex items-start gap-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0 mt-0.5" />
-          <div className="min-w-0">
-            <span className="text-slate-400 dark:text-slate-500 block text-[10px] font-medium">
+        <div className="flex items-start gap-2 p-2 sm:p-0 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 sm:bg-transparent border border-slate-100 dark:border-slate-800/50 sm:border-0">
+          <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0 mt-1 sm:mt-0.5" />
+          <div className="min-w-0 flex-1">
+            <span className="text-slate-400 dark:text-slate-500 block text-[10px] font-medium truncate">
               Cash ({(treasPct * 100).toFixed(0)}%)
             </span>
-            <span className="font-bold text-slate-900 dark:text-slate-100 font-mono text-xs truncate block">
-              +<AnimatedNumber value={treasury} /> ETB
+            <span className="font-bold text-slate-900 dark:text-slate-100 font-mono text-xs truncate block mt-0.5">
+              +<AnimatedNumber value={treasury} /> <span className="text-[10px] font-normal text-slate-400">ETB</span>
             </span>
           </div>
         </div>
 
-        <div className="flex items-start gap-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0 mt-0.5" />
-          <div className="min-w-0">
-            <span className="text-slate-400 dark:text-slate-500 block text-[10px] font-medium">
+        <div className="flex items-start gap-2 p-2 sm:p-0 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 sm:bg-transparent border border-slate-100 dark:border-slate-800/50 sm:border-0">
+          <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0 mt-1 sm:mt-0.5" />
+          <div className="min-w-0 flex-1">
+            <span className="text-slate-400 dark:text-slate-500 block text-[10px] font-medium truncate">
               Gold/FX ({(assetPct * 100).toFixed(0)}%)
             </span>
-            <span className="font-bold text-slate-900 dark:text-slate-100 font-mono text-xs truncate block">
-              +<AnimatedNumber value={assets} /> ETB
+            <span className="font-bold text-slate-900 dark:text-slate-100 font-mono text-xs truncate block mt-0.5">
+              +<AnimatedNumber value={assets} /> <span className="text-[10px] font-normal text-slate-400">ETB</span>
             </span>
           </div>
         </div>
 
-        <div className="flex items-start gap-2 col-span-2 sm:col-span-1">
-          <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0 mt-0.5" />
-          <div className="min-w-0">
-            <span className="text-slate-400 dark:text-slate-500 block text-[10px] font-medium">
+        <div className="flex items-start gap-2 p-2 sm:p-0 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 sm:bg-transparent border border-slate-100 dark:border-slate-800/50 sm:border-0 col-span-2 sm:col-span-1">
+          <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0 mt-1 sm:mt-0.5" />
+          <div className="min-w-0 flex-1">
+            <span className="text-slate-400 dark:text-slate-500 block text-[10px] font-medium truncate">
               Payables ({payables > 0 ? (payablePct * 100).toFixed(0) : '0'}%)
             </span>
-            <span className="font-bold text-rose-600 dark:text-rose-400 font-mono text-xs truncate block">
-              −<AnimatedNumber value={payables} /> ETB
+            <span className="font-bold text-rose-600 dark:text-rose-400 font-mono text-xs truncate block mt-0.5">
+              −<AnimatedNumber value={payables} /> <span className="text-[10px] font-normal text-slate-400">ETB</span>
             </span>
           </div>
         </div>
