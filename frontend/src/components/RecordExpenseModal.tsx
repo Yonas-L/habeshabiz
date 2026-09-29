@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import type { Contact, FinancialAccount, InventoryUnit } from '../api/client';
 import { api } from '../api/client';
 import { toast } from 'sonner';
@@ -192,14 +193,16 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
+  if (!isOpen) return null;
+
+  const modalContent = (
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center sm:p-4 overflow-y-auto">
       <div
-        className="fixed inset-0 bg-slate-950/40 dark:bg-black/60 backdrop-blur-xs animate-backdrop-enter"
+        className="fixed inset-0 bg-slate-950/50 dark:bg-black/70 backdrop-blur-xs animate-backdrop-enter"
         onClick={onClose}
       />
 
-      <div className="relative z-10 bg-white dark:bg-[#131926] rounded-t-3xl sm:rounded-2xl border-t sm:border border-slate-100 dark:border-slate-800 shadow-2xl ring-1 ring-black/5 max-w-lg w-full max-h-[92vh] sm:max-h-[85vh] flex flex-col p-5 sm:p-6 space-y-4 animate-bottom-sheet sm:animate-modal-enter pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] sm:pb-6">
+      <div className="relative z-10 bg-white dark:bg-[#131926] rounded-t-3xl sm:rounded-2xl border-t sm:border border-slate-100 dark:border-slate-800 shadow-2xl ring-1 ring-black/5 max-w-lg w-full max-h-[88vh] sm:max-h-[85vh] flex flex-col p-5 sm:p-6 space-y-4 animate-bottom-sheet sm:animate-modal-enter my-0 sm:my-auto">
         {/* Mobile Drag Indicator */}
         <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto -mt-1 mb-1 sm:hidden shrink-0" />
 
@@ -226,7 +229,7 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto overscroll-contain flex-1 pr-1">
+        <form id="record-expense-form" onSubmit={handleSubmit} className="space-y-4 overflow-y-auto overscroll-contain flex-1 pr-1">
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
               Expense Category
@@ -477,25 +480,29 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
               Mark as Owner Personal Draw (Does not reduce shop profit)
             </label>
           </div>
-
-          <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
-            <button
-              type="button"
-              onClick={onClose}
-              className="h-10 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="h-10 px-5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 disabled:opacity-50 transition-colors shadow-xs active:scale-[0.98] cursor-pointer"
-            >
-              {submitting ? 'Recording...' : 'Record Outflow'}
-            </button>
-          </div>
         </form>
+
+        {/* Footer Actions */}
+        <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800 shrink-0 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] sm:pb-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-10 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            form="record-expense-form"
+            disabled={submitting}
+            className="h-10 px-5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 disabled:opacity-50 transition-colors shadow-xs active:scale-[0.98] cursor-pointer"
+          >
+            {submitting ? 'Recording...' : 'Record Outflow'}
+          </button>
+        </div>
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 };

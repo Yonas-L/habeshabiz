@@ -407,8 +407,33 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       </div>
 
       {/* ── 4. Monthly Performance (High-Visibility Operational Metrics) ── */}
-      <div className="bg-white dark:bg-[#131926] rounded-2xl sm:rounded-xl border border-slate-200/60 dark:border-slate-800/60 p-4 sm:p-5 animate-stagger-4">
-        <div className="flex items-center justify-between pb-3.5 border-b border-slate-100 dark:border-slate-800/60">
+      <div className="bg-transparent sm:bg-white sm:dark:bg-[#131926] sm:rounded-xl sm:border sm:border-slate-200/60 sm:dark:border-slate-800/60 sm:p-5 sm:shadow-xs animate-stagger-4">
+        {/* Mobile Header (Outside the card grid) */}
+        <div className="flex items-center justify-between px-0.5 mb-2.5 sm:hidden">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white truncate">
+              {selectedMonth ? (() => {
+                const [y, m] = selectedMonth.split('-').map(Number);
+                const d = new Date(y, m - 1);
+                return `${d.toLocaleString('default', { month: 'long' })} ${y} Performance`;
+              })() : "This Month's Performance"}
+            </h2>
+          </div>
+          {topSeller && user?.role === 'owner' && (
+            <button
+              onClick={() => onNavigateTab('staff')}
+              title="View Staff & Team Dashboard"
+              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-amber-50/90 dark:bg-amber-950/40 border border-amber-200/70 dark:border-amber-900/50 text-amber-900 dark:text-amber-300 text-[10px] font-semibold active:scale-[0.98] cursor-pointer"
+            >
+              <span>Top: <span className="font-bold">{topSeller.name}</span></span>
+              <ChevronRight className="w-3 h-3 opacity-60" />
+            </button>
+          )}
+        </div>
+
+        {/* Desktop Header (Inside the container) */}
+        <div className="hidden sm:flex items-center justify-between pb-3.5 border-b border-slate-100 dark:border-slate-800/60">
           <div className="flex items-center gap-2">
             <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
             <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white truncate">
@@ -457,9 +482,9 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           </div>
         </div>
 
-        <div className={`grid grid-cols-2 ${canViewCost ? 'sm:grid-cols-3 lg:grid-cols-5' : 'sm:grid-cols-3'} gap-2 sm:gap-6 pt-3.5`}>
+        <div className={`grid grid-cols-2 ${canViewCost ? 'sm:grid-cols-3 lg:grid-cols-5' : 'sm:grid-cols-3'} gap-2.5 sm:gap-6 sm:pt-3.5`}>
           {/* Revenue */}
-          <div className="p-3 sm:p-0 rounded-2xl sm:rounded-none bg-slate-50/80 dark:bg-[#0c1017] sm:bg-transparent border border-slate-200/60 dark:border-slate-800/80 sm:border-0 flex flex-col justify-between">
+          <div className="p-3.5 sm:p-0 rounded-2xl sm:rounded-none bg-white dark:bg-[#131926] sm:bg-transparent border-2 border-slate-200/90 dark:border-slate-800 sm:border-0 shadow-xs sm:shadow-none flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                 Revenue
@@ -476,7 +501,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           </div>
 
           {canViewCost && (
-            <div className="p-3 sm:p-0 rounded-2xl sm:rounded-none bg-slate-50/80 dark:bg-[#0c1017] sm:bg-transparent border border-slate-200/60 dark:border-slate-800/80 sm:border-0 flex flex-col justify-between">
+            <div className="p-3.5 sm:p-0 rounded-2xl sm:rounded-none bg-white dark:bg-[#131926] sm:bg-transparent border-2 border-slate-200/90 dark:border-slate-800 sm:border-0 shadow-xs sm:shadow-none flex flex-col justify-between">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
                   Gross Margin
@@ -497,7 +522,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           <button
             onClick={() => setIsExpenseModalOpen(true)}
             title="Click to record an expense or personal draw"
-            className="p-3 sm:p-0 rounded-2xl sm:rounded-none bg-slate-50/80 dark:bg-[#0c1017] sm:bg-transparent border border-slate-200/60 dark:border-slate-800/80 sm:border-0 text-left group cursor-pointer sm:-m-2 sm:p-2 sm:rounded-xl hover:bg-slate-100/80 dark:hover:bg-slate-800/60 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/30 active:scale-[0.98] sm:active:scale-100 flex flex-col justify-between"
+            className="p-3.5 sm:p-0 rounded-2xl sm:rounded-none bg-white dark:bg-[#131926] sm:bg-transparent border-2 border-slate-200/90 dark:border-slate-800 sm:border-0 shadow-xs sm:shadow-none text-left group cursor-pointer sm:-m-2 sm:p-2 sm:rounded-xl hover:bg-slate-50/80 dark:hover:bg-slate-800/60 sm:hover:bg-slate-100/80 dark:sm:hover:bg-slate-800/60 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/30 active:scale-[0.98] sm:active:scale-100 flex flex-col justify-between"
           >
             <div className="flex items-center justify-between">
               <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 group-hover:text-slate-700 dark:group-hover:text-slate-300 transition-colors">
@@ -517,7 +542,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           </button>
 
           {canViewCost && (
-            <div className="p-3 sm:p-0 rounded-2xl sm:rounded-none bg-slate-50/80 dark:bg-[#0c1017] sm:bg-transparent border border-slate-200/60 dark:border-slate-800/80 sm:border-0 flex flex-col justify-between">
+            <div className="p-3.5 sm:p-0 rounded-2xl sm:rounded-none bg-white dark:bg-[#131926] sm:bg-transparent border-2 border-slate-200/90 dark:border-slate-800 sm:border-0 shadow-xs sm:shadow-none flex flex-col justify-between">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
                   Net Profit
@@ -535,7 +560,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           )}
 
           {/* Draws */}
-          <div className={`p-3 sm:p-0 rounded-2xl sm:rounded-none bg-slate-50/80 dark:bg-[#0c1017] sm:bg-transparent border border-slate-200/60 dark:border-slate-800/80 sm:border-0 flex flex-col justify-between ${
+          <div className={`p-3.5 sm:p-0 rounded-2xl sm:rounded-none bg-white dark:bg-[#131926] sm:bg-transparent border-2 border-slate-200/90 dark:border-slate-800 sm:border-0 shadow-xs sm:shadow-none flex flex-col justify-between ${
             canViewCost ? 'col-span-2 sm:col-span-1' : ''
           }`}>
             <div className="flex items-center justify-between">

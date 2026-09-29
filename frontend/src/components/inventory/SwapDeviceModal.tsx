@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import type { InventoryUnit, SalesOrder } from '../../api/client';
 import { api } from '../../api/client';
 import { toast } from 'sonner';
@@ -181,9 +182,9 @@ export const SwapDeviceModal: React.FC<SwapDeviceModalProps> = ({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
-      <div className="bg-white dark:bg-[#131926] rounded-t-3xl sm:rounded-2xl border-t sm:border border-slate-100 dark:border-slate-800 w-full max-w-lg p-5 space-y-4 shadow-2xl max-h-[92vh] sm:max-h-[85vh] flex flex-col animate-bottom-sheet sm:animate-fade-in pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] sm:pb-5">
+  const modalContent = (
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+      <div className="bg-white dark:bg-[#131926] rounded-t-3xl sm:rounded-2xl border-t sm:border border-slate-100 dark:border-slate-800 w-full max-w-lg p-5 space-y-4 shadow-2xl max-h-[88vh] sm:max-h-[85vh] flex flex-col animate-bottom-sheet sm:animate-fade-in">
         {/* Mobile Drag Indicator */}
         <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto -mt-1 mb-1 sm:hidden shrink-0" />
 
@@ -211,7 +212,7 @@ export const SwapDeviceModal: React.FC<SwapDeviceModalProps> = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-3.5 overflow-y-auto pr-1 flex-1">
+        <form id="swap-device-form" onSubmit={handleSubmit} className="space-y-3.5 overflow-y-auto pr-1 flex-1">
           {/* Defective Device Info Card */}
           <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-800 text-xs">
             <div className="flex items-center justify-between">
@@ -502,42 +503,45 @@ export const SwapDeviceModal: React.FC<SwapDeviceModalProps> = ({
               Customer already paid in full. Receipt IMEI updates automatically with zero financial distortion.
             </span>
           </div>
-
-          {/* Form Actions */}
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800 shrink-0">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={submitting}
-              className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={
-                submitting ||
-                !selectedReplacementId ||
-                !swapReason.trim() ||
-                !isCostMatch
-              }
-              className="px-4 py-1.5 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white transition-all shadow-xs flex items-center gap-1.5 active:scale-[0.98] cursor-pointer"
-            >
-              {submitting ? (
-                <>
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                  <span>Processing Swap...</span>
-                </>
-              ) : (
-                <>
-                  <ArrowLeftRight className="w-3 h-3" />
-                  <span>Confirm Swap</span>
-                </>
-              )}
-            </button>
-          </div>
         </form>
+
+        {/* Form Actions */}
+        <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800 shrink-0 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] sm:pb-0">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={submitting}
+            className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            form="swap-device-form"
+            disabled={
+              submitting ||
+              !selectedReplacementId ||
+              !swapReason.trim() ||
+              !isCostMatch
+            }
+            className="px-4 py-1.5 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white transition-all shadow-xs flex items-center gap-1.5 active:scale-[0.98] cursor-pointer"
+          >
+            {submitting ? (
+              <>
+                <Loader2 className="w-3 h-3 animate-spin" />
+                <span>Processing Swap...</span>
+              </>
+            ) : (
+              <>
+                <ArrowLeftRight className="w-3 h-3" />
+                <span>Confirm Swap</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 };

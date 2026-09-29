@@ -1339,7 +1339,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
         </div>
 
         {/* ═══ RIGHT: Order Summary / Receipt (2 cols) ═══ */}
-        <div className="lg:col-span-2">
+        <div id="counter-order-summary" className="lg:col-span-2">
           <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800/90 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] sticky top-4 overflow-hidden">
             {/* Receipt Header */}
             <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
@@ -1555,6 +1555,32 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
           </div>
         </div>
       </div>
+
+      {/* Mobile Sticky Quick-Checkout Trigger Bar */}
+      {selectedProduct && selectedVariant && (
+        <div className="lg:hidden fixed bottom-16 left-0 right-0 z-30 p-3 px-4 bg-white/95 dark:bg-[#131926]/95 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800 shadow-xl flex items-center justify-between gap-3 animate-fade-in">
+          <div className="min-w-0">
+            <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 truncate">
+              {selectedProduct.name} · {quantity}x
+            </div>
+            <div className="text-sm font-black text-slate-900 dark:text-white">
+              {unitPriceNum > 0
+                ? `${(tradeInAllowance > 0 ? netCashDue : totalAfterDiscount).toLocaleString()} ETB`
+                : 'Enter Unit Price'}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              document.getElementById('counter-order-summary')?.scrollIntoView({ behavior: 'smooth' });
+            }}
+            className="h-9 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs flex items-center gap-1.5 active:scale-95 transition-all shrink-0 cursor-pointer"
+          >
+            <span>Review & Pay</span>
+            <ChevronDown className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Exchange Device Modal */}
       <ExchangeDeviceModal

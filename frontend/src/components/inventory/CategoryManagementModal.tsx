@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { ProductCategory } from '../../api/client';
 import { api } from '../../api/client';
 import { toast } from 'sonner';
@@ -163,8 +164,8 @@ export const CategoryManagementModal: React.FC<CategoryManagementModalProps> = (
       (c.description && c.description.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
+  const modalContent = (
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-slate-950/50 backdrop-blur-xs animate-backdrop-enter"
@@ -172,7 +173,7 @@ export const CategoryManagementModal: React.FC<CategoryManagementModalProps> = (
       />
 
       {/* Modal / Bottom Sheet Surface */}
-      <div className="relative z-10 w-full max-w-2xl bg-white dark:bg-[#131926] rounded-t-3xl sm:rounded-2xl border-t sm:border border-slate-200/80 dark:border-slate-800 shadow-2xl overflow-hidden animate-bottom-sheet sm:animate-modal-enter flex flex-col max-h-[92vh] sm:max-h-[90vh] pb-[calc(1rem+env(safe-area-inset-bottom,0px))] sm:pb-0">
+      <div className="relative z-10 w-full max-w-2xl bg-white dark:bg-[#131926] rounded-t-3xl sm:rounded-2xl border-t sm:border border-slate-200/80 dark:border-slate-800 shadow-2xl overflow-hidden animate-bottom-sheet sm:animate-modal-enter flex flex-col max-h-[88vh] sm:max-h-[85vh]">
         {/* Mobile Drag Indicator */}
         <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mt-2.5 mb-1 sm:hidden shrink-0" />
 
@@ -426,10 +427,10 @@ export const CategoryManagementModal: React.FC<CategoryManagementModalProps> = (
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/30 flex items-center justify-end">
+        <div className="px-5 py-3 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/30 flex items-center justify-end shrink-0 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] sm:pb-3">
           <button
             onClick={onClose}
-            className="h-8 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs"
+            className="h-8 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs cursor-pointer"
           >
             Done
           </button>
@@ -437,4 +438,6 @@ export const CategoryManagementModal: React.FC<CategoryManagementModalProps> = (
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 };

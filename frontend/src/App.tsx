@@ -552,19 +552,21 @@ export default function App() {
         onNavigate={handleQuickSearchNavigate}
       />
 
-      {/* Mobile Floating Action Button (Speed Dial) */}
-      <SpeedDialFAB
-        onNewSale={() => setActiveTab('counter')}
-        onRecordExpense={() => {
-          setNavContext({ showRecordExpense: true });
-          setActiveTab('expenses');
-        }}
-        onStockIntake={() => {
-          setNavContext({ showIntake: true });
-          setActiveTab('inventory');
-        }}
-        isOwner={user?.role === 'owner'}
-      />
+      {/* Mobile Floating Action Button (Speed Dial) - hidden on counter so it never obstructs checkout */}
+      {activeTab !== 'counter' && (
+        <SpeedDialFAB
+          onNewSale={() => setActiveTab('counter')}
+          onRecordExpense={() => {
+            setNavContext({ showRecordExpense: true });
+            setActiveTab('expenses');
+          }}
+          onStockIntake={() => {
+            setNavContext({ showIntake: true });
+            setActiveTab('inventory');
+          }}
+          isOwner={user?.role === 'owner'}
+        />
+      )}
 
       {/* Mobile Native Bottom Navigation Bar */}
       <MobileBottomNav

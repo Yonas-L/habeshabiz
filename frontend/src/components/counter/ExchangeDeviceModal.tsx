@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import type { ProductCategory, Product, InventoryUnit } from '../../api/client';
 import { api } from '../../api/client';
 import { toast } from 'sonner';
@@ -312,10 +313,10 @@ export const ExchangeDeviceModal: React.FC<ExchangeDeviceModalProps> = ({
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/60 backdrop-blur-xs overflow-y-auto">
+  const modalContent = (
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/60 backdrop-blur-xs overflow-y-auto">
       <div
-        className="bg-white dark:bg-[#131926] border-t sm:border border-slate-200 dark:border-slate-800 rounded-t-3xl sm:rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[85vh] animate-bottom-sheet sm:animate-in pb-[calc(1rem+env(safe-area-inset-bottom,0px))] sm:pb-0"
+        className="bg-white dark:bg-[#131926] border-t sm:border border-slate-200 dark:border-slate-800 rounded-t-3xl sm:rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[88vh] sm:max-h-[85vh] animate-bottom-sheet sm:animate-in my-0 sm:my-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Mobile Drag Indicator */}
@@ -647,7 +648,7 @@ export const ExchangeDeviceModal: React.FC<ExchangeDeviceModalProps> = ({
         </div>
 
         {/* Footer Actions */}
-        <div className="p-3.5 px-5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2 shrink-0">
+        <div className="p-3.5 px-5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2 shrink-0 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] sm:pb-3.5">
           <button
             type="button"
             onClick={onClose}
@@ -668,4 +669,6 @@ export const ExchangeDeviceModal: React.FC<ExchangeDeviceModalProps> = ({
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 };
