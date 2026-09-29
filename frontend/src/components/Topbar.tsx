@@ -104,29 +104,30 @@ export const Topbar: React.FC<TopbarProps> = ({
   const displayLabel = `${MONTH_NAMES[selectedMonthIndex]} ${selectedYear}`;
 
   return (
-    <header className="sticky top-0 z-40 h-16 px-4 lg:px-8 flex items-center justify-between bg-[#f6f8fa]/95 dark:bg-[#0b0f17]/95 backdrop-blur-md transition-colors border-b border-slate-200/60 dark:border-slate-800/60 animate-fluid-topbar">
-      <div className="flex items-center gap-3">
+    <header className="sticky top-0 z-40 h-14 sm:h-16 px-3 sm:px-4 lg:px-8 flex items-center justify-between bg-[#f6f8fa]/95 dark:bg-[#0b0f17]/95 backdrop-blur-md transition-colors border-b border-slate-200/60 dark:border-slate-800/60 animate-fluid-topbar">
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0 pr-2">
         {/* Mobile Hamburger */}
         <button
           type="button"
           onClick={onOpenMobileSidebar}
-          className="md:hidden p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:text-slate-900 shadow-xs"
+          aria-label="Open Navigation Menu"
+          className="md:hidden w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 text-slate-700 dark:text-slate-200 hover:text-slate-900 flex items-center justify-center shadow-xs active:scale-95 shrink-0"
         >
           <Menu className="w-4 h-4" />
         </button>
 
-        <div>
-          <h1 className="text-base font-bold text-slate-900 dark:text-white tracking-tight leading-none">
+        <div className="min-w-0">
+          <h1 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white tracking-tight leading-tight truncate">
             {current.title}
           </h1>
-          <p className="text-[11px] text-slate-400 dark:text-slate-500 hidden sm:block mt-0.5 font-medium">
+          <p className="text-[11px] text-slate-400 dark:text-slate-500 hidden sm:block mt-0.5 font-medium truncate">
             {current.subtitle}
           </p>
         </div>
       </div>
 
       {/* Right Header Area */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
         {/* User Persona Pill (Clickable for Account Settings) */}
         {user && (
           <button
@@ -150,19 +151,22 @@ export const Topbar: React.FC<TopbarProps> = ({
             type="button"
             onClick={() => setIsMonthPickerOpen((prev) => !prev)}
             title="Filter by month"
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white dark:bg-[#131926] border text-xs font-medium shadow-xs transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl bg-white dark:bg-[#131926] border text-xs font-medium shadow-xs transition-all cursor-pointer select-none ${
               isMonthPickerOpen
                 ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400 ring-2 ring-emerald-500/20'
                 : 'border-slate-200/80 dark:border-slate-800/90 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700'
             }`}
           >
-            <Calendar className={`w-3.5 h-3.5 ${isMonthPickerOpen ? 'text-emerald-500' : 'text-slate-400'}`} />
-            <span>{displayLabel}</span>
+            <Calendar className={`w-3.5 h-3.5 shrink-0 ${isMonthPickerOpen ? 'text-emerald-500' : 'text-slate-400'}`} />
+            <span className="hidden sm:inline font-medium">{displayLabel}</span>
+            <span className="sm:hidden font-mono font-bold text-[11px] whitespace-nowrap">
+              {MONTH_NAMES[selectedMonthIndex].slice(0, 3)} '{String(selectedYear).slice(-2)}
+            </span>
           </button>
 
           {/* Month Picker Dropdown */}
           {isMonthPickerOpen && (
-            <div className="absolute right-0 mt-2 w-72 p-3.5 rounded-2xl bg-white dark:bg-[#131926] border border-slate-200 dark:border-slate-800 shadow-xl z-50 animate-in fade-in zoom-in-95 duration-150">
+            <div className="absolute right-0 mt-2 w-72 max-w-[calc(100vw-2rem)] p-3.5 rounded-2xl bg-white dark:bg-[#131926] border border-slate-200 dark:border-slate-800 shadow-xl z-50 animate-in fade-in zoom-in-95 duration-150">
               {/* Year Selector Header */}
               <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
                 <button
@@ -235,7 +239,7 @@ export const Topbar: React.FC<TopbarProps> = ({
             type="button"
             onClick={onToggleTheme}
             title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-            className="w-9 h-9 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/90 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition-colors shadow-xs active:scale-95 cursor-pointer"
+            className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/90 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition-colors shadow-xs active:scale-95 cursor-pointer shrink-0"
           >
             {theme === 'dark' ? (
               <Sun className="w-4 h-4 text-amber-400" />
@@ -245,12 +249,12 @@ export const Topbar: React.FC<TopbarProps> = ({
           </button>
         )}
 
-        {/* New Sale Button */}
+        {/* New Sale Button (Desktop Only — on mobile handled via SpeedDial FAB & Bottom Nav) */}
         {onQuickAction && (
           <button
             type="button"
             onClick={onQuickAction}
-            className="h-9 px-3.5 rounded-xl bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 text-white dark:text-slate-900 text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 active:scale-[0.98]"
+            className="hidden md:flex h-9 px-3.5 rounded-xl bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 text-white dark:text-slate-900 text-xs font-bold transition-all shadow-sm items-center gap-1.5 active:scale-[0.98]"
           >
             <Plus className="w-3.5 h-3.5 text-emerald-400 dark:text-emerald-600" />
             <span>Record Sale</span>

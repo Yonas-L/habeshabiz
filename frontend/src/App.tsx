@@ -32,6 +32,8 @@ import { OnboardingView } from './views/OnboardingView';
 import { PublicStatementView } from './views/PublicStatementView';
 import { ProfileSettingsModal } from './components/ProfileSettingsModal';
 import { QuickSearchModal, type NavigationPayload } from './components/QuickSearchModal';
+import { MobileBottomNav } from './components/navigation/MobileBottomNav';
+import { SpeedDialFAB } from './components/navigation/SpeedDialFAB';
 import { Toaster, toast } from 'sonner';
 import { ArrowRight, Loader2 } from 'lucide-react';
 
@@ -432,7 +434,7 @@ export default function App() {
         />
 
         {/* View Surface */}
-        <main className="flex-1 p-4 lg:p-8 max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-4 lg:p-8 max-w-7xl w-full mx-auto pb-28 md:pb-8">
           {activeTab === 'overview' && (
             user?.role === 'owner' ? (
               <OverviewView
@@ -548,6 +550,28 @@ export default function App() {
         user={user}
         accounts={accounts}
         onNavigate={handleQuickSearchNavigate}
+      />
+
+      {/* Mobile Floating Action Button (Speed Dial) */}
+      <SpeedDialFAB
+        onNewSale={() => setActiveTab('counter')}
+        onRecordExpense={() => {
+          setNavContext({ showRecordExpense: true });
+          setActiveTab('expenses');
+        }}
+        onStockIntake={() => {
+          setNavContext({ showIntake: true });
+          setActiveTab('inventory');
+        }}
+        isOwner={user?.role === 'owner'}
+      />
+
+      {/* Mobile Native Bottom Navigation Bar */}
+      <MobileBottomNav
+        activeTab={activeTab}
+        onChangeTab={setActiveTab}
+        onOpenDrawer={() => setIsMobileSidebarOpen(true)}
+        openDebtsCount={openDebtsCount}
       />
     </div>
   );

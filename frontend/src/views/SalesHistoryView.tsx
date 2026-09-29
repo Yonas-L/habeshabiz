@@ -336,7 +336,8 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
 
       {/* Orders Table — High-contrast, clean ledger */}
       <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-100 dark:border-slate-800/80 overflow-hidden shadow-2xs">
-        <div className="overflow-x-auto">
+        {/* Desktop Table (md and up) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50/70 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
               <tr>
@@ -562,6 +563,159 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Native Cards (< md) */}
+        <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800/80">
+          {loading ? (
+            <div className="py-12 text-center text-slate-400">
+              <div className="flex items-center justify-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin text-slate-900 dark:text-white" />
+                <span>Loading sales...</span>
+              </div>
+            </div>
+          ) : sales.length === 0 ? (
+            <div className="py-12 text-center text-slate-400 text-xs">
+              <Receipt className="w-8 h-8 mx-auto mb-2 text-slate-300 dark:text-slate-600" />
+              <p className="font-semibold text-slate-600 dark:text-slate-400">No sales found</p>
+              <p className="text-xs text-slate-400 mt-0.5">Completed checkout orders will appear here.</p>
+            </div>
+          ) : (
+            sales.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((order) => {
+              const gross = Number(order.total_amount) || 0;
+              const disc = Number(order.discount_amount) || 0;
+              const exchange = Number(order.exchange_allowance) || 0;
+              const netPayable = Math.max(0, gross - disc - exchange);
+
+              const returnableUnits = getReturnableUnits(order);
+              const hasReturnedUnits = order.items.some(
+                (i) =>
+                  i.inventory_unit?.status === 'returned' ||
+                  i.inventory_unit?.status === 'fixed' ||
+                  Boolean(i.inventory_unit?.returned_at)
+              );
+
+              return (
+                <div
+                  key={order.id}
+                  onClick={() => setSelectedOrder(order)}
+                  className="p-4 space-y-3 hover:bg-slate-50/80 dark:hover:bg-slate-800/30 transition-colors cursor-pointer active:bg-slate-100 dark:active:bg-slate-800/50"
+                >
+                  {/* Card Header: Order # + Date + Status */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="font-mono font-bold text-slate-900 dark:text-white text-sm">
+                        {order.order_number}
+                      </div>
+                      <div className="text-[11px] text-slate-400 mt-0.5">
+                        {new Date(order.order_date).toLocaleDateString(undefined, {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })} • {order.customer?.name || 'Walk-in'}
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="font-mono font-bold text-base text-slate-900 dark:text-white">
+                        {gross.toLocaleString()} <span className="text-[10px] font-normal text-slate-400 font-sans">ETB</span>
+                      </div>
+                      {exchange > 0 ? (
+                        <div className="text-[10px] text-purple-700 dark:text-purple-300 font-mono mt-0.5">
+                          {netPayable.toLocaleString()} cash + {exchange.toLocaleString()} trade
+                        </div>
+                      ) : disc > 0 ? (
+                        <div className="text-[10px] text-rose-600 dark:text-rose-400 font-mono mt-0.5">
+                          −{disc.toLocaleString()} disc ({netPayable.toLocaleString()} net)
+                        </div>
+                      ) : null}
+                      <div className="mt-1">
+                        {order.payment_status === 'paid' ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            Paid
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400">
+                            <Clock className="w-3.5 h-3.5" />
+                            Credit
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Sold Items Summary */}
+                  <div className="space-y-1.5 pt-2 border-t border-slate-100/80 dark:border-slate-800/50">
+                    {order.items.map((item, idx) => {
+                      const pName = item.variant?.product?.name || 'Device';
+                      const spec = [item.variant?.storage, item.variant?.color].filter(Boolean).join(' • ');
+                      const imei = item.inventory_unit?.imei_or_serial;
+
+                      return (
+                        <div key={idx} className="flex items-center justify-between text-xs">
+                          <div className="min-w-0 flex-1 pr-2">
+                            <span className="font-medium text-slate-800 dark:text-slate-200 truncate block">
+                              {item.quantity > 1 ? `${item.quantity}× ` : ''}{pName}
+                            </span>
+                            {spec && <span className="text-[10px] text-slate-400 block">{spec}</span>}
+                          </div>
+                          {imei && (
+                            <span className="font-mono text-[11px] font-bold text-emerald-600 dark:text-emerald-400 shrink-0">
+                              {imei}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {exchange > 0 && (
+                      <div className="text-[11px] text-purple-700 dark:text-purple-300 font-medium flex items-center gap-1 pt-0.5">
+                        <Repeat className="w-3 h-3 text-purple-500 shrink-0" />
+                        <span>Trade-In allowance: {exchange.toLocaleString()} ETB</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Actions & Chevron Footer */}
+                  <div className="flex items-center justify-between pt-1">
+                    <div className="text-[11px] text-slate-400">
+                      {order.items.length} {order.items.length === 1 ? 'item' : 'items'}
+                    </div>
+
+                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                      {isOwner && (
+                        returnableUnits.length > 0 ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleInitiateReturn(order)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-rose-50 dark:bg-rose-950/50 border border-rose-200/60 dark:border-rose-800/60 text-rose-700 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/60 active:scale-95"
+                            >
+                              <Undo2 className="w-3 h-3" />
+                              <span>Return</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleInitiateSwap(order)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200/60 dark:border-indigo-800/60 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 active:scale-95"
+                            >
+                              <ArrowLeftRight className="w-3 h-3" />
+                              <span>Swap</span>
+                            </button>
+                          </>
+                        ) : hasReturnedUnits ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-rose-600 dark:text-rose-400">
+                            <Undo2 className="w-2.5 h-2.5" />
+                            Returned
+                          </span>
+                        ) : null
+                      )}
+                      <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 ml-1" />
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
 
         {/* Pagination */}

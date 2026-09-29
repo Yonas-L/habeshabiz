@@ -816,9 +816,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           </div>
         </div>
 
-        {/* Right: Owner Action Buttons */}
+        {/* Right: Owner Action Buttons (Hidden on mobile as accessible via FAB & in-card action) */}
         {isOwner && (
-          <div className="flex items-center gap-2 shrink-0 justify-end">
+          <div className="hidden sm:flex items-center gap-2 shrink-0 justify-end">
             <button
               onClick={() => setIsCategoryModalOpen(true)}
               className="h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 active:scale-95 cursor-pointer"
@@ -881,7 +881,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           </div>
         )}
 
-        <div className="overflow-x-auto">
+        {/* Desktop Tables (md and up) */}
+        <div className="hidden md:block overflow-x-auto">
           {statusFilter === 'in_stock' ? (
             /* COLLAPSIBLE GROUPED IN-STOCK TABLE */
             <table className="w-full text-left text-xs">
@@ -1696,6 +1697,288 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 )}
               </tbody>
             </table>
+          )}
+        </div>
+
+        {/* Mobile Native Cards (< md) */}
+        <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800/80">
+          {statusFilter === 'in_stock' ? (
+            /* COLLAPSIBLE GROUPED IN-STOCK MOBILE CARDS */
+            loading ? (
+              <div className="py-12 text-center text-slate-400">
+                <div className="flex items-center justify-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-slate-900 dark:text-white" />
+                  <span>Loading inventory models...</span>
+                </div>
+              </div>
+            ) : inStockProducts.length === 0 ? (
+              <div className="py-12 text-center text-slate-400 text-xs">
+                <Package className="w-8 h-8 mx-auto mb-2 text-slate-300 dark:text-slate-600" />
+                <p className="font-semibold text-slate-600 dark:text-slate-400">No products currently in stock</p>
+                {isOwner && (
+                  <p className="text-xs text-slate-400 mt-0.5">Use the "+ Add" button to receive new items into counter inventory.</p>
+                )}
+              </div>
+            ) : (
+              inStockProducts.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((item) => {
+                const isExpanded = expandedProductIds.has(item.product.id);
+                const pCat = item.product.category;
+                const pCatRel = item.product.category_rel;
+                const priceLabel =
+                  item.minPrice !== null && item.maxPrice !== null
+                    ? item.minPrice === item.maxPrice
+                      ? `${Number(item.minPrice).toLocaleString()} ETB`
+                      : `${Number(item.minPrice).toLocaleString()} – ${Number(item.maxPrice).toLocaleString()} ETB`
+                    : '—';
+
+                return (
+                  <div key={item.product.id} className="p-4 space-y-3">
+                    {/* Top Row: Click to toggle expand */}
+                    <div
+                      onClick={() => toggleExpand(item.product.id)}
+                      className="flex items-start justify-between gap-3 cursor-pointer active:opacity-70"
+                    >
+                      <div className="flex items-start gap-2.5 min-w-0">
+                        <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 mt-0.5 text-slate-600 dark:text-slate-300">
+                          {pCatRel?.icon
+                            ? getCategoryIcon(pCatRel.icon, 'w-4 h-4')
+                            : getItemCategoryIcon(pCat, item.product.name)}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="font-bold text-slate-900 dark:text-white text-sm truncate flex items-center gap-1.5">
+                            <span>{item.product.name}</span>
+                            {item.product.brand && (
+                              <span className="text-[10px] font-medium text-slate-400 shrink-0">
+                                {item.product.brand}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-slate-400 mt-0.5">
+                            <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                              {item.totalInStock} in stock
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <div className="font-mono font-bold text-sm text-slate-900 dark:text-white">
+                          {priceLabel}
+                        </div>
+                        <div className="flex items-center justify-end gap-1 text-[11px] text-slate-400 mt-1">
+                          <span>{isExpanded ? 'Hide' : 'Units'}</span>
+                          {isExpanded ? (
+                            <ChevronDown className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                          ) : (
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Quick Action Header for Owner */}
+                    {isOwner && (
+                      <div className="flex items-center justify-between pt-1 border-t border-slate-100/80 dark:border-slate-800/50">
+                        <button
+                          type="button"
+                          onClick={() => setEditingProduct(item.product)}
+                          className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white"
+                        >
+                          <Edit3 className="w-3 h-3" />
+                          <span>Edit Model</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIntakeInitialProductId(item.product.id);
+                            setIntakeInitialVariantId(undefined);
+                            setShowIntakeModal(true);
+                          }}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-2xs active:scale-95"
+                        >
+                          <Plus className="w-3 h-3" />
+                          <span>Add Stock</span>
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Expanded Units Sub-List */}
+                    {isExpanded && (
+                      <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5">
+                        {item.units.map((unit) => {
+                          const unitSpec = [
+                            unit.variant?.storage,
+                            unit.variant?.ram ? `${unit.variant.ram} RAM` : null,
+                            unit.variant?.color,
+                          ]
+                            .filter(Boolean)
+                            .join(' • ') || 'Standard';
+
+                          return (
+                            <div
+                              key={unit.id}
+                              onClick={() => setSelectedUnit(unit)}
+                              className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-700/60 text-xs active:bg-slate-100 dark:active:bg-slate-800 cursor-pointer"
+                            >
+                              <div className="min-w-0 pr-2">
+                                <div className="flex items-center gap-2 font-mono">
+                                  <span className="font-bold text-emerald-600 dark:text-emerald-400 truncate">
+                                    {unit.imei_or_serial || 'Unserialized'}
+                                  </span>
+                                  {unit.battery_health !== null && unit.battery_health !== undefined && (
+                                    <span className="text-[10px] text-slate-400 flex items-center gap-0.5 shrink-0">
+                                      <Battery className="w-2.5 h-2.5" />
+                                      {unit.battery_health}%
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[10px] text-slate-400 truncate mt-0.5 font-sans">
+                                  {unitSpec}
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-1 text-[11px] text-slate-400 shrink-0">
+                                <span>Inspect</span>
+                                <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )
+          ) : statusFilter === 'archived' ? (
+            /* ARCHIVED PRODUCT MODELS MOBILE CARDS */
+            filteredArchivedProducts.length === 0 ? (
+              <div className="py-12 text-center text-slate-400 text-xs">
+                No archived product models.
+              </div>
+            ) : (
+              filteredArchivedProducts.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((prod) => (
+                <div key={prod.id} className="p-4 space-y-2.5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-bold text-slate-900 dark:text-white text-sm truncate">
+                        {prod.name}
+                      </div>
+                      <div className="text-[11px] text-slate-400 mt-0.5">
+                        {prod.category} • {prod.has_serials ? 'Serialized IMEI' : 'Batch / Bulk'}
+                      </div>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-500">
+                      Archived
+                    </span>
+                  </div>
+                  {isOwner && (
+                    <div className="flex items-center justify-end gap-2 pt-1 border-t border-slate-100 dark:border-slate-800">
+                      <button
+                        onClick={() => handleRestoreProduct(prod)}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 active:scale-95"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>Unarchive</span>
+                      </button>
+                      <button
+                        onClick={() => setEditingProduct(prod)}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 active:scale-95"
+                      >
+                        <Edit3 className="w-3 h-3" />
+                        <span>Edit</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))
+            )
+          ) : (
+            /* FLAT UNITS MOBILE CARDS (out, sold, returned, all, exchange) */
+            loading ? (
+              <div className="py-12 text-center text-slate-400">
+                <div className="flex items-center justify-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-slate-900 dark:text-white" />
+                  <span>Loading inventory units...</span>
+                </div>
+              </div>
+            ) : units.length === 0 ? (
+              <div className="py-12 text-center text-slate-400 text-xs">
+                {statusFilter === 'out'
+                  ? 'No items are currently out with staff or brokers.'
+                  : statusFilter === 'sold'
+                  ? 'No sold items found.'
+                  : statusFilter === 'returned'
+                  ? 'No devices under return/repair inspection.'
+                  : 'No inventory units found in this category.'}
+              </div>
+            ) : (
+              units.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((unit) => {
+                const pName = unit.variant?.product?.name || 'Device';
+                const specVals = unit.variant?.specs ? Object.values(unit.variant.specs).map(String) : [];
+                const variantSubtitle = [
+                  unit.variant?.storage,
+                  unit.variant?.ram ? `${unit.variant.ram} RAM` : null,
+                  unit.variant?.color,
+                  ...specVals,
+                ].filter(Boolean).join(' • ') || 'Standard';
+
+                return (
+                  <div
+                    key={unit.id}
+                    onClick={() => setSelectedUnit(unit)}
+                    className="p-4 space-y-3 hover:bg-slate-50/80 dark:hover:bg-slate-800/30 transition-colors cursor-pointer active:bg-slate-100 dark:active:bg-slate-800/50"
+                  >
+                    {/* Header: Model & Status */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-bold text-slate-900 dark:text-white text-sm truncate flex items-center gap-1.5">
+                          <span>{pName}</span>
+                          {unit.source_type === 'consignment' && (
+                            <span className="text-[10px] text-amber-600 font-semibold">Vendor</span>
+                          )}
+                          {unit.source_type === 'exchange' && (
+                            <span className="text-[10px] text-purple-600 font-semibold">Exchanged</span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-slate-400 mt-0.5">{variantSubtitle}</div>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        {canViewCost && unit.cost_basis ? (
+                          <div className="font-mono font-bold text-sm text-slate-900 dark:text-white">
+                            {Number(unit.cost_basis).toLocaleString()} <span className="text-[10px] font-normal text-slate-400 font-sans">ETB</span>
+                          </div>
+                        ) : null}
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold capitalize mt-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                          {unit.status.replace(/_/g, ' ')}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* IMEI / Battery Row */}
+                    <div className="flex items-center justify-between pt-1 border-t border-slate-100/80 dark:border-slate-800/50 text-xs">
+                      <div className="flex items-center gap-2 font-mono">
+                        <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                          {unit.imei_or_serial || 'Unserialized'}
+                        </span>
+                        {unit.battery_health && (
+                          <span className="text-[11px] text-slate-400 flex items-center gap-0.5">
+                            <Battery className="w-3 h-3" />
+                            {unit.battery_health}%
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1 text-[11px] text-slate-400">
+                        <span>Inspect</span>
+                        <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )
           )}
         </div>
 

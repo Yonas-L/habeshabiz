@@ -71,7 +71,7 @@ export const SlideOverDrawer: React.FC<SlideOverDrawerProps> = ({
         }`}
       />
 
-      <div className="fixed inset-y-0 right-0 max-w-full flex pl-10 pointer-events-none">
+      <div className="fixed inset-y-0 right-0 max-w-full flex pl-0 sm:pl-10 pointer-events-none">
         <aside
           className={`pointer-events-auto w-screen ${widthClass} bg-white dark:bg-[#131926] border-l border-slate-200/80 dark:border-slate-800/90 shadow-2xl flex flex-col justify-between overflow-hidden transition-colors ${
             isClosing ? 'animate-drawer-exit' : 'animate-drawer-enter'
@@ -113,7 +113,7 @@ export const SlideOverDrawer: React.FC<SlideOverDrawerProps> = ({
 
           {/* Optional Action Footer */}
           {footerActions && (
-            <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/70 dark:bg-slate-900/50 backdrop-blur-sm flex items-center justify-between gap-3 shrink-0 z-10">
+            <div className="px-6 py-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] sm:pb-4 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/70 dark:bg-slate-900/50 backdrop-blur-sm flex items-center justify-between gap-3 shrink-0 z-10">
               {footerActions}
             </div>
           )}

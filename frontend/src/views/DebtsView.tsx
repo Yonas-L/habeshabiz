@@ -245,7 +245,8 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
 
       {/* Debt Table with Click-to-Open Drawer */}
       <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-100 dark:border-slate-800/80 overflow-hidden shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
-        <div className="overflow-x-auto">
+        {/* Desktop Table (md and up) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50/70 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
               <tr>
@@ -410,6 +411,136 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Native Cards (< md) */}
+        <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800/80">
+          {loading ? (
+            <div className="py-12 text-center text-slate-400">
+              <div className="flex items-center justify-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin text-slate-900 dark:text-white" />
+                <span>Loading ledger records...</span>
+              </div>
+            </div>
+          ) : debts.length === 0 ? (
+            <div className="py-12 text-center text-slate-400 text-xs">
+              No outstanding {debtType} records found.
+            </div>
+          ) : (
+            debts.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((debt) => {
+              const due = formatDueDate(debt.due_date);
+              const isManual = debt.reference_type === 'direct_credit';
+              const hasPayments = parseFloat(String(debt.paid_amount)) > 0;
+              const hasOffset = debt.contact && ((debt.contact.open_payable ?? 0) > 0 && (debt.contact.open_receivable ?? 0) > 0);
+
+              return (
+                <div
+                  key={debt.id}
+                  onClick={() => setDrawerDebt(debt)}
+                  className="p-4 space-y-3 hover:bg-slate-50/80 dark:hover:bg-slate-800/30 transition-colors cursor-pointer active:bg-slate-100 dark:active:bg-slate-800/50"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-bold text-slate-900 dark:text-white text-sm">
+                          {debt.contact?.name}
+                        </span>
+                        {debt.reference_type === 'handover_holding' && (
+                          <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50 dark:border-amber-800/50">
+                            Handover
+                          </span>
+                        )}
+                        {debt.reference_type === 'vendor_return_refund' && (
+                          <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-400 border border-teal-200/50 dark:border-teal-800/50">
+                            Return Refund
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-slate-400 mt-0.5">
+                        {debt.contact?.phone || 'No phone'}
+                        {hasOffset && (
+                          <span className="text-[10px] text-slate-500 dark:text-slate-400 ml-1">
+                            · Net: {(debt.contact?.net_balance ?? 0) > 0 ? `+${Number(debt.contact?.net_balance).toLocaleString()} ETB` : (debt.contact?.net_balance ?? 0) < 0 ? `−${Math.abs(Number(debt.contact?.net_balance)).toLocaleString()} ETB` : 'Settled'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className={`font-mono font-bold text-base ${debtType === 'receivable' ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400'}`}>
+                        {Number(debt.remaining_amount).toLocaleString()} <span className="text-[10px] font-normal text-slate-400 font-sans">ETB</span>
+                      </div>
+                      <span
+                        className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold capitalize mt-1 ${
+                          debt.status === 'settled'
+                            ? 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                            : debt.status === 'partially_paid'
+                            ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200/50 dark:border-amber-800/50'
+                            : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-800/50'
+                        }`}
+                      >
+                        {debt.status.replace(/_/g, ' ')}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Notes / Due Date */}
+                  <div className="flex items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400 pt-1 border-t border-slate-100/80 dark:border-slate-800/50">
+                    <div className="min-w-0 truncate text-[11px]">
+                      {debt.notes || <span className="italic text-slate-400">No notes</span>}
+                    </div>
+                    {due && (
+                      <span
+                        className={`inline-flex items-center gap-1 text-[11px] font-semibold shrink-0 ${
+                          due.isOverdue ? 'text-rose-600 dark:text-rose-400' : 'text-slate-400'
+                        }`}
+                      >
+                        {due.isOverdue && <AlertTriangle className="w-3 h-3" />}
+                        <CalendarDays className="w-3 h-3" />
+                        {due.label}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Actions Bar */}
+                  <div className="flex items-center justify-between pt-1">
+                    <div className="flex items-center gap-2 font-mono text-[11px] text-slate-400">
+                      <span>Orig: {Number(debt.original_amount).toLocaleString()}</span>
+                      {hasPayments && <span>• Paid: {Number(debt.paid_amount).toLocaleString()}</span>}
+                    </div>
+                    <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                      {isManual && (
+                        <button
+                          onClick={(e) => openEdit(debt, e)}
+                          title="Edit"
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      {isManual && !hasPayments && (
+                        <button
+                          onClick={(e) => confirmDelete(debt, e)}
+                          title="Delete"
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      {parseFloat(String(debt.remaining_amount)) > 0 && (
+                        <button
+                          onClick={(e) => handleOpenSettleModal(debt, e)}
+                          className="h-7 px-3 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-[11px] font-semibold hover:bg-slate-800 dark:hover:bg-slate-100 active:scale-95 shadow-xs"
+                        >
+                          Settle
+                        </button>
+                      )}
+                      <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 ml-1" />
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
 
         {/* Pagination */}

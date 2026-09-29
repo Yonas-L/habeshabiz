@@ -215,7 +215,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
 
         <div className="flex items-center gap-2">
           {/* View toggle */}
-          <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl">
+          <div className="hidden md:flex items-center p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl">
             <button
               type="button"
               onClick={() => setViewMode('grid')}

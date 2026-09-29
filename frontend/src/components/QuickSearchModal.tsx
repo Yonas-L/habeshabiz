@@ -460,7 +460,7 @@ export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto p-4 sm:p-6 md:p-20 flex justify-center items-start">
+    <div className="fixed inset-0 z-50 overflow-y-auto p-3 sm:p-6 md:p-20 flex justify-center items-start pt-14 sm:pt-20">
       {/* Backdrop */}
       <div
         onClick={onClose}
@@ -475,7 +475,7 @@ export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({
           <input
             ref={inputRef}
             type="text"
-            placeholder="Type a page, command, device model, IMEI/SN, partner, or bank account..."
+            placeholder="Search pages, commands, IMEIs, partners..."
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
@@ -587,7 +587,7 @@ export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({
 
         {/* Modal Footer Hints */}
         <div className="px-4 py-2.5 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 flex items-center justify-between text-[11px] text-slate-400">
-          <div className="flex items-center gap-3">
+          <div className="hidden sm:flex items-center gap-3">
             <span className="flex items-center gap-1">
               <kbd className="px-1 py-0.5 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-mono text-[9px]">↑</kbd>
               <kbd className="px-1 py-0.5 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-mono text-[9px]">↓</kbd>

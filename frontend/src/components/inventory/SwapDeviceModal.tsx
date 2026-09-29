@@ -182,8 +182,11 @@ export const SwapDeviceModal: React.FC<SwapDeviceModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
-      <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-100 dark:border-slate-800 w-full max-w-lg p-5 space-y-4 shadow-xl max-h-[92vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+      <div className="bg-white dark:bg-[#131926] rounded-t-3xl sm:rounded-2xl border-t sm:border border-slate-100 dark:border-slate-800 w-full max-w-lg p-5 space-y-4 shadow-2xl max-h-[92vh] sm:max-h-[85vh] flex flex-col animate-bottom-sheet sm:animate-fade-in pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] sm:pb-5">
+        {/* Mobile Drag Indicator */}
+        <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto -mt-1 mb-1 sm:hidden shrink-0" />
+
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 shrink-0">
           <div className="flex items-center gap-2.5">

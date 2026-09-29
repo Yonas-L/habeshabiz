@@ -216,7 +216,8 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
 
       {/* Expense History Table with Click-to-Open Drawer */}
       <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-100 dark:border-slate-800/80 overflow-hidden shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
-        <div className="overflow-x-auto">
+        {/* Desktop Table (md and up) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50/70 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
               <tr>
@@ -315,6 +316,90 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Native Cards (< md) */}
+        <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800/80">
+          {loading ? (
+            <div className="py-12 text-center text-slate-400">
+              <div className="flex items-center justify-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin text-slate-900 dark:text-white" />
+                <span>Loading expense ledger...</span>
+              </div>
+            </div>
+          ) : expenses.length === 0 ? (
+            <div className="py-12 text-center text-slate-400 text-xs">
+              No expense or drawing records found.
+            </div>
+          ) : (
+            pagedExpenses.map((exp) => (
+              <div
+                key={exp.id}
+                onClick={() => setSelectedExpense(exp)}
+                className="p-4 space-y-2.5 hover:bg-slate-50/80 dark:hover:bg-slate-800/30 transition-colors cursor-pointer active:bg-slate-100 dark:active:bg-slate-800/50"
+              >
+                {/* Header row: category + amount */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-50 dark:bg-slate-800/70 border border-slate-200/60 dark:border-slate-700 text-slate-800 dark:text-slate-200 capitalize">
+                    {getCategoryIcon(exp.category)}
+                    <span>{exp.category.replace(/_/g, ' ')}</span>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="font-mono font-bold text-base text-slate-900 dark:text-white">
+                      {Number(exp.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}{' '}
+                      <span className="text-[10px] font-normal text-slate-400 font-sans">ETB</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Description */}
+                <div>
+                  <div className="text-slate-900 dark:text-white font-bold text-sm">
+                    {exp.description}
+                  </div>
+                  {exp.inventory_unit && (
+                    <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                      <span>{exp.inventory_unit.variant?.product?.name || 'Device'}</span>
+                      {exp.inventory_unit.imei_or_serial && (
+                        <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                          • {exp.inventory_unit.imei_or_serial}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer details: Account, Date, Classification, Chevron */}
+                <div className="flex items-center justify-between pt-1 border-t border-slate-100/80 dark:border-slate-800/50 text-[11px] text-slate-400">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-slate-600 dark:text-slate-300 font-medium">
+                      {exp.financial_account?.name || 'Cash Drawer'}
+                    </span>
+                    <span>•</span>
+                    <span>
+                      {new Date(exp.date).toLocaleDateString(undefined, {
+                        month: 'short',
+                        day: 'numeric',
+                      })}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold ${
+                        exp.is_owner_draw
+                          ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200/50 dark:border-amber-800/50'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                      }`}
+                    >
+                      {exp.is_owner_draw ? 'Owner Draw' : 'Business Expense'}
+                    </span>
+                    <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600" />
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
         </div>
         {expenses.length > 0 && (
           <div className="px-5 pb-4">
