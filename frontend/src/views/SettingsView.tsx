@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { User, Tenant, SettingsProfileResponse } from '../api/client';
-import { api } from '../api/client';
+import { api, resolveImageUrl } from '../api/client';
 import {
   Building2,
   Phone,
@@ -77,6 +77,25 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           setCurrencyCode(res.tenant.currency_code || 'ETB');
           setSecondaryCurrencies(res.tenant.secondary_currencies || ['USD']);
           setLogoUrl(res.tenant.logo_url || null);
+
+          if (tenant && user) {
+            const updatedTenant: Tenant = {
+              ...tenant,
+              name: res.tenant.name,
+              phone: res.tenant.phone,
+              currency: res.tenant.currency_code,
+              settings: {
+                ...tenant.settings,
+                city: res.tenant.city,
+                address: res.tenant.address,
+                tin_number: res.tenant.tin_number,
+                footer_note: res.tenant.footer_note,
+                secondary_currencies: res.tenant.secondary_currencies,
+                logo_url: res.tenant.logo_url,
+              },
+            };
+            onProfileUpdated(updatedTenant, user);
+          }
         }
         if (res.user) {
           setOwnerName(res.user.name || '');
@@ -252,7 +271,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         <div className="lg:col-span-2 space-y-6">
           <form
             onSubmit={handleSaveProfile}
-            className="p-6 rounded-2xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-5"
+            className="p-4 sm:p-6 rounded-2xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-5"
           >
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800/80">
               <div className="flex items-center gap-2.5">
@@ -271,26 +290,28 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
 
             {/* Logo Upload Section */}
-            <div className="flex items-center gap-4 p-3.5 rounded-xl bg-slate-50/70 dark:bg-slate-900/40 border border-slate-200/60 dark:border-slate-800">
-              <div className="w-14 h-14 rounded-xl bg-slate-200 dark:bg-slate-800 border border-slate-300/60 dark:border-slate-700 flex items-center justify-center shrink-0 overflow-hidden shadow-xs">
-                {logoUrl ? (
-                  <img
-                    src={logoUrl}
-                    alt="Business Logo"
-                    className="w-full h-full object-contain p-1"
-                  />
-                ) : (
-                  <ImageIcon className="w-6 h-6 text-slate-400" />
-                )}
-              </div>
-
-              <div className="flex-1 min-w-0">
-                <div className="text-xs font-bold text-slate-900 dark:text-white">
-                  Business Logo
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 p-3.5 rounded-xl bg-slate-50/70 dark:bg-slate-900/40 border border-slate-200/60 dark:border-slate-800">
+              <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                <div className="w-12 sm:w-14 h-12 sm:h-14 rounded-xl bg-slate-200 dark:bg-slate-800 border border-slate-300/60 dark:border-slate-700 flex items-center justify-center shrink-0 overflow-hidden shadow-xs">
+                  {logoUrl ? (
+                    <img
+                      src={resolveImageUrl(logoUrl) || logoUrl}
+                      alt="Business Logo"
+                      className="w-full h-full object-contain p-1"
+                    />
+                  ) : (
+                    <ImageIcon className="w-6 h-6 text-slate-400" />
+                  )}
                 </div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                  PNG, JPG, or SVG up to 2MB. Displayed in sidebar and printable invoices.
-                </p>
+
+                <div className="min-w-0">
+                  <div className="text-xs font-bold text-slate-900 dark:text-white">
+                    Business Logo
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    PNG, JPG, or SVG up to 2MB. Displayed in invoices.
+                  </p>
+                </div>
               </div>
 
               <input
@@ -305,7 +326,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 type="button"
                 disabled={isUploadingLogo}
                 onClick={() => fileInputRef.current?.click()}
-                className="h-8 px-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0"
+                className="h-8 px-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 w-full sm:w-auto shrink-0"
               >
                 {isUploadingLogo ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -409,7 +430,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
                   Secondary Display Currencies
                 </label>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   {['USD', 'EUR', 'AED', 'GBP'].map((curr) => {
                     const isSelected = secondaryCurrencies.includes(curr);
                     return (
@@ -449,7 +470,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <button
                 type="submit"
                 disabled={isSavingProfile}
-                className="h-9 px-5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-emerald-500 dark:hover:bg-emerald-600 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-95 disabled:opacity-50"
+                className="h-9 px-5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-emerald-500 dark:hover:bg-emerald-600 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-95 disabled:opacity-50 w-full sm:w-auto"
               >
                 {isSavingProfile ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -465,7 +486,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         {/* Right Column: Owner Account & Password (1 Col on lg) */}
         <div className="space-y-6">
           {/* Owner Account Card */}
-          <div className="p-6 rounded-2xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-4">
+          <div className="p-4 sm:p-6 rounded-2xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-4">
             <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800/80">
               <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center">
                 <UserIcon className="w-4 h-4" />
@@ -529,7 +550,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           {/* Change Password Card */}
           <form
             onSubmit={handleChangePassword}
-            className="p-6 rounded-2xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-4"
+            className="p-4 sm:p-6 rounded-2xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-4"
           >
             <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800/80">
               <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center">

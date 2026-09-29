@@ -121,32 +121,32 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
   return (
     <div className="space-y-6 animate-page-enter">
       {/* Top Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <div className="flex items-center gap-2.5">
-            <h2 className="font-bold text-slate-900 dark:text-white text-lg tracking-tight">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="font-bold text-slate-900 dark:text-white text-base sm:text-lg tracking-tight">
               Operating Expenses & Owner Draws
             </h2>
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700">
               Segregated Ledgers
             </span>
           </div>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5">
             Strict segregation between shop operational costs and owner personal withdrawals
           </p>
         </div>
 
         <button
           onClick={() => setShowModal(true)}
-          className="h-10 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs flex items-center gap-2 self-start sm:self-auto active:scale-[0.98] cursor-pointer"
+          className="h-9 sm:h-10 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs flex items-center justify-center gap-2 w-full sm:w-auto active:scale-[0.98] cursor-pointer"
         >
           <Plus className="w-4 h-4 text-emerald-400 dark:text-emerald-600" />
           <span>Record Expense</span>
         </button>
       </div>
 
-      {/* Summary Matrix (3 Bold Cards with Embedded Micro-Charts) */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* Desktop Summary Matrix (sm and up) */}
+      <div className="hidden sm:grid sm:grid-cols-3 gap-4">
         {/* 1. Operating Expenses */}
         <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-100 dark:border-slate-800/80 p-5 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] flex flex-col justify-between">
           <div>
@@ -210,6 +210,64 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
           <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-end justify-between">
             <span className="text-[11px] text-slate-400 font-medium">{expenses.length} Records In Ledger</span>
             <MiniSparkline values={outflowTrend} color="rose" />
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile Summary Matrix (< sm) */}
+      <div className="sm:hidden space-y-2.5">
+        <div className="grid grid-cols-2 gap-2.5">
+          {/* Mobile 1: Operating */}
+          <div className="bg-white dark:bg-[#131926] rounded-xl border border-slate-200/80 dark:border-slate-800/80 p-3.5 shadow-xs flex flex-col justify-between">
+            <div className="flex items-center justify-between gap-1 mb-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 truncate">Shop Expenses</span>
+              <div className="size-7 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-100 dark:border-rose-900/40 flex items-center justify-center shrink-0">
+                <Receipt className="size-3.5 text-rose-600 dark:text-rose-400" />
+              </div>
+            </div>
+            <div>
+              <div className="text-base font-bold font-mono text-slate-900 dark:text-white tabular-nums tracking-tight">
+                <AnimatedNumber value={operatingTotal} decimals={0} />
+                <span className="text-[10px] font-medium text-slate-400 ml-1 font-sans">ETB</span>
+              </div>
+              <div className="text-[10px] text-slate-400 mt-0.5">Operating costs</div>
+            </div>
+          </div>
+
+          {/* Mobile 2: Owner Draws */}
+          <div className="bg-white dark:bg-[#131926] rounded-xl border border-slate-200/80 dark:border-slate-800/80 p-3.5 shadow-xs flex flex-col justify-between">
+            <div className="flex items-center justify-between gap-1 mb-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 truncate">Owner Draws</span>
+              <div className="size-7 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60 flex items-center justify-center shrink-0">
+                <UserMinus className="size-3.5 text-slate-700 dark:text-slate-300" />
+              </div>
+            </div>
+            <div>
+              <div className="text-base font-bold font-mono text-slate-900 dark:text-white tabular-nums tracking-tight">
+                <AnimatedNumber value={ownerDrawsTotal} decimals={0} />
+                <span className="text-[10px] font-medium text-slate-400 ml-1 font-sans">ETB</span>
+              </div>
+              <div className="text-[10px] text-slate-400 mt-0.5">Personal drawings</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile 3: Total Outflows Handled */}
+        <div className="bg-white dark:bg-[#131926] rounded-xl border border-slate-200/80 dark:border-slate-800/80 p-3.5 shadow-xs flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="size-8 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-100 dark:border-rose-900/40 flex items-center justify-center shrink-0">
+              <TrendingDown className="size-4 text-rose-600 dark:text-rose-400" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Cash Outflows</div>
+              <div className="text-[10px] text-slate-400">{expenses.length} Records in Ledger</div>
+            </div>
+          </div>
+          <div className="text-right shrink-0">
+            <div className="text-base font-bold font-mono text-slate-900 dark:text-white tabular-nums">
+              <AnimatedNumber value={operatingTotal + ownerDrawsTotal} decimals={0} />
+              <span className="text-[10px] font-medium text-slate-400 ml-1 font-sans">ETB</span>
+            </div>
           </div>
         </div>
       </div>
@@ -336,7 +394,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
               <div
                 key={exp.id}
                 onClick={() => setSelectedExpense(exp)}
-                className="p-4 space-y-2.5 hover:bg-slate-50/80 dark:hover:bg-slate-800/30 transition-colors cursor-pointer active:bg-slate-100 dark:active:bg-slate-800/50"
+                className="p-3.5 sm:p-4 space-y-2 hover:bg-slate-50/80 dark:hover:bg-slate-800/30 transition-colors cursor-pointer active:bg-slate-100 dark:active:bg-slate-800/50"
               >
                 {/* Header row: category + amount */}
                 <div className="flex items-start justify-between gap-3">
@@ -345,7 +403,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
                     <span>{exp.category.replace(/_/g, ' ')}</span>
                   </div>
                   <div className="text-right shrink-0">
-                    <div className="font-mono font-bold text-base text-slate-900 dark:text-white">
+                    <div className="font-mono font-bold text-sm sm:text-base text-slate-900 dark:text-white tabular-nums">
                       {Number(exp.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}{' '}
                       <span className="text-[10px] font-normal text-slate-400 font-sans">ETB</span>
                     </div>
@@ -354,7 +412,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
 
                 {/* Description */}
                 <div>
-                  <div className="text-slate-900 dark:text-white font-bold text-sm">
+                  <div className="text-slate-900 dark:text-white font-bold text-xs sm:text-sm">
                     {exp.description}
                   </div>
                   {exp.inventory_unit && (

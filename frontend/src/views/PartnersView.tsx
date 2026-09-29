@@ -364,36 +364,32 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
             </button>
           )}
         </div>
-      ) : viewMode === 'grid' ? (
-        /* ═══ GRID CARDS VIEW ═══ */
+      ) : (
         <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {/* ═══ MOBILE CONTACT LIST (< sm) ═══ */}
+          <div className="sm:hidden space-y-2.5">
             {filteredContacts.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((contact) => {
-            const isBrokered = contact.roles.includes('peer_vendor');
-            const initials = contact.name
-              .split(' ')
-              .map((n) => n[0])
-              .slice(0, 2)
-              .join('')
-              .toUpperCase();
-            const isInactive = contact.is_active === false;
+              const isBrokered = contact.roles.includes('peer_vendor');
+              const initials = contact.name
+                .split(' ')
+                .map((n) => n[0])
+                .slice(0, 2)
+                .join('')
+                .toUpperCase();
+              const isInactive = contact.is_active === false;
 
-            return (
-              <div
-                key={contact.id}
-                onClick={() => setSelectedPartnerId(contact.id)}
-                className={`group rounded-2xl border flex flex-col overflow-hidden transition-all duration-150 cursor-pointer ${
-                  isInactive
-                    ? 'bg-slate-50/80 dark:bg-[#131926]/60 border-slate-200/50 dark:border-slate-800/40 opacity-60'
-                    : 'bg-white dark:bg-[#131926] border-slate-200/80 dark:border-slate-800/80 hover:border-slate-400/80 dark:hover:border-slate-600 shadow-[0_2px_12px_-2px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_24px_-4px_rgba(0,0,0,0.08)]'
-                }`}
-              >
-                {/* ── Card Body ── */}
-                <div className="p-5 flex-1 space-y-3.5">
-                  {/* Header: Avatar + Name + Badges */}
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      {/* Avatar */}
+              return (
+                <div
+                  key={contact.id}
+                  onClick={() => setSelectedPartnerId(contact.id)}
+                  className={`rounded-2xl border p-4 transition-all active:scale-[0.99] cursor-pointer bg-white dark:bg-[#131926] shadow-xs ${
+                    isInactive
+                      ? 'border-slate-200/50 dark:border-slate-800/40 opacity-60'
+                      : 'border-slate-200/80 dark:border-slate-800/80 hover:border-slate-400/80'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2.5">
+                    <div className="flex items-center gap-2.5 min-w-0">
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-extrabold text-xs shrink-0 ${
                         isBrokered
                           ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-200/60 dark:border-amber-800/50'
@@ -402,330 +398,459 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                         {initials}
                       </div>
 
-                      {/* Name + Inactive Flag */}
                       <div className="min-w-0">
-                        <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate tracking-tight leading-tight group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate leading-tight">
                           {contact.name}
                         </h3>
-                        {isInactive && (
-                          <span className="text-[10px] font-semibold text-slate-400 block mt-0.5">
-                            Inactive
-                          </span>
+                        {contact.phone ? (
+                          <div className="flex items-center gap-1.5 mt-0.5 text-xs text-slate-500 font-mono">
+                            <Phone className="w-3 h-3 text-slate-400 shrink-0" />
+                            <span>{contact.phone}</span>
+                          </div>
+                        ) : (
+                          <span className="text-[10px] text-slate-400 italic block mt-0.5">No phone</span>
                         )}
                       </div>
                     </div>
 
-                    {/* Role Badges */}
-                    <div className="flex flex-wrap items-start justify-end gap-1 shrink-0 pt-0.5">
-                      {contact.roles.map((r) => {
-                        const badge = getRoleBadge(r);
-                        return (
-                          <span key={r} className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md leading-none ${badge.classes}`}>
-                            {badge.label}
-                          </span>
-                        );
-                      })}
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      <div className="flex flex-wrap gap-1 justify-end">
+                        {contact.roles.map((r) => {
+                          const badge = getRoleBadge(r);
+                          return (
+                            <span key={r} className={`text-[9px] font-bold px-1.5 py-0.5 rounded leading-none ${badge.classes}`}>
+                              {badge.label}
+                            </span>
+                          );
+                        })}
+                      </div>
+                      {isInactive && (
+                        <span className="text-[9px] font-semibold text-slate-400">Inactive</span>
+                      )}
                     </div>
                   </div>
 
-                  {/* Phone */}
-                  <div className="flex items-center justify-between">
-                    {contact.phone ? (
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <Phone className="w-3 h-3 text-slate-400 shrink-0" />
+                  {/* Financial Balance and Actions */}
+                  <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800/60 flex items-center justify-between text-xs">
+                    <div>
+                      {typeof contact.net_balance === 'number' ? (
+                        <span className={`font-mono font-bold text-xs ${
+                          contact.net_balance > 0
+                            ? 'text-emerald-600 dark:text-emerald-400'
+                            : contact.net_balance < 0
+                            ? 'text-rose-600 dark:text-rose-400'
+                            : 'text-slate-400'
+                        }`}>
+                          {contact.net_balance > 0
+                            ? `+${contact.net_balance.toLocaleString()} ETB`
+                            : contact.net_balance < 0
+                            ? `−${Math.abs(contact.net_balance).toLocaleString()} ETB`
+                            : '0.00 ETB'}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-slate-400">No balance</span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                      {contact.phone && (
                         <a
                           href={`tel:${contact.phone}`}
                           onClick={(e) => e.stopPropagation()}
-                          className="text-[11px] font-mono text-slate-700 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors truncate"
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-600 hover:bg-slate-100 dark:hover:bg-slate-800"
+                          title="Call"
                         >
-                          {contact.phone}
+                          <Phone className="w-3.5 h-3.5" />
                         </a>
-                        {contact.alt_phone && (
-                          <span className="text-[11px] font-mono text-slate-400 truncate">· {contact.alt_phone}</span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenEditModal(contact);
+                        }}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                        title="Edit"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeletingContact(contact);
+                        }}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                        title="Delete"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                      <ChevronRight className="w-4 h-4 text-slate-300 ml-0.5" />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* ═══ DESKTOP VIEW (≥ sm): user's chosen viewMode (grid or table) ═══ */}
+          <div className="hidden sm:block">
+            {viewMode === 'grid' ? (
+              /* ═══ GRID CARDS VIEW ═══ */
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {filteredContacts.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((contact) => {
+                  const isBrokered = contact.roles.includes('peer_vendor');
+                  const initials = contact.name
+                    .split(' ')
+                    .map((n) => n[0])
+                    .slice(0, 2)
+                    .join('')
+                    .toUpperCase();
+                  const isInactive = contact.is_active === false;
+
+                  return (
+                    <div
+                      key={contact.id}
+                      onClick={() => setSelectedPartnerId(contact.id)}
+                      className={`group rounded-2xl border flex flex-col overflow-hidden transition-all duration-150 cursor-pointer ${
+                        isInactive
+                          ? 'bg-slate-50/80 dark:bg-[#131926]/60 border-slate-200/50 dark:border-slate-800/40 opacity-60'
+                          : 'bg-white dark:bg-[#131926] border-slate-200/80 dark:border-slate-800/80 hover:border-slate-400/80 dark:hover:border-slate-600 shadow-[0_2px_12px_-2px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_24px_-4px_rgba(0,0,0,0.08)]'
+                      }`}
+                    >
+                      {/* ── Card Body ── */}
+                      <div className="p-5 flex-1 space-y-3.5">
+                        {/* Header: Avatar + Name + Badges */}
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            {/* Avatar */}
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-extrabold text-xs shrink-0 ${
+                              isBrokered
+                                ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-200/60 dark:border-amber-800/50'
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200/60 dark:border-slate-700/60'
+                            }`}>
+                              {initials}
+                            </div>
+
+                            {/* Name + Inactive Flag */}
+                            <div className="min-w-0">
+                              <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate tracking-tight leading-tight group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                                {contact.name}
+                              </h3>
+                              {isInactive && (
+                                <span className="text-[10px] font-semibold text-slate-400 block mt-0.5">
+                                  Inactive
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Role Badges */}
+                          <div className="flex flex-wrap items-start justify-end gap-1 shrink-0 pt-0.5">
+                            {contact.roles.map((r) => {
+                              const badge = getRoleBadge(r);
+                              return (
+                                <span key={r} className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md leading-none ${badge.classes}`}>
+                                  {badge.label}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Phone */}
+                        <div className="flex items-center justify-between">
+                          {contact.phone ? (
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <Phone className="w-3 h-3 text-slate-400 shrink-0" />
+                              <a
+                                href={`tel:${contact.phone}`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-[11px] font-mono text-slate-700 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors truncate"
+                              >
+                                {contact.phone}
+                              </a>
+                              {contact.alt_phone && (
+                                <span className="text-[11px] font-mono text-slate-400 truncate">· {contact.alt_phone}</span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-[11px] text-slate-400 italic">No phone on file</span>
+                          )}
+
+                          {contact.phone && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCopyPhone(contact.phone!, contact.id);
+                              }}
+                              title="Copy phone number"
+                              className="ml-2 p-1 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0"
+                            >
+                              {copiedId === contact.id
+                                ? <Check className="w-3.5 h-3.5 text-emerald-500" />
+                                : <Copy className="w-3.5 h-3.5" />
+                              }
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Notes */}
+                        {contact.notes && (
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1 leading-relaxed">
+                            {contact.notes}
+                          </p>
+                        )}
+
+                        {/* Clean Financial Balance Row */}
+                        {typeof contact.net_balance === 'number' && (
+                          <div className="pt-3 border-t border-slate-100 dark:border-slate-800/60 flex items-baseline justify-between">
+                            <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
+                              {contact.net_balance > 0 ? 'Receivable' : contact.net_balance < 0 ? 'Payable' : 'Balance'}
+                            </span>
+                            <span className={`font-mono font-bold text-xs ${
+                              contact.net_balance > 0
+                                ? 'text-emerald-600 dark:text-emerald-400'
+                                : contact.net_balance < 0
+                                ? 'text-rose-600 dark:text-rose-400'
+                                : 'text-slate-400'
+                            }`}>
+                              {contact.net_balance > 0
+                                ? `+${contact.net_balance.toLocaleString()} ETB`
+                                : contact.net_balance < 0
+                                ? `−${Math.abs(contact.net_balance).toLocaleString()} ETB`
+                                : '0.00 ETB'}
+                            </span>
+                          </div>
                         )}
                       </div>
-                    ) : (
-                      <span className="text-[11px] text-slate-400 italic">No phone on file</span>
-                    )}
 
-                    {contact.phone && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleCopyPhone(contact.phone!, contact.id);
-                        }}
-                        title="Copy phone number"
-                        className="ml-2 p-1 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0"
-                      >
-                        {copiedId === contact.id
-                          ? <Check className="w-3.5 h-3.5 text-emerald-500" />
-                          : <Copy className="w-3.5 h-3.5" />
-                        }
-                      </button>
-                    )}
-                  </div>
+                      {/* ── Card Footer ── */}
+                      <div className="px-4 py-2.5 border-t border-slate-100 dark:border-slate-800/60 bg-slate-50/50 dark:bg-slate-900/20 flex items-center justify-between">
+                        {/* Left: Statement & Ledger indicator */}
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600 dark:text-slate-300 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                          Statement and Ledger
+                          <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
+                        </span>
 
-                  {/* Notes */}
-                  {contact.notes && (
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1 leading-relaxed">
-                      {contact.notes}
-                    </p>
-                  )}
+                        {/* Right: action buttons */}
+                        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                          {isBrokered && onNavigateTab && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onNavigateTab('counter');
+                                toast.info(`Source from ${contact.name} in Sales`);
+                              }}
+                              title="Source in Sales"
+                              className="p-1.5 rounded-lg text-amber-600 dark:text-amber-400 hover:bg-amber-100/50 dark:hover:bg-amber-950/50 transition-colors"
+                            >
+                              <ShoppingBag className="w-3.5 h-3.5" />
+                            </button>
+                          )}
 
-                  {/* Clean Financial Balance Row */}
-                  {typeof contact.net_balance === 'number' && (
-                    <div className="pt-3 border-t border-slate-100 dark:border-slate-800/60 flex items-baseline justify-between">
-                      <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
-                        {contact.net_balance > 0 ? 'Receivable' : contact.net_balance < 0 ? 'Payable' : 'Balance'}
-                      </span>
-                      <span className={`font-mono font-bold text-xs ${
-                        contact.net_balance > 0
-                          ? 'text-emerald-600 dark:text-emerald-400'
-                          : contact.net_balance < 0
-                          ? 'text-rose-600 dark:text-rose-400'
-                          : 'text-slate-400'
-                      }`}>
-                        {contact.net_balance > 0
-                          ? `+${contact.net_balance.toLocaleString()} ETB`
-                          : contact.net_balance < 0
-                          ? `−${Math.abs(contact.net_balance).toLocaleString()} ETB`
-                          : '0.00 ETB'}
-                      </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenEditModal(contact);
+                            }}
+                            title="Edit details"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeletingContact(contact);
+                            }}
+                            title="Remove partner"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                  )}
-                </div>
+                  );
+                })}
+              </div>
+            ) : (
+              /* ═══ TABLE VIEW ═══ */
+              <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800/80 overflow-hidden shadow-[0_2px_12px_-2px_rgba(0,0,0,0.04)]">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="border-b border-slate-100 dark:border-slate-800/80">
+                        <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 bg-slate-50/70 dark:bg-slate-900/40 whitespace-nowrap">
+                          Partner
+                        </th>
+                        <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 bg-slate-50/70 dark:bg-slate-900/40 whitespace-nowrap">
+                          Roles
+                        </th>
+                        <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 bg-slate-50/70 dark:bg-slate-900/40 whitespace-nowrap">
+                          Phone
+                        </th>
+                        <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 bg-slate-50/70 dark:bg-slate-900/40 whitespace-nowrap hidden lg:table-cell">
+                          Notes
+                        </th>
+                        <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 bg-slate-50/70 dark:bg-slate-900/40 text-center whitespace-nowrap">
+                          Status
+                        </th>
+                        <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 bg-slate-50/70 dark:bg-slate-900/40 text-right whitespace-nowrap">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
+                      {filteredContacts.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((contact) => {
+                        const isBrokered = contact.roles.includes('peer_vendor');
+                        const isInactive = contact.is_active === false;
+                        return (
+                          <tr
+                            key={contact.id}
+                            onClick={() => setSelectedPartnerId(contact.id)}
+                            className={`group transition-colors cursor-pointer ${isInactive ? 'opacity-60' : 'hover:bg-slate-50/70 dark:hover:bg-slate-800/30'}`}
+                          >
+                            {/* Name */}
+                            <td className="py-3 px-4">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-sm font-semibold text-slate-900 dark:text-white block leading-tight group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                                  {contact.name}
+                                </span>
+                                <ChevronRight className="w-3.5 h-3.5 text-slate-300 opacity-0 group-hover:opacity-100 group-hover:text-emerald-500 transition-all" />
+                              </div>
+                              {contact.email && (
+                                <span className="text-[10px] text-slate-400 font-medium mt-0.5 block">{contact.email}</span>
+                              )}
+                            </td>
 
-                {/* ── Card Footer ── */}
-                <div className="px-4 py-2.5 border-t border-slate-100 dark:border-slate-800/60 bg-slate-50/50 dark:bg-slate-900/20 flex items-center justify-between">
-                  {/* Left: Statement & Ledger indicator */}
-                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600 dark:text-slate-300 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                    Statement and Ledger
-                    <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
-                  </span>
+                            {/* Roles */}
+                            <td className="py-3 px-4">
+                              <div className="flex flex-wrap gap-1">
+                                {contact.roles.map((r) => {
+                                  const badge = getRoleBadge(r);
+                                  return (
+                                    <span key={r} className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md leading-none ${badge.classes}`}>
+                                      {badge.label}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            </td>
 
-                  {/* Right: action buttons */}
-                  <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                    {isBrokered && onNavigateTab && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onNavigateTab('counter');
-                          toast.info(`Source from ${contact.name} in Sales`);
-                        }}
-                        title="Source in Sales"
-                        className="p-1.5 rounded-lg text-amber-600 dark:text-amber-400 hover:bg-amber-100/50 dark:hover:bg-amber-950/50 transition-colors"
-                      >
-                        <ShoppingBag className="w-3.5 h-3.5" />
-                      </button>
-                    )}
+                            {/* Phone */}
+                            <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
+                              {contact.phone ? (
+                                <div className="flex items-center gap-1.5">
+                                  <a
+                                    href={`tel:${contact.phone}`}
+                                    className="text-[11px] font-mono text-slate-700 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+                                  >
+                                    {contact.phone}
+                                  </a>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopyPhone(contact.phone!, contact.id)}
+                                    title="Copy phone"
+                                    className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+                                  >
+                                    {copiedId === contact.id
+                                      ? <Check className="w-3 h-3 text-emerald-500" />
+                                      : <Copy className="w-3 h-3" />
+                                    }
+                                  </button>
+                                </div>
+                              ) : (
+                                <span className="text-[11px] text-slate-400">—</span>
+                              )}
+                            </td>
 
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOpenEditModal(contact);
-                      }}
-                      title="Edit details"
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors"
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                    </button>
+                            {/* Notes (hidden on smaller screens) */}
+                            <td className="py-3 px-4 hidden lg:table-cell">
+                              <span className="text-[11px] text-slate-500 dark:text-slate-400 max-w-xs truncate block">
+                                {contact.notes || <span className="text-slate-300 dark:text-slate-600">—</span>}
+                              </span>
+                            </td>
 
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDeletingContact(contact);
-                      }}
-                      title="Remove partner"
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+                            {/* Status */}
+                            <td className="py-3 px-4 text-center" onClick={(e) => e.stopPropagation()}>
+                              <button
+                                type="button"
+                                onClick={() => handleToggleActive(contact)}
+                                title={isInactive ? 'Mark active' : 'Mark inactive'}
+                                className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-bold transition-colors ${
+                                  !isInactive
+                                    ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-950/60'
+                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'
+                                }`}
+                              >
+                                <span className={`w-1.5 h-1.5 rounded-full ${!isInactive ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                                {!isInactive ? 'Active' : 'Inactive'}
+                              </button>
+                            </td>
+
+                            {/* Actions */}
+                            <td className="py-3 px-4 text-right" onClick={(e) => e.stopPropagation()}>
+                              <div className="flex items-center justify-end gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedPartnerId(contact.id)}
+                                  title="Open Statement and Ledger"
+                                  className="px-2 py-1 rounded-lg text-[10px] font-bold text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors inline-flex items-center gap-1"
+                                >
+                                  Statement
+                                  <ExternalLink className="w-3 h-3" />
+                                </button>
+                                {isBrokered && onNavigateTab && (
+                                  <button
+                                    type="button"
+                                    onClick={() => { onNavigateTab('counter'); toast.info(`Switched to Sales for ${contact.name}`); }}
+                                    title="Source in Sales"
+                                    className="p-1.5 rounded-lg text-amber-500 hover:text-amber-700 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors"
+                                  >
+                                    <ShoppingBag className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditModal(contact)}
+                                  title="Edit"
+                                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setDeletingContact(contact)}
+                                  title="Remove"
+                                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </div>
-            );
-          })}
+            )}
           </div>
+
           <Pagination
             currentPage={currentPage}
             totalItems={filteredContacts.length}
             pageSize={pageSize}
             onPageChange={setCurrentPage}
           />
-        </div>
-      ) : (
-        /* ═══ TABLE VIEW ═══ */
-        <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800/80 overflow-hidden shadow-[0_2px_12px_-2px_rgba(0,0,0,0.04)]">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="border-b border-slate-100 dark:border-slate-800/80">
-                  <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 bg-slate-50/70 dark:bg-slate-900/40 whitespace-nowrap">
-                    Partner
-                  </th>
-                  <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 bg-slate-50/70 dark:bg-slate-900/40 whitespace-nowrap">
-                    Roles
-                  </th>
-                  <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 bg-slate-50/70 dark:bg-slate-900/40 whitespace-nowrap">
-                    Phone
-                  </th>
-                  <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 bg-slate-50/70 dark:bg-slate-900/40 whitespace-nowrap hidden lg:table-cell">
-                    Notes
-                  </th>
-                  <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 bg-slate-50/70 dark:bg-slate-900/40 text-center whitespace-nowrap">
-                    Status
-                  </th>
-                  <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 bg-slate-50/70 dark:bg-slate-900/40 text-right whitespace-nowrap">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
-                {filteredContacts.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((contact) => {
-                  const isBrokered = contact.roles.includes('peer_vendor');
-                  const isInactive = contact.is_active === false;
-                  return (
-                    <tr
-                      key={contact.id}
-                      onClick={() => setSelectedPartnerId(contact.id)}
-                      className={`group transition-colors cursor-pointer ${isInactive ? 'opacity-60' : 'hover:bg-slate-50/70 dark:hover:bg-slate-800/30'}`}
-                    >
-                      {/* Name */}
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-sm font-semibold text-slate-900 dark:text-white block leading-tight group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                            {contact.name}
-                          </span>
-                          <ChevronRight className="w-3.5 h-3.5 text-slate-300 opacity-0 group-hover:opacity-100 group-hover:text-emerald-500 transition-all" />
-                        </div>
-                        {contact.email && (
-                          <span className="text-[10px] text-slate-400 font-medium mt-0.5 block">{contact.email}</span>
-                        )}
-                      </td>
-
-                      {/* Roles */}
-                      <td className="py-3 px-4">
-                        <div className="flex flex-wrap gap-1">
-                          {contact.roles.map((r) => {
-                            const badge = getRoleBadge(r);
-                            return (
-                              <span key={r} className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md leading-none ${badge.classes}`}>
-                                {badge.label}
-                              </span>
-                            );
-                          })}
-                        </div>
-                      </td>
-
-                      {/* Phone */}
-                      <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
-                        {contact.phone ? (
-                          <div className="flex items-center gap-1.5">
-                            <a
-                              href={`tel:${contact.phone}`}
-                              className="text-[11px] font-mono text-slate-700 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
-                            >
-                              {contact.phone}
-                            </a>
-                            <button
-                              type="button"
-                              onClick={() => handleCopyPhone(contact.phone!, contact.id)}
-                              title="Copy phone"
-                              className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
-                            >
-                              {copiedId === contact.id
-                                ? <Check className="w-3 h-3 text-emerald-500" />
-                                : <Copy className="w-3 h-3" />
-                              }
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="text-[11px] text-slate-400">—</span>
-                        )}
-                      </td>
-
-                      {/* Notes (hidden on smaller screens) */}
-                      <td className="py-3 px-4 hidden lg:table-cell">
-                        <span className="text-[11px] text-slate-500 dark:text-slate-400 max-w-xs truncate block">
-                          {contact.notes || <span className="text-slate-300 dark:text-slate-600">—</span>}
-                        </span>
-                      </td>
-
-                      {/* Status */}
-                      <td className="py-3 px-4 text-center" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          type="button"
-                          onClick={() => handleToggleActive(contact)}
-                          title={isInactive ? 'Mark active' : 'Mark inactive'}
-                          className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-bold transition-colors ${
-                            !isInactive
-                              ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-950/60'
-                              : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'
-                          }`}
-                        >
-                          <span className={`w-1.5 h-1.5 rounded-full ${!isInactive ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-                          {!isInactive ? 'Active' : 'Inactive'}
-                        </button>
-                      </td>
-
-                      {/* Actions */}
-                      <td className="py-3 px-4 text-right" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedPartnerId(contact.id)}
-                            title="Open Statement and Ledger"
-                            className="px-2 py-1 rounded-lg text-[10px] font-bold text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors inline-flex items-center gap-1"
-                          >
-                            Statement
-                            <ExternalLink className="w-3 h-3" />
-                          </button>
-                          {isBrokered && onNavigateTab && (
-                            <button
-                              type="button"
-                              onClick={() => { onNavigateTab('counter'); toast.info(`Switched to Sales for ${contact.name}`); }}
-                              title="Source in Sales"
-                              className="p-1.5 rounded-lg text-amber-500 hover:text-amber-700 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors"
-                            >
-                              <ShoppingBag className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEditModal(contact)}
-                            title="Edit"
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setDeletingContact(contact)}
-                            title="Remove"
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-          <div className="px-5 pb-4">
-            <Pagination
-              currentPage={currentPage}
-              totalItems={filteredContacts.length}
-              pageSize={pageSize}
-              onPageChange={setCurrentPage}
-            />
-          </div>
         </div>
       )}
 

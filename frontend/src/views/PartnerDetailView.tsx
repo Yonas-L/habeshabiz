@@ -535,7 +535,8 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
             </span>
           </div>
 
-          <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs overflow-hidden">
+          {/* Desktop Table View (≥ sm) */}
+          <div className="hidden sm:block bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
@@ -640,192 +641,447 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
               </table>
             </div>
           </div>
+
+          {/* Mobile Ledger List (< sm): Native cards without horizontal scrolling */}
+          <div className="sm:hidden space-y-2.5">
+            {filteredLedger.length === 0 ? (
+              <div className="py-8 text-center text-slate-400 font-sans italic text-xs bg-white dark:bg-[#131926] rounded-xl border border-slate-200/80 dark:border-slate-800">
+                No transactions found matching your criteria.
+              </div>
+            ) : (
+              filteredLedger.map((row) => (
+                <div
+                  key={row.id}
+                  className="bg-white dark:bg-[#131926] rounded-xl border border-slate-200/80 dark:border-slate-800 p-3.5 space-y-2 shadow-2xs"
+                >
+                  <div className="flex items-center justify-between">
+                    <span
+                      className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                        row.type === 'consignment_sale' || row.type === 'brokered_sourcing' || row.type === 'manual_payable'
+                          ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50'
+                          : row.type === 'payment_sent'
+                          ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 border border-blue-200/50'
+                          : row.type === 'repair_offset'
+                          ? 'bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-400 border border-sky-200/50'
+                          : row.type === 'repair_claim'
+                          ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border border-rose-200/50'
+                          : row.type === 'sales_credit' || row.type === 'handover_holding' || row.type === 'manual_receivable'
+                          ? 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/50'
+                          : row.type === 'payout_advance'
+                          ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border border-indigo-200/50'
+                          : row.type === 'vendor_return' || row.type === 'vendor_return_refund'
+                          ? 'bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-400 border border-teal-200/50'
+                          : row.type === 'payment_received'
+                          ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                      }`}
+                    >
+                      {row.type_label}
+                    </span>
+                    <span className="text-[11px] text-slate-400 font-mono">
+                      {row.formatted_date}
+                    </span>
+                  </div>
+
+                  <div className="text-xs font-semibold text-slate-900 dark:text-white leading-snug">
+                    {row.context}
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs font-mono">
+                    <div>
+                      {row.payable !== 0 && (
+                        <div className="text-[11px] text-rose-600 dark:text-rose-400 font-semibold">
+                          Payable: {row.payable.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </div>
+                      )}
+                      {row.receivable !== 0 && (
+                        <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                          Receivable: +{row.receivable.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[9px] text-slate-400 block font-sans uppercase font-bold">Balance</span>
+                      <span
+                        className={`font-bold tabular-nums ${
+                          row.running_balance > 0
+                            ? 'text-emerald-600 dark:text-emerald-400'
+                            : row.running_balance < 0
+                            ? 'text-rose-600 dark:text-rose-400'
+                            : 'text-slate-500'
+                        }`}
+                      >
+                        {row.running_balance > 0 ? '+' : ''}
+                        {row.running_balance.toLocaleString(undefined, { minimumFractionDigits: 2 })} ETB
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       )}
 
       {/* TAB 2: SUPPLIED INVENTORY UNITS */}
       {activeTab === 'inventory' && (
-        <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="bg-slate-50/80 dark:bg-slate-900/60 border-b border-slate-200/80 dark:border-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  <th className="py-2.5 px-3.5">Device Model</th>
-                  <th className="py-2.5 px-3.5">Serial Number</th>
-                  <th className="py-2.5 px-3.5 text-right">Cost</th>
-                  <th className="py-2.5 px-3.5 text-right">Selling Price</th>
-                  <th className="py-2.5 px-3.5 text-center">Status</th>
-                  <th className="py-2.5 px-3.5 whitespace-nowrap">Sold Date</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 font-mono text-xs">
-                {supplied_units.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="py-12 text-center text-slate-400 font-sans italic">
-                      No inventory units supplied by this partner.
-                    </td>
+        <div>
+          {/* Desktop Table View (≥ sm) */}
+          <div className="hidden sm:block bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/80 dark:bg-slate-900/60 border-b border-slate-200/80 dark:border-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    <th className="py-2.5 px-3.5">Device Model</th>
+                    <th className="py-2.5 px-3.5">Serial Number</th>
+                    <th className="py-2.5 px-3.5 text-right">Cost</th>
+                    <th className="py-2.5 px-3.5 text-right">Selling Price</th>
+                    <th className="py-2.5 px-3.5 text-center">Status</th>
+                    <th className="py-2.5 px-3.5 whitespace-nowrap">Sold Date</th>
                   </tr>
-                ) : (
-                  supplied_units.map((unit) => (
-                    <tr key={unit.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
-                      <td className="py-2.5 px-3.5 font-sans font-bold text-slate-900 dark:text-white">
-                        <div>{unit.model}</div>
-                        {unit.specs.length > 0 && (
-                          <div className="text-[10px] text-slate-400 font-normal">
-                            {unit.specs.join(' · ')}
-                          </div>
-                        )}
-                      </td>
-                      <td className="py-2.5 px-3.5 text-slate-700 dark:text-slate-300">
-                        {unit.imei_or_serial || <span className="text-slate-400 italic font-sans">—</span>}
-                      </td>
-                      <td className="py-2.5 px-3.5 text-right tabular-nums text-slate-800 dark:text-slate-200">
-                        {unit.cost_basis.toLocaleString()} ETB
-                      </td>
-                      <td className="py-2.5 px-3.5 text-right tabular-nums text-slate-600 dark:text-slate-400">
-                        {unit.selling_price > 0 ? `${unit.selling_price.toLocaleString()} ETB` : '—'}
-                      </td>
-                      <td className="py-2.5 px-3.5 text-center font-sans">
-                        <span
-                          className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                            unit.status === 'in_stock'
-                              ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400'
-                              : unit.status === 'sold'
-                              ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400'
-                              : unit.status === 'returned_to_vendor'
-                              ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400'
-                              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-                          }`}
-                        >
-                          {unit.status.replace(/_/g, ' ')}
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-3.5 whitespace-nowrap text-slate-500 font-sans text-[11px]">
-                        {unit.order_number ? (
-                          <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">
-                            {unit.order_number}
-                          </span>
-                        ) : unit.sold_at ? (
-                          new Date(unit.sold_at).toLocaleDateString()
-                        ) : (
-                          'Active in Shop'
-                        )}
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 font-mono text-xs">
+                  {supplied_units.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-12 text-center text-slate-400 font-sans italic">
+                        No inventory units supplied by this partner.
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    supplied_units.map((unit) => (
+                      <tr key={unit.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
+                        <td className="py-2.5 px-3.5 font-sans font-bold text-slate-900 dark:text-white">
+                          <div>{unit.model}</div>
+                          {unit.specs.length > 0 && (
+                            <div className="text-[10px] text-slate-400 font-normal">
+                              {unit.specs.join(' · ')}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3.5 text-slate-700 dark:text-slate-300">
+                          {unit.imei_or_serial || <span className="text-slate-400 italic font-sans">—</span>}
+                        </td>
+                        <td className="py-2.5 px-3.5 text-right tabular-nums text-slate-800 dark:text-slate-200">
+                          {unit.cost_basis.toLocaleString()} ETB
+                        </td>
+                        <td className="py-2.5 px-3.5 text-right tabular-nums text-slate-600 dark:text-slate-400">
+                          {unit.selling_price > 0 ? `${unit.selling_price.toLocaleString()} ETB` : '—'}
+                        </td>
+                        <td className="py-2.5 px-3.5 text-center font-sans">
+                          <span
+                            className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                              unit.status === 'in_stock'
+                                ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400'
+                                : unit.status === 'sold'
+                                ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400'
+                                : unit.status === 'returned_to_vendor'
+                                ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400'
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                            }`}
+                          >
+                            {unit.status.replace(/_/g, ' ')}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3.5 whitespace-nowrap text-slate-500 font-sans text-[11px]">
+                          {unit.order_number ? (
+                            <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">
+                              {unit.order_number}
+                            </span>
+                          ) : unit.sold_at ? (
+                            new Date(unit.sold_at).toLocaleDateString()
+                          ) : (
+                            'Active in Shop'
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Mobile Supplied Stock List (< sm) */}
+          <div className="sm:hidden space-y-2.5">
+            {supplied_units.length === 0 ? (
+              <div className="py-8 text-center text-slate-400 font-sans italic text-xs bg-white dark:bg-[#131926] rounded-xl border border-slate-200/80 dark:border-slate-800">
+                No inventory units supplied by this partner.
+              </div>
+            ) : (
+              supplied_units.map((unit) => (
+                <div
+                  key={unit.id}
+                  className="bg-white dark:bg-[#131926] rounded-xl border border-slate-200/80 dark:border-slate-800 p-3.5 space-y-2 shadow-2xs"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <h4 className="font-bold text-xs text-slate-900 dark:text-white leading-tight">
+                        {unit.model}
+                      </h4>
+                      {unit.specs.length > 0 && (
+                        <p className="text-[10px] text-slate-400 mt-0.5">
+                          {unit.specs.join(' · ')}
+                        </p>
+                      )}
+                      {unit.imei_or_serial && (
+                        <p className="font-mono text-[10px] text-slate-500 mt-0.5">
+                          SN: {unit.imei_or_serial}
+                        </p>
+                      )}
+                    </div>
+                    <span
+                      className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold shrink-0 ${
+                        unit.status === 'in_stock'
+                          ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400'
+                          : unit.status === 'sold'
+                          ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400'
+                          : unit.status === 'returned_to_vendor'
+                          ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                      }`}
+                    >
+                      {unit.status.replace(/_/g, ' ')}
+                    </span>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs">
+                    <div>
+                      <span className="text-[10px] text-slate-400 block">Cost</span>
+                      <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
+                        {unit.cost_basis.toLocaleString()} ETB
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] text-slate-400 block">
+                        {unit.order_number ? 'Sold In' : unit.sold_at ? 'Sold' : 'Status'}
+                      </span>
+                      <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                        {unit.order_number || (unit.sold_at ? new Date(unit.sold_at).toLocaleDateString() : 'Active in Shop')}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       )}
 
       {/* TAB 3: HANDOVERS */}
       {activeTab === 'handovers' && (
-        <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="bg-slate-50/80 dark:bg-slate-900/60 border-b border-slate-200/80 dark:border-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  <th className="py-2.5 px-3.5">Device Model</th>
-                  <th className="py-2.5 px-3.5">Serial Number</th>
-                  <th className="py-2.5 px-3.5 text-right">Holding Value</th>
-                  <th className="py-2.5 px-3.5 whitespace-nowrap">Handed Out Date</th>
-                  <th className="py-2.5 px-3.5 text-center">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 font-mono text-xs">
-                {handed_out_units.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="py-12 text-center text-slate-400 font-sans italic">
-                      No devices currently out on handover with this partner.
-                    </td>
+        <div>
+          {/* Desktop Table View (≥ sm) */}
+          <div className="hidden sm:block bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/80 dark:bg-slate-900/60 border-b border-slate-200/80 dark:border-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    <th className="py-2.5 px-3.5">Device Model</th>
+                    <th className="py-2.5 px-3.5">Serial Number</th>
+                    <th className="py-2.5 px-3.5 text-right">Holding Value</th>
+                    <th className="py-2.5 px-3.5 whitespace-nowrap">Handed Out Date</th>
+                    <th className="py-2.5 px-3.5 text-center">Status</th>
                   </tr>
-                ) : (
-                  handed_out_units.map((unit) => (
-                    <tr key={unit.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
-                      <td className="py-2.5 px-3.5 font-sans font-bold text-slate-900 dark:text-white">
-                        {unit.model}
-                      </td>
-                      <td className="py-2.5 px-3.5 text-slate-700 dark:text-slate-300">
-                        {unit.imei_or_serial || '—'}
-                      </td>
-                      <td className="py-2.5 px-3.5 text-right tabular-nums text-slate-800 dark:text-slate-200 font-bold">
-                        {unit.handover_payout > 0 ? `${unit.handover_payout.toLocaleString()} ETB` : '—'}
-                      </td>
-                      <td className="py-2.5 px-3.5 font-sans text-slate-500 text-[11px]">
-                        {unit.handed_out_at ? new Date(unit.handed_out_at).toLocaleDateString() : '—'}
-                      </td>
-                      <td className="py-2.5 px-3.5 text-center font-sans">
-                        <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50">
-                          Out with Partner
-                        </span>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 font-mono text-xs">
+                  {handed_out_units.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-12 text-center text-slate-400 font-sans italic">
+                        No devices currently out on handover with this partner.
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    handed_out_units.map((unit) => (
+                      <tr key={unit.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
+                        <td className="py-2.5 px-3.5 font-sans font-bold text-slate-900 dark:text-white">
+                          {unit.model}
+                        </td>
+                        <td className="py-2.5 px-3.5 text-slate-700 dark:text-slate-300">
+                          {unit.imei_or_serial || '—'}
+                        </td>
+                        <td className="py-2.5 px-3.5 text-right tabular-nums text-slate-800 dark:text-slate-200 font-bold">
+                          {unit.handover_payout > 0 ? `${unit.handover_payout.toLocaleString()} ETB` : '—'}
+                        </td>
+                        <td className="py-2.5 px-3.5 font-sans text-slate-500 text-[11px]">
+                          {unit.handed_out_at ? new Date(unit.handed_out_at).toLocaleDateString() : '—'}
+                        </td>
+                        <td className="py-2.5 px-3.5 text-center font-sans">
+                          <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50">
+                            Out with Partner
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Mobile Handovers List (< sm) */}
+          <div className="sm:hidden space-y-2.5">
+            {handed_out_units.length === 0 ? (
+              <div className="py-8 text-center text-slate-400 font-sans italic text-xs bg-white dark:bg-[#131926] rounded-xl border border-slate-200/80 dark:border-slate-800">
+                No devices currently out on handover with this partner.
+              </div>
+            ) : (
+              handed_out_units.map((unit) => (
+                <div
+                  key={unit.id}
+                  className="bg-white dark:bg-[#131926] rounded-xl border border-slate-200/80 dark:border-slate-800 p-3.5 space-y-2 shadow-2xs"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <h4 className="font-bold text-xs text-slate-900 dark:text-white leading-tight">
+                        {unit.model}
+                      </h4>
+                      {unit.imei_or_serial && (
+                        <p className="font-mono text-[10px] text-slate-500 mt-0.5">
+                          SN: {unit.imei_or_serial}
+                        </p>
+                      )}
+                    </div>
+                    <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50 shrink-0">
+                      Out with Partner
+                    </span>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs">
+                    <div>
+                      <span className="text-[10px] text-slate-400 block">Holding Value</span>
+                      <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
+                        {unit.handover_payout > 0 ? `${unit.handover_payout.toLocaleString()} ETB` : '—'}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] text-slate-400 block">Date</span>
+                      <span className="font-mono text-[11px] text-slate-500">
+                        {unit.handed_out_at ? new Date(unit.handed_out_at).toLocaleDateString() : '—'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       )}
 
       {/* TAB 4: REPAIRS & DEFECT RETURNS */}
       {activeTab === 'repairs' && (
-        <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="bg-slate-50/80 dark:bg-slate-900/60 border-b border-slate-200/80 dark:border-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  <th className="py-2.5 px-3.5">Device Model</th>
-                  <th className="py-2.5 px-3.5">Serial Number</th>
-                  <th className="py-2.5 px-3.5">Reason</th>
-                  <th className="py-2.5 px-3.5 text-right">Maintenance Cost</th>
-                  <th className="py-2.5 px-3.5 whitespace-nowrap">Returned Date</th>
-                  <th className="py-2.5 px-3.5 text-center">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 font-mono text-xs">
-                {vendor_return_units.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="py-12 text-center text-slate-400 font-sans italic">
-                      No warranty/defect units currently returned to this vendor.
-                    </td>
+        <div>
+          {/* Desktop Table View (≥ sm) */}
+          <div className="hidden sm:block bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/80 dark:bg-slate-900/60 border-b border-slate-200/80 dark:border-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    <th className="py-2.5 px-3.5">Device Model</th>
+                    <th className="py-2.5 px-3.5">Serial Number</th>
+                    <th className="py-2.5 px-3.5">Reason</th>
+                    <th className="py-2.5 px-3.5 text-right">Maintenance Cost</th>
+                    <th className="py-2.5 px-3.5 whitespace-nowrap">Returned Date</th>
+                    <th className="py-2.5 px-3.5 text-center">Status</th>
                   </tr>
-                ) : (
-                  vendor_return_units.map((unit) => (
-                    <tr key={unit.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
-                      <td className="py-2.5 px-3.5 font-sans font-bold text-slate-900 dark:text-white">
-                        {unit.model}
-                      </td>
-                      <td className="py-2.5 px-3.5 text-slate-700 dark:text-slate-300">
-                        {unit.imei_or_serial || '—'}
-                      </td>
-                      <td className="py-2.5 px-3.5 font-sans text-rose-600 dark:text-rose-400 font-medium">
-                        {unit.return_reason || 'Defect repair'}
-                      </td>
-                      <td className="py-2.5 px-3.5 text-right tabular-nums text-slate-800 dark:text-slate-200 font-bold">
-                        {unit.maintenance_cost > 0 ? `${unit.maintenance_cost.toLocaleString()} ETB` : '—'}
-                      </td>
-                      <td className="py-2.5 px-3.5 font-sans text-slate-500 text-[11px]">
-                        {unit.returned_at ? new Date(unit.returned_at).toLocaleDateString() : '—'}
-                      </td>
-                      <td className="py-2.5 px-3.5 text-center font-sans">
-                        <span
-                          className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                            unit.status === 'fixed'
-                              ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 border border-blue-200/50'
-                              : 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50'
-                          }`}
-                        >
-                          {unit.status === 'fixed' ? 'Fixed' : 'With Vendor'}
-                        </span>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 font-mono text-xs">
+                  {vendor_return_units.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-12 text-center text-slate-400 font-sans italic">
+                        No warranty/defect units currently returned to this vendor.
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    vendor_return_units.map((unit) => (
+                      <tr key={unit.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
+                        <td className="py-2.5 px-3.5 font-sans font-bold text-slate-900 dark:text-white">
+                          {unit.model}
+                        </td>
+                        <td className="py-2.5 px-3.5 text-slate-700 dark:text-slate-300">
+                          {unit.imei_or_serial || '—'}
+                        </td>
+                        <td className="py-2.5 px-3.5 font-sans text-rose-600 dark:text-rose-400 font-medium">
+                          {unit.return_reason || 'Defect repair'}
+                        </td>
+                        <td className="py-2.5 px-3.5 text-right tabular-nums text-slate-800 dark:text-slate-200 font-bold">
+                          {unit.maintenance_cost > 0 ? `${unit.maintenance_cost.toLocaleString()} ETB` : '—'}
+                        </td>
+                        <td className="py-2.5 px-3.5 font-sans text-slate-500 text-[11px]">
+                          {unit.returned_at ? new Date(unit.returned_at).toLocaleDateString() : '—'}
+                        </td>
+                        <td className="py-2.5 px-3.5 text-center font-sans">
+                          <span
+                            className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                              unit.status === 'fixed'
+                                ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 border border-blue-200/50'
+                                : 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50'
+                            }`}
+                          >
+                            {unit.status === 'fixed' ? 'Fixed' : 'With Vendor'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Mobile Repairs List (< sm) */}
+          <div className="sm:hidden space-y-2.5">
+            {vendor_return_units.length === 0 ? (
+              <div className="py-8 text-center text-slate-400 font-sans italic text-xs bg-white dark:bg-[#131926] rounded-xl border border-slate-200/80 dark:border-slate-800">
+                No warranty/defect units currently returned to this vendor.
+              </div>
+            ) : (
+              vendor_return_units.map((unit) => (
+                <div
+                  key={unit.id}
+                  className="bg-white dark:bg-[#131926] rounded-xl border border-slate-200/80 dark:border-slate-800 p-3.5 space-y-2 shadow-2xs"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <h4 className="font-bold text-xs text-slate-900 dark:text-white leading-tight">
+                        {unit.model}
+                      </h4>
+                      {unit.imei_or_serial && (
+                        <p className="font-mono text-[10px] text-slate-500 mt-0.5">
+                          SN: {unit.imei_or_serial}
+                        </p>
+                      )}
+                      <p className="text-[11px] text-rose-600 dark:text-rose-400 font-medium mt-1">
+                        Reason: {unit.return_reason || 'Defect repair'}
+                      </p>
+                    </div>
+                    <span
+                      className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold shrink-0 ${
+                        unit.status === 'fixed'
+                          ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 border border-blue-200/50'
+                          : 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50'
+                      }`}
+                    >
+                      {unit.status === 'fixed' ? 'Fixed' : 'With Vendor'}
+                    </span>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs">
+                    <div>
+                      <span className="text-[10px] text-slate-400 block">Maintenance Cost</span>
+                      <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
+                        {unit.maintenance_cost > 0 ? `${unit.maintenance_cost.toLocaleString()} ETB` : '—'}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] text-slate-400 block">Returned</span>
+                      <span className="font-mono text-[11px] text-slate-500">
+                        {unit.returned_at ? new Date(unit.returned_at).toLocaleDateString() : '—'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       )}

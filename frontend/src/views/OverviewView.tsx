@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { DashboardData, User, FinancialAccount, Debt, LeaderboardItem } from '../api/client';
 import { api } from '../api/client';
 import {
@@ -48,11 +48,17 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   const [isDebtModalOpen, setIsDebtModalOpen] = useState(false);
   const [debtModalDefaultType, setDebtModalDefaultType] = useState<'receivable' | 'payable'>('receivable');
   const [isBarAnimated, setIsBarAnimated] = useState(false);
+  const barMountedRef = useRef(false);
 
   useEffect(() => {
-    setIsBarAnimated(false);
-    const t = setTimeout(() => setIsBarAnimated(true), 100);
-    return () => clearTimeout(t);
+    if (!barMountedRef.current) {
+      const t = setTimeout(() => {
+        setIsBarAnimated(true);
+        barMountedRef.current = true;
+      }, 60);
+      return () => clearTimeout(t);
+    }
+    setIsBarAnimated(true);
   }, [data]);
 
   useEffect(() => {
@@ -213,8 +219,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 <div
                   style={{
                     width: isBarAnimated ? `${stockPct}%` : '0%',
-                    transition: 'width 900ms cubic-bezier(0.16, 1, 0.3, 1)',
-                    transitionDelay: '40ms',
+                    transition: 'width 800ms cubic-bezier(0.16, 1, 0.3, 1)',
                   }}
                   className="h-full bg-slate-400 rounded-full"
                   title={`Stock: ${stockPct}%`}
@@ -224,8 +229,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 <div
                   style={{
                     width: isBarAnimated ? `${cashPct}%` : '0%',
-                    transition: 'width 900ms cubic-bezier(0.16, 1, 0.3, 1)',
-                    transitionDelay: '90ms',
+                    transition: 'width 800ms cubic-bezier(0.16, 1, 0.3, 1)',
                   }}
                   className="h-full bg-blue-400 rounded-full"
                   title={`Cash: ${cashPct}%`}
@@ -235,8 +239,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 <div
                   style={{
                     width: isBarAnimated ? `${recPct}%` : '0%',
-                    transition: 'width 900ms cubic-bezier(0.16, 1, 0.3, 1)',
-                    transitionDelay: '140ms',
+                    transition: 'width 800ms cubic-bezier(0.16, 1, 0.3, 1)',
                   }}
                   className="h-full bg-emerald-400 rounded-full"
                   title={`Receivables: ${recPct}%`}
@@ -246,8 +249,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 <div
                   style={{
                     width: isBarAnimated ? `${assetPct}%` : '0%',
-                    transition: 'width 900ms cubic-bezier(0.16, 1, 0.3, 1)',
-                    transitionDelay: '190ms',
+                    transition: 'width 800ms cubic-bezier(0.16, 1, 0.3, 1)',
                   }}
                   className="h-full bg-amber-400 rounded-full"
                   title={`Other Assets: ${assetPct}%`}

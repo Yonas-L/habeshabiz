@@ -545,6 +545,16 @@ export function removeAuthToken(): void {
   localStorage.removeItem('habeshabiz_token');
 }
 
+export function resolveImageUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  if (url.startsWith('data:') || url.startsWith('blob:')) return url;
+  const storageIndex = url.indexOf('/storage/');
+  if (storageIndex !== -1) {
+    return url.slice(storageIndex);
+  }
+  return url;
+}
+
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = getAuthToken();
   const headers = new Headers(options.headers || {});

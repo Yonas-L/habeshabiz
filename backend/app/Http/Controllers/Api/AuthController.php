@@ -54,7 +54,10 @@ class AuthController extends Controller
                     'id' => $user->tenant->id,
                     'name' => $user->tenant->name,
                     'slug' => $user->tenant->slug,
+                    'phone' => $user->tenant->phone,
                     'currency' => $user->tenant->currency_code,
+                    'business_type' => $user->tenant->business_type,
+                    'settings' => $user->tenant->settings,
                 ] : null,
             ],
         ]);
@@ -82,7 +85,10 @@ class AuthController extends Controller
                     'id' => $user->tenant->id,
                     'name' => $user->tenant->name,
                     'slug' => $user->tenant->slug,
+                    'phone' => $user->tenant->phone,
                     'currency' => $user->tenant->currency_code,
+                    'business_type' => $user->tenant->business_type,
+                    'settings' => $user->tenant->settings,
                 ] : null,
             ],
         ]);

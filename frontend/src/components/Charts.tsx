@@ -30,14 +30,20 @@ export const InteractiveSalesWaveChart: React.FC<{
   const [isLoaded, setIsLoaded] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const touchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasMountedRef = useRef(false);
 
   useEffect(() => {
-    setIsLoaded(false);
-    const raf = requestAnimationFrame(() => {
-      const t = setTimeout(() => setIsLoaded(true), 60);
-      return () => clearTimeout(t);
-    });
-    return () => cancelAnimationFrame(raf);
+    if (!hasMountedRef.current) {
+      const raf = requestAnimationFrame(() => {
+        const t = setTimeout(() => {
+          setIsLoaded(true);
+          hasMountedRef.current = true;
+        }, 50);
+        return () => clearTimeout(t);
+      });
+      return () => cancelAnimationFrame(raf);
+    }
+    setIsLoaded(true);
   }, [data, metric, chartType]);
 
   const width = 640;
@@ -230,6 +236,17 @@ export const InteractiveSalesWaveChart: React.FC<{
               <stop offset="0%" stopColor="#6366f1" stopOpacity="0.22" />
               <stop offset="100%" stopColor="#6366f1" stopOpacity="0.00" />
             </linearGradient>
+            <clipPath id="salesWaveReveal">
+              <rect
+                x="0"
+                y="0"
+                width={isLoaded ? width : 0}
+                height={height}
+                style={{
+                  transition: 'width 1000ms cubic-bezier(0.16, 1, 0.3, 1)',
+                }}
+              />
+            </clipPath>
           </defs>
 
           {/* Dotted Horizontal Guide Lines */}
@@ -263,35 +280,28 @@ export const InteractiveSalesWaveChart: React.FC<{
             strokeWidth="1"
           />
 
-          {/* Wave Mode: Shaded Area */}
-          {chartType === 'wave' && areaPath && (
-            <path
-              d={areaPath}
-              fill={metric === 'revenue' ? 'url(#indigoWave)' : 'url(#emeraldWave)'}
-              style={{
-                clipPath: isLoaded ? 'inset(0 0% 0 0)' : 'inset(0 100% 0 0)',
-                transition: 'clip-path 1100ms cubic-bezier(0.16, 1, 0.3, 1), opacity 600ms ease-out',
-              }}
-              className={isLoaded ? 'opacity-100' : 'opacity-0'}
-            />
-          )}
-
-          {/* Wave Mode: Bezier Stroke Curve */}
-          {chartType === 'wave' && curvePath && (
-            <path
-              d={curvePath}
-              fill="none"
-              stroke={metric === 'revenue' ? '#6366f1' : '#10b981'}
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              pathLength={1000}
-              strokeDasharray={1000}
-              strokeDashoffset={isLoaded ? 0 : 1000}
-              style={{
-                transition: 'stroke-dashoffset 1000ms cubic-bezier(0.16, 1, 0.3, 1), opacity 400ms ease-out',
-              }}
-              className={isLoaded ? 'opacity-100' : 'opacity-0'}
-            />
+          {/* Wave Mode: Synchronously Clipped Area & Bezier Curve */}
+          {chartType === 'wave' && (
+            <g clipPath="url(#salesWaveReveal)">
+              {areaPath && (
+                <path
+                  d={areaPath}
+                  fill={metric === 'revenue' ? 'url(#indigoWave)' : 'url(#emeraldWave)'}
+                  className="transition-opacity duration-300"
+                />
+              )}
+              {curvePath && (
+                <path
+                  d={curvePath}
+                  fill="none"
+                  stroke={metric === 'revenue' ? '#6366f1' : '#10b981'}
+                  strokeWidth="2.75"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="transition-opacity duration-300"
+                />
+              )}
+            </g>
           )}
 
           {/* Wave Mode: Interactive Guides & Points */}
@@ -317,8 +327,7 @@ export const InteractiveSalesWaveChart: React.FC<{
                 strokeWidth="2"
                 style={{
                   transformOrigin: `${pt.x}px ${pt.y}px`,
-                  transition: 'transform 400ms cubic-bezier(0.16, 1, 0.3, 1), opacity 350ms ease-out',
-                  transitionDelay: `${250 + i * (650 / Math.max(points.length, 1))}ms`,
+                  transition: 'transform 300ms ease-out, opacity 400ms ease-out',
                 }}
                 className={`cursor-pointer ${isLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-0'}`}
                 onMouseEnter={() => setHoverIndex(i)}
@@ -506,14 +515,20 @@ export const DonutCapitalChart: React.FC<{
   showLegend?: boolean;
 }> = ({ stock, receivables, treasury, assets, payables = 0, netCapital, showLegend = true }) => {
   const [isLoaded, setIsLoaded] = useState(false);
+  const hasMountedRef = useRef(false);
 
   useEffect(() => {
-    setIsLoaded(false);
-    const raf = requestAnimationFrame(() => {
-      const t = setTimeout(() => setIsLoaded(true), 50);
-      return () => clearTimeout(t);
-    });
-    return () => cancelAnimationFrame(raf);
+    if (!hasMountedRef.current) {
+      const raf = requestAnimationFrame(() => {
+        const t = setTimeout(() => {
+          setIsLoaded(true);
+          hasMountedRef.current = true;
+        }, 50);
+        return () => clearTimeout(t);
+      });
+      return () => cancelAnimationFrame(raf);
+    }
+    setIsLoaded(true);
   }, [stock, receivables, treasury, assets, payables]);
 
   const grossAssets = stock + receivables + treasury + assets;
@@ -534,16 +549,18 @@ export const DonutCapitalChart: React.FC<{
   const assetOffset = circum * (stockPct + recPct + treasPct);
   const payableOffset = circum * (stockPct + recPct + treasPct + assetPct);
 
+  const segmentTransition = 'stroke-dasharray 900ms cubic-bezier(0.16, 1, 0.3, 1), stroke-dashoffset 900ms cubic-bezier(0.16, 1, 0.3, 1)';
+
   return (
     <div className={showLegend ? "flex flex-col sm:flex-row lg:flex-col xl:flex-row items-center justify-center gap-5 sm:gap-6" : "flex items-center justify-center"}>
       {/* SVG Ring (Enlarged) */}
       <div className={`relative ${showLegend ? 'w-44 h-44 sm:w-48 sm:h-48' : 'w-40 h-40 sm:w-44 sm:h-44'} shrink-0`}>
         <svg
           viewBox="0 0 160 160"
-          className="w-full h-full transition-all duration-1000 ease-out"
+          className="w-full h-full transition-all duration-700 ease-out"
           style={{
-            transform: isLoaded ? 'rotate(-90deg) scale(1)' : 'rotate(-135deg) scale(0.92)',
-            opacity: isLoaded ? 1 : 0.4,
+            transform: isLoaded ? 'rotate(-90deg) scale(1)' : 'rotate(-90deg) scale(0.95)',
+            opacity: isLoaded ? 1 : 0,
             transformOrigin: 'center center',
           }}
         >
@@ -566,10 +583,7 @@ export const DonutCapitalChart: React.FC<{
             strokeWidth={stroke}
             strokeDasharray={isLoaded ? `${circum * stockPct} ${circum}` : `0 ${circum}`}
             strokeDashoffset={isLoaded ? -stockOffset : 0}
-            style={{
-              transition: 'stroke-dasharray 900ms cubic-bezier(0.16, 1, 0.3, 1), stroke-dashoffset 900ms cubic-bezier(0.16, 1, 0.3, 1)',
-              transitionDelay: '40ms',
-            }}
+            style={{ transition: segmentTransition }}
           />
           {/* Receivables segment */}
           <circle
@@ -581,10 +595,7 @@ export const DonutCapitalChart: React.FC<{
             strokeWidth={stroke}
             strokeDasharray={isLoaded ? `${circum * recPct} ${circum}` : `0 ${circum}`}
             strokeDashoffset={isLoaded ? -recOffset : 0}
-            style={{
-              transition: 'stroke-dasharray 900ms cubic-bezier(0.16, 1, 0.3, 1), stroke-dashoffset 900ms cubic-bezier(0.16, 1, 0.3, 1)',
-              transitionDelay: '80ms',
-            }}
+            style={{ transition: segmentTransition }}
           />
           {/* Treasury segment */}
           <circle
@@ -596,10 +607,7 @@ export const DonutCapitalChart: React.FC<{
             strokeWidth={stroke}
             strokeDasharray={isLoaded ? `${circum * treasPct} ${circum}` : `0 ${circum}`}
             strokeDashoffset={isLoaded ? -treasOffset : 0}
-            style={{
-              transition: 'stroke-dasharray 900ms cubic-bezier(0.16, 1, 0.3, 1), stroke-dashoffset 900ms cubic-bezier(0.16, 1, 0.3, 1)',
-              transitionDelay: '120ms',
-            }}
+            style={{ transition: segmentTransition }}
           />
           {/* Assets segment */}
           <circle
@@ -611,10 +619,7 @@ export const DonutCapitalChart: React.FC<{
             strokeWidth={stroke}
             strokeDasharray={isLoaded ? `${circum * assetPct} ${circum}` : `0 ${circum}`}
             strokeDashoffset={isLoaded ? -assetOffset : 0}
-            style={{
-              transition: 'stroke-dasharray 900ms cubic-bezier(0.16, 1, 0.3, 1), stroke-dashoffset 900ms cubic-bezier(0.16, 1, 0.3, 1)',
-              transitionDelay: '160ms',
-            }}
+            style={{ transition: segmentTransition }}
           />
           {/* Payables segment */}
           {payables > 0 && (
@@ -627,10 +632,7 @@ export const DonutCapitalChart: React.FC<{
               strokeWidth={stroke}
               strokeDasharray={isLoaded ? `${circum * payablePct} ${circum}` : `0 ${circum}`}
               strokeDashoffset={isLoaded ? -payableOffset : 0}
-              style={{
-                transition: 'stroke-dasharray 900ms cubic-bezier(0.16, 1, 0.3, 1), stroke-dashoffset 900ms cubic-bezier(0.16, 1, 0.3, 1)',
-                transitionDelay: '200ms',
-              }}
+              style={{ transition: segmentTransition }}
             />
           )}
         </svg>

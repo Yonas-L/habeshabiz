@@ -1,5 +1,7 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import type { User, Tenant } from '../api/client';
+import { resolveImageUrl } from '../api/client';
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -14,6 +16,10 @@ import {
   Settings,
   Handshake,
   ScrollText,
+  X,
+  ChevronRight,
+  Sun,
+  Moon,
 } from 'lucide-react';
 
 export type NavTab =
@@ -42,6 +48,8 @@ interface SidebarProps {
   onCloseMobile: () => void;
   onOpenProfile?: () => void;
   onOpenQuickSearch?: () => void;
+  theme?: 'light' | 'dark';
+  onToggleTheme?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -55,6 +63,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onCloseMobile,
   onOpenProfile,
   onOpenQuickSearch,
+  theme,
+  onToggleTheme,
 }) => {
   const isOwner = user?.role === 'owner';
 
@@ -64,6 +74,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
     if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
     return (words[0][0] + words[1][0]).toUpperCase();
   }, [tenant?.name]);
+
+  const [logoLoadFailed, setLogoLoadFailed] = React.useState(false);
+
+  React.useEffect(() => {
+    setLogoLoadFailed(false);
+  }, [tenant?.settings?.logo_url]);
+
+  const resolvedLogoUrl = React.useMemo(() => {
+    return resolveImageUrl(tenant?.settings?.logo_url);
+  }, [tenant?.settings?.logo_url]);
 
   const mainNav: {
     id: NavTab;
@@ -103,11 +123,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="px-2 py-2.5 flex items-center justify-between gap-2.5 border-b border-slate-100 dark:border-slate-800/80">
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
             <div className="w-9 h-9 rounded-xl bg-slate-900 dark:bg-slate-800 border border-slate-700/30 text-white flex items-center justify-center font-bold text-xs tracking-tight shrink-0 shadow-xs overflow-hidden">
-              {tenant?.settings?.logo_url ? (
+              {resolvedLogoUrl && !logoLoadFailed ? (
                 <img
-                  src={tenant.settings.logo_url}
-                  alt={tenant.name}
+                  src={resolvedLogoUrl}
+                  alt={tenant?.name || 'Business Logo'}
                   className="w-full h-full object-contain p-0.5"
+                  onError={() => setLogoLoadFailed(true)}
                 />
               ) : (
                 businessInitials
@@ -334,25 +355,348 @@ export const Sidebar: React.FC<SidebarProps> = ({
     </aside>
   );
 
+  const mobileDrawer = isOpenMobile ? (
+    <div className="fixed inset-0 z-[100] md:hidden flex overflow-hidden">
+      {/* Native Backdrop Blur Overlay */}
+      <div
+        className="fixed inset-0 bg-slate-950/60 dark:bg-black/80 backdrop-blur-sm transition-opacity duration-300 animate-backdrop-enter"
+        onClick={onCloseMobile}
+        aria-hidden="true"
+      />
+
+      {/* Native Drawer Sheet */}
+      <aside
+        aria-label="Mobile Navigation Menu"
+        className="relative z-10 w-[86vw] max-w-[340px] h-full bg-white dark:bg-[#0f141f] border-r border-slate-200/80 dark:border-slate-800/80 flex flex-col justify-between shadow-2xl animate-sidebar-slide-in select-none"
+      >
+        {/* Top Header: Business Branding & Close */}
+        <div className="pt-[calc(1.1rem+env(safe-area-inset-top,0px))] px-4 pb-3.5 border-b border-slate-100 dark:border-slate-800/80 shrink-0">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+              <div className="w-10 h-10 rounded-2xl bg-slate-900 dark:bg-slate-800 border border-slate-700/40 text-white flex items-center justify-center font-black text-xs tracking-tight shrink-0 shadow-xs overflow-hidden">
+                {resolvedLogoUrl && !logoLoadFailed ? (
+                  <img
+                    src={resolvedLogoUrl}
+                    alt={tenant?.name || 'Business Logo'}
+                    className="w-full h-full object-contain p-0.5"
+                    onError={() => setLogoLoadFailed(true)}
+                  />
+                ) : (
+                  businessInitials
+                )}
+              </div>
+              <div className="leading-tight min-w-0 flex-1">
+                <div
+                  className="font-extrabold text-slate-900 dark:text-white text-sm tracking-tight truncate"
+                  title={tenant?.name || 'HabeshaBiz'}
+                >
+                  {tenant?.name || 'HabeshaBiz'}
+                </div>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 ring-2 ring-emerald-400/40 animate-pulse shrink-0" />
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wider">
+                    Live System
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={onCloseMobile}
+              className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-slate-900 dark:hover:text-white flex items-center justify-center active:scale-90 transition-transform cursor-pointer"
+              aria-label="Close menu"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Quick Search Tap Bar */}
+        <div className="px-4 pt-3 pb-1 shrink-0">
+          <button
+            type="button"
+            onClick={() => {
+              onCloseMobile();
+              onOpenQuickSearch?.();
+            }}
+            className="w-full h-10 px-3.5 rounded-xl bg-slate-100/80 hover:bg-slate-200/60 dark:bg-slate-800/60 dark:hover:bg-slate-800 border border-slate-200/60 dark:border-slate-800 flex items-center justify-between text-xs text-slate-400 active:scale-[0.98] transition-all cursor-pointer"
+          >
+            <div className="flex items-center gap-2.5">
+              <Search className="w-4 h-4 text-slate-400" />
+              <span className="font-medium text-slate-500 dark:text-slate-400">Search transactions, catalog...</span>
+            </div>
+            <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-500 shadow-2xs">
+              Quick
+            </span>
+          </button>
+        </div>
+
+        {/* Scrollable Nav Sections */}
+        <div className="flex-1 overflow-y-auto overscroll-contain px-3 py-2 space-y-4">
+          {/* Main Workspace Navigation */}
+          <div className="space-y-1">
+            <div className="px-3 py-1 text-[10px] font-bold tracking-wider uppercase text-slate-400 dark:text-slate-500">
+              Workspace
+            </div>
+            {mainNav.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    onChangeTab(item.id);
+                    onCloseMobile();
+                  }}
+                  className={`w-full min-h-[46px] flex items-center justify-between px-3 py-2.5 rounded-xl transition-all cursor-pointer ${
+                    isActive
+                      ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-sm font-bold'
+                      : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50 active:bg-slate-100 dark:active:bg-slate-800 active:scale-[0.98] font-semibold'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                        isActive
+                          ? 'bg-white/10 dark:bg-slate-900/10'
+                          : 'bg-slate-100 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400'
+                      }`}
+                    >
+                      <Icon className={`w-4 h-4 ${isActive ? 'text-emerald-400 dark:text-emerald-600' : ''}`} />
+                    </div>
+                    <span className="text-xs">{item.label}</span>
+                  </div>
+                  {isActive ? (
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 dark:bg-emerald-600 shrink-0" />
+                  ) : (
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 shrink-0" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Finance & Ledgers (Owner Only) */}
+          {isOwner && (
+            <div className="space-y-1 pt-2 border-t border-slate-100 dark:border-slate-800/80">
+              <div className="px-3 py-1 text-[10px] font-bold tracking-wider uppercase text-slate-400 dark:text-slate-500">
+                Treasury & Ledgers
+              </div>
+              {financeNav.map((item) => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      onChangeTab(item.id);
+                      onCloseMobile();
+                    }}
+                    className={`w-full min-h-[46px] flex items-center justify-between px-3 py-2.5 rounded-xl transition-all cursor-pointer ${
+                      isActive
+                        ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-sm font-bold'
+                        : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50 active:bg-slate-100 dark:active:bg-slate-800 active:scale-[0.98] font-semibold'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                          isActive
+                            ? 'bg-white/10 dark:bg-slate-900/10'
+                            : 'bg-slate-100 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400'
+                        }`}
+                      >
+                        <Icon className={`w-4 h-4 ${isActive ? 'text-emerald-400 dark:text-emerald-600' : ''}`} />
+                      </div>
+                      <span className="text-xs">{item.label}</span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {item.badge !== undefined && item.badge > 0 && (
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold leading-none ${
+                            isActive
+                              ? 'bg-emerald-500 dark:bg-emerald-600 text-white'
+                              : 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border border-rose-200/50 dark:border-rose-800/50'
+                          }`}
+                        >
+                          {item.badge}
+                        </span>
+                      )}
+                      {isActive ? (
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 dark:bg-emerald-600 shrink-0" />
+                      ) : (
+                        <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 shrink-0" />
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* System & Management (Owner Only) */}
+          {isOwner && (
+            <div className="space-y-1 pt-2 border-t border-slate-100 dark:border-slate-800/80">
+              <div className="px-3 py-1 text-[10px] font-bold tracking-wider uppercase text-slate-400 dark:text-slate-500">
+                System & Control
+              </div>
+              <button
+                onClick={() => {
+                  onChangeTab('logs');
+                  onCloseMobile();
+                }}
+                className={`w-full min-h-[46px] flex items-center justify-between px-3 py-2.5 rounded-xl transition-all cursor-pointer ${
+                  activeTab === 'logs'
+                    ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-sm font-bold'
+                    : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50 active:bg-slate-100 dark:active:bg-slate-800 active:scale-[0.98] font-semibold'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                      activeTab === 'logs'
+                        ? 'bg-white/10 dark:bg-slate-900/10'
+                        : 'bg-slate-100 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400'
+                    }`}
+                  >
+                    <ScrollText className={`w-4 h-4 ${activeTab === 'logs' ? 'text-emerald-400 dark:text-emerald-600' : ''}`} />
+                  </div>
+                  <span className="text-xs">Audit Logs</span>
+                </div>
+                {activeTab === 'logs' ? (
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 dark:bg-emerald-600 shrink-0" />
+                ) : (
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 shrink-0" />
+                )}
+              </button>
+
+              <button
+                onClick={() => {
+                  onChangeTab('settings');
+                  onCloseMobile();
+                }}
+                className={`w-full min-h-[46px] flex items-center justify-between px-3 py-2.5 rounded-xl transition-all cursor-pointer ${
+                  activeTab === 'settings'
+                    ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-sm font-bold'
+                    : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50 active:bg-slate-100 dark:active:bg-slate-800 active:scale-[0.98] font-semibold'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                      activeTab === 'settings'
+                        ? 'bg-white/10 dark:bg-slate-900/10'
+                        : 'bg-slate-100 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400'
+                    }`}
+                  >
+                    <Settings className={`w-4 h-4 ${activeTab === 'settings' ? 'text-emerald-400 dark:text-emerald-600' : ''}`} />
+                  </div>
+                  <span className="text-xs">Business Settings</span>
+                </div>
+                {activeTab === 'settings' ? (
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 dark:bg-emerald-600 shrink-0" />
+                ) : (
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 shrink-0" />
+                )}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Mobile Drawer Bottom: Profile & Quick Utilities */}
+        <div className="p-3 px-4 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/60 dark:bg-slate-900/40 shrink-0 pb-[calc(1.1rem+env(safe-area-inset-bottom,0px))]">
+          <div className="flex items-center justify-between gap-2">
+            {/* User Info with tap to profile/settings */}
+            <div
+              onClick={() => {
+                onCloseMobile();
+                if (isOwner) {
+                  onChangeTab('settings');
+                } else if (onOpenProfile) {
+                  onOpenProfile();
+                }
+              }}
+              className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer group active:scale-[0.98] transition-transform"
+            >
+              <div className="w-9 h-9 rounded-xl bg-slate-900 dark:bg-slate-800 border border-slate-700/30 text-white flex items-center justify-center text-xs font-bold uppercase shadow-2xs shrink-0">
+                {user?.name?.slice(0, 2) || 'HB'}
+              </div>
+              <div className="leading-tight min-w-0 flex-1">
+                <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                  {user?.name}
+                </div>
+                <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold capitalize mt-0.5">
+                  {user?.role === 'owner' ? 'Owner' : 'Sales Staff'}
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Action Buttons */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              {/* Theme Toggle Button */}
+              {onToggleTheme && (
+                <button
+                  type="button"
+                  onClick={onToggleTheme}
+                  title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+                  className="w-8 h-8 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white flex items-center justify-center active:scale-90 transition-all cursor-pointer"
+                  aria-label="Toggle theme"
+                >
+                  {theme === 'dark' ? (
+                    <Sun className="w-4 h-4 text-amber-400" />
+                  ) : (
+                    <Moon className="w-4 h-4 text-slate-600" />
+                  )}
+                </button>
+              )}
+
+              {/* Profile / Settings Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  onCloseMobile();
+                  if (isOwner) {
+                    onChangeTab('settings');
+                  } else if (onOpenProfile) {
+                    onOpenProfile();
+                  }
+                }}
+                title={isOwner ? 'Business Settings' : 'Account Settings'}
+                className="w-8 h-8 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white flex items-center justify-center active:scale-90 transition-all cursor-pointer"
+              >
+                <Settings className="w-4 h-4" />
+              </button>
+
+              {/* Sign Out Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  onCloseMobile();
+                  onLogout();
+                }}
+                title="Sign Out"
+                className="w-8 h-8 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-800/80 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 flex items-center justify-center active:scale-90 transition-all cursor-pointer"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  ) : null;
+
   return (
     <>
-      {/* Desktop Persistent Sidebar */}
+      {/* Desktop Persistent Sidebar - completely intact */}
       <div className="hidden md:block shrink-0 w-64 h-[calc(100vh-2rem)] sticky top-4 my-4 ml-4 animate-fluid-sidebar">
         {sidebarInner}
       </div>
 
-      {/* Mobile Drawer */}
-      {isOpenMobile && (
-        <div className="fixed inset-0 z-50 md:hidden flex p-3">
-          <div
-            className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs transition-opacity"
-            onClick={onCloseMobile}
-          />
-          <div className="relative z-10 w-64 h-full shadow-2xl animate-modal-enter">
-            {sidebarInner}
-          </div>
-        </div>
-      )}
+      {/* Native Mobile Navigation Drawer (Portaled to document.body at z-[100]) */}
+      {mobileDrawer && createPortal(mobileDrawer, document.body)}
     </>
   );
 };

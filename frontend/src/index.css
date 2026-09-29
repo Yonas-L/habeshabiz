@@ -136,6 +136,15 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   }
 }
 
+@keyframes sidebarSlideInLeft {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
 @keyframes collapseOpen {
   from {
     opacity: 0;
@@ -160,6 +169,10 @@ html.dark ::-webkit-scrollbar-thumb:hover {
 
 .animate-drawer-enter {
   animation: drawerSlideIn 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-sidebar-slide-in {
+  animation: sidebarSlideInLeft 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .animate-drawer-exit {

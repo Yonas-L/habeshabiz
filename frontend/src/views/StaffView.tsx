@@ -185,7 +185,8 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Desktop Header Actions */}
+        <div className="hidden sm:flex items-center gap-2">
           <div className="relative">
             <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
             <input
@@ -210,6 +211,36 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
             <UserPlus className="w-4 h-4 text-emerald-400 dark:text-emerald-600" />
             Add Staff
           </button>
+        </div>
+
+        {/* Mobile Header Actions */}
+        <div className="sm:hidden space-y-2">
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search staff..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full h-9 pl-8 pr-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900 dark:focus:ring-white"
+              />
+            </div>
+            <button
+              onClick={loadData}
+              title="Refresh"
+              className="w-9 h-9 shrink-0 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition-colors"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="h-9 px-3 shrink-0 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-sm flex items-center gap-1.5 active:scale-[0.98]"
+            >
+              <UserPlus className="w-4 h-4 text-emerald-400 dark:text-emerald-600" />
+              <span>Add</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -262,7 +293,8 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
       </div>
 
       <div className="bg-white dark:bg-[#131926] rounded-xl border border-slate-200/80 dark:border-slate-800/80 overflow-hidden">
-          <div className="overflow-x-auto">
+        {/* Desktop Table View */}
+        <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/30 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
@@ -409,6 +441,139 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
               </tbody>
             </table>
           </div>
+
+        {/* Mobile Staff Cards (< md) */}
+        <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800/60">
+          {filteredStaff.length === 0 ? (
+            <div className="py-12 text-center text-slate-400 text-xs">No staff found.</div>
+          ) : (
+            pagedStaff.map((member) => {
+              const isSelf = member.id === currentUser?.id;
+              return (
+                <div key={member.id} className="p-3.5 space-y-3">
+                  {/* Top row: Avatar, name, role badge, status */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="size-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-bold text-xs text-slate-700 dark:text-slate-200 uppercase shrink-0 shadow-xs">
+                        {member.name.slice(0, 2)}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-1.5 flex-wrap">
+                          <span className="truncate">{member.name}</span>
+                          {isSelf && (
+                            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">You</span>
+                          )}
+                          {member.role === 'owner' && (
+                            <span className="text-[9px] font-bold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-400 px-1.5 py-0.5 rounded">Owner</span>
+                          )}
+                        </div>
+                        <div className="text-[10px] text-slate-400 truncate mt-0.5">
+                          {member.email || 'No email registered'}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Status Pill */}
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
+                      member.is_active
+                        ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60'
+                        : 'bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200/60 dark:border-rose-800/60'
+                    }`}>
+                      <span className={`size-1.5 rounded-full ${member.is_active ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+                      {member.is_active ? 'Active' : 'Suspended'}
+                    </span>
+                  </div>
+
+                  {/* Info row: Phone, Access badge */}
+                  <div className="flex items-center justify-between gap-2 text-[11px] pt-0.5">
+                    {member.phone ? (
+                      <a
+                        href={`tel:${member.phone}`}
+                        className="inline-flex items-center gap-1 font-mono text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+                      >
+                        <Phone className="size-3 text-slate-400" />
+                        <span>{member.phone}</span>
+                      </a>
+                    ) : (
+                      <span className="text-slate-400 italic text-[10px]">No phone</span>
+                    )}
+
+                    <div className="shrink-0">
+                      {member.role === 'owner' ? (
+                        <span className="text-[10px] font-semibold text-purple-600 dark:text-purple-400 px-2 py-0.5 rounded bg-purple-50 dark:bg-purple-950/40">Full Access</span>
+                      ) : member.permissions?.can_discount ? (
+                        <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40">Can Discount</span>
+                      ) : (
+                        <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800">Fixed Prices</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Performance stats: 3 mini columns */}
+                  <div className="grid grid-cols-3 gap-2 p-2 rounded-xl bg-slate-50/70 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800/60 text-center">
+                    <div>
+                      <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Week</div>
+                      <div className="font-mono font-bold text-xs text-slate-900 dark:text-white mt-0.5">
+                        {(member.stats?.sales_volume_week || 0).toLocaleString()}
+                      </div>
+                      <div className="text-[9px] text-slate-400 mt-0.5">{member.stats?.sales_count_week || 0} sold</div>
+                    </div>
+                    <div className="border-x border-slate-200/60 dark:border-slate-800/60">
+                      <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Month</div>
+                      <div className="font-mono font-bold text-xs text-slate-900 dark:text-white mt-0.5">
+                        {(member.stats?.sales_volume_month || 0).toLocaleString()}
+                      </div>
+                      <div className="text-[9px] text-slate-400 mt-0.5">{member.stats?.sales_count_month || 0} sold</div>
+                    </div>
+                    <div>
+                      <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Bonus</div>
+                      {(member.stats?.uncollected_bonus ?? 0) > 0 ? (
+                        <div>
+                          <div className="font-mono font-bold text-xs text-purple-600 dark:text-purple-400 mt-0.5">
+                            {(member.stats.uncollected_bonus ?? 0).toLocaleString()}
+                          </div>
+                          <div className="text-[9px] text-purple-600 dark:text-purple-400 font-semibold mt-0.5">uncollected</div>
+                        </div>
+                      ) : (member.stats?.total_bonus_earned ?? 0) > 0 ? (
+                        <div>
+                          <div className="font-mono font-semibold text-xs text-slate-700 dark:text-slate-300 mt-0.5">
+                            {(member.stats.total_bonus_earned ?? 0).toLocaleString()}
+                          </div>
+                          <div className="text-[9px] text-emerald-600 dark:text-emerald-400 mt-0.5">settled</div>
+                        </div>
+                      ) : (
+                        <div className="text-slate-400 text-xs mt-0.5">—</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Actions row on mobile */}
+                  {member.role !== 'owner' && !isSelf && (
+                    <div className="flex items-center justify-end gap-2 pt-1 border-t border-slate-100 dark:border-slate-800/60">
+                      <button
+                        onClick={() => setResetConfirmStaff(member)}
+                        className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-semibold text-xs flex items-center gap-1.5 transition-colors"
+                      >
+                        <KeyRound className="size-3" />
+                        <span>Reset Password</span>
+                      </button>
+                      <button
+                        onClick={() => handleToggleStatus(member)}
+                        className={`px-3 py-1.5 rounded-lg font-semibold text-xs transition-colors ${
+                          member.is_active
+                            ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-100'
+                            : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100'
+                        }`}
+                      >
+                        {member.is_active ? 'Suspend' : 'Activate'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
           {filteredStaff.length > 6 && (
             <div className="px-4 pb-4">
               <Pagination

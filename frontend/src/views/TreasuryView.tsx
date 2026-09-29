@@ -257,8 +257,8 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
         </button>
       </div>
 
-      {/* Summary Matrix (3 Consistent Emerald Asset Cards with Embedded Micro-Charts) */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* Summary Matrix - Desktop View (≥ sm) */}
+      <div className="hidden sm:grid sm:grid-cols-3 gap-4">
         {/* 1. Cash and Banks */}
         <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-100 dark:border-slate-800/80 p-5 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] flex flex-col justify-between">
           <div>
@@ -326,6 +326,64 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
         </div>
       </div>
 
+      {/* Summary Matrix - Mobile View (< sm): 2 Stat Cards on top + Full Width Total Combined Card */}
+      <div className="flex sm:hidden flex-col gap-2.5">
+        {/* 2 Stat Cards Grid */}
+        <div className="grid grid-cols-2 gap-2.5">
+          {/* Liquid Cash and Banks */}
+          <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-100 dark:border-slate-800/80 p-3.5 shadow-xs flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 truncate">
+                Cash & Banks
+              </span>
+              <div className="w-6 h-6 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/40 flex items-center justify-center shrink-0">
+                <Landmark className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              </div>
+            </div>
+            <div className="mt-2.5">
+              <div className="text-base font-black text-slate-900 dark:text-white font-mono tabular-nums tracking-tight truncate">
+                <AnimatedNumber value={totalTreasury} decimals={2} />
+              </div>
+              <span className="text-[9px] font-bold text-slate-400 font-sans">ETB</span>
+            </div>
+          </div>
+
+          {/* Hedge Reserves */}
+          <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-100 dark:border-slate-800/80 p-3.5 shadow-xs flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 truncate">
+                Reserves
+              </span>
+              <div className="w-6 h-6 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/40 flex items-center justify-center shrink-0">
+                <Coins className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              </div>
+            </div>
+            <div className="mt-2.5">
+              <div className="text-base font-black text-slate-900 dark:text-white font-mono tabular-nums tracking-tight truncate">
+                <AnimatedNumber value={totalAssets} decimals={2} />
+              </div>
+              <span className="text-[9px] font-bold text-slate-400 font-sans">ETB</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Full-Width Total Combined Card */}
+        <div className="w-full bg-white dark:bg-[#131926] rounded-2xl border border-slate-100 dark:border-slate-800/80 p-4 shadow-xs flex items-center justify-between">
+          <div className="min-w-0 flex-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 block">
+              Total Combined Treasury
+            </span>
+            <div className="text-xl font-black text-emerald-600 dark:text-emerald-400 font-mono tabular-nums tracking-tight mt-0.5 truncate">
+              <AnimatedNumber value={totalTreasury + totalAssets} decimals={2} />{' '}
+              <span className="text-xs font-bold text-emerald-500/80 font-sans">ETB</span>
+            </div>
+          </div>
+          <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/40 flex items-center justify-center shrink-0 ml-3">
+            <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+          </div>
+        </div>
+      </div>
+
       {/* Bank Accounts & Mobile Wallets */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
@@ -335,7 +393,8 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
           <span className="text-[10px] text-slate-400">{treasuryAccounts.length} accounts</span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {/* Desktop Bank Cards (≥ sm) */}
+        <div className="hidden sm:grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {treasuryAccounts.map((acc) => {
             const isInactive = acc.is_active === false;
             return (
@@ -424,6 +483,51 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
             );
           })}
         </div>
+
+        {/* Mobile Bank Logo Grid (< sm): Compact tiles with bank logos, minimal info, and balance under them */}
+        <div className="grid grid-cols-2 gap-2.5 sm:hidden">
+          {treasuryAccounts.map((acc) => {
+            const isInactive = acc.is_active === false;
+            return (
+              <div
+                key={acc.id}
+                onClick={() => setSelectedAccountForLedger(acc)}
+                className={`bg-white dark:bg-[#131926] rounded-2xl border p-3 flex flex-col justify-between cursor-pointer transition-all active:scale-[0.98] shadow-xs ${
+                  isInactive
+                    ? 'border-slate-200/50 dark:border-slate-800/50 opacity-60'
+                    : 'border-slate-100 dark:border-slate-800/80 hover:border-emerald-500/30'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <AccountLogo account={acc} size="sm" />
+                    <span className={`w-1.5 h-1.5 rounded-full ${isInactive ? 'bg-slate-400' : 'bg-emerald-500 animate-pulse'}`} />
+                  </div>
+                  <h4 className="font-bold text-slate-900 dark:text-white text-xs leading-tight truncate">
+                    {acc.name}
+                  </h4>
+                  {acc.account_number ? (
+                    <p className="font-mono text-[10px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
+                      {acc.account_number}
+                    </p>
+                  ) : (
+                    <p className="text-[10px] text-slate-400 capitalize truncate mt-0.5">
+                      {acc.type.replace(/_/g, ' ')}
+                    </p>
+                  )}
+                </div>
+
+                <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-800/80">
+                  <div className="text-[10px] text-slate-400">Balance</div>
+                  <div className="font-mono font-bold text-xs text-slate-900 dark:text-white tabular-nums truncate">
+                    <AnimatedNumber value={Number(acc.current_balance)} decimals={2} />{' '}
+                    <span className="text-[9px] font-medium text-slate-400 font-sans">ETB</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Asset Reserves */}
@@ -451,64 +555,107 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
             <p className="text-[11px] text-slate-400 mt-0.5">Add gold, USD, USDT, or other hedge assets</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {assetAccounts.map((acc) => {
-              const isGold = acc.type === 'asset_gold';
-              const isInactive = acc.is_active === false;
-              return (
-                <div
-                  key={acc.id}
-                  onClick={() => setSelectedAccountForLedger(acc)}
-                  className={`bg-white dark:bg-[#131926] rounded-2xl border p-5 transition-all cursor-pointer group shadow-[0_4px_20px_-4px_rgba(0,0,0,0.03)] hover:shadow-lg ${
-                    isInactive
-                      ? 'border-slate-200/50 dark:border-slate-800/50 opacity-60'
-                      : 'border-slate-100 dark:border-slate-800/80 hover:border-emerald-500/30 dark:hover:border-emerald-500/20'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <AccountLogo account={acc} size="md" />
-                      <div>
-                        <div className="font-bold text-slate-900 dark:text-white text-sm group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">{acc.name}</div>
-                        <span className="text-[10px] text-slate-400">
-                          {isGold ? 'Gold' : acc.type === 'custom' ? 'Custom' : 'Foreign Currency and USDT'}
-                          {isInactive ? ' · Inactive' : ''}
-                        </span>
+          <>
+            {/* Desktop Asset Cards (≥ sm) */}
+            <div className="hidden sm:grid sm:grid-cols-2 gap-3">
+              {assetAccounts.map((acc) => {
+                const isGold = acc.type === 'asset_gold';
+                const isInactive = acc.is_active === false;
+                return (
+                  <div
+                    key={acc.id}
+                    onClick={() => setSelectedAccountForLedger(acc)}
+                    className={`bg-white dark:bg-[#131926] rounded-2xl border p-5 transition-all cursor-pointer group shadow-[0_4px_20px_-4px_rgba(0,0,0,0.03)] hover:shadow-lg ${
+                      isInactive
+                        ? 'border-slate-200/50 dark:border-slate-800/50 opacity-60'
+                        : 'border-slate-100 dark:border-slate-800/80 hover:border-emerald-500/30 dark:hover:border-emerald-500/20'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <AccountLogo account={acc} size="md" />
+                        <div>
+                          <div className="font-bold text-slate-900 dark:text-white text-sm group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">{acc.name}</div>
+                          <span className="text-[10px] text-slate-400">
+                            {isGold ? 'Gold' : acc.type === 'custom' ? 'Custom' : 'Foreign Currency and USDT'}
+                            {isInactive ? ' · Inactive' : ''}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                        <button onClick={(e) => { e.stopPropagation(); handleOpenEdit(acc); }} title="Edit" className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); setDeletingAccount(acc); }} title="Remove" className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                      <button onClick={(e) => { e.stopPropagation(); handleOpenEdit(acc); }} title="Edit" className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
-                      <button onClick={(e) => { e.stopPropagation(); setDeletingAccount(acc); }} title="Remove" className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                    {acc.asset_details && (
+                      <div className="mt-3 space-y-1 text-xs font-mono text-slate-600 dark:text-slate-400">
+                        {Object.entries(acc.asset_details).map(([k, v]) => (
+                          <div key={k} className="flex justify-between">
+                            <span className="capitalize text-slate-400 font-sans text-[11px]">{k.replace(/_/g, ' ')}</span>
+                            <span className="font-bold text-slate-800 dark:text-slate-200">{String(v)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-baseline justify-between">
+                      <span className="text-[10px] text-slate-400">Valuation</span>
+                      <span className="inline-flex items-baseline gap-1 whitespace-nowrap font-mono font-bold text-slate-900 dark:text-white">
+                        <AnimatedNumber value={Number(acc.current_balance)} decimals={2} />
+                        <span className="text-[10px] font-medium text-slate-400 font-sans">ETB</span>
+                      </span>
                     </div>
                   </div>
+                );
+              })}
+            </div>
 
-                  {acc.asset_details && (
-                    <div className="mt-3 space-y-1 text-xs font-mono text-slate-600 dark:text-slate-400">
-                      {Object.entries(acc.asset_details).map(([k, v]) => (
-                        <div key={k} className="flex justify-between">
-                          <span className="capitalize text-slate-400 font-sans text-[11px]">{k.replace(/_/g, ' ')}</span>
-                          <span className="font-bold text-slate-800 dark:text-slate-200">{String(v)}</span>
-                        </div>
-                      ))}
+            {/* Mobile Asset Logo Grid (< sm) */}
+            <div className="grid grid-cols-2 gap-2.5 sm:hidden">
+              {assetAccounts.map((acc) => {
+                const isGold = acc.type === 'asset_gold';
+                const isInactive = acc.is_active === false;
+                return (
+                  <div
+                    key={acc.id}
+                    onClick={() => setSelectedAccountForLedger(acc)}
+                    className={`bg-white dark:bg-[#131926] rounded-2xl border p-3 flex flex-col justify-between cursor-pointer transition-all active:scale-[0.98] shadow-xs ${
+                      isInactive
+                        ? 'border-slate-200/50 dark:border-slate-800/50 opacity-60'
+                        : 'border-slate-100 dark:border-slate-800/80 hover:border-emerald-500/30'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <AccountLogo account={acc} size="sm" />
+                        <span className={`w-1.5 h-1.5 rounded-full ${isInactive ? 'bg-slate-400' : 'bg-emerald-500 animate-pulse'}`} />
+                      </div>
+                      <h4 className="font-bold text-slate-900 dark:text-white text-xs leading-tight truncate">
+                        {acc.name}
+                      </h4>
+                      <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                        {isGold ? 'Gold' : acc.type === 'custom' ? 'Custom' : 'Forex / USDT'}
+                      </p>
                     </div>
-                  )}
 
-                  <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-baseline justify-between">
-                    <span className="text-[10px] text-slate-400">Valuation</span>
-                    <span className="inline-flex items-baseline gap-1 whitespace-nowrap font-mono font-bold text-slate-900 dark:text-white">
-                      <AnimatedNumber value={Number(acc.current_balance)} decimals={2} />
-                      <span className="text-[10px] font-medium text-slate-400 font-sans">ETB</span>
-                    </span>
+                    <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-800/80">
+                      <div className="text-[10px] text-slate-400">Valuation</div>
+                      <div className="font-mono font-bold text-xs text-slate-900 dark:text-white tabular-nums truncate">
+                        <AnimatedNumber value={Number(acc.current_balance)} decimals={2} />{' '}
+                        <span className="text-[9px] font-medium text-slate-400 font-sans">ETB</span>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
 

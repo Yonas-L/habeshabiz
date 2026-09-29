@@ -416,6 +416,8 @@ export default function App() {
         onCloseMobile={() => setIsMobileSidebarOpen(false)}
         onOpenProfile={() => setIsProfileModalOpen(true)}
         onOpenQuickSearch={() => setIsQuickSearchOpen(true)}
+        theme={theme}
+        onToggleTheme={handleToggleTheme}
       />
 
       {/* Main Content Area */}

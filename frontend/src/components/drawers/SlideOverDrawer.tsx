@@ -62,7 +62,7 @@ export const SlideOverDrawer: React.FC<SlideOverDrawerProps> = ({
   if (!rendered) return null;
 
   const content = (
-    <div className="fixed inset-0 z-[70] overflow-hidden" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-[80] overflow-hidden" role="dialog" aria-modal="true">
       {/* Dimmed subtle backdrop allowing dashboard visibility */}
       <div
         onClick={onClose}
@@ -113,7 +113,7 @@ export const SlideOverDrawer: React.FC<SlideOverDrawerProps> = ({
 
           {/* Optional Action Footer */}
           {footerActions && (
-            <div className="px-6 py-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] sm:pb-4 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/70 dark:bg-slate-900/50 backdrop-blur-sm flex items-center justify-between gap-3 shrink-0 z-10">
+            <div className="px-4 sm:px-6 py-3 sm:py-4 pb-[calc(1.1rem+env(safe-area-inset-bottom,0px))] sm:pb-4 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/80 dark:bg-[#131926]/90 backdrop-blur-md flex items-center justify-between gap-3 shrink-0 z-10 w-full">
               {footerActions}
             </div>
           )}
