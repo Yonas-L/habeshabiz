@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { User, AuditLogItem, AuditLogsResponse } from '../api/client';
 import { api } from '../api/client';
+import { CustomPageLoader } from '../components/loading/CustomPageLoader';
 import { SlideOverDrawer } from '../components/drawers/SlideOverDrawer';
 import {
   ScrollText,
@@ -303,6 +304,10 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
     return range;
   }, [currentPage, totalPages]);
 
+  if (loading && (!data?.items || data.items.length === 0)) {
+    return <CustomPageLoader mode="app" fullScreen={false} />;
+  }
+
   return (
     <div className="flex flex-col gap-6 animate-page-enter">
       {/* Top Header & Actions Strip */}
@@ -554,11 +559,8 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
               {loading && (!data?.items || data.items.length === 0) ? (
                 <tr>
-                  <td colSpan={7} className="py-16 text-center">
-                    <div className="flex flex-col items-center justify-center gap-2">
-                      <RefreshCw className="size-6 text-slate-400 animate-spin" />
-                      <span className="text-xs text-slate-400 font-medium">Loading audit trail...</span>
-                    </div>
+                  <td colSpan={7} className="py-12 text-center">
+                    <CustomPageLoader mode="app" fullScreen={false} />
                   </td>
                 </tr>
               ) : !data?.items || data.items.length === 0 ? (
@@ -717,11 +719,8 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
         {/* Mobile Cards View */}
         <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800/60 min-h-[250px]">
           {loading && (!data?.items || data.items.length === 0) ? (
-            <div className="py-16 text-center">
-              <div className="flex flex-col items-center justify-center gap-2">
-                <RefreshCw className="size-6 text-slate-400 animate-spin" />
-                <span className="text-xs text-slate-400 font-medium">Loading audit trail...</span>
-              </div>
+            <div className="py-12 text-center">
+              <CustomPageLoader mode="app" fullScreen={false} />
             </div>
           ) : !data?.items || data.items.length === 0 ? (
             <div className="py-16 text-center px-4">

@@ -23,6 +23,7 @@ import {
 import { PartnerFormModal } from '../components/partners/PartnerFormModal';
 import { PartnerDetailView } from './PartnerDetailView';
 import { Pagination } from '../components/Pagination';
+import { CustomPageLoader } from '../components/loading/CustomPageLoader';
 
 interface PartnersViewProps {
   user?: User | null;
@@ -75,9 +76,6 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
       setLoading(true);
       const res = await api.getContacts();
       setContacts(res);
-      if (onRefreshContacts) {
-        onRefreshContacts();
-      }
     } catch (err: any) {
       toast.error('Failed to load partners network', { description: err.message });
     } finally {
@@ -116,7 +114,8 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
         description: 'All historical transactions, debts, and inventory records are preserved.',
       });
       setDeletingContact(null);
-      loadContacts();
+      await loadContacts();
+      onRefreshContacts?.();
     } catch (err: any) {
       toast.error('Failed to remove partner', { description: err.message });
     } finally {
@@ -129,6 +128,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
       const updated = await api.updateContact(contact.id, { is_active: !contact.is_active });
       toast.success(`"${contact.name}" marked as ${updated.is_active ? 'active' : 'inactive'}`);
       setContacts((prev) => prev.map((c) => (c.id === contact.id ? { ...c, is_active: updated.is_active } : c)));
+      onRefreshContacts?.();
     } catch (err: any) {
       toast.error('Failed to update status', { description: err.message });
     }
@@ -177,12 +177,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
   };
 
   if (loading && contacts.length === 0) {
-    return (
-      <div className="py-24 text-center text-slate-400 dark:text-slate-500 text-xs flex items-center justify-center gap-2">
-        <Loader2 className="w-4 h-4 animate-spin text-slate-700 dark:text-slate-300" />
-        <span className="font-medium">Loading partners &amp; brokers network...</span>
-      </div>
-    );
+    return <CustomPageLoader mode="app" fullScreen={false} />;
   }
 
   if (selectedPartnerId) {
@@ -863,7 +858,10 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
         }}
         contactToEdit={editingContact}
         defaultRole={formDefaultRole}
-        onSuccess={() => loadContacts()}
+        onSuccess={() => {
+          loadContacts();
+          onRefreshContacts?.();
+        }}
       />
 
       {/* ─── Delete Confirmation Dialog ─── */}

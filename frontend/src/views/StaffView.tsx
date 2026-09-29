@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { AnimatedNumber } from '../components/AnimatedNumber';
 import { Pagination } from '../components/Pagination';
+import { CustomPageLoader } from '../components/loading/CustomPageLoader';
 
 interface StaffViewProps {
   currentUser: User | null;
@@ -170,6 +171,10 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
 
   const totalWeekVolume = staff.reduce((acc, s) => acc + (s.stats?.sales_volume_week || 0), 0);
   const activeCount = staff.filter((s) => s.is_active).length;
+
+  if (loading && staff.length === 0) {
+    return <CustomPageLoader mode="app" fullScreen={false} />;
+  }
 
   return (
     <div className="space-y-5 animate-page-enter">

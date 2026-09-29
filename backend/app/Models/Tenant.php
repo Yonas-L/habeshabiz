@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -19,6 +20,9 @@ class Tenant extends Model
         'business_type',
         'settings',
         'is_active',
+        'is_locked',
+        'lock_reason',
+        'locked_at',
     ];
 
     protected function casts(): array
@@ -26,7 +30,19 @@ class Tenant extends Model
         return [
             'settings' => 'array',
             'is_active' => 'boolean',
+            'is_locked' => 'boolean',
+            'locked_at' => 'datetime',
         ];
+    }
+
+    public function scopeLocked(Builder $query): Builder
+    {
+        return $query->where('is_locked', true);
+    }
+
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('is_locked', false);
     }
 
     public function users(): HasMany

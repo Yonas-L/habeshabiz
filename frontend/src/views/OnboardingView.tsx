@@ -92,6 +92,15 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSuccess, onCan
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Waitlist Screen State
+  const [isWaitlisted, setIsWaitlisted] = useState(false);
+  const [attemptId, setAttemptId] = useState<string | null>(null);
+  const [waitlistPhone, setWaitlistPhone] = useState('');
+  const [waitlistMessage, setWaitlistMessage] = useState('');
+  const [waitlistConsent, setWaitlistConsent] = useState(false);
+  const [waitlistStatus, setWaitlistStatus] = useState<'form' | 'joined' | 'opted_out'>('form');
+  const [isWaitlistLoading, setIsWaitlistLoading] = useState(false);
+
   const goToStep = (nextStep: 1 | 2 | 3) => {
     setDirection(nextStep > step ? 'forward' : 'backward');
     setStep(nextStep);
@@ -150,6 +159,13 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSuccess, onCan
       toast.success('Workspace created successfully');
       onSuccess(res.token, res.user, res.tenant);
     } catch (err: any) {
+      if (err.error === 'not_whitelisted' || err.status === 403) {
+        setAttemptId(err.attempt_id || null);
+        setWaitlistPhone(ownerPhone);
+        setIsWaitlisted(true);
+        setIsSubmitting(false);
+        return;
+      }
       console.error('Onboarding failed:', err);
       const msg = err.message || 'Failed to create workspace. Please check your information.';
       setErrorMessage(msg);
@@ -158,6 +174,244 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSuccess, onCan
       goToStep(2);
     }
   };
+
+  const handleJoinWaitlist = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!waitlistConsent) return;
+    try {
+      setIsWaitlistLoading(true);
+      await api.joinWaitlist({
+        name: ownerName.trim(),
+        email: ownerEmail.trim().toLowerCase(),
+        phone: waitlistPhone.trim() || undefined,
+        business_name: businessName.trim() || undefined,
+        message: waitlistMessage.trim() || undefined,
+        consented: true,
+        attempt_id: attemptId || undefined,
+      });
+      setWaitlistStatus('joined');
+    } catch (err: any) {
+      toast.error('Failed to submit waitlist', { description: err.message });
+    } finally {
+      setIsWaitlistLoading(false);
+    }
+  };
+
+  const handleDeclineWaitlist = async () => {
+    try {
+      setIsWaitlistLoading(true);
+      await api.joinWaitlist({
+        name: ownerName.trim() || 'Guest',
+        email: ownerEmail.trim().toLowerCase(),
+        consented: false,
+        attempt_id: attemptId || undefined,
+      });
+      setWaitlistStatus('opted_out');
+    } catch (err: any) {
+      toast.error('Request failed', { description: err.message });
+    } finally {
+      setIsWaitlistLoading(false);
+    }
+  };
+
+  if (isWaitlisted) {
+    if (waitlistStatus === 'joined') {
+      return (
+        <div className="min-h-screen bg-[#f6f8fa] dark:bg-[#0b0f17] flex flex-col justify-center items-center p-4 sm:p-6 font-sans transition-colors duration-200">
+          <div className="w-full max-w-lg bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xl overflow-hidden p-8 text-center space-y-6 animate-page-enter">
+            <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto shadow-inner">
+              <CheckCircle2 className="w-7 h-7" />
+            </div>
+            <div className="space-y-1.5">
+              <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+                You're on the list.
+              </h1>
+              <h2 className="text-base font-semibold text-emerald-600 dark:text-emerald-400 font-sans">
+                ዝርዝሩ ላይ ተቀላቅለዋል።
+              </h2>
+            </div>
+            <div className="space-y-1 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              <p>We'll reach out to you personally. Thank you.</p>
+              <p className="font-sans">በግል እናነጋግርዎታለን። አመሰግናለሁ።</p>
+            </div>
+            <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={onCancelToLogin}
+                className="text-xs font-semibold text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer inline-flex items-center gap-1.5"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>← Back to login</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (waitlistStatus === 'opted_out') {
+      return (
+        <div className="min-h-screen bg-[#f6f8fa] dark:bg-[#0b0f17] flex flex-col justify-center items-center p-4 sm:p-6 font-sans transition-colors duration-200">
+          <div className="w-full max-w-lg bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xl overflow-hidden p-8 text-center space-y-6 animate-page-enter">
+            <div className="space-y-1.5">
+              <h1 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
+                Understood. We haven't saved your details.
+              </h1>
+              <h2 className="text-sm font-semibold text-slate-500 dark:text-slate-400 font-sans">
+                ገባን። ዝርዝርዎን አላስቀመጥንም።
+              </h2>
+            </div>
+            <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={onCancelToLogin}
+                className="text-xs font-semibold text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer inline-flex items-center gap-1.5"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>← Back to login</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="min-h-screen bg-[#f6f8fa] dark:bg-[#0b0f17] flex flex-col justify-center items-center p-4 sm:p-6 font-sans transition-colors duration-200">
+        <div className="w-full max-w-xl bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xl overflow-hidden animate-page-enter">
+          {/* Header */}
+          <div className="px-6 sm:px-8 pt-7 pb-5 border-b border-slate-100 dark:border-slate-800/80 text-center space-y-2">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto mb-3 font-bold text-xs">
+              HB
+            </div>
+            <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white leading-snug">
+              We're currently in private beta with a selected group of shops.
+            </h1>
+            <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400 font-sans">
+              በአሁኑ ጊዜ ከተወሰኑ ሱቆች ጋር በፕራይቬት ቤታ ላይ ነን።
+            </p>
+            <div className="pt-1 text-xs text-slate-500 dark:text-slate-400 space-y-0.5">
+              <p>Leave your details and we'll reach out personally when we're ready for you.</p>
+              <p className="font-sans">ዝርዝርዎን ይተዉ — ዝግጁ ስንሆን እናነጋግርዎታለን።</p>
+            </div>
+          </div>
+
+          {/* Form */}
+          <form onSubmit={handleJoinWaitlist} className="p-6 sm:p-8 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Owner Name
+                </label>
+                <input
+                  type="text"
+                  value={ownerName}
+                  disabled
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-xs font-medium text-slate-600 dark:text-slate-400 cursor-not-allowed"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  value={ownerEmail}
+                  disabled
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-xs font-medium text-slate-600 dark:text-slate-400 cursor-not-allowed"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Business Name
+                </label>
+                <input
+                  type="text"
+                  value={businessName}
+                  disabled
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-xs font-medium text-slate-600 dark:text-slate-400 cursor-not-allowed"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Phone Number <span className="text-[10px] text-slate-400 font-normal">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={waitlistPhone}
+                  onChange={(e) => setWaitlistPhone(e.target.value)}
+                  placeholder="+251 9..."
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder:text-slate-400"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Tell us about your shop <span className="text-[10px] text-slate-400 font-normal font-sans">(optional)</span>
+              </label>
+              <textarea
+                value={waitlistMessage}
+                onChange={(e) => setWaitlistMessage(e.target.value)}
+                maxLength={500}
+                rows={3}
+                placeholder="Tell us about your shop / ስለሱቅዎ ይንገሩን"
+                className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder:text-slate-400 resize-none"
+              />
+            </div>
+
+            {/* Consent Checkbox */}
+            <div className="pt-2">
+              <label className="flex items-start gap-3 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={waitlistConsent}
+                  onChange={(e) => setWaitlistConsent(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 dark:border-slate-700 cursor-pointer"
+                />
+                <div className="text-xs text-slate-700 dark:text-slate-300 leading-snug space-y-0.5">
+                  <p className="font-medium">I agree to be contacted when we open for new shops.</p>
+                  <p className="text-slate-500 dark:text-slate-400 font-sans">አዲስ ሱቆችን ሲቀበሉ እንዲያነጋግሩኝ እፈቅዳለሁ።</p>
+                </div>
+              </label>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="pt-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={handleDeclineWaitlist}
+                disabled={isWaitlistLoading}
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer disabled:opacity-50 text-center"
+              >
+                No thanks / አይ አስፈልገኝም
+              </button>
+
+              <button
+                type="submit"
+                disabled={!waitlistConsent || isWaitlistLoading}
+                className="w-full sm:w-auto h-10 px-6 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-all shadow-xs cursor-pointer active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isWaitlistLoading ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Submitting...</span>
+                  </>
+                ) : (
+                  <span>Join Waitlist / ዝርዝር ተቀላቀሉ</span>
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#f6f8fa] dark:bg-[#0b0f17] flex flex-col justify-center items-center p-4 sm:p-6 font-sans transition-colors duration-200">

@@ -20,6 +20,7 @@ import {
 import { AnimatedNumber } from '../components/AnimatedNumber';
 import { VendorStatementPrintModal } from '../components/partners/VendorStatementPrintModal';
 import { PartnerFormModal } from '../components/partners/PartnerFormModal';
+import { CustomPageLoader } from '../components/loading/CustomPageLoader';
 
 interface PartnerDetailViewProps {
   contactId: string;
@@ -151,12 +152,7 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
   };
 
   if (loading && !statementData) {
-    return (
-      <div className="py-24 text-center">
-        <Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400" />
-        <p className="text-xs text-slate-500 mt-2 font-medium">Loading partner dashboard...</p>
-      </div>
-    );
+    return <CustomPageLoader mode="app" fullScreen={false} />;
   }
 
   if (!statementData) {

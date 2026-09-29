@@ -1,6 +1,12 @@
 <?php
 
 use App\Http\Controllers\Api\AccountController;
+use App\Http\Controllers\Api\Admin\AdminAuthController;
+use App\Http\Controllers\Api\Admin\AdminSettingController;
+use App\Http\Controllers\Api\Admin\AdminSignupAttemptController;
+use App\Http\Controllers\Api\Admin\AdminTenantController;
+use App\Http\Controllers\Api\Admin\AdminWaitlistController;
+use App\Http\Controllers\Api\Admin\AdminWhitelistController;
 use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CategoryController;
@@ -15,16 +21,49 @@ use App\Http\Controllers\Api\SaleController;
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\StaffController;
 use App\Http\Controllers\Api\TaskController;
+use App\Http\Controllers\Api\WaitlistController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
     // Public Endpoints
     Route::post('/auth/login', [AuthController::class, 'login']);
     Route::post('/onboard', [OnboardingController::class, 'onboard']);
+    Route::post('/waitlist', [WaitlistController::class, 'store']);
     Route::get('/public/statement/{token}', [ContactController::class, 'publicStatement']);
 
+    // Platform Superadmin Routes
+    Route::prefix('admin')->group(function () {
+        Route::post('/auth/login', [AdminAuthController::class, 'login'])->middleware('throttle:10,1');
+
+        Route::middleware('auth.platform_admin')->group(function () {
+            Route::post('/auth/logout', [AdminAuthController::class, 'logout']);
+            Route::get('/auth/me', [AdminAuthController::class, 'me']);
+
+            // Tenants
+            Route::get('/tenants', [AdminTenantController::class, 'index']);
+            Route::post('/tenants/{id}/lock', [AdminTenantController::class, 'lock']);
+            Route::post('/tenants/{id}/unlock', [AdminTenantController::class, 'unlock']);
+
+            // Whitelist
+            Route::get('/whitelist', [AdminWhitelistController::class, 'index']);
+            Route::post('/whitelist', [AdminWhitelistController::class, 'store']);
+            Route::delete('/whitelist/{id}', [AdminWhitelistController::class, 'destroy']);
+
+            // Waitlist
+            Route::get('/waitlist', [AdminWaitlistController::class, 'index']);
+            Route::patch('/waitlist/{id}', [AdminWaitlistController::class, 'update']);
+
+            // Signup Attempts
+            Route::get('/signup-attempts', [AdminSignupAttemptController::class, 'index']);
+
+            // Platform Settings
+            Route::get('/settings', [AdminSettingController::class, 'index']);
+            Route::patch('/settings', [AdminSettingController::class, 'update']);
+        });
+    });
+
     // Protected Routes
-    Route::middleware('auth:sanctum')->group(function () {
+    Route::middleware(['auth:sanctum', 'tenant.not_locked'])->group(function () {
         // Business Settings & Profile (Owner Only)
         Route::get('/settings/profile', [SettingsController::class, 'getProfile']);
         Route::put('/settings/profile', [SettingsController::class, 'updateProfile']);

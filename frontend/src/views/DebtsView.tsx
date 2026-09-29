@@ -7,6 +7,7 @@ import { AnimatedNumber } from '../components/AnimatedNumber';
 import { DebtDrawer } from '../components/drawers/DebtDrawer';
 import { RecordDebtModal } from '../components/debts/RecordDebtModal';
 import { Pagination } from '../components/Pagination';
+import { CustomPageLoader } from '../components/loading/CustomPageLoader';
 
 interface DebtsViewProps {
   accounts: FinancialAccount[];
@@ -148,6 +149,10 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
     };
   };
 
+  if (loading && debts.length === 0) {
+    return <CustomPageLoader mode="app" fullScreen={false} />;
+  }
+
   return (
     <div className="space-y-6 animate-page-enter">
       {/* Top Header & Type Switcher */}
@@ -263,11 +268,8 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-slate-700 dark:text-slate-300">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="py-16 text-center text-slate-400">
-                    <div className="flex items-center justify-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin text-slate-900 dark:text-white" />
-                      <span>Loading ledger records...</span>
-                    </div>
+                  <td colSpan={8} className="py-8 text-center">
+                    <CustomPageLoader mode="app" fullScreen={false} />
                   </td>
                 </tr>
               ) : debts.length === 0 ? (
@@ -461,11 +463,8 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
         {/* Mobile Native Cards (< md) */}
         <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800/80">
           {loading ? (
-            <div className="py-12 text-center text-slate-400">
-              <div className="flex items-center justify-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin text-slate-900 dark:text-white" />
-                <span>Loading ledger records...</span>
-              </div>
+            <div className="py-6 text-center">
+              <CustomPageLoader mode="app" fullScreen={false} />
             </div>
           ) : debts.length === 0 ? (
             <div className="py-12 text-center text-slate-400 text-xs">

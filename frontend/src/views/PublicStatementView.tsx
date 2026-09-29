@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import type { PartnerStatementData } from '../api/client';
 import { api } from '../api/client';
+import { CustomPageLoader } from '../components/loading/CustomPageLoader';
 import {
   Printer,
   ShieldCheck,
-  Loader2,
   AlertCircle,
 } from 'lucide-react';
 
@@ -66,14 +66,7 @@ export const PublicStatementView: React.FC<PublicStatementViewProps> = ({ token 
   }, [token]);
 
   if (loading && !data) {
-    return (
-      <div className="min-h-screen bg-[#f8fafc] text-slate-900 flex items-center justify-center p-4">
-        <div className="text-center space-y-3">
-          <Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-500" />
-          <p className="text-xs text-slate-500 font-medium">Loading official partner statement...</p>
-        </div>
-      </div>
-    );
+    return <CustomPageLoader mode="app" fullScreen={true} />;
   }
 
   if (error || !data) {

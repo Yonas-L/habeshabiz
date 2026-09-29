@@ -16,6 +16,7 @@ import {
   DollarSign,
 } from 'lucide-react';
 import { AnimatedNumber } from '../components/AnimatedNumber';
+import { CustomPageLoader } from '../components/loading/CustomPageLoader';
 
 interface StaffOverviewViewProps {
   user: User | null;
@@ -152,17 +153,7 @@ export const StaffOverviewView: React.FC<StaffOverviewViewProps> = ({
   const pendingTasksCount = tasks.filter((t) => !t.is_completed).length;
 
   if (loading) {
-    return (
-      <div className="space-y-4 animate-page-enter">
-        <div className="h-28 rounded-2xl bg-slate-200/60 dark:bg-slate-800/50 animate-skeleton" />
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-20 rounded-2xl bg-slate-200/60 dark:bg-slate-800/50 animate-skeleton" />
-          ))}
-        </div>
-        <div className="h-32 rounded-2xl bg-slate-200/60 dark:bg-slate-800/50 animate-skeleton" />
-      </div>
-    );
+    return <CustomPageLoader mode="app" fullScreen={false} />;
   }
 
   return (

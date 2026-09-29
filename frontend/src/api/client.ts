@@ -555,6 +555,24 @@ export function resolveImageUrl(url: string | null | undefined): string | null {
   return url;
 }
 
+export class ApiError extends Error {
+  status: number;
+  error?: string;
+  attempt_id?: string;
+  lock_reason?: string;
+  data?: any;
+
+  constructor(message: string, status: number, data?: any) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.error = data?.error;
+    this.attempt_id = data?.attempt_id;
+    this.lock_reason = data?.lock_reason;
+    this.data = data;
+  }
+}
+
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = getAuthToken();
   const headers = new Headers(options.headers || {});
@@ -571,11 +589,33 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     headers,
   });
 
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
+
   if (!res.ok) {
-    throw new Error(data.message || 'API request failed');
+    if (res.status === 403 && data.error === 'tenant_suspended') {
+      removeAuthToken();
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('habeshabiz_lock_reason', data.lock_reason || '');
+        if (window.location.pathname !== '/suspended') {
+          window.location.href = '/suspended';
+        }
+      }
+    }
+
+    throw new ApiError(data.message || 'API request failed', res.status, data);
   }
+
   return data.data !== undefined ? data.data : data;
+}
+
+export interface WaitlistPayload {
+  name: string;
+  email: string;
+  phone?: string;
+  business_name?: string;
+  message?: string;
+  consented: boolean;
+  attempt_id?: string;
 }
 
 export interface OnboardingPayload {
@@ -637,6 +677,11 @@ export const api = {
     request<{ token: string; user: User; tenant: Tenant }>('/onboard', {
       method: 'POST',
       body: JSON.stringify(data),
+    }),
+  joinWaitlist: (payload: WaitlistPayload) =>
+    request<{ message: string }>('/waitlist', {
+      method: 'POST',
+      body: JSON.stringify(payload),
     }),
   getMe: () => request<{ user: User; tenant: Tenant }>('/auth/me'),
   logout: () => request<void>('/auth/logout', { method: 'POST' }),

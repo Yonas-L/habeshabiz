@@ -39,6 +39,7 @@ import { CategoryManagementModal, getCategoryIcon } from '../components/inventor
 import { EditProductModal } from '../components/inventory/EditProductModal';
 import { SwapDeviceModal } from '../components/inventory/SwapDeviceModal';
 import { RecordExpenseModal } from '../components/RecordExpenseModal';
+import { CustomPageLoader } from '../components/loading/CustomPageLoader';
 import { formatPurchaseAge } from '../utils/dateUtils';
 
 interface InventoryViewProps {
@@ -729,6 +730,10 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     return <Smartphone className="w-4 h-4 text-slate-600 dark:text-slate-400" />;
   };
 
+  if (loading && products.length === 0) {
+    return <CustomPageLoader mode="app" fullScreen={false} />;
+  }
+
   return (
     <div className="space-y-5 animate-page-enter">
       {/* Top Controls Bar */}
@@ -899,11 +904,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-slate-700 dark:text-slate-300">
                 {loading ? (
                   <tr>
-                    <td colSpan={canViewCost ? (isOwner ? 6 : 5) : (isOwner ? 5 : 4)} className="py-16 text-center text-slate-400">
-                      <div className="flex items-center justify-center gap-2">
-                        <Loader2 className="w-4 h-4 animate-spin text-slate-900 dark:text-white" />
-                        <span>Loading inventory models...</span>
-                      </div>
+                    <td colSpan={canViewCost ? (isOwner ? 6 : 5) : (isOwner ? 5 : 4)} className="py-8 text-center">
+                      <CustomPageLoader mode="app" fullScreen={false} />
                     </td>
                   </tr>
                 ) : inStockProducts.length === 0 ? (
@@ -1338,11 +1340,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-slate-700 dark:text-slate-300">
                 {loading ? (
                   <tr>
-                    <td colSpan={canViewCost ? (isOwner ? 6 : 5) : (isOwner ? 5 : 4)} className="py-16 text-center text-slate-400">
-                      <div className="flex items-center justify-center gap-2">
-                        <Loader2 className="w-4 h-4 animate-spin text-slate-900 dark:text-white" />
-                        <span>Loading inventory units...</span>
-                      </div>
+                    <td colSpan={canViewCost ? (isOwner ? 6 : 5) : (isOwner ? 5 : 4)} className="py-8 text-center">
+                      <CustomPageLoader mode="app" fullScreen={false} />
                     </td>
                   </tr>
                 ) : units.length === 0 ? (
@@ -1705,11 +1704,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           {statusFilter === 'in_stock' ? (
             /* COLLAPSIBLE GROUPED IN-STOCK MOBILE CARDS */
             loading ? (
-              <div className="py-12 text-center text-slate-400">
-                <div className="flex items-center justify-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin text-slate-900 dark:text-white" />
-                  <span>Loading inventory models...</span>
-                </div>
+              <div className="py-6 text-center">
+                <CustomPageLoader mode="app" fullScreen={false} />
               </div>
             ) : inStockProducts.length === 0 ? (
               <div className="py-12 text-center text-slate-400 text-xs">
@@ -1896,11 +1892,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           ) : (
             /* FLAT UNITS MOBILE CARDS (out, sold, returned, all, exchange) */
             loading ? (
-              <div className="py-12 text-center text-slate-400">
-                <div className="flex items-center justify-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin text-slate-900 dark:text-white" />
-                  <span>Loading inventory units...</span>
-                </div>
+              <div className="py-6 text-center">
+                <CustomPageLoader mode="app" fullScreen={false} />
               </div>
             ) : units.length === 0 ? (
               <div className="py-12 text-center text-slate-400 text-xs">

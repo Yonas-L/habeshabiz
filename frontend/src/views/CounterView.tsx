@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { Product, ProductVariant, InventoryUnit, Contact, FinancialAccount, User } from '../api/client';
 import { api } from '../api/client';
+import { CustomPageLoader } from '../components/loading/CustomPageLoader';
 import { toast } from 'sonner';
 import {
   ShoppingBag,
@@ -583,12 +584,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
   };
 
   if (loading && products.length === 0) {
-    return (
-      <div className="py-24 text-center text-slate-400 dark:text-slate-500 text-xs flex items-center justify-center gap-2 animate-pulse">
-        <Loader2 className="w-4 h-4 animate-spin text-slate-900 dark:text-white" />
-        <span>Loading POS workspace...</span>
-      </div>
-    );
+    return <CustomPageLoader mode="app" fullScreen={false} />;
   }
 
   return (

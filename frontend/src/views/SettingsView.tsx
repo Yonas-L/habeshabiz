@@ -15,6 +15,7 @@ import {
   Check,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { CustomPageLoader } from '../components/loading/CustomPageLoader';
 
 interface SettingsViewProps {
   user: User | null;
@@ -247,11 +248,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[300px] text-xs text-slate-400">
-        Loading settings...
-      </div>
-    );
+    return <CustomPageLoader mode="app" fullScreen={false} />;
   }
 
   return (

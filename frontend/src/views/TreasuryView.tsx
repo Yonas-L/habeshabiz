@@ -18,6 +18,7 @@ import { AnimatedNumber } from '../components/AnimatedNumber';
 import { ManageAccountModal } from '../components/treasury/ManageAccountModal';
 import { AccountLedgerDrawer } from '../components/drawers/AccountLedgerDrawer';
 import { AccountLogo } from '../utils/bankLogos';
+import { CustomPageLoader } from '../components/loading/CustomPageLoader';
 
 interface TreasuryViewProps {
   accounts?: FinancialAccount[];
@@ -225,12 +226,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
   };
 
   if (loading && treasuryAccounts.length === 0) {
-    return (
-      <div className="py-24 text-center text-slate-400 dark:text-slate-500 text-xs flex items-center justify-center gap-2 animate-pulse">
-        <Loader2 className="w-4 h-4 animate-spin text-slate-900 dark:text-white" />
-        <span>Loading bank and treasury accounts...</span>
-      </div>
-    );
+    return <CustomPageLoader mode="app" fullScreen={false} />;
   }
 
   const allAccounts = [...treasuryAccounts, ...assetAccounts];

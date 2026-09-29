@@ -208,6 +208,65 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   animation: skeletonPulse 1.8s ease-in-out infinite;
 }
 
+/* Custom Page Loading Progress Keyframes */
+@keyframes progressShimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(300%);
+  }
+}
+
+@keyframes orbitSpin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    opacity: 0.35;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 0.75;
+    transform: scale(1.06);
+  }
+}
+
+@keyframes floatGentle {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+.animate-progress-shimmer {
+  animation: progressShimmer 1.8s ease-in-out infinite;
+}
+
+.animate-orbit-spin {
+  animation: orbitSpin 5s linear infinite;
+}
+
+.animate-orbit-spin-reverse {
+  animation: orbitSpin 7s linear infinite reverse;
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 3.5s ease-in-out infinite;
+}
+
+.animate-float-gentle {
+  animation: floatGentle 3.5s ease-in-out infinite;
+}
+
 /* Liquid Flow Step Transitions */
 @keyframes liquidSlideInRight {
   0% {

@@ -18,6 +18,7 @@ import { AnimatedNumber } from '../components/AnimatedNumber';
 import { Pagination } from '../components/Pagination';
 import { SalesOrderDrawer } from '../components/drawers/SalesOrderDrawer';
 import { SwapDeviceModal } from '../components/inventory/SwapDeviceModal';
+import { CustomPageLoader } from '../components/loading/CustomPageLoader';
 
 interface SalesHistoryViewProps {
   user: User | null;
@@ -193,6 +194,10 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
 
   const tradeInCount = sales.filter((s) => Number(s.exchange_allowance || 0) > 0).length;
 
+  if (loading && sales.length === 0) {
+    return <CustomPageLoader mode="app" fullScreen={false} />;
+  }
+
   return (
     <div className="space-y-4 animate-page-enter">
       {/* Sleek KPI Summary Strip */}
@@ -354,11 +359,8 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-slate-700 dark:text-slate-300">
               {loading ? (
                 <tr>
-                  <td colSpan={isOwner ? 8 : 7} className="py-16 text-center text-slate-400">
-                    <div className="flex items-center justify-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin text-slate-900 dark:text-white" />
-                      <span>Loading sales...</span>
-                    </div>
+                  <td colSpan={isOwner ? 8 : 7} className="py-8 text-center">
+                    <CustomPageLoader mode="app" fullScreen={false} />
                   </td>
                 </tr>
               ) : sales.length === 0 ? (
@@ -568,11 +570,8 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
         {/* Mobile Native Cards (< md) */}
         <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800/80">
           {loading ? (
-            <div className="py-12 text-center text-slate-400">
-              <div className="flex items-center justify-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin text-slate-900 dark:text-white" />
-                <span>Loading sales...</span>
-              </div>
+            <div className="py-6 text-center">
+              <CustomPageLoader mode="app" fullScreen={false} />
             </div>
           ) : sales.length === 0 ? (
             <div className="py-12 text-center text-slate-400 text-xs">

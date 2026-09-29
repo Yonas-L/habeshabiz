@@ -30,12 +30,18 @@ import { LogsView } from './views/LogsView';
 import { SettingsView } from './views/SettingsView';
 import { OnboardingView } from './views/OnboardingView';
 import { PublicStatementView } from './views/PublicStatementView';
+import { SuspendedView } from './views/SuspendedView';
+import { AdminLoginView } from './views/admin/AdminLoginView';
+import { AdminLayout } from './views/admin/AdminLayout';
+import { getAdminToken } from './api/adminClient';
 import { ProfileSettingsModal } from './components/ProfileSettingsModal';
 import { QuickSearchModal, type NavigationPayload } from './components/QuickSearchModal';
 import { MobileBottomNav } from './components/navigation/MobileBottomNav';
 import { SpeedDialFAB } from './components/navigation/SpeedDialFAB';
+import { CustomPageLoader } from './components/loading/CustomPageLoader';
+import { TopProgressBar } from './components/loading/TopProgressBar';
 import { Toaster, toast } from 'sonner';
-import { ArrowRight, Loader2 } from 'lucide-react';
+import { ArrowRight, Loader2, ShieldCheck } from 'lucide-react';
 
 export const getCurrentMonth = (): string => {
   const now = new Date();
@@ -46,6 +52,17 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [activeTab, setActiveTab] = useState<NavTab>('overview');
+  const [isPageLoading, setIsPageLoading] = useState<boolean>(false);
+
+  const handleNavigateTab = useCallback((tab: NavTab) => {
+    if (tab === activeTab) return;
+    setIsPageLoading(true);
+    setActiveTab(tab);
+    setTimeout(() => {
+      setIsPageLoading(false);
+    }, 320);
+  }, [activeTab]);
+
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -62,12 +79,38 @@ export default function App() {
     showIntake?: boolean;
     showRecordExpense?: boolean;
   }>({});
+  const resolveCurrentPath = () => {
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash;
+      if (hash.startsWith('#/admin') || hash.startsWith('#admin')) return '/admin';
+      if (hash.startsWith('#/onboard') || hash.startsWith('#onboard')) return '/onboard';
+      return window.location.pathname;
+    }
+    return '/';
+  };
+
+  const [currentPath, setCurrentPath] = useState<string>(resolveCurrentPath);
+
   const [isOnboarding, setIsOnboarding] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
-      return window.location.pathname === '/onboard';
+      return resolveCurrentPath() === '/onboard';
     }
     return false;
   });
+
+  useEffect(() => {
+    const handleLocationChange = () => {
+      const p = resolveCurrentPath();
+      setCurrentPath(p);
+      setIsOnboarding(p === '/onboard');
+    };
+    window.addEventListener('popstate', handleLocationChange);
+    window.addEventListener('hashchange', handleLocationChange);
+    return () => {
+      window.removeEventListener('popstate', handleLocationChange);
+      window.removeEventListener('hashchange', handleLocationChange);
+    };
+  }, []);
 
   const handleClearNavContext = useCallback(() => {
     setNavContext({});
@@ -198,6 +241,14 @@ export default function App() {
   // Check existing session on boot (no hardcoded auto-login)
   useEffect(() => {
     const initSession = async () => {
+      if (typeof window !== 'undefined') {
+        const p = window.location.pathname;
+        if (p.startsWith('/admin') || p === '/suspended' || p.startsWith('/statement/')) {
+          setLoading(false);
+          return;
+        }
+      }
+
       setLoading(true);
       const token = getAuthToken();
 
@@ -276,13 +327,69 @@ export default function App() {
     );
   }
 
+  // Suspended account view
+  if (currentPath === '/suspended') {
+    return (
+      <div className={theme === 'dark' ? 'dark' : ''}>
+        <Toaster position="bottom-right" richColors closeButton theme={theme} />
+        <SuspendedView
+          onBackToLogin={() => {
+            setCurrentPath('/');
+            if (typeof window !== 'undefined' && window.history.pushState) {
+              window.history.pushState({}, '', '/');
+            }
+          }}
+        />
+      </div>
+    );
+  }
+
+  // Platform Admin portal
+  if (currentPath.startsWith('/admin')) {
+    const adminToken = getAdminToken();
+    if (!adminToken || currentPath === '/admin/login') {
+      return (
+        <div className={theme === 'dark' ? 'dark' : ''}>
+          <Toaster position="bottom-right" richColors closeButton theme={theme} />
+          <AdminLoginView
+            onSuccess={() => {
+              setCurrentPath('/admin');
+              if (typeof window !== 'undefined' && window.history.pushState) {
+                window.history.pushState({}, '', '/admin');
+              }
+            }}
+            onBackToStore={() => {
+              setCurrentPath('/');
+              if (typeof window !== 'undefined' && window.history.pushState) {
+                window.history.pushState({}, '', '/');
+              }
+            }}
+          />
+        </div>
+      );
+    }
+
+    return (
+      <div className={theme === 'dark' ? 'dark' : ''}>
+        <Toaster position="bottom-right" richColors closeButton theme={theme} />
+        <AdminLayout
+          theme={theme}
+          onToggleTheme={handleToggleTheme}
+          onLogoutSuccess={() => {
+            setCurrentPath('/admin/login');
+            if (typeof window !== 'undefined' && window.history.pushState) {
+              window.history.pushState({}, '', '/admin/login');
+            }
+          }}
+        />
+      </div>
+    );
+  }
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#f6f8fa] flex flex-col items-center justify-center p-4">
-        <div className="flex items-center gap-2.5 text-slate-700 bg-white p-4 rounded-lg border border-slate-200 shadow-xs">
-          <Loader2 className="w-4 h-4 animate-spin text-slate-900" />
-          <span className="text-xs font-medium tracking-tight">Syncing HabeshaBiz workspace...</span>
-        </div>
+      <div className={theme === 'dark' ? 'dark' : ''}>
+        <CustomPageLoader mode="app" />
       </div>
     );
   }
@@ -300,12 +407,14 @@ export default function App() {
               setUser(newUser);
               setTenant(newTenant);
               setIsOnboarding(false);
+              setCurrentPath('/');
               if (typeof window !== 'undefined' && window.history.pushState) {
                 window.history.pushState({}, '', '/');
               }
             }}
             onCancelToLogin={() => {
               setIsOnboarding(false);
+              setCurrentPath('/');
               if (typeof window !== 'undefined' && window.history.pushState) {
                 window.history.pushState({}, '', '/');
               }
@@ -376,11 +485,12 @@ export default function App() {
             </button>
           </form>
 
-          <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800 text-center">
+          <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-col items-center gap-2.5">
             <button
               type="button"
               onClick={() => {
                 setIsOnboarding(true);
+                setCurrentPath('/onboard');
                 if (typeof window !== 'undefined' && window.history.pushState) {
                   window.history.pushState({}, '', '/onboard');
                 }
@@ -389,6 +499,20 @@ export default function App() {
             >
               <span>New business? Set up your workspace</span>
               <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setCurrentPath('/admin');
+                if (typeof window !== 'undefined' && window.history.pushState) {
+                  window.history.pushState({}, '', '/admin');
+                }
+              }}
+              className="text-[11px] font-medium text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+              <span>Platform Superadmin Portal</span>
             </button>
           </div>
         </div>
@@ -401,12 +525,13 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#f6f8fa] dark:bg-[#0b0f17] text-slate-900 dark:text-slate-100 flex font-sans selection:bg-slate-900 selection:text-white transition-colors duration-200">
+      <TopProgressBar isLoading={isPageLoading} />
       <Toaster position="bottom-right" richColors closeButton theme={theme} />
 
       {/* Sidebar (Desktop & Mobile Drawer) */}
       <Sidebar
         activeTab={activeTab}
-        onChangeTab={setActiveTab}
+        onChangeTab={handleNavigateTab}
         user={user}
         tenant={tenant}
         netCapital={netCapital}
@@ -431,106 +556,112 @@ export default function App() {
           theme={theme}
           onToggleTheme={handleToggleTheme}
           onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
-          onQuickAction={() => setActiveTab('counter')}
+          onQuickAction={() => handleNavigateTab('counter')}
           onOpenProfile={() => setIsProfileModalOpen(true)}
         />
 
         {/* View Surface */}
-        <main className="flex-1 p-4 lg:p-8 max-w-7xl w-full mx-auto pb-28 md:pb-8">
-          {activeTab === 'overview' && (
-            user?.role === 'owner' ? (
-              <OverviewView
-                data={dashboardData}
-                user={user}
-                accounts={accounts}
-                selectedMonth={selectedMonth}
-                onNavigateTab={setActiveTab}
-                onRefreshData={refreshData}
-              />
-            ) : (
-              <StaffOverviewView
-                user={user}
-                onNavigateTab={setActiveTab}
-              />
-            )
-          )}
+        <main className="flex-1 p-4 lg:p-8 max-w-7xl w-full mx-auto pb-28 md:pb-8 flex flex-col">
+          {isPageLoading ? (
+            <CustomPageLoader mode="app" fullScreen={false} />
+          ) : (
+            <>
+              {activeTab === 'overview' && (
+                user?.role === 'owner' ? (
+                  <OverviewView
+                    data={dashboardData}
+                    user={user}
+                    accounts={accounts}
+                    selectedMonth={selectedMonth}
+                    onNavigateTab={handleNavigateTab}
+                    onRefreshData={refreshData}
+                  />
+                ) : (
+                  <StaffOverviewView
+                    user={user}
+                    onNavigateTab={handleNavigateTab}
+                  />
+                )
+              )}
 
-          {activeTab === 'counter' && (
-            <CounterView
-              user={user}
-              accounts={accounts}
-              contacts={contacts}
-              onSaleSuccess={refreshData}
-            />
-          )}
+              {activeTab === 'counter' && (
+                <CounterView
+                  user={user}
+                  accounts={accounts}
+                  contacts={contacts}
+                  onSaleSuccess={refreshData}
+                />
+              )}
 
-          {activeTab === 'inventory' && (
-            <InventoryView
-              user={user}
-              onInventoryChange={refreshData}
-              initialSelectedUnit={navContext.unit}
-              initialShowIntake={navContext.showIntake}
-              onClearInitialContext={handleClearNavContext}
-            />
-          )}
+              {activeTab === 'inventory' && (
+                <InventoryView
+                  user={user}
+                  onInventoryChange={refreshData}
+                  initialSelectedUnit={navContext.unit}
+                  initialShowIntake={navContext.showIntake}
+                  onClearInitialContext={handleClearNavContext}
+                />
+              )}
 
-          {activeTab === 'sales' && (
-            <SalesHistoryView
-              user={user}
-              tenant={tenant}
-              initialSelectedOrder={navContext.order}
-              onClearInitialContext={handleClearNavContext}
-            />
-          )}
+              {activeTab === 'sales' && (
+                <SalesHistoryView
+                  user={user}
+                  tenant={tenant}
+                  initialSelectedOrder={navContext.order}
+                  onClearInitialContext={handleClearNavContext}
+                />
+              )}
 
-          {/* Owner-only Tabs */}
-          {activeTab === 'partners' && user?.role === 'owner' && (
-            <PartnersView
-              user={user}
-              onNavigateTab={setActiveTab}
-              onRefreshContacts={refreshData}
-              initialSelectedPartnerId={navContext.partnerId}
-              onClearInitialContext={handleClearNavContext}
-            />
-          )}
-          {activeTab === 'debts' && user?.role === 'owner' && (
-            <DebtsView accounts={accounts} />
-          )}
+              {/* Owner-only Tabs */}
+              {activeTab === 'partners' && user?.role === 'owner' && (
+                <PartnersView
+                  user={user}
+                  onNavigateTab={handleNavigateTab}
+                  onRefreshContacts={refreshData}
+                  initialSelectedPartnerId={navContext.partnerId}
+                  onClearInitialContext={handleClearNavContext}
+                />
+              )}
+              {activeTab === 'debts' && user?.role === 'owner' && (
+                <DebtsView accounts={accounts} />
+              )}
 
-          {activeTab === 'treasury' && user?.role === 'owner' && (
-            <TreasuryView
-              accounts={accounts}
-              initialSelectedAccount={navContext.account}
-              onClearInitialContext={handleClearNavContext}
-            />
-          )}
+              {activeTab === 'treasury' && user?.role === 'owner' && (
+                <TreasuryView
+                  accounts={accounts}
+                  initialSelectedAccount={navContext.account}
+                  onClearInitialContext={handleClearNavContext}
+                />
+              )}
 
-          {activeTab === 'expenses' && user?.role === 'owner' && (
-            <ExpensesView
-              accounts={accounts}
-              user={user}
-              initialShowRecordExpense={navContext.showRecordExpense}
-              onClearInitialContext={handleClearNavContext}
-            />
-          )}
+              {activeTab === 'expenses' && user?.role === 'owner' && (
+                <ExpensesView
+                  accounts={accounts}
+                  user={user}
+                  initialShowRecordExpense={navContext.showRecordExpense}
+                  onClearInitialContext={handleClearNavContext}
+                />
+              )}
 
-          {activeTab === 'staff' && user?.role === 'owner' && (
-            <StaffView currentUser={user} />
-          )}
+              {activeTab === 'staff' && user?.role === 'owner' && (
+                <StaffView currentUser={user} />
+              )}
 
-          {activeTab === 'logs' && user?.role === 'owner' && (
-            <LogsView currentUser={user} />
-          )}
+              {activeTab === 'logs' && user?.role === 'owner' && (
+                <LogsView currentUser={user} />
+              )}
 
-          {activeTab === 'settings' && user?.role === 'owner' && (
-            <SettingsView
-              user={user}
-              tenant={tenant}
-              onProfileUpdated={(updatedTenant, updatedUser) => {
-                setTenant(updatedTenant);
-                setUser(updatedUser);
-              }}
-            />
+              {activeTab === 'settings' && user?.role === 'owner' && (
+                <SettingsView
+                  user={user}
+                  tenant={tenant}
+                  onProfileUpdated={(updatedTenant, updatedUser) => {
+                    setTenant(updatedTenant);
+                    setUser(updatedUser);
+                  }}
+                />
+              )}
+            </>
           )}
         </main>
       </div>
@@ -557,14 +688,14 @@ export default function App() {
       {/* Mobile Floating Action Button (Speed Dial) - hidden on counter so it never obstructs checkout */}
       {activeTab !== 'counter' && (
         <SpeedDialFAB
-          onNewSale={() => setActiveTab('counter')}
+          onNewSale={() => handleNavigateTab('counter')}
           onRecordExpense={() => {
             setNavContext({ showRecordExpense: true });
-            setActiveTab('expenses');
+            handleNavigateTab('expenses');
           }}
           onStockIntake={() => {
             setNavContext({ showIntake: true });
-            setActiveTab('inventory');
+            handleNavigateTab('inventory');
           }}
           isOwner={user?.role === 'owner'}
         />
@@ -573,7 +704,7 @@ export default function App() {
       {/* Mobile Native Bottom Navigation Bar */}
       <MobileBottomNav
         activeTab={activeTab}
-        onChangeTab={setActiveTab}
+        onChangeTab={handleNavigateTab}
         onOpenDrawer={() => setIsMobileSidebarOpen(true)}
         openDebtsCount={openDebtsCount}
       />
