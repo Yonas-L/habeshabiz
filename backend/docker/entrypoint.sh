@@ -3,8 +3,7 @@ set -e
 
 # Dynamically adjust port for Render ($PORT)
 if [ -n "$PORT" ]; then
-    sed -i "s/listen 80;/listen $PORT;/" /etc/nginx/http.d/default.conf
-    sed -i "s/listen 10000;/listen $PORT;/" /etc/nginx/http.d/default.conf
+    sed -i "s/listen [0-9]*;/listen $PORT;/" /etc/nginx/http.d/default.conf
 fi
 
 # Ensure storage link exists
