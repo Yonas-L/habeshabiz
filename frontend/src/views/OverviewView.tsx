@@ -91,15 +91,25 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   const canViewCost = user?.can_view_costs ?? false;
 
   /* ─── Gross assets and proportional breakdown for mobile visual bar ─── */
+  const liquidVal = capital_overview.liquid_finance ?? capital_overview.cash_and_banks ?? 0;
+  const forexVal = capital_overview.forex_assets ?? 0;
+  const goldVal = capital_overview.gold_assets ?? 0;
+  const otherVal = capital_overview.other_assets ?? Math.max(0, (capital_overview.custom_assets || 0) - forexVal - goldVal);
+  const hasGranularAssets = forexVal > 0 || goldVal > 0;
+
   const grossAssets = (capital_overview.stock_value || 0) +
-    (capital_overview.cash_and_banks || 0) +
+    liquidVal +
     (capital_overview.receivables || 0) +
-    (capital_overview.custom_assets || 0);
+    (hasGranularAssets ? (forexVal + goldVal + otherVal) : (capital_overview.custom_assets || 0));
 
   const stockPct = grossAssets > 0 ? Math.round(((capital_overview.stock_value || 0) / grossAssets) * 100) : 0;
-  const cashPct = grossAssets > 0 ? Math.round(((capital_overview.cash_and_banks || 0) / grossAssets) * 100) : 0;
+  const cashPct = grossAssets > 0 ? Math.round((liquidVal / grossAssets) * 100) : 0;
   const recPct = grossAssets > 0 ? Math.round(((capital_overview.receivables || 0) / grossAssets) * 100) : 0;
-  const assetPct = grossAssets > 0 ? Math.max(0, 100 - stockPct - cashPct - recPct) : 0;
+  const forexPct = grossAssets > 0 && hasGranularAssets ? Math.round((forexVal / grossAssets) * 100) : 0;
+  const goldPct = grossAssets > 0 && hasGranularAssets ? Math.round((goldVal / grossAssets) * 100) : 0;
+  const otherPct = grossAssets > 0 && hasGranularAssets
+    ? Math.max(0, 100 - stockPct - cashPct - recPct - forexPct - goldPct)
+    : (grossAssets > 0 ? Math.max(0, 100 - stockPct - cashPct - recPct) : 0);
 
   /* ─── Capital metrics for the unified strip ─── */
   const capitalMetrics: {
@@ -232,7 +242,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                     transition: 'width 800ms cubic-bezier(0.16, 1, 0.3, 1)',
                   }}
                   className="h-full bg-blue-400 rounded-full"
-                  title={`Cash: ${cashPct}%`}
+                  title={`${hasGranularAssets ? 'Liquid Finance' : 'Cash'}: ${cashPct}%`}
                 />
               )}
               {recPct > 0 && (
@@ -245,36 +255,70 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   title={`Receivables: ${recPct}%`}
                 />
               )}
-              {assetPct > 0 && (
+              {hasGranularAssets && forexPct > 0 && (
                 <div
                   style={{
-                    width: isBarAnimated ? `${assetPct}%` : '0%',
+                    width: isBarAnimated ? `${forexPct}%` : '0%',
+                    transition: 'width 800ms cubic-bezier(0.16, 1, 0.3, 1)',
+                  }}
+                  className="h-full bg-indigo-400 rounded-full"
+                  title={`Forex Reserves: ${forexPct}%`}
+                />
+              )}
+              {hasGranularAssets && goldPct > 0 && (
+                <div
+                  style={{
+                    width: isBarAnimated ? `${goldPct}%` : '0%',
                     transition: 'width 800ms cubic-bezier(0.16, 1, 0.3, 1)',
                   }}
                   className="h-full bg-amber-400 rounded-full"
-                  title={`Other Assets: ${assetPct}%`}
+                  title={`Physical Gold: ${goldPct}%`}
+                />
+              )}
+              {otherPct > 0 && (
+                <div
+                  style={{
+                    width: isBarAnimated ? `${otherPct}%` : '0%',
+                    transition: 'width 800ms cubic-bezier(0.16, 1, 0.3, 1)',
+                  }}
+                  className={`h-full ${hasGranularAssets ? 'bg-orange-400' : 'bg-amber-400'} rounded-full`}
+                  title={`Other Assets: ${otherPct}%`}
                 />
               )}
             </div>
 
             {/* Micro legend chips */}
-            <div className="flex items-center justify-between flex-wrap gap-y-1 text-[10px] text-slate-300 font-medium mt-2 pt-1.5 border-t border-white/10">
+            <div className="flex items-center justify-between flex-wrap gap-x-2 gap-y-1 text-[10px] text-slate-300 font-medium mt-2 pt-1.5 border-t border-white/10">
               <div className="flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />
                 <span>Stock {stockPct}%</span>
               </div>
               <div className="flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
-                <span>Cash {cashPct}%</span>
+                <span>{hasGranularAssets ? 'Liquid' : 'Cash'} {cashPct}%</span>
               </div>
               <div className="flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
                 <span>Owed {recPct}%</span>
               </div>
-              <div className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
-                <span>Other {assetPct}%</span>
-              </div>
+              {hasGranularAssets && forexVal > 0 && (
+                <div className="flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0" />
+                  <span>Forex {forexPct}%</span>
+                </div>
+              )}
+              {hasGranularAssets && goldVal > 0 && (
+                <div className="flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                  <span>Gold {goldPct}%</span>
+                </div>
+              )}
+              {(!hasGranularAssets || otherVal > 0) && (
+                <div className="flex items-center gap-1">
+                  <span className={`w-1.5 h-1.5 rounded-full ${hasGranularAssets ? 'bg-orange-400' : 'bg-amber-400'} shrink-0`} />
+                  <span>Other {otherPct}%</span>
+                </div>
+              )}
               {capital_overview.payables > 0 && (
                 <div className="flex items-center gap-1 text-rose-400">
                   <span className="w-1.5 h-1.5 rounded-full bg-rose-400 shrink-0" />
@@ -401,9 +445,112 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               receivables={capital_overview.receivables}
               treasury={capital_overview.cash_and_banks}
               assets={capital_overview.custom_assets}
+              liquidFinance={capital_overview.liquid_finance}
+              forexAssets={capital_overview.forex_assets}
+              goldAssets={capital_overview.gold_assets}
+              otherAssets={capital_overview.other_assets}
               payables={capital_overview.payables}
               netCapital={capital_overview.net_capital}
             />
+
+            {/* Granular Asset & Reserves Breakdown for selected month */}
+            <div className="mt-4 pt-3.5 border-t border-slate-100 dark:border-slate-800/70">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                  Liquid & Reserves Breakdown
+                </span>
+                {selectedMonth ? (
+                  <span className="text-[10px] font-mono font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200/60 dark:border-emerald-900/50 px-1.5 py-0.5 rounded">
+                    {(() => {
+                      const [y, m] = selectedMonth.split('-').map(Number);
+                      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                      return `${months[m - 1] || ''} ${y}`;
+                    })()}
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">
+                    Live
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                {/* Liquid Finance */}
+                <button
+                  type="button"
+                  onClick={() => setSelectedVital('cash')}
+                  className="p-2 rounded-xl bg-blue-50/50 hover:bg-blue-100/60 dark:bg-blue-950/30 dark:hover:bg-blue-900/40 border border-blue-100/80 dark:border-blue-900/40 text-left transition-colors cursor-pointer group"
+                  title="View Bank Accounts Breakdown"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider truncate">
+                      Liquid
+                    </span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                  </div>
+                  <div className="text-[11px] font-bold font-mono text-slate-900 dark:text-slate-100 mt-1 truncate">
+                    <AnimatedNumber value={liquidVal} />
+                    <span className="text-[8px] font-normal text-slate-400 ml-0.5">ETB</span>
+                  </div>
+                </button>
+
+                {/* Forex Reserves */}
+                <button
+                  type="button"
+                  onClick={() => setSelectedVital('reserves')}
+                  className="p-2 rounded-xl bg-indigo-50/50 hover:bg-indigo-100/60 dark:bg-indigo-950/30 dark:hover:bg-indigo-900/40 border border-indigo-100/80 dark:border-indigo-900/40 text-left transition-colors cursor-pointer group"
+                  title="View Forex & USD Holdings"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider truncate">
+                      Forex / USD
+                    </span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0" />
+                  </div>
+                  <div className="text-[11px] font-bold font-mono text-slate-900 dark:text-slate-100 mt-1 truncate">
+                    <AnimatedNumber value={forexVal} />
+                    <span className="text-[8px] font-normal text-slate-400 ml-0.5">ETB</span>
+                  </div>
+                </button>
+
+                {/* Physical Gold */}
+                <button
+                  type="button"
+                  onClick={() => setSelectedVital('reserves')}
+                  className="p-2 rounded-xl bg-amber-50/50 hover:bg-amber-100/60 dark:bg-amber-950/30 dark:hover:bg-amber-900/40 border border-amber-100/80 dark:border-amber-900/40 text-left transition-colors cursor-pointer group"
+                  title="View Physical Gold Reserves"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider truncate">
+                      Physical Gold
+                    </span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                  </div>
+                  <div className="text-[11px] font-bold font-mono text-slate-900 dark:text-slate-100 mt-1 truncate">
+                    <AnimatedNumber value={goldVal} />
+                    <span className="text-[8px] font-normal text-slate-400 ml-0.5">ETB</span>
+                  </div>
+                </button>
+
+                {/* Other Assets */}
+                <button
+                  type="button"
+                  onClick={() => setSelectedVital('reserves')}
+                  className="p-2 rounded-xl bg-orange-50/50 hover:bg-orange-100/60 dark:bg-orange-950/30 dark:hover:bg-orange-900/40 border border-orange-100/80 dark:border-orange-900/40 text-left transition-colors cursor-pointer group"
+                  title="View Other Store Assets"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] font-semibold text-orange-600 dark:text-orange-400 uppercase tracking-wider truncate">
+                      Other Assets
+                    </span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-orange-500 shrink-0" />
+                  </div>
+                  <div className="text-[11px] font-bold font-mono text-slate-900 dark:text-slate-100 mt-1 truncate">
+                    <AnimatedNumber value={otherVal} />
+                    <span className="text-[8px] font-normal text-slate-400 ml-0.5">ETB</span>
+                  </div>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -735,6 +882,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         onClose={() => setSelectedVital(null)}
         data={data}
         accounts={accounts}
+        selectedMonth={selectedMonth}
         onNavigateTab={onNavigateTab}
         onSelectDebt={(debt) => {
           setSelectedVital(null);

@@ -28,10 +28,18 @@ interface VitalBreakdownDrawerProps {
   onClose: () => void;
   data: DashboardData | null;
   accounts: FinancialAccount[];
+  selectedMonth?: string;
   onNavigateTab: (tab: any) => void;
   onSelectDebt?: (debt: Debt) => void;
   onRefreshData?: () => void;
 }
+
+const formatMonthLabel = (mStr?: string) => {
+  if (!mStr || !mStr.includes('-')) return '';
+  const [y, m] = mStr.split('-').map(Number);
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${months[m - 1] || ''} ${y}`;
+};
 
 export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
   vitalType,
@@ -39,6 +47,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
   onClose,
   data,
   accounts,
+  selectedMonth,
   onNavigateTab,
   onSelectDebt,
   onRefreshData,
@@ -141,6 +150,21 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
   const liquidAccounts = accounts.filter((a) => !a.is_custom_asset);
   const reserveAccounts = accounts.filter((a) => a.is_custom_asset);
 
+  const [reserveTab, setReserveTab] = useState<'all' | 'gold' | 'forex' | 'other'>('all');
+
+  const getReserveCategory = (acc: FinancialAccount): 'gold' | 'forex' | 'other' => {
+    const t = (acc.type || '').toLowerCase();
+    const n = (acc.name || '').toLowerCase();
+    if (t.includes('gold') || n.includes('gold')) return 'gold';
+    if (t.includes('fx') || t.includes('currency') || n.includes('forex') || n.includes('usdt') || n.includes('usd')) return 'forex';
+    return 'other';
+  };
+
+  const filteredReserveAccounts = reserveAccounts.filter((acc) => {
+    if (reserveTab === 'all') return true;
+    return getReserveCategory(acc) === reserveTab;
+  });
+
   return (
     <>
       <SlideOverDrawer
@@ -149,9 +173,16 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
       title={current.title}
       subtitle={current.subtitle}
       badge={
-        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-          Store Asset
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+            Store Asset
+          </span>
+          {selectedMonth && (
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60 font-mono">
+              {formatMonthLabel(selectedMonth)}
+            </span>
+          )}
+        </div>
       }
       footerActions={
         <>
@@ -181,7 +212,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
       <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between">
         <div>
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-            Total Valuation
+            {selectedMonth ? `Valuation as of ${formatMonthLabel(selectedMonth)}` : 'Total Valuation'}
           </span>
           <div className="text-3xl font-black text-slate-900 dark:text-white font-mono tabular-nums tracking-tight mt-1">
             <AnimatedNumber value={current.amount} />{' '}
@@ -242,7 +273,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                         {Number(acc.current_balance).toLocaleString()} ETB
                       </div>
                       <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold block">
-                        Reconciled
+                        {acc.type === 'bank' ? 'Bank Account' : acc.type === 'mobile_money' ? 'Mobile Wallet' : 'Cash Drawer'}
                       </span>
                     </div>
 
@@ -459,52 +490,120 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                 No active reserve assets. Click "Add Asset Reserve" to store physical gold, crypto, or foreign currency hedges.
               </div>
             ) : (
-              reserveAccounts.map((acc) => (
-                <div
-                  key={acc.id}
-                  className="p-3.5 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/70 dark:border-slate-800/90 flex items-center justify-between text-xs group"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                    <AccountLogo account={acc} size="sm" />
-                    <div className="min-w-0">
-                      <div className="font-bold text-slate-900 dark:text-white truncate">{acc.name}</div>
-                      <div className="text-[11px] text-slate-400 mt-0.5">
-                        {acc.type.replace(/_/g, ' ')} &bull; {acc.currency}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 shrink-0">
-                    <div className="text-right">
-                      <div className="font-mono font-bold text-slate-900 dark:text-white text-sm">
-                        {Number(acc.current_balance).toLocaleString()} ETB
-                      </div>
-                      <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold block">
-                        Store Reserve
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-1 pl-1.5 border-l border-slate-100 dark:border-slate-800">
-                      <button
-                        type="button"
-                        onClick={() => handleOpenEdit(acc)}
-                        title="Edit Reserve Asset"
-                        className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setDeletingAccount(acc)}
-                        title="Remove Reserve Asset"
-                        className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
+              <>
+                <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800/60 rounded-xl text-[10px] font-semibold mb-2">
+                  <button
+                    type="button"
+                    onClick={() => setReserveTab('all')}
+                    className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
+                      reserveTab === 'all'
+                        ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    All ({reserveAccounts.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReserveTab('gold')}
+                    className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
+                      reserveTab === 'gold'
+                        ? 'bg-white dark:bg-slate-700 text-amber-600 dark:text-amber-400 shadow-xs'
+                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    Gold
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReserveTab('forex')}
+                    className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
+                      reserveTab === 'forex'
+                        ? 'bg-white dark:bg-slate-700 text-sky-600 dark:text-sky-400 shadow-xs'
+                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    Forex / USD
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReserveTab('other')}
+                    className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
+                      reserveTab === 'other'
+                        ? 'bg-white dark:bg-slate-700 text-purple-600 dark:text-purple-400 shadow-xs'
+                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    Other
+                  </button>
                 </div>
-              ))
+
+                {filteredReserveAccounts.length === 0 ? (
+                  <div className="py-6 text-center text-xs text-slate-400">
+                    No matching reserve assets in this category.
+                  </div>
+                ) : (
+                  filteredReserveAccounts.map((acc) => {
+                    const cat = getReserveCategory(acc);
+                    return (
+                      <div
+                        key={acc.id}
+                        className="p-3.5 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/70 dark:border-slate-800/90 flex items-center justify-between text-xs group"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                          <AccountLogo account={acc} size="sm" />
+                          <div className="min-w-0">
+                            <div className="font-bold text-slate-900 dark:text-white truncate">{acc.name}</div>
+                            <div className="text-[11px] text-slate-400 mt-0.5">
+                              {acc.type.replace(/_/g, ' ')} &bull; {acc.currency}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <div className="text-right">
+                            <div className="font-mono font-bold text-slate-900 dark:text-white text-sm">
+                              {Number(acc.current_balance).toLocaleString()} ETB
+                            </div>
+                            {cat === 'gold' ? (
+                              <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold block">
+                                Physical Gold
+                              </span>
+                            ) : cat === 'forex' ? (
+                              <span className="text-[10px] text-sky-600 dark:text-sky-400 font-semibold block">
+                                Forex & USD
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-purple-600 dark:text-purple-400 font-semibold block">
+                                Store Reserve
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-1 pl-1.5 border-l border-slate-100 dark:border-slate-800">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEdit(acc)}
+                              title="Edit Reserve Asset"
+                              className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDeletingAccount(acc)}
+                              title="Remove Reserve Asset"
+                              className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </>
             )}
           </div>
         </ProgressiveSection>

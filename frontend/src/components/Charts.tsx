@@ -510,10 +510,26 @@ export const DonutCapitalChart: React.FC<{
   receivables: number;
   treasury: number;
   assets: number;
+  liquidFinance?: number;
+  forexAssets?: number;
+  goldAssets?: number;
+  otherAssets?: number;
   payables?: number;
   netCapital: number;
   showLegend?: boolean;
-}> = ({ stock, receivables, treasury, assets, payables = 0, netCapital, showLegend = true }) => {
+}> = ({
+  stock,
+  receivables,
+  treasury,
+  assets,
+  liquidFinance,
+  forexAssets = 0,
+  goldAssets = 0,
+  otherAssets,
+  payables = 0,
+  netCapital,
+  showLegend = true,
+}) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const hasMountedRef = useRef(false);
 
@@ -529,9 +545,17 @@ export const DonutCapitalChart: React.FC<{
       return () => cancelAnimationFrame(raf);
     }
     setIsLoaded(true);
-  }, [stock, receivables, treasury, assets, payables]);
+  }, [stock, receivables, treasury, assets, payables, liquidFinance, forexAssets, goldAssets, otherAssets]);
 
-  const grossAssets = stock + receivables + treasury + assets;
+  const hasGranularAssets = forexAssets > 0 || goldAssets > 0;
+  const liquidVal = liquidFinance !== undefined ? liquidFinance : treasury;
+  const forexVal = forexAssets;
+  const goldVal = goldAssets;
+  const otherVal = otherAssets !== undefined ? otherAssets : Math.max(0, assets - forexVal - goldVal);
+
+  const grossAssets = hasGranularAssets
+    ? stock + receivables + liquidVal + forexVal + goldVal + otherVal
+    : stock + receivables + treasury + assets;
   const total = grossAssets + payables;
   const radius = 58;
   const stroke = 15;
@@ -539,15 +563,20 @@ export const DonutCapitalChart: React.FC<{
 
   const stockPct = total > 0 ? stock / total : 0;
   const recPct = total > 0 ? receivables / total : 0;
-  const treasPct = total > 0 ? treasury / total : 0;
-  const assetPct = total > 0 ? assets / total : 0;
+  const treasPct = total > 0 ? (hasGranularAssets ? liquidVal : treasury) / total : 0;
+  const forexPct = total > 0 && hasGranularAssets ? forexVal / total : 0;
+  const goldPct = total > 0 && hasGranularAssets ? goldVal / total : 0;
+  const otherPct = total > 0 && hasGranularAssets ? otherVal / total : (total > 0 ? assets / total : 0);
   const payablePct = total > 0 ? payables / total : 0;
 
-  const stockOffset = 0;
-  const recOffset = circum * stockPct;
-  const treasOffset = circum * (stockPct + recPct);
-  const assetOffset = circum * (stockPct + recPct + treasPct);
-  const payableOffset = circum * (stockPct + recPct + treasPct + assetPct);
+  let currentOffset = 0;
+  const stockOffset = currentOffset; currentOffset += circum * stockPct;
+  const recOffset = currentOffset; currentOffset += circum * recPct;
+  const treasOffset = currentOffset; currentOffset += circum * treasPct;
+  const forexOffset = currentOffset; currentOffset += circum * forexPct;
+  const goldOffset = currentOffset; currentOffset += circum * goldPct;
+  const otherOffset = currentOffset; currentOffset += circum * otherPct;
+  const payableOffset = currentOffset;
 
   const segmentTransition = 'stroke-dasharray 900ms cubic-bezier(0.16, 1, 0.3, 1), stroke-dashoffset 900ms cubic-bezier(0.16, 1, 0.3, 1)';
 
@@ -597,7 +626,7 @@ export const DonutCapitalChart: React.FC<{
             strokeDashoffset={isLoaded ? -recOffset : 0}
             style={{ transition: segmentTransition }}
           />
-          {/* Treasury segment */}
+          {/* Treasury / Liquid segment */}
           <circle
             cx="80"
             cy="80"
@@ -609,18 +638,48 @@ export const DonutCapitalChart: React.FC<{
             strokeDashoffset={isLoaded ? -treasOffset : 0}
             style={{ transition: segmentTransition }}
           />
-          {/* Assets segment */}
-          <circle
-            cx="80"
-            cy="80"
-            r={radius}
-            fill="none"
-            stroke="#f59e0b"
-            strokeWidth={stroke}
-            strokeDasharray={isLoaded ? `${circum * assetPct} ${circum}` : `0 ${circum}`}
-            strokeDashoffset={isLoaded ? -assetOffset : 0}
-            style={{ transition: segmentTransition }}
-          />
+          {/* Forex segment (if granular and > 0) */}
+          {hasGranularAssets && forexPct > 0 && (
+            <circle
+              cx="80"
+              cy="80"
+              r={radius}
+              fill="none"
+              stroke="#6366f1"
+              strokeWidth={stroke}
+              strokeDasharray={isLoaded ? `${circum * forexPct} ${circum}` : `0 ${circum}`}
+              strokeDashoffset={isLoaded ? -forexOffset : 0}
+              style={{ transition: segmentTransition }}
+            />
+          )}
+          {/* Gold segment (if granular and > 0) */}
+          {hasGranularAssets && goldPct > 0 && (
+            <circle
+              cx="80"
+              cy="80"
+              r={radius}
+              fill="none"
+              stroke="#eab308"
+              strokeWidth={stroke}
+              strokeDasharray={isLoaded ? `${circum * goldPct} ${circum}` : `0 ${circum}`}
+              strokeDashoffset={isLoaded ? -goldOffset : 0}
+              style={{ transition: segmentTransition }}
+            />
+          )}
+          {/* Assets / Other segment */}
+          {otherPct > 0 && (
+            <circle
+              cx="80"
+              cy="80"
+              r={radius}
+              fill="none"
+              stroke={hasGranularAssets ? "#f97316" : "#f59e0b"}
+              strokeWidth={stroke}
+              strokeDasharray={isLoaded ? `${circum * otherPct} ${circum}` : `0 ${circum}`}
+              strokeDashoffset={isLoaded ? -otherOffset : 0}
+              style={{ transition: segmentTransition }}
+            />
+          )}
           {/* Payables segment */}
           {payables > 0 && (
             <circle
@@ -637,7 +696,7 @@ export const DonutCapitalChart: React.FC<{
           )}
         </svg>
 
-        {/* Center Readout: Net Capital (as before) */}
+        {/* Center Readout: Net Capital */}
         <div
           className={`absolute inset-0 flex flex-col items-center justify-center text-center select-none pointer-events-none transition-all duration-700 delay-300 ${
             isLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-90'
@@ -655,7 +714,7 @@ export const DonutCapitalChart: React.FC<{
         </div>
       </div>
 
-      {/* Legend Grid (only when showLegend is true) */}
+      {/* Legend Grid */}
       {showLegend && (
         <div className="grid grid-cols-2 gap-2 sm:gap-x-4 sm:gap-y-3 text-xs w-full">
           <div className="flex items-start gap-2 p-2 sm:p-0 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 sm:bg-transparent border border-slate-100 dark:border-slate-800/50 sm:border-0">
@@ -686,37 +745,69 @@ export const DonutCapitalChart: React.FC<{
             <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0 mt-1 sm:mt-0.5" />
             <div className="min-w-0 flex-1">
               <span className="text-slate-400 dark:text-slate-500 block text-[10px] font-medium truncate">
-                Cash ({(treasPct * 100).toFixed(0)}%)
+                {hasGranularAssets ? 'Liquid Finance' : 'Cash'} ({(treasPct * 100).toFixed(0)}%)
               </span>
               <span className="font-bold text-slate-900 dark:text-slate-100 font-mono text-xs truncate block mt-0.5">
-                +<AnimatedNumber value={treasury} /> <span className="text-[10px] font-normal text-slate-400">ETB</span>
+                +<AnimatedNumber value={liquidVal} /> <span className="text-[10px] font-normal text-slate-400">ETB</span>
               </span>
             </div>
           </div>
 
-          <div className="flex items-start gap-2 p-2 sm:p-0 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 sm:bg-transparent border border-slate-100 dark:border-slate-800/50 sm:border-0">
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0 mt-1 sm:mt-0.5" />
-            <div className="min-w-0 flex-1">
-              <span className="text-slate-400 dark:text-slate-500 block text-[10px] font-medium truncate">
-                Other Assets ({(assetPct * 100).toFixed(0)}%)
-              </span>
-              <span className="font-bold text-slate-900 dark:text-slate-100 font-mono text-xs truncate block mt-0.5">
-                +<AnimatedNumber value={assets} /> <span className="text-[10px] font-normal text-slate-400">ETB</span>
-              </span>
+          {hasGranularAssets && forexVal > 0 && (
+            <div className="flex items-start gap-2 p-2 sm:p-0 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 sm:bg-transparent border border-slate-100 dark:border-slate-800/50 sm:border-0">
+              <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 shrink-0 mt-1 sm:mt-0.5" />
+              <div className="min-w-0 flex-1">
+                <span className="text-slate-400 dark:text-slate-500 block text-[10px] font-medium truncate">
+                  Forex Reserves ({(forexPct * 100).toFixed(0)}%)
+                </span>
+                <span className="font-bold text-indigo-600 dark:text-indigo-400 font-mono text-xs truncate block mt-0.5">
+                  +<AnimatedNumber value={forexVal} /> <span className="text-[10px] font-normal text-slate-400">ETB</span>
+                </span>
+              </div>
             </div>
-          </div>
+          )}
 
-          <div className="flex items-start gap-2 p-2 sm:p-0 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 sm:bg-transparent border border-slate-100 dark:border-slate-800/50 sm:border-0 col-span-2 sm:col-span-1">
-            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0 mt-1 sm:mt-0.5" />
-            <div className="min-w-0 flex-1">
-              <span className="text-slate-400 dark:text-slate-500 block text-[10px] font-medium truncate">
-                Payables ({payables > 0 ? (payablePct * 100).toFixed(0) : '0'}%)
-              </span>
-              <span className="font-bold text-rose-600 dark:text-rose-400 font-mono text-xs truncate block mt-0.5">
-                −<AnimatedNumber value={payables} /> <span className="text-[10px] font-normal text-slate-400">ETB</span>
-              </span>
+          {hasGranularAssets && goldVal > 0 && (
+            <div className="flex items-start gap-2 p-2 sm:p-0 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 sm:bg-transparent border border-slate-100 dark:border-slate-800/50 sm:border-0">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0 mt-1 sm:mt-0.5" />
+              <div className="min-w-0 flex-1">
+                <span className="text-slate-400 dark:text-slate-500 block text-[10px] font-medium truncate">
+                  Physical Gold ({(goldPct * 100).toFixed(0)}%)
+                </span>
+                <span className="font-bold text-amber-600 dark:text-amber-400 font-mono text-xs truncate block mt-0.5">
+                  +<AnimatedNumber value={goldVal} /> <span className="text-[10px] font-normal text-slate-400">ETB</span>
+                </span>
+              </div>
             </div>
-          </div>
+          )}
+
+          {(!hasGranularAssets || otherVal > 0) && (
+            <div className="flex items-start gap-2 p-2 sm:p-0 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 sm:bg-transparent border border-slate-100 dark:border-slate-800/50 sm:border-0">
+              <span className={`w-2.5 h-2.5 rounded-full ${hasGranularAssets ? 'bg-orange-500' : 'bg-amber-500'} shrink-0 mt-1 sm:mt-0.5`} />
+              <div className="min-w-0 flex-1">
+                <span className="text-slate-400 dark:text-slate-500 block text-[10px] font-medium truncate">
+                  Other Assets ({(otherPct * 100).toFixed(0)}%)
+                </span>
+                <span className="font-bold text-slate-900 dark:text-slate-100 font-mono text-xs truncate block mt-0.5">
+                  +<AnimatedNumber value={hasGranularAssets ? otherVal : assets} /> <span className="text-[10px] font-normal text-slate-400">ETB</span>
+                </span>
+              </div>
+            </div>
+          )}
+
+          {payables > 0 && (
+            <div className="flex items-start gap-2 p-2 sm:p-0 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 sm:bg-transparent border border-slate-100 dark:border-slate-800/50 sm:border-0 col-span-2 sm:col-span-1">
+              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0 mt-1 sm:mt-0.5" />
+              <div className="min-w-0 flex-1">
+                <span className="text-slate-400 dark:text-slate-500 block text-[10px] font-medium truncate">
+                  Payables ({payables > 0 ? (payablePct * 100).toFixed(0) : '0'}%)
+                </span>
+                <span className="font-bold text-rose-600 dark:text-rose-400 font-mono text-xs truncate block mt-0.5">
+                  −<AnimatedNumber value={payables} /> <span className="text-[10px] font-normal text-slate-400">ETB</span>
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

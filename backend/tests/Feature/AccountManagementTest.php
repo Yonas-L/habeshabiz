@@ -1,11 +1,11 @@
 <?php
 
 use App\Models\FinancialAccount;
+use App\Models\FinancialTransaction;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Scopes\TenantScope;
 use Illuminate\Support\Facades\Hash;
-use App\Models\FinancialTransaction;
 
 beforeEach(function () {
     $this->tenant = Tenant::create([
@@ -46,7 +46,7 @@ test('owner can create a bank account with opening balance', function () {
         ->assertJsonPath('data.type', 'bank')
         ->assertJsonPath('data.is_custom_asset', false)
         ->assertJsonPath('data.current_balance', '50000.00');
-        
+
     expect(FinancialAccount::where('name', 'CBE Main Account')->count())->toBe(1);
 });
 
@@ -57,8 +57,8 @@ test('owner can create a custom asset (gold) with asset_details', function () {
         'opening_balance' => 0,
         'asset_details' => [
             'grams' => 50,
-            'karat' => 21
-        ]
+            'karat' => 21,
+        ],
     ]);
 
     $response->assertStatus(201)
@@ -287,4 +287,63 @@ test('owner can retrieve dedicated account activities ledger with precise runnin
     expect($filterRes->json('data.activities.0.transaction_number'))->toBe('TXN-OUT-02');
 });
 
+test('accounts endpoint and dashboard summary calculate historical account and asset balances based on selected month', function () {
+    $bank = FinancialAccount::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Past Month Bank',
+        'type' => 'bank',
+        'current_balance' => 20000.00,
+        'is_custom_asset' => false,
+        'is_active' => true,
+    ]);
 
+    $gold = FinancialAccount::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Physical Gold 24k',
+        'type' => 'asset_gold',
+        'current_balance' => 80000.00,
+        'is_custom_asset' => true,
+        'is_active' => true,
+    ]);
+
+    $forex = FinancialAccount::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Forex USD Holding',
+        'type' => 'asset_fx',
+        'current_balance' => 50000.00,
+        'is_custom_asset' => true,
+        'is_active' => true,
+    ]);
+
+    // Transaction that occurred this month (inflow of 5,000 into bank)
+    FinancialTransaction::create([
+        'tenant_id' => $this->tenant->id,
+        'transaction_number' => 'TXN-THIS-MONTH',
+        'destination_account_id' => $bank->id,
+        'type' => 'customer_payment',
+        'amount' => 5000.00,
+        'fee' => 0,
+        'date' => now(),
+        'created_by' => $this->owner->id,
+    ]);
+
+    $pastMonth = now()->subMonth()->format('Y-m');
+
+    // 1. Fetch accounts for past month
+    $res = $this->actingAs($this->owner)->getJson("/api/v1/accounts?month={$pastMonth}");
+    $res->assertStatus(200);
+
+    $treasury = collect($res->json('data.treasury_accounts'));
+    $bankInPast = $treasury->firstWhere('id', $bank->id);
+    expect((float) $bankInPast['current_balance'])->toEqual(15000.00);
+
+    // 2. Fetch dashboard summary for past month
+    $dashRes = $this->actingAs($this->owner)->getJson("/api/v1/dashboard/summary?month={$pastMonth}");
+    $dashRes->assertStatus(200)
+        ->assertJsonPath('success', true);
+
+    $cap = $dashRes->json('data.capital_overview');
+    expect($cap)->toHaveKeys(['cash_and_banks', 'custom_assets', 'liquid_finance', 'forex_assets', 'gold_assets', 'other_assets']);
+    expect($cap['gold_assets'])->toBeGreaterThanOrEqual(80000);
+    expect($cap['forex_assets'])->toBeGreaterThanOrEqual(50000);
+});

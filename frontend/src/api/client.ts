@@ -423,6 +423,10 @@ export interface DashboardData {
     receivables: number;
     cash_and_banks: number;
     custom_assets: number;
+    liquid_finance?: number;
+    forex_assets?: number;
+    gold_assets?: number;
+    other_assets?: number;
     payables: number;
   };
   monthly_performance: {
@@ -531,7 +535,8 @@ export interface StaffTask {
   created_at: string;
 }
 
-const API_BASE = '/api/v1';
+const RAW_API_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+const API_BASE = RAW_API_URL ? `${RAW_API_URL}/api/v1` : '/api/v1';
 
 export function getAuthToken(): string | null {
   return localStorage.getItem('habeshabiz_token');
@@ -548,11 +553,13 @@ export function removeAuthToken(): void {
 export function resolveImageUrl(url: string | null | undefined): string | null {
   if (!url) return null;
   if (url.startsWith('data:') || url.startsWith('blob:')) return url;
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
   const storageIndex = url.indexOf('/storage/');
   if (storageIndex !== -1) {
-    return url.slice(storageIndex);
+    const path = url.slice(storageIndex);
+    return RAW_API_URL ? `${RAW_API_URL}${path}` : path;
   }
-  return url;
+  return RAW_API_URL ? `${RAW_API_URL}${url.startsWith('/') ? '' : '/'}${url}` : url;
 }
 
 export class ApiError extends Error {
@@ -1079,14 +1086,16 @@ export const api = {
       method: 'DELETE',
     }),
 
-  getAccounts: () =>
-    request<{
+  getAccounts: (params?: { month?: string }) => {
+    const qs = params?.month ? `?month=${encodeURIComponent(params.month)}` : '';
+    return request<{
       treasury_accounts: FinancialAccount[];
       asset_accounts: FinancialAccount[];
       total_treasury: number;
       total_assets: number;
       grand_total: number;
-    }>('/accounts'),
+    }>(`/accounts${qs}`);
+  },
 
   transferFunds: (data: { source_account_id: string; destination_account_id: string; amount: number; fee?: number; reference_number?: string; description?: string }) =>
     request<{ source_balance: number; destination_balance: number }>('/accounts/transfer', {

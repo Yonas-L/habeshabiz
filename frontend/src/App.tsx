@@ -160,7 +160,7 @@ export default function App() {
       const targetMonth = monthOverride !== undefined ? monthOverride : selectedMonth;
       const [dashRes, accountsRes, contactsRes] = await Promise.all([
         api.getDashboardSummary(targetMonth),
-        api.getAccounts(),
+        api.getAccounts({ month: targetMonth }),
         api.getContacts(),
       ]);
 

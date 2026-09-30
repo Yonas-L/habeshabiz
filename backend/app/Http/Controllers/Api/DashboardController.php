@@ -11,6 +11,7 @@ use App\Models\InventoryStock;
 use App\Models\InventoryUnit;
 use App\Models\SalesOrder;
 use App\Models\SalesOrderItem;
+use App\Services\AccountBalanceService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -71,9 +72,33 @@ class DashboardController extends Controller
             // net ≈ 0 → this contact contributes nothing to either side
         }
 
-        // 3. Treasury Balances
-        $cashAndBankBalance = (float) FinancialAccount::where('is_custom_asset', false)->sum('current_balance');
-        $customAssetsBalance = (float) FinancialAccount::where('is_custom_asset', true)->sum('current_balance');
+        // 3. Treasury & Asset Balances (calculated as of end of selected month)
+        $accounts = FinancialAccount::all();
+        (new AccountBalanceService)->calculateBalancesAsOf($accounts, $endOfMonth);
+
+        $cashAndBankBalance = 0.0;
+        $forexBalance = 0.0;
+        $goldBalance = 0.0;
+        $otherAssetsBalance = 0.0;
+        $customAssetsBalance = 0.0;
+
+        foreach ($accounts as $acc) {
+            $bal = (float) $acc->current_balance;
+            if (! $acc->is_custom_asset) {
+                $cashAndBankBalance += $bal;
+            } else {
+                $customAssetsBalance += $bal;
+                $type = strtolower((string) $acc->type);
+                $name = strtolower((string) $acc->name);
+                if (str_contains($type, 'gold') || str_contains($name, 'gold')) {
+                    $goldBalance += $bal;
+                } elseif (str_contains($type, 'fx') || str_contains($type, 'currency') || str_contains($name, 'forex') || str_contains($name, 'usdt') || str_contains($name, 'usd')) {
+                    $forexBalance += $bal;
+                } else {
+                    $otherAssetsBalance += $bal;
+                }
+            }
+        }
 
         // 4. Net Capital (The Ethiopian Merchant Formula from Excel)
         // Net Capital = Stock + Receivables + Cash/Banks + Assets - Payables
@@ -243,6 +268,10 @@ class DashboardController extends Controller
                     'receivables' => $totalReceivables,
                     'cash_and_banks' => $cashAndBankBalance,
                     'custom_assets' => $customAssetsBalance,
+                    'liquid_finance' => $cashAndBankBalance,
+                    'forex_assets' => $forexBalance,
+                    'gold_assets' => $goldBalance,
+                    'other_assets' => $otherAssetsBalance,
                     'payables' => $totalPayables,
                 ],
                 'monthly_performance' => [

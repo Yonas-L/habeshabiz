@@ -3,9 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\FinancialAccount;
 use App\Models\FinancialTransaction;
+use App\Models\User;
 use App\Scopes\TenantScope;
+use App\Services\AccountBalanceService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -16,11 +20,17 @@ class AccountController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        /** @var \App\Models\User|null $user */
+        /** @var User|null $user */
         $user = $request->user();
         $isOwner = $user ? $user->isOwner() : false;
 
         $accounts = FinancialAccount::orderBy('name')->get();
+
+        $monthParam = $request->query('month');
+        if ($monthParam && preg_match('/^\d{4}-\d{2}$/', $monthParam)) {
+            $endOfMonth = Carbon::createFromFormat('Y-m', $monthParam)->endOfMonth();
+            (new AccountBalanceService)->calculateBalancesAsOf($accounts, $endOfMonth);
+        }
 
         if (! $isOwner) {
             // Staff only see bank/cash account names and IDs to select payment destination; balances are masked
@@ -67,7 +77,7 @@ class AccountController extends Controller
 
     public function transfer(Request $request): JsonResponse
     {
-        /** @var \App\Models\User|null $user */
+        /** @var User|null $user */
         $user = $request->user();
         if (! $user || ! $user->isOwner()) {
             return response()->json([
@@ -129,7 +139,7 @@ class AccountController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
         if (! $user->isOwner()) {
             return response()->json([
@@ -165,7 +175,7 @@ class AccountController extends Controller
             'is_active' => true,
         ]);
 
-        \App\Models\AuditLog::record(
+        AuditLog::record(
             action: 'account_created',
             entityType: 'FinancialAccount',
             entityId: $account->id,
@@ -186,7 +196,7 @@ class AccountController extends Controller
 
     public function update(Request $request, string $id): JsonResponse
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
         if (! $user->isOwner()) {
             return response()->json([
@@ -211,22 +221,38 @@ class AccountController extends Controller
 
         $oldValues = $account->only(['name', 'type', 'account_number', 'currency', 'logo', 'is_custom_asset', 'asset_details', 'is_active', 'current_balance']);
 
-        if (array_key_exists('name', $validated)) $account->name = $validated['name'];
-        if (array_key_exists('type', $validated)) $account->type = $validated['type'];
-        if (array_key_exists('account_number', $validated)) $account->account_number = $validated['account_number'];
-        if (array_key_exists('currency', $validated)) $account->currency = $validated['currency'];
-        if (array_key_exists('logo', $validated)) $account->logo = $validated['logo'];
-        if (array_key_exists('is_custom_asset', $validated)) $account->is_custom_asset = $validated['is_custom_asset'];
-        if (array_key_exists('asset_details', $validated)) $account->asset_details = $validated['asset_details'];
-        if (array_key_exists('is_active', $validated)) $account->is_active = $validated['is_active'];
-        
+        if (array_key_exists('name', $validated)) {
+            $account->name = $validated['name'];
+        }
+        if (array_key_exists('type', $validated)) {
+            $account->type = $validated['type'];
+        }
+        if (array_key_exists('account_number', $validated)) {
+            $account->account_number = $validated['account_number'];
+        }
+        if (array_key_exists('currency', $validated)) {
+            $account->currency = $validated['currency'];
+        }
+        if (array_key_exists('logo', $validated)) {
+            $account->logo = $validated['logo'];
+        }
+        if (array_key_exists('is_custom_asset', $validated)) {
+            $account->is_custom_asset = $validated['is_custom_asset'];
+        }
+        if (array_key_exists('asset_details', $validated)) {
+            $account->asset_details = $validated['asset_details'];
+        }
+        if (array_key_exists('is_active', $validated)) {
+            $account->is_active = $validated['is_active'];
+        }
+
         if (isset($validated['balance_adjustment'])) {
             $account->current_balance += (float) $validated['balance_adjustment'];
         }
 
         $account->save();
 
-        \App\Models\AuditLog::record(
+        AuditLog::record(
             action: 'account_updated',
             entityType: 'FinancialAccount',
             entityId: $account->id,
@@ -243,7 +269,7 @@ class AccountController extends Controller
 
     public function destroy(Request $request, string $id): JsonResponse
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
         if (! $user->isOwner()) {
             return response()->json([
@@ -262,7 +288,7 @@ class AccountController extends Controller
         $account->save();
         $account->delete();
 
-        \App\Models\AuditLog::record(
+        AuditLog::record(
             action: 'account_deleted',
             entityType: 'FinancialAccount',
             entityId: $id,
@@ -283,7 +309,7 @@ class AccountController extends Controller
      */
     public function activities(Request $request, string $id): JsonResponse
     {
-        /** @var \App\Models\User|null $user */
+        /** @var User|null $user */
         $user = $request->user();
         if (! $user || ! $user->isOwner()) {
             return response()->json([
@@ -298,7 +324,7 @@ class AccountController extends Controller
         $allTxns = FinancialTransaction::with(['contact', 'sourceAccount', 'destinationAccount', 'creator'])
             ->where(function ($q) use ($account) {
                 $q->where('source_account_id', $account->id)
-                  ->orWhere('destination_account_id', $account->id);
+                    ->orWhere('destination_account_id', $account->id);
             })
             ->orderBy('date', 'asc')
             ->orderBy('created_at', 'asc')
@@ -327,7 +353,7 @@ class AccountController extends Controller
                 $direction = 'outflow';
                 $inflow = 0.0;
                 $outflow = $amount + $fee;
-                $netEffect = - ($amount + $fee);
+                $netEffect = -($amount + $fee);
             }
 
             $stampedBalance = $runningBalance;
@@ -408,12 +434,12 @@ class AccountController extends Controller
 
         // Date range filter
         if ($request->filled('start_date')) {
-            $start = \Carbon\Carbon::parse($request->start_date)->startOfDay();
-            $filtered = $filtered->filter(fn ($item) => \Carbon\Carbon::parse($item['date'])->greaterThanOrEqualTo($start));
+            $start = Carbon::parse($request->start_date)->startOfDay();
+            $filtered = $filtered->filter(fn ($item) => Carbon::parse($item['date'])->greaterThanOrEqualTo($start));
         }
         if ($request->filled('end_date')) {
-            $end = \Carbon\Carbon::parse($request->end_date)->endOfDay();
-            $filtered = $filtered->filter(fn ($item) => \Carbon\Carbon::parse($item['date'])->lessThanOrEqualTo($end));
+            $end = Carbon::parse($request->end_date)->endOfDay();
+            $filtered = $filtered->filter(fn ($item) => Carbon::parse($item['date'])->lessThanOrEqualTo($end));
         }
 
         // Search filter
