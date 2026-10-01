@@ -106,7 +106,6 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
   const [variantCaseSize, setVariantCaseSize] = useState('');
   const [variantMaterial, setVariantMaterial] = useState('');
   const [variantGeneralSpec, setVariantGeneralSpec] = useState('');
-  const [variantDefaultPrice, setVariantDefaultPrice] = useState('');
 
   const [isSubmittingProduct, setIsSubmittingProduct] = useState(false);
   const [isCreatingVariant, setIsCreatingVariant] = useState(false);
@@ -347,7 +346,6 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
     setVariantCaseSize('');
     setVariantMaterial('');
     setVariantGeneralSpec('');
-    setVariantDefaultPrice('');
   };
 
   // Build variant payload based on category archetype
@@ -463,11 +461,7 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
 
     try {
       setIsSubmittingVariant(true);
-      const baseData = buildVariantData();
-      const variantData: any = {
-        ...baseData,
-        default_selling_price: variantDefaultPrice ? parseFormattedNumber(variantDefaultPrice) : undefined,
-      };
+      const variantData = buildVariantData();
 
       const createdVariant: ProductVariant = await api.addVariant(selectedProductId, variantData);
 
@@ -1434,25 +1428,6 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
 
                         {/* Interactive Radio Builders for Storage, RAM, Color, etc. */}
                         {renderCategoryVariantInputs()}
-
-                        {/* Optional Default Benchmark Price */}
-                        <div>
-                          <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                            Default Selling Price for this Variant (Optional)
-                          </label>
-                          <div className="relative max-w-xs">
-                            <input
-                              type="text"
-                              value={variantDefaultPrice}
-                              onChange={(e) => setVariantDefaultPrice(formatCurrencyInput(e.target.value))}
-                              placeholder="e.g. 140,000"
-                              className="w-full h-9 pl-3 pr-12 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
-                            />
-                            <span className="absolute right-3 top-2.5 text-[10px] font-semibold text-slate-400">
-                              ETB
-                            </span>
-                          </div>
-                        </div>
 
                         {/* Actions */}
                         <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200/70 dark:border-slate-800">
