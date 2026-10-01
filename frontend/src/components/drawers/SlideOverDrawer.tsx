@@ -62,23 +62,23 @@ export const SlideOverDrawer: React.FC<SlideOverDrawerProps> = ({
   if (!rendered) return null;
 
   const content = (
-    <div className="fixed inset-0 z-[80] overflow-hidden" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-[80] overflow-hidden printable-modal-backdrop" role="dialog" aria-modal="true">
       {/* Dimmed subtle backdrop allowing dashboard visibility */}
       <div
         onClick={onClose}
-        className={`fixed inset-0 bg-slate-950/40 dark:bg-black/60 backdrop-blur-xs transition-opacity duration-200 ${
+        className={`fixed inset-0 bg-slate-950/40 dark:bg-black/60 backdrop-blur-xs transition-opacity duration-200 no-print ${
           isClosing ? 'opacity-0' : 'opacity-100 animate-backdrop-enter'
         }`}
       />
 
-      <div className="fixed inset-y-0 right-0 max-w-full flex pl-0 sm:pl-10 pointer-events-none">
+      <div className="fixed inset-y-0 right-0 max-w-full flex pl-0 sm:pl-10 pointer-events-none printable-modal-card">
         <aside
           className={`pointer-events-auto w-screen ${widthClass} bg-white dark:bg-[#131926] border-l border-slate-200/80 dark:border-slate-800/90 shadow-2xl flex flex-col justify-between overflow-hidden transition-colors ${
             isClosing ? 'animate-drawer-exit' : 'animate-drawer-enter'
           }`}
         >
           {/* Header */}
-          <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-4 bg-white/80 dark:bg-[#131926]/80 backdrop-blur-sm z-10 shrink-0">
+          <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-4 bg-white/80 dark:bg-[#131926]/80 backdrop-blur-sm z-10 shrink-0 no-print">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <h2 className="text-base font-bold text-slate-900 dark:text-white tracking-tight truncate">
@@ -113,7 +113,7 @@ export const SlideOverDrawer: React.FC<SlideOverDrawerProps> = ({
 
           {/* Optional Action Footer */}
           {footerActions && (
-            <div className="px-4 sm:px-6 py-3 sm:py-4 pb-[calc(1.1rem+env(safe-area-inset-bottom,0px))] sm:pb-4 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/80 dark:bg-[#131926]/90 backdrop-blur-md flex items-center justify-between gap-3 shrink-0 z-10 w-full">
+            <div className="px-4 sm:px-6 py-3 sm:py-4 pb-[calc(1.1rem+env(safe-area-inset-bottom,0px))] sm:pb-4 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/80 dark:bg-[#131926]/90 backdrop-blur-md flex items-center justify-between gap-3 shrink-0 z-10 w-full no-print">
               {footerActions}
             </div>
           )}

@@ -478,21 +478,29 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   }
 
   /*
-   * Step 1: Hide EVERYTHING in the body with display:none so it occupies
-   * zero layout space (visibility:hidden alone keeps elements in flow and
-   * causes phantom extra pages).
+   * Strategy: visibility:hidden on the whole body keeps every element in
+   * the layout flow (so ancestors of the printable target remain traversable)
+   * but paints nothing. Then we selectively restore visibility on the exact
+   * ancestor chain we need.
+   *
+   * For phantom-page prevention we additionally collapse every sibling of
+   * the printable-modal-backdrop / printable-modal-card wrappers with
+   * display:none, since those siblings have no printable content and would
+   * otherwise occupy page height.
    */
-  body > * {
-    display: none !important;
+
+  body {
+    visibility: hidden !important;
   }
 
-  /*
-   * Step 2: Re-show only the modal backdrop ancestor so the statement
-   * is reachable, but keep it as a zero-chrome pass-through wrapper.
-   */
-  body > .printable-modal-backdrop,
-  body .printable-modal-backdrop {
-    display: block !important;
+  /* The backdrop wrapper and everything inside it becomes visible */
+  .printable-modal-backdrop,
+  .printable-modal-backdrop * {
+    visibility: visible !important;
+  }
+
+  /* Collapse the backdrop's own fixed/overflow chrome */
+  .printable-modal-backdrop {
     position: static !important;
     background: transparent !important;
     padding: 0 !important;
@@ -503,6 +511,19 @@ html.dark ::-webkit-scrollbar-thumb:hover {
     max-height: none !important;
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
+    display: block !important;
+  }
+
+  /*
+   * Hide the app root (#root) so it contributes zero height — but only
+   * when it does NOT contain the printable-modal-backdrop (i.e. for the
+   * drawer/portal case where backdrop is a direct body child).
+   * When the vendor modal is inside #root, #root itself hosts the backdrop
+   * and must stay visible; the rule below is overridden by the
+   * .printable-modal-backdrop rules above for that case.
+   */
+  #root:not(:has(.printable-modal-backdrop)) {
+    display: none !important;
   }
 
   .printable-modal-card {
@@ -520,9 +541,31 @@ html.dark ::-webkit-scrollbar-thumb:hover {
     padding: 0 !important;
   }
 
-  /* Action bar: hide it so it never bleeds onto the printed page */
-  .no-print {
+  /* Reset the aside and its inner scroll wrapper inside SlideOverDrawer */
+  .printable-modal-card aside,
+  .printable-modal-card aside > div {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: none !important;
+    height: auto !important;
+    overflow: visible !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    flex: none !important;
+  }
+
+  /* Hide all non-printable chrome: action bars, headers, footers, backdrop overlay */
+  .no-print,
+  .printable-modal-card .no-print,
+  .printable-modal-card aside .no-print {
     display: none !important;
+    visibility: hidden !important;
   }
 
   #printable-invoice,
