@@ -1301,11 +1301,11 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                 {/* Variant Selector — Radio Tiles & Inline Builder */}
                 {selectedProduct && (
                   <div className="sm:col-span-2 space-y-2.5 pt-1">
-                    <div className="flex items-center justify-between">
-                      <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                        Device Variant <span className="text-rose-500">*</span>
-                      </label>
-                      {!isCreatingVariant && (
+                    {!isCreatingVariant && (
+                      <div className="flex items-center justify-between">
+                        <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                          Device Variant <span className="text-rose-500">*</span>
+                        </label>
                         <button
                           type="button"
                           onClick={() => {
@@ -1317,8 +1317,8 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                           <Plus className="w-3.5 h-3.5" />
                           <span>New Variant</span>
                         </button>
-                      )}
-                    </div>
+                      </div>
+                    )}
 
                     {/* Radio Cards for Existing Variants — hidden while adding a new one */}
                     {!isCreatingVariant && selectedProduct.variants && selectedProduct.variants.length > 0 ? (

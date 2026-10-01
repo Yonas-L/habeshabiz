@@ -41,7 +41,7 @@ import { SpeedDialFAB } from './components/navigation/SpeedDialFAB';
 import { CustomPageLoader } from './components/loading/CustomPageLoader';
 import { TopProgressBar } from './components/loading/TopProgressBar';
 import { Toaster, toast } from 'sonner';
-import { ArrowRight, Loader2, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Loader2 } from 'lucide-react';
 
 export const getCurrentMonth = (): string => {
   const now = new Date();
@@ -499,20 +499,6 @@ export default function App() {
             >
               <span>New business? Set up your workspace</span>
               <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setCurrentPath('/admin');
-                if (typeof window !== 'undefined' && window.history.pushState) {
-                  window.history.pushState({}, '', '/admin');
-                }
-              }}
-              className="text-[11px] font-medium text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-              <span>Platform Superadmin Portal</span>
             </button>
           </div>
         </div>

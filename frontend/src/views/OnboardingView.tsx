@@ -263,13 +263,9 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSuccess, onCan
               <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
                 You're on the list.
               </h1>
-              <h2 className="text-base font-semibold text-emerald-600 dark:text-emerald-400 font-sans">
-                ዝርዝሩ ላይ ተቀላቅለዋል።
-              </h2>
             </div>
             <div className="space-y-1 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-              <p>We'll reach out to you personally. Thank you.</p>
-              <p className="font-sans">በግል እናነጋግርዎታለን። አመሰግናለሁ።</p>
+              <p>We'll reach out to you personally when your workspace is ready. Thank you.</p>
             </div>
             <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
               <button
@@ -321,12 +317,8 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSuccess, onCan
             <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white leading-snug">
               We're currently in private beta with a selected group of shops.
             </h1>
-            <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400 font-sans">
-              በአሁኑ ጊዜ ከተወሰኑ ሱቆች ጋር በፕራይቬት ቤታ ላይ ነን።
-            </p>
-            <div className="pt-1 text-xs text-slate-500 dark:text-slate-400 space-y-0.5">
-              <p>Leave your details and we'll reach out personally when we're ready for you.</p>
-              <p className="font-sans">ዝርዝርዎን ይተዉ — ዝግጁ ስንሆን እናነጋግርዎታለን።</p>
+            <div className="pt-1 text-xs text-slate-500 dark:text-slate-400">
+              <p>Leave your details and we'll reach out personally when registration opens for your shop.</p>
             </div>
           </div>
 
@@ -394,7 +386,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSuccess, onCan
                 onChange={(e) => setWaitlistMessage(e.target.value)}
                 maxLength={500}
                 rows={3}
-                placeholder="Tell us about your shop / ስለሱቅዎ ይንገሩን"
+                placeholder="Tell us about your shop..."
                 className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder:text-slate-400 resize-none"
               />
             </div>
@@ -408,9 +400,8 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSuccess, onCan
                   onChange={(e) => setWaitlistConsent(e.target.checked)}
                   className="mt-0.5 w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 dark:border-slate-700 cursor-pointer"
                 />
-                <div className="text-xs text-slate-700 dark:text-slate-300 leading-snug space-y-0.5">
-                  <p className="font-medium">I agree to be contacted when we open for new shops.</p>
-                  <p className="text-slate-500 dark:text-slate-400 font-sans">አዲስ ሱቆችን ሲቀበሉ እንዲያነጋግሩኝ እፈቅዳለሁ።</p>
+                <div className="text-xs text-slate-700 dark:text-slate-300 leading-snug">
+                  <p className="font-medium">I agree to be contacted when registration opens for new shops.</p>
                 </div>
               </label>
             </div>
@@ -423,7 +414,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSuccess, onCan
                 disabled={isWaitlistLoading}
                 className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer disabled:opacity-50 text-center"
               >
-                No thanks / አይ አስፈልገኝም
+                No thanks
               </button>
 
               <button
@@ -437,7 +428,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSuccess, onCan
                     <span>Submitting...</span>
                   </>
                 ) : (
-                  <span>Join Waitlist / ዝርዝር ተቀላቀሉ</span>
+                  <span>Join Waitlist</span>
                 )}
               </button>
             </div>
