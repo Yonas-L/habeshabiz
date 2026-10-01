@@ -99,6 +99,8 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
 
   const canViewCost = user?.can_view_costs ?? false;
   const isOwner = user?.role === 'owner';
+  const canHandover = isOwner || !!user?.can_handover || !!user?.permissions?.can_handover;
+  const canManageInv = isOwner || !!user?.can_manage_inventory || !!user?.permissions?.can_manage_inventory;
 
   const initForm = (u: InventoryUnit) => {
     setImei(u.imei_or_serial || '');
@@ -329,7 +331,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
             </button>
           )}
 
-          {isOwner && (
+          {(isOwner || canManageInv) && (
             <button
               type="button"
               onClick={() => {
@@ -408,7 +410,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
               {/* IN STOCK: Handover (Owner Only) or Sell (Everyone) */}
               {isInStock && (
                 <>
-                  {isOwner && onOpenHandover && (
+                  {(isOwner || canHandover) && onOpenHandover && (
                     <button
                       type="button"
                       onClick={() => {
@@ -438,8 +440,8 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
                 </>
               )}
 
-              {/* OUT FOR SALE: Mark Sold or Restock to Shelf (Owner Only) */}
-              {isOut && isOwner && (
+              {/* OUT FOR SALE: Mark Sold or Restock to Shelf */}
+              {isOut && (isOwner || canHandover) && (
                 <div className="flex items-center gap-2">
                   {onOpenMarkSold && (
                     <button
@@ -481,7 +483,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
                 </button>
               )}
 
-              {isSold && isOwner && onOpenCustomerReturn && (
+              {isSold && (isOwner || canManageInv) && onOpenCustomerReturn && (
                 <button
                   type="button"
                   onClick={() => {
@@ -495,8 +497,8 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
                 </button>
               )}
 
-              {/* RETURNED / FIXED: Repaired & Restock (Owner Only) */}
-              {(isReturned || currentUnit.status === 'fixed') && isOwner && onOpenRepairedRestock && (
+              {/* RETURNED / FIXED: Repaired & Restock */}
+              {(isReturned || currentUnit.status === 'fixed') && (isOwner || canManageInv) && onOpenRepairedRestock && (
                 <button
                   type="button"
                   onClick={() => {
@@ -512,8 +514,8 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
                 </button>
               )}
 
-              {/* WITH VENDOR: Receive Fixed & Vendor Swap (Owner Only) */}
-              {currentUnit.status === 'returned_to_vendor' && isOwner && (
+              {/* WITH VENDOR: Receive Fixed & Vendor Swap */}
+              {currentUnit.status === 'returned_to_vendor' && (isOwner || canManageInv) && (
                 <>
                   {onOpenReceiveFixed && (
                     <button

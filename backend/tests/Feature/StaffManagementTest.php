@@ -242,3 +242,105 @@ test('leaderboard returns ranked sellers with volume and bonuses', function () {
 
     expect($res->json('data.leaderboard'))->toBeArray();
 });
+
+test('owner can update staff privileges and details', function () {
+    $res = $this->actingAs($this->owner)
+        ->putJson("/api/v1/staff/{$this->staff->id}", [
+            'name' => 'Husa Senior Sales',
+            'phone' => '+251911223344',
+            'can_discount' => true,
+            'can_handover' => true,
+            'can_intake_stock' => true,
+            'can_view_costs' => true,
+            'can_manage_inventory' => true,
+        ]);
+
+    $res->assertStatus(200)
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.name', 'Husa Senior Sales');
+
+    $freshStaff = $this->staff->fresh();
+    expect($freshStaff->name)->toBe('Husa Senior Sales');
+    expect($freshStaff->canDiscount())->toBeTrue();
+    expect($freshStaff->canHandover())->toBeTrue();
+    expect($freshStaff->canIntakeStock())->toBeTrue();
+    expect($freshStaff->canViewCosts())->toBeTrue();
+    expect($freshStaff->canManageInventory())->toBeTrue();
+
+    // Verify audit log
+    $log = AuditLog::where('action', 'staff_updated')->where('entity_id', (string) $this->staff->id)->first();
+    expect($log)->not->toBeNull();
+});
+
+test('staff permission enforcement for stock intake and handover', function () {
+    $product = Product::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'iPhone 15 Pro Max',
+        'brand' => 'Apple',
+        'category' => 'smartphones',
+    ]);
+
+    $variant = ProductVariant::create([
+        'product_id' => $product->id,
+        'storage' => '256GB',
+        'color' => 'Natural Titanium',
+        'default_selling_price' => 175000,
+    ]);
+
+    // 1. Without can_intake_stock, staff gets 403
+    $this->staff->update([
+        'permissions' => ['can_intake_stock' => false],
+    ]);
+
+    $intakeFail = $this->actingAs($this->staff)
+        ->postJson('/api/v1/inventory/units', [
+            'variant_id' => $variant->id,
+            'imei_or_serial' => 'IMEI-TEST-999',
+            'cost_basis' => 120000,
+            'condition' => 'brand_new',
+        ]);
+    $intakeFail->assertStatus(403);
+
+    // 2. With can_intake_stock granted, staff succeeds
+    $this->staff->update([
+        'permissions' => ['can_intake_stock' => true],
+    ]);
+
+    $intakeSuccess = $this->actingAs($this->staff)
+        ->postJson('/api/v1/inventory/units', [
+            'variant_id' => $variant->id,
+            'imei_or_serial' => 'IMEI-TEST-999',
+            'cost_basis' => 120000,
+            'condition' => 'brand_new',
+        ]);
+    $intakeSuccess->assertStatus(201);
+    $unitId = $intakeSuccess->json('data.id');
+
+    // 3. Without can_handover, staff cannot handover unit
+    $this->staff->update([
+        'permissions' => [
+            'can_intake_stock' => true,
+            'can_handover' => false,
+        ],
+    ]);
+
+    $handoverFail = $this->actingAs($this->staff)
+        ->postJson("/api/v1/inventory/units/{$unitId}/handover", [
+            'handover_to' => 'Brokers Hub',
+        ]);
+    $handoverFail->assertStatus(403);
+
+    // 4. With can_handover granted, staff can handover unit
+    $this->staff->update([
+        'permissions' => [
+            'can_intake_stock' => true,
+            'can_handover' => true,
+        ],
+    ]);
+
+    $handoverSuccess = $this->actingAs($this->staff)
+        ->postJson("/api/v1/inventory/units/{$unitId}/handover", [
+            'handover_to' => 'Brokers Hub',
+        ]);
+    $handoverSuccess->assertStatus(200);
+});

@@ -81,22 +81,22 @@ export const SpeedDialFAB: React.FC<SpeedDialFABProps> = ({
             {actions.map((act) => {
               const Icon = act.icon;
               return (
-                <div
+                <button
                   key={act.id}
-                  className="flex items-center gap-2.5 transition-transform active:scale-95"
+                  type="button"
+                  onClick={act.onClick}
+                  aria-label={act.label}
+                  className="flex items-center gap-2.5 transition-transform active:scale-95 cursor-pointer"
                 >
                   <span className="px-2.5 py-1 rounded-lg bg-white/95 dark:bg-[#131926]/95 border border-slate-200/80 dark:border-slate-800 text-xs font-bold text-slate-800 dark:text-slate-100 shadow-md">
                     {act.label}
                   </span>
-                  <button
-                    type="button"
-                    onClick={act.onClick}
-                    className={`w-11 h-11 rounded-full flex items-center justify-center shadow-lg cursor-pointer ${act.colorClass}`}
-                    aria-label={act.label}
+                  <span
+                    className={`w-11 h-11 rounded-full flex items-center justify-center shadow-lg ${act.colorClass}`}
                   >
                     <Icon className="w-5 h-5 stroke-[2]" />
-                  </button>
-                </div>
+                  </span>
+                </button>
               );
             })}
           </div>

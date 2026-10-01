@@ -772,7 +772,7 @@ export const DonutCapitalChart: React.FC<{
               <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0 mt-1 sm:mt-0.5" />
               <div className="min-w-0 flex-1">
                 <span className="text-slate-400 dark:text-slate-500 block text-[10px] font-medium truncate">
-                  Physical Gold ({(goldPct * 100).toFixed(0)}%)
+                  Other Assets ({(goldPct * 100).toFixed(0)}%)
                 </span>
                 <span className="font-bold text-amber-600 dark:text-amber-400 font-mono text-xs truncate block mt-0.5">
                   +<AnimatedNumber value={goldVal} /> <span className="text-[10px] font-normal text-slate-400">ETB</span>

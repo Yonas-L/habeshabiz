@@ -16,6 +16,12 @@ import {
   RefreshCw,
   TrendingUp,
   AlertTriangle,
+  Edit2,
+  Shield,
+  PackagePlus,
+  ArrowRightLeft,
+  Eye,
+  Percent,
 } from 'lucide-react';
 import { AnimatedNumber } from '../components/AnimatedNumber';
 import { Pagination } from '../components/Pagination';
@@ -37,7 +43,23 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
   const [newPhone, setNewPhone] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [canDiscount, setCanDiscount] = useState(false);
+  const [canHandover, setCanHandover] = useState(false);
+  const [canIntakeStock, setCanIntakeStock] = useState(false);
+  const [canViewCosts, setCanViewCosts] = useState(false);
+  const [canManageInventory, setCanManageInventory] = useState(false);
   const [isSubmittingStaff, setIsSubmittingStaff] = useState(false);
+
+  // Edit Staff Modal State
+  const [editingStaff, setEditingStaff] = useState<StaffMember | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editCanDiscount, setEditCanDiscount] = useState(false);
+  const [editCanHandover, setEditCanHandover] = useState(false);
+  const [editCanIntakeStock, setEditCanIntakeStock] = useState(false);
+  const [editCanViewCosts, setEditCanViewCosts] = useState(false);
+  const [editCanManageInventory, setEditCanManageInventory] = useState(false);
+  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
 
   // Temporary Credentials Share Modal
   const [shareCredentials, setShareCredentials] = useState<{
@@ -85,6 +107,10 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
         phone: newPhone.trim(),
         email: newEmail.trim() || undefined,
         can_discount: canDiscount,
+        can_handover: canHandover,
+        can_intake_stock: canIntakeStock,
+        can_view_costs: canViewCosts,
+        can_manage_inventory: canManageInventory,
       });
 
       toast.success('Staff account created successfully!');
@@ -102,11 +128,58 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
       setNewPhone('');
       setNewEmail('');
       setCanDiscount(false);
+      setCanHandover(false);
+      setCanIntakeStock(false);
+      setCanViewCosts(false);
+      setCanManageInventory(false);
       loadData();
     } catch (err: any) {
       toast.error(err.message || 'Failed to create staff member');
     } finally {
       setIsSubmittingStaff(false);
+    }
+  };
+
+  const handleOpenEdit = (member: StaffMember) => {
+    setEditingStaff(member);
+    setEditName(member.name);
+    setEditPhone(member.phone || '');
+    setEditEmail(member.email || '');
+    setEditCanDiscount(!!member.permissions?.can_discount);
+    setEditCanHandover(!!member.permissions?.can_handover);
+    setEditCanIntakeStock(!!member.permissions?.can_intake_stock);
+    setEditCanViewCosts(!!member.permissions?.can_view_costs);
+    setEditCanManageInventory(!!member.permissions?.can_manage_inventory);
+  };
+
+  const handleUpdateStaff = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingStaff) return;
+    if (!editName.trim() || !editPhone.trim()) {
+      toast.error('Please provide worker full name and phone number');
+      return;
+    }
+
+    try {
+      setIsSubmittingEdit(true);
+      await api.updateStaff(editingStaff.id, {
+        name: editName.trim(),
+        phone: editPhone.trim(),
+        email: editEmail.trim() || undefined,
+        can_discount: editCanDiscount,
+        can_handover: editCanHandover,
+        can_intake_stock: editCanIntakeStock,
+        can_view_costs: editCanViewCosts,
+        can_manage_inventory: editCanManageInventory,
+      });
+
+      toast.success(`${editName.trim()} updated successfully!`);
+      setEditingStaff(null);
+      loadData();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update staff member');
+    } finally {
+      setIsSubmittingEdit(false);
     }
   };
 
@@ -351,11 +424,32 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
                         {/* Access */}
                         <td className="py-3 px-4">
                           {member.role === 'owner' ? (
-                            <span className="text-[10px] font-semibold text-purple-600 dark:text-purple-400">Full Access</span>
-                          ) : member.permissions?.can_discount ? (
-                            <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">Can Discount</span>
+                            <span className="text-[10px] font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/60 px-2 py-0.5 rounded-md">Full Access</span>
                           ) : (
-                            <span className="text-[10px] font-semibold text-slate-400">Fixed Prices</span>
+                            <div className="flex flex-wrap gap-1 max-w-[210px]">
+                              {member.permissions?.can_discount && (
+                                <span className="text-[9px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded">Discount</span>
+                              )}
+                              {member.permissions?.can_handover && (
+                                <span className="text-[9px] font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 px-1.5 py-0.5 rounded">Handover</span>
+                              )}
+                              {member.permissions?.can_intake_stock && (
+                                <span className="text-[9px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 px-1.5 py-0.5 rounded">Intake</span>
+                              )}
+                              {member.permissions?.can_view_costs && (
+                                <span className="text-[9px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 rounded">Costs</span>
+                              )}
+                              {member.permissions?.can_manage_inventory && (
+                                <span className="text-[9px] font-bold text-cyan-700 dark:text-cyan-300 bg-cyan-50 dark:bg-cyan-950/60 px-1.5 py-0.5 rounded">Inventory</span>
+                              )}
+                              {!member.permissions?.can_discount &&
+                               !member.permissions?.can_handover &&
+                               !member.permissions?.can_intake_stock &&
+                               !member.permissions?.can_view_costs &&
+                               !member.permissions?.can_manage_inventory && (
+                                <span className="text-[10px] font-medium text-slate-400">Sales Only</span>
+                              )}
+                            </div>
                           )}
                         </td>
 
@@ -416,6 +510,14 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
                         <td className="py-3 px-4 text-right">
                           {member.role !== 'owner' && !isSelf ? (
                             <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => handleOpenEdit(member)}
+                                title="Edit staff details and privileges"
+                                className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-[11px] flex items-center gap-1 transition-colors"
+                              >
+                                <Edit2 className="w-3 h-3 text-slate-500 dark:text-slate-400" />
+                                Edit
+                              </button>
                               <button
                                 onClick={() => setResetConfirmStaff(member)}
                                 title="Reset password"
@@ -505,11 +607,32 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
 
                     <div className="shrink-0">
                       {member.role === 'owner' ? (
-                        <span className="text-[10px] font-semibold text-purple-600 dark:text-purple-400 px-2 py-0.5 rounded bg-purple-50 dark:bg-purple-950/40">Full Access</span>
-                      ) : member.permissions?.can_discount ? (
-                        <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40">Can Discount</span>
+                        <span className="text-[10px] font-bold text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded-md bg-purple-50 dark:bg-purple-950/60">Full Access</span>
                       ) : (
-                        <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800">Fixed Prices</span>
+                        <div className="flex flex-wrap gap-1 justify-end max-w-[200px]">
+                          {member.permissions?.can_discount && (
+                            <span className="text-[9px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded">Discount</span>
+                          )}
+                          {member.permissions?.can_handover && (
+                            <span className="text-[9px] font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 px-1.5 py-0.5 rounded">Handover</span>
+                          )}
+                          {member.permissions?.can_intake_stock && (
+                            <span className="text-[9px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 px-1.5 py-0.5 rounded">Intake</span>
+                          )}
+                          {member.permissions?.can_view_costs && (
+                            <span className="text-[9px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 rounded">Costs</span>
+                          )}
+                          {member.permissions?.can_manage_inventory && (
+                            <span className="text-[9px] font-bold text-cyan-700 dark:text-cyan-300 bg-cyan-50 dark:bg-cyan-950/60 px-1.5 py-0.5 rounded">Inventory</span>
+                          )}
+                          {!member.permissions?.can_discount &&
+                           !member.permissions?.can_handover &&
+                           !member.permissions?.can_intake_stock &&
+                           !member.permissions?.can_view_costs &&
+                           !member.permissions?.can_manage_inventory && (
+                            <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800">Sales Only</span>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -555,6 +678,13 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
                   {/* Actions row on mobile */}
                   {member.role !== 'owner' && !isSelf && (
                     <div className="flex items-center justify-end gap-2 pt-1 border-t border-slate-100 dark:border-slate-800/60">
+                      <button
+                        onClick={() => handleOpenEdit(member)}
+                        className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs flex items-center gap-1.5 transition-colors"
+                      >
+                        <Edit2 className="size-3 text-slate-500" />
+                        <span>Edit</span>
+                      </button>
                       <button
                         onClick={() => setResetConfirmStaff(member)}
                         className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-semibold text-xs flex items-center gap-1.5 transition-colors"
@@ -671,18 +801,107 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
                 </div>
               </div>
 
-              <div className="flex items-start gap-3">
-                <input
-                  type="checkbox"
-                  id="canDiscount"
-                  checked={canDiscount}
-                  onChange={(e) => setCanDiscount(e.target.checked)}
-                  className="mt-0.5 w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
-                />
-                <label htmlFor="canDiscount" className="cursor-pointer">
-                  <div className="text-xs font-bold text-slate-900 dark:text-white">Allow Counter Discounts</div>
-                  <div className="text-[11px] text-slate-500 dark:text-slate-400">Can apply custom discounts when making sales.</div>
-                </label>
+              {/* Granular Permissions Section */}
+              <div className="space-y-2 pt-1 border-t border-slate-100 dark:border-slate-800">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                    <Shield className="w-3.5 h-3.5 text-emerald-500" />
+                    <span>Staff Privileges & Permissions</span>
+                  </label>
+                  <span className="text-[10px] text-slate-400">Configure access level</span>
+                </div>
+
+                <div className="space-y-2.5 bg-slate-50/70 dark:bg-slate-900/40 p-3 rounded-xl border border-slate-100 dark:border-slate-800/80">
+                  {/* Privilege 1: Discount */}
+                  <label className="flex items-start gap-2.5 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      id="canDiscount"
+                      checked={canDiscount}
+                      onChange={(e) => setCanDiscount(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900 cursor-pointer"
+                    />
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                        <Percent className="w-3 h-3 text-emerald-500 shrink-0" />
+                        <span>Allow Counter Discounts</span>
+                      </div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400">Can apply custom price discounts during POS checkout.</div>
+                    </div>
+                  </label>
+
+                  {/* Privilege 2: Handover */}
+                  <label className="flex items-start gap-2.5 cursor-pointer group pt-2.5 border-t border-slate-200/50 dark:border-slate-800/60">
+                    <input
+                      type="checkbox"
+                      id="canHandover"
+                      checked={canHandover}
+                      onChange={(e) => setCanHandover(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900 cursor-pointer"
+                    />
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                        <ArrowRightLeft className="w-3 h-3 text-blue-500 shrink-0" />
+                        <span>Allow Device Handover & Flow</span>
+                      </div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400">Can hand out units to brokers/staff, confirm handover sales, or restock to shelf.</div>
+                    </div>
+                  </label>
+
+                  {/* Privilege 3: Intake Stock */}
+                  <label className="flex items-start gap-2.5 cursor-pointer group pt-2.5 border-t border-slate-200/50 dark:border-slate-800/60">
+                    <input
+                      type="checkbox"
+                      id="canIntakeStock"
+                      checked={canIntakeStock}
+                      onChange={(e) => setCanIntakeStock(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900 cursor-pointer"
+                    />
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                        <PackagePlus className="w-3 h-3 text-indigo-500 shrink-0" />
+                        <span>Allow Stock Intake</span>
+                      </div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400">Can add new inventory units, record supplier shipments, and add catalog models.</div>
+                    </div>
+                  </label>
+
+                  {/* Privilege 4: View Costs */}
+                  <label className="flex items-start gap-2.5 cursor-pointer group pt-2.5 border-t border-slate-200/50 dark:border-slate-800/60">
+                    <input
+                      type="checkbox"
+                      id="canViewCosts"
+                      checked={canViewCosts}
+                      onChange={(e) => setCanViewCosts(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900 cursor-pointer"
+                    />
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                        <Eye className="w-3 h-3 text-amber-500 shrink-0" />
+                        <span>Allow View Cost Basis & Margins</span>
+                      </div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400">Can view purchase prices, cost basis, and margin percentages on devices.</div>
+                    </div>
+                  </label>
+
+                  {/* Privilege 5: Manage Inventory */}
+                  <label className="flex items-start gap-2.5 cursor-pointer group pt-2.5 border-t border-slate-200/50 dark:border-slate-800/60">
+                    <input
+                      type="checkbox"
+                      id="canManageInventory"
+                      checked={canManageInventory}
+                      onChange={(e) => setCanManageInventory(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900 cursor-pointer"
+                    />
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                        <Shield className="w-3 h-3 text-cyan-500 shrink-0" />
+                        <span>Allow Inventory Management & Swaps</span>
+                      </div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400">Can edit unit IMEI/serials, process customer warranty returns, and handle vendor swaps.</div>
+                    </div>
+                  </label>
+                </div>
               </div>
 
               <div className="pt-2 flex justify-end gap-2.5">
@@ -704,6 +923,210 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
                     <UserPlus className="w-3.5 h-3.5" />
                   )}
                   <span>Create Staff Account</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Edit Staff Member ── */}
+      {editingStaff && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-slate-950/40 dark:bg-slate-950/70 backdrop-blur-xs transition-opacity"
+            onClick={() => setEditingStaff(null)}
+          />
+
+          <div className="relative z-10 w-full max-w-lg bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xl overflow-hidden animate-modal-enter p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-950/60 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                  <Edit2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+                    Edit Staff & Privileges
+                  </h2>
+                  <p className="text-[11px] text-slate-400">
+                    Modify profile details and toggle granular operational permissions.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setEditingStaff(null)}
+                className="w-7 h-7 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 flex items-center justify-center"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateStaff} className="mt-4 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Worker Full Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Kidus Tesfaye"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#182030] text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Phone Number * (used for staff login)
+                </label>
+                <div className="relative">
+                  <Phone className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+                  <input
+                    type="text"
+                    required
+                    placeholder="0911234567"
+                    value={editPhone}
+                    onChange={(e) => setEditPhone(e.target.value)}
+                    className="w-full h-10 pl-9 pr-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#182030] text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-white font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Email Address
+                </label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+                  <input
+                    type="email"
+                    placeholder="e.g. kidus@boletech.et"
+                    value={editEmail}
+                    onChange={(e) => setEditEmail(e.target.value)}
+                    className="w-full h-10 pl-9 pr-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#182030] text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-white"
+                  />
+                </div>
+              </div>
+
+              {/* Granular Permissions Section */}
+              <div className="space-y-2 pt-1 border-t border-slate-100 dark:border-slate-800">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                    <Shield className="w-3.5 h-3.5 text-blue-500" />
+                    <span>Staff Privileges & Permissions</span>
+                  </label>
+                  <span className="text-[10px] text-slate-400">Checked = Enabled</span>
+                </div>
+
+                <div className="space-y-2.5 bg-slate-50/70 dark:bg-slate-900/40 p-3 rounded-xl border border-slate-100 dark:border-slate-800/80">
+                  {/* Privilege 1: Discount */}
+                  <label className="flex items-start gap-2.5 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      checked={editCanDiscount}
+                      onChange={(e) => setEditCanDiscount(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900 cursor-pointer"
+                    />
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                        <Percent className="w-3 h-3 text-emerald-500 shrink-0" />
+                        <span>Allow Counter Discounts</span>
+                      </div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400">Can apply custom price discounts during POS checkout.</div>
+                    </div>
+                  </label>
+
+                  {/* Privilege 2: Handover */}
+                  <label className="flex items-start gap-2.5 cursor-pointer group pt-2.5 border-t border-slate-200/50 dark:border-slate-800/60">
+                    <input
+                      type="checkbox"
+                      checked={editCanHandover}
+                      onChange={(e) => setEditCanHandover(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900 cursor-pointer"
+                    />
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                        <ArrowRightLeft className="w-3 h-3 text-blue-500 shrink-0" />
+                        <span>Allow Device Handover & Flow</span>
+                      </div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400">Can hand out units to brokers/staff, confirm handover sales, or restock to shelf.</div>
+                    </div>
+                  </label>
+
+                  {/* Privilege 3: Intake Stock */}
+                  <label className="flex items-start gap-2.5 cursor-pointer group pt-2.5 border-t border-slate-200/50 dark:border-slate-800/60">
+                    <input
+                      type="checkbox"
+                      checked={editCanIntakeStock}
+                      onChange={(e) => setEditCanIntakeStock(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900 cursor-pointer"
+                    />
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                        <PackagePlus className="w-3 h-3 text-indigo-500 shrink-0" />
+                        <span>Allow Stock Intake</span>
+                      </div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400">Can add new inventory units, record supplier shipments, and add catalog models.</div>
+                    </div>
+                  </label>
+
+                  {/* Privilege 4: View Costs */}
+                  <label className="flex items-start gap-2.5 cursor-pointer group pt-2.5 border-t border-slate-200/50 dark:border-slate-800/60">
+                    <input
+                      type="checkbox"
+                      checked={editCanViewCosts}
+                      onChange={(e) => setEditCanViewCosts(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900 cursor-pointer"
+                    />
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                        <Eye className="w-3 h-3 text-amber-500 shrink-0" />
+                        <span>Allow View Cost Basis & Margins</span>
+                      </div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400">Can view purchase prices, cost basis, and margin percentages on devices.</div>
+                    </div>
+                  </label>
+
+                  {/* Privilege 5: Manage Inventory */}
+                  <label className="flex items-start gap-2.5 cursor-pointer group pt-2.5 border-t border-slate-200/50 dark:border-slate-800/60">
+                    <input
+                      type="checkbox"
+                      checked={editCanManageInventory}
+                      onChange={(e) => setEditCanManageInventory(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900 cursor-pointer"
+                    />
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                        <Shield className="w-3 h-3 text-cyan-500 shrink-0" />
+                        <span>Allow Inventory Management & Swaps</span>
+                      </div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400">Can edit unit IMEI/serials, process customer warranty returns, and handle vendor swaps.</div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              <div className="pt-2 flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setEditingStaff(null)}
+                  className="px-4 h-9 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingEdit}
+                  className="px-4 h-9 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {isSubmittingEdit ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Check className="w-3.5 h-3.5" />
+                  )}
+                  <span>Save Changes</span>
                 </button>
               </div>
             </form>

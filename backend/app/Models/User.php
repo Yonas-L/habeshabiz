@@ -90,6 +90,39 @@ class User extends Authenticatable
 
         $permissions = is_array($this->permissions) ? $this->permissions : [];
 
-        return (bool) ($permissions['can_discount'] ?? true);
+        return (bool) ($permissions['can_discount'] ?? false);
+    }
+
+    public function canHandover(): bool
+    {
+        if ($this->isManager()) {
+            return true;
+        }
+
+        $permissions = is_array($this->permissions) ? $this->permissions : [];
+
+        return (bool) ($permissions['can_handover'] ?? false);
+    }
+
+    public function canIntakeStock(): bool
+    {
+        if ($this->isManager()) {
+            return true;
+        }
+
+        $permissions = is_array($this->permissions) ? $this->permissions : [];
+
+        return (bool) ($permissions['can_intake_stock'] ?? false);
+    }
+
+    public function canManageInventory(): bool
+    {
+        if ($this->isManager()) {
+            return true;
+        }
+
+        $permissions = is_array($this->permissions) ? $this->permissions : [];
+
+        return (bool) ($permissions['can_manage_inventory'] ?? false);
     }
 }

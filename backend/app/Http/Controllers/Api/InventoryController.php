@@ -2,13 +2,18 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\SettleDebtPaymentAction;
+use App\Actions\SynchronizeInventoryStockAction;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Contact;
 use App\Models\Debt;
 use App\Models\DebtPayment;
+use App\Models\FinancialAccount;
+use App\Models\FinancialTransaction;
 use App\Models\InventoryStock;
 use App\Models\InventoryUnit;
+use App\Models\ProductVariant;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -129,7 +134,7 @@ class InventoryController extends Controller
     {
         /** @var User $user */
         $user = $request->user();
-        if (! $user->isOwner()) {
+        if (! ($user->isOwner() || $user->canIntakeStock())) {
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized. Stock intake is restricted to store owners/administrators.',
@@ -166,7 +171,7 @@ class InventoryController extends Controller
             $validated['sim_type'] = 'na';
         }
 
-        $variant = \App\Models\ProductVariant::with('product')->findOrFail($validated['variant_id']);
+        $variant = ProductVariant::with('product')->findOrFail($validated['variant_id']);
 
         // Update default selling price if provided
         if (! empty($validated['selling_price'])) {
@@ -198,7 +203,7 @@ class InventoryController extends Controller
             if (! empty($duplicates)) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Duplicate IMEI/Serial number in submission: ' . implode(', ', array_unique($duplicates)),
+                    'message' => 'Duplicate IMEI/Serial number in submission: '.implode(', ', array_unique($duplicates)),
                 ], 422);
             }
 
@@ -213,7 +218,7 @@ class InventoryController extends Controller
             if (! empty($existing)) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'The following IMEI/Serial number(s) are already in active shop inventory: ' . implode(', ', $existing),
+                    'message' => 'The following IMEI/Serial number(s) are already in active shop inventory: '.implode(', ', $existing),
                 ], 422);
             }
         }
@@ -221,7 +226,7 @@ class InventoryController extends Controller
         $createdUnits = [];
         $costBasis = (float) $validated['cost_basis'];
 
-        \Illuminate\Support\Facades\DB::transaction(function () use ($validated, $variant, $hasSerials, $imeisList, $costBasis, $user, &$createdUnits) {
+        DB::transaction(function () use ($validated, $variant, $hasSerials, $imeisList, $costBasis, $user, &$createdUnits) {
             $countToCreate = $hasSerials
                 ? count($imeisList)
                 : max(1, (int) ($validated['quantity'] ?? 1));
@@ -264,7 +269,7 @@ class InventoryController extends Controller
                         'remaining_amount' => $costBasis,
                         'due_date' => $validated['return_deadline'] ?? now()->addDays(30),
                         'status' => 'open',
-                        'notes' => ($variant->product?->name ?? 'Device') . ($imei ? " (SN: {$imei})" : ''),
+                        'notes' => ($variant->product?->name ?? 'Device').($imei ? " (SN: {$imei})" : ''),
                     ]);
 
                     Debt::applyOpenAdvancesToPayable($intakeDebt);
@@ -322,10 +327,10 @@ class InventoryController extends Controller
     {
         /** @var User $user */
         $user = $request->user();
-        if (! $user->isOwner()) {
+        if (! ($user->isOwner() || $user->canManageInventory())) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. Editing inventory unit details is restricted to store owners/administrators.',
+                'message' => 'Unauthorized. Editing inventory unit details is restricted to authorized personnel.',
             ], 403);
         }
 
@@ -381,11 +386,11 @@ class InventoryController extends Controller
             && $validated['cost_basis'] !== null
             && (float) $validated['cost_basis'] !== (float) $unit->cost_basis;
 
-        \Illuminate\Support\Facades\DB::transaction(function () use ($unit, $validated, $oldValues, $costBasisChanged) {
+        DB::transaction(function () use ($unit, $validated, $oldValues, $costBasisChanged) {
             $unit->update($validated);
 
             if ($costBasisChanged && $unit->status === 'in_stock') {
-                (new \App\Actions\SynchronizeInventoryStockAction())->execute();
+                (new SynchronizeInventoryStockAction)->execute();
             }
 
             AuditLog::record(
@@ -421,10 +426,10 @@ class InventoryController extends Controller
     {
         /** @var User $user */
         $user = $request->user();
-        if (! $user->isOwner()) {
+        if (! ($user->isOwner() || $user->canHandover())) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. Device handover and flow actions are restricted to store owners/administrators.',
+                'message' => 'Unauthorized. Device handover and flow actions are restricted to authorized personnel.',
             ], 403);
         }
 
@@ -508,7 +513,7 @@ class InventoryController extends Controller
 
         $message = "Item handed out to {$validated['handover_to']} for sale.";
         if ($debtCreated) {
-            $message .= " Receivable of " . number_format((float) $validated['handover_payout'], 2) . " ETB recorded.";
+            $message .= ' Receivable of '.number_format((float) $validated['handover_payout'], 2).' ETB recorded.';
         }
 
         return response()->json([
@@ -526,10 +531,10 @@ class InventoryController extends Controller
     {
         /** @var User $user */
         $user = $request->user();
-        if (! $user->isOwner()) {
+        if (! ($user->isOwner() || $user->canHandover() || $user->canManageInventory())) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. Restocking units is restricted to store owners/administrators.',
+                'message' => 'Unauthorized. Restocking units is restricted to authorized personnel.',
             ], 403);
         }
 
@@ -551,7 +556,7 @@ class InventoryController extends Controller
 
         $previousHandover = $unit->handover_to;
 
-        \Illuminate\Support\Facades\DB::transaction(function () use ($unit, $previousHandover) {
+        DB::transaction(function () use ($unit, $previousHandover) {
             $unit->update([
                 'status' => 'in_stock',
                 'handover_to' => null,
@@ -583,12 +588,12 @@ class InventoryController extends Controller
                         'paid_amount' => $debt->original_amount,
                         'remaining_amount' => 0.0,
                         'status' => 'settled',
-                        'notes' => ($debt->notes ? $debt->notes . ' | ' : '') . 'CANCELLED — device returned unsold by ' . ($previousHandover ?? 'vendor') . '.',
+                        'notes' => ($debt->notes ? $debt->notes.' | ' : '').'CANCELLED — device returned unsold by '.($previousHandover ?? 'vendor').'.',
                     ]);
                 }
             }
 
-            (new \App\Actions\SynchronizeInventoryStockAction())->execute();
+            (new SynchronizeInventoryStockAction)->execute();
         });
 
         $note = $previousHandover ? " (returned unsold by {$previousHandover})" : '';
@@ -619,10 +624,10 @@ class InventoryController extends Controller
     {
         /** @var User $user */
         $user = $request->user();
-        if (! $user->isOwner()) {
+        if (! ($user->isOwner() || $user->canHandover())) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. Only store owners can confirm handover device sales.',
+                'message' => 'Unauthorized. Confirming handover device sales is restricted to authorized personnel.',
             ], 403);
         }
 
@@ -649,7 +654,7 @@ class InventoryController extends Controller
             ? (float) $validated['selling_price']
             : (float) ($unit->handover_payout ?? $unit->selling_price ?? 0);
 
-        \Illuminate\Support\Facades\DB::transaction(function () use ($unit, $validated, $settlementType, $finalPrice, $user) {
+        DB::transaction(function () use ($unit, $validated, $settlementType, $finalPrice, $user) {
             $now = now();
             $vendorName = $unit->handover_to ?? 'Vendor/Broker';
 
@@ -660,11 +665,11 @@ class InventoryController extends Controller
                 ->first();
 
             if ($settlementType === 'paid') {
-                $account = \App\Models\FinancialAccount::findOrFail($validated['financial_account_id']);
+                $account = FinancialAccount::findOrFail($validated['financial_account_id']);
                 $paymentAmount = $holdingDebt ? (float) $holdingDebt->remaining_amount : $finalPrice;
 
                 if ($holdingDebt && $paymentAmount > 0) {
-                    (new \App\Actions\SettleDebtPaymentAction())->execute($holdingDebt, [
+                    (new SettleDebtPaymentAction)->execute($holdingDebt, [
                         'amount' => $paymentAmount,
                         'financial_account_id' => $account->id,
                         'payment_date' => $validated['payment_date'] ?? $now,
@@ -673,7 +678,7 @@ class InventoryController extends Controller
                     ]);
                 } elseif ($paymentAmount > 0) {
                     $account->increment('current_balance', $paymentAmount);
-                    \App\Models\FinancialTransaction::create([
+                    FinancialTransaction::create([
                         'tenant_id' => $user->tenant_id,
                         'financial_account_id' => $account->id,
                         'type' => 'income',
@@ -705,17 +710,17 @@ class InventoryController extends Controller
                         'paid_amount' => $holdingDebt->original_amount,
                         'remaining_amount' => 0.0,
                         'status' => 'settled',
-                        'notes' => ($holdingDebt->notes ? $holdingDebt->notes . ' | ' : '') . "Settled via bilateral offset with {$vendorName}.",
+                        'notes' => ($holdingDebt->notes ? $holdingDebt->notes.' | ' : '')."Settled via bilateral offset with {$vendorName}.",
                     ]);
                 }
             } elseif ($settlementType === 'credit') {
                 // Credit: Device sold to end-user, payment collection pending
                 if ($holdingDebt) {
                     $holdingDebt->update([
-                        'notes' => ($holdingDebt->notes ? $holdingDebt->notes . ' | ' : '') . "Device confirmed SOLD by {$vendorName}. Awaiting payment collection.",
+                        'notes' => ($holdingDebt->notes ? $holdingDebt->notes.' | ' : '')."Device confirmed SOLD by {$vendorName}. Awaiting payment collection.",
                     ]);
                 } else {
-                    $contact = \App\Models\Contact::where('name', 'ilike', $vendorName)->first();
+                    $contact = Contact::where('name', 'ilike', $vendorName)->first();
                     if ($contact && $finalPrice > 0) {
                         Debt::create([
                             'tenant_id' => $user->tenant_id,
@@ -735,7 +740,7 @@ class InventoryController extends Controller
             }
 
             // Permanently update unit status to 'sold'
-            $notesAppend = "Sold by {$vendorName} on " . $now->format('M d, Y') . " ({$settlementType} settlement).";
+            $notesAppend = "Sold by {$vendorName} on ".$now->format('M d, Y')." ({$settlementType} settlement).";
             if (! empty($validated['notes'])) {
                 $notesAppend .= " Note: {$validated['notes']}";
             }
@@ -754,7 +759,7 @@ class InventoryController extends Controller
                 $stock->decrement('quantity_on_hand', 1);
             }
 
-            (new \App\Actions\SynchronizeInventoryStockAction())->execute();
+            (new SynchronizeInventoryStockAction)->execute();
 
             AuditLog::record(
                 action: 'handover_marked_sold',
@@ -784,10 +789,10 @@ class InventoryController extends Controller
     {
         /** @var User $user */
         $user = $request->user();
-        if (! $user->isOwner()) {
+        if (! ($user->isOwner() || $user->canManageInventory())) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. Processing customer returns is restricted to store owners/administrators.',
+                'message' => 'Unauthorized. Processing customer returns is restricted to authorized personnel.',
             ], 403);
         }
 
@@ -858,10 +863,10 @@ class InventoryController extends Controller
     {
         /** @var User $user */
         $user = $request->user();
-        if (! $user->isOwner()) {
+        if (! ($user->isOwner() || $user->canManageInventory())) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. Repair and restock is restricted to store owners/administrators.',
+                'message' => 'Unauthorized. Repair and restock is restricted to authorized personnel.',
             ], 403);
         }
 
@@ -900,7 +905,7 @@ class InventoryController extends Controller
             if ($duplicate) {
                 $dupName = $duplicate->variant?->product?->name ?? 'another device';
                 $dupSpec = array_filter([$duplicate->variant?->color, $duplicate->variant?->storage]);
-                $dupDesc = $dupSpec ? "{$dupName} (" . implode(' ', $dupSpec) . ")" : $dupName;
+                $dupDesc = $dupSpec ? "{$dupName} (".implode(' ', $dupSpec).')' : $dupName;
 
                 return response()->json([
                     'success' => false,
@@ -938,7 +943,7 @@ class InventoryController extends Controller
             $salesOrderItem = $unit->salesOrderItem;
             if ($salesOrderItem && $salesOrderItem->salesOrder) {
                 $salesOrder = $salesOrderItem->salesOrder;
-                $orderAuditNote = "[Shop Repair " . now()->format('M d, Y H:i') . ": Repaired and delivered to customer.]";
+                $orderAuditNote = '[Shop Repair '.now()->format('M d, Y H:i').': Repaired and delivered to customer.]';
                 $salesOrder->update([
                     'notes' => $salesOrder->notes ? "{$salesOrder->notes}\n{$orderAuditNote}" : $orderAuditNote,
                 ]);
@@ -1019,10 +1024,10 @@ class InventoryController extends Controller
     {
         /** @var User $user */
         $user = $request->user();
-        if (! $user->isOwner()) {
+        if (! ($user->isOwner() || $user->canManageInventory())) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. Returning units to vendor is restricted to store owners/administrators.',
+                'message' => 'Unauthorized. Returning units to vendor is restricted to authorized personnel.',
             ], 403);
         }
 
@@ -1050,7 +1055,7 @@ class InventoryController extends Controller
         $vendorName = $unit->supplier?->name ?? 'Vendor';
         $previousStatus = $unit->status;
 
-        \Illuminate\Support\Facades\DB::transaction(function () use ($unit, $validated, $previousStatus) {
+        DB::transaction(function () use ($unit, $validated, $previousStatus) {
             $unit->update([
                 'status' => 'returned_to_vendor',
                 'returned_at' => now(),
@@ -1155,10 +1160,10 @@ class InventoryController extends Controller
     {
         /** @var User $user */
         $user = $request->user();
-        if (! $user->isOwner()) {
+        if (! ($user->isOwner() || $user->canManageInventory())) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. Only store owners can process vendor intakes.',
+                'message' => 'Unauthorized. Processing vendor intakes is restricted to authorized personnel.',
             ], 403);
         }
 
@@ -1201,7 +1206,7 @@ class InventoryController extends Controller
             if ($duplicate) {
                 $dupName = $duplicate->variant?->product?->name ?? 'another device';
                 $dupSpec = array_filter([$duplicate->variant?->color, $duplicate->variant?->storage]);
-                $dupDesc = $dupSpec ? "{$dupName} (" . implode(' ', $dupSpec) . ")" : $dupName;
+                $dupDesc = $dupSpec ? "{$dupName} (".implode(' ', $dupSpec).')' : $dupName;
 
                 return response()->json([
                     'success' => false,
@@ -1212,14 +1217,14 @@ class InventoryController extends Controller
 
         $now = now();
 
-        \Illuminate\Support\Facades\DB::transaction(function () use ($unit, $validated, $action, $now) {
+        DB::transaction(function () use ($unit, $validated, $action, $now) {
             $prevNotes = $unit->notes;
             $vendorName = $unit->supplier?->name ?? 'Vendor';
 
             if ($action === 'deliver_to_customer') {
                 $status = 'sold';
                 $location = 'With Customer';
-                $appendNote = "Received fixed from {$vendorName} and delivered back to customer on " . $now->format('M d, Y') . ".";
+                $appendNote = "Received fixed from {$vendorName} and delivered back to customer on ".$now->format('M d, Y').'.';
                 if (! empty($validated['notes'])) {
                     $appendNote .= " Note: {$validated['notes']}";
                 }
@@ -1227,7 +1232,7 @@ class InventoryController extends Controller
                 $salesOrderItem = $unit->salesOrderItem;
                 if ($salesOrderItem && $salesOrderItem->salesOrder) {
                     $salesOrder = $salesOrderItem->salesOrder;
-                    $orderAuditNote = "[Vendor Return " . $now->format('M d, Y H:i') . ": SN {$unit->imei_or_serial} repaired by {$vendorName} and delivered to customer.]";
+                    $orderAuditNote = '[Vendor Return '.$now->format('M d, Y H:i').": SN {$unit->imei_or_serial} repaired by {$vendorName} and delivered to customer.]";
                     $salesOrder->update([
                         'notes' => $salesOrder->notes ? "{$salesOrder->notes}\n{$orderAuditNote}" : $orderAuditNote,
                     ]);
@@ -1235,7 +1240,7 @@ class InventoryController extends Controller
             } else {
                 $status = 'in_stock';
                 $location = 'Shop Counter';
-                $appendNote = "Received fixed from {$vendorName} and restocked to shelf on " . $now->format('M d, Y') . ".";
+                $appendNote = "Received fixed from {$vendorName} and restocked to shelf on ".$now->format('M d, Y').'.';
                 if (! empty($validated['notes'])) {
                     $appendNote .= " Note: {$validated['notes']}";
                 }
@@ -1266,7 +1271,7 @@ class InventoryController extends Controller
 
             $unit->update($updateData);
 
-            (new \App\Actions\SynchronizeInventoryStockAction())->execute();
+            (new SynchronizeInventoryStockAction)->execute();
 
             AuditLog::record(
                 action: 'received_from_vendor',
@@ -1301,10 +1306,10 @@ class InventoryController extends Controller
     {
         /** @var User $user */
         $user = $request->user();
-        if (! $user->isOwner()) {
+        if (! ($user->isOwner() || $user->canManageInventory())) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. Only store owners can process vendor replacement swaps.',
+                'message' => 'Unauthorized. Processing vendor replacement swaps is restricted to authorized personnel.',
             ], 403);
         }
 
@@ -1352,11 +1357,11 @@ class InventoryController extends Controller
         $vendorName = $oldUnit->supplier?->name ?? 'Vendor';
         $replacementUnit = null;
 
-        \Illuminate\Support\Facades\DB::transaction(function () use ($oldUnit, $validated, $replacementImei, $action, $now, $vendorName, $user, &$replacementUnit) {
+        DB::transaction(function () use ($oldUnit, $validated, $replacementImei, $action, $now, $vendorName, $user, &$replacementUnit) {
             $newStatus = $action === 'deliver_to_customer' ? 'sold' : 'in_stock';
             $newLocation = $action === 'deliver_to_customer' ? 'With Customer' : 'Shop Counter';
 
-            $replacementNote = "Received from {$vendorName} as warranty replacement for defective SN {$oldUnit->imei_or_serial} on " . $now->format('M d, Y') . ".";
+            $replacementNote = "Received from {$vendorName} as warranty replacement for defective SN {$oldUnit->imei_or_serial} on ".$now->format('M d, Y').'.';
             if (! empty($validated['notes'])) {
                 $replacementNote .= " Note: {$validated['notes']}";
             }
@@ -1397,7 +1402,7 @@ class InventoryController extends Controller
                 ]);
 
                 if ($salesOrder) {
-                    $orderAuditNote = "[Vendor Warranty Swap " . $now->format('M d, Y H:i') . ": {$vendorName} replaced defective SN {$oldUnit->imei_or_serial} with new SN {$replacementImei}. Delivered to customer under Order #{$salesOrder->order_number}.]";
+                    $orderAuditNote = '[Vendor Warranty Swap '.$now->format('M d, Y H:i').": {$vendorName} replaced defective SN {$oldUnit->imei_or_serial} with new SN {$replacementImei}. Delivered to customer under Order #{$salesOrder->order_number}.]";
                     $salesOrder->update([
                         'notes' => $salesOrder->notes ? "{$salesOrder->notes}\n{$orderAuditNote}" : $orderAuditNote,
                     ]);
@@ -1405,7 +1410,7 @@ class InventoryController extends Controller
             }
 
             // 3. Mark old unit as permanently replaced by vendor
-            $oldUnitCloseNote = "Replaced by {$vendorName} on " . $now->format('M d, Y') . " with replacement SN {$replacementImei}.";
+            $oldUnitCloseNote = "Replaced by {$vendorName} on ".$now->format('M d, Y')." with replacement SN {$replacementImei}.";
             $oldUnit->update([
                 'customer_waiting' => false,
                 'customer_waiting_at' => null,
@@ -1414,7 +1419,7 @@ class InventoryController extends Controller
             ]);
 
             // 4. Synchronize inventory stock levels
-            (new \App\Actions\SynchronizeInventoryStockAction())->execute();
+            (new SynchronizeInventoryStockAction)->execute();
 
             // 5. Audit Log
             AuditLog::record(
@@ -1453,10 +1458,10 @@ class InventoryController extends Controller
     {
         /** @var User $user */
         $user = $request->user();
-        if (! $user->isOwner()) {
+        if (! ($user->isOwner() || $user->canManageInventory())) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. Device swaps are restricted to store owners/administrators.',
+                'message' => 'Unauthorized. Device swaps are restricted to authorized personnel.',
             ], 403);
         }
 
@@ -1510,7 +1515,7 @@ class InventoryController extends Controller
             if (! $request->boolean('allow_cost_difference')) {
                 return response()->json([
                     'success' => false,
-                    'message' => "Cost value mismatch: Defective device cost basis (" . number_format($oldCost) . " ETB) does not match replacement device cost basis (" . number_format($replacementCost) . " ETB). Swapping devices with different costs causes inventory valuation distortion.",
+                    'message' => 'Cost value mismatch: Defective device cost basis ('.number_format($oldCost).' ETB) does not match replacement device cost basis ('.number_format($replacementCost).' ETB). Swapping devices with different costs causes inventory valuation distortion.',
                 ], 422);
             }
         }
@@ -1526,7 +1531,7 @@ class InventoryController extends Controller
             // 1. Move old defective unit to repair (or in_stock)
             $oldStatus = $destination === 'in_stock' ? 'in_stock' : 'returned';
             $oldLocation = $destination === 'in_stock' ? 'Shop Counter' : 'Repair & Inspection Shelf';
-            $swapNote = "Swapped for IMEI {$newImei} on " . $now->format('M d, Y') . ". Reason: {$validated['swap_reason']}";
+            $swapNote = "Swapped for IMEI {$newImei} on ".$now->format('M d, Y').". Reason: {$validated['swap_reason']}";
 
             $oldUnit->update([
                 'status' => $oldStatus,
@@ -1542,7 +1547,7 @@ class InventoryController extends Controller
             ]);
 
             // 2. Mark replacement unit as sold
-            $replacementNote = "Issued as warranty replacement for IMEI {$oldImei} on " . $now->format('M d, Y');
+            $replacementNote = "Issued as warranty replacement for IMEI {$oldImei} on ".$now->format('M d, Y');
             $replacementUnit->update([
                 'status' => 'sold',
                 'sold_at' => $now,
@@ -1568,13 +1573,13 @@ class InventoryController extends Controller
             $salesOrderItem->update($salesOrderItemUpdate);
 
             // 4. Append audit note to SalesOrder
-            $orderAuditNote = "[Warranty Swap " . $now->format('M d, Y H:i') . ": SN {$oldImei} replaced with SN {$newImei}. Reason: {$validated['swap_reason']}]";
+            $orderAuditNote = '[Warranty Swap '.$now->format('M d, Y H:i').": SN {$oldImei} replaced with SN {$newImei}. Reason: {$validated['swap_reason']}]";
             $salesOrder->update([
                 'notes' => $salesOrder->notes ? "{$salesOrder->notes}\n{$orderAuditNote}" : $orderAuditNote,
             ]);
 
             // 5. Synchronize inventory stock levels
-            (new \App\Actions\SynchronizeInventoryStockAction())->execute();
+            (new SynchronizeInventoryStockAction)->execute();
 
             // 6. Record Audit Log
             AuditLog::record(

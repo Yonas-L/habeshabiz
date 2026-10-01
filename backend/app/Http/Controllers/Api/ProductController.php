@@ -3,8 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Category;
+use App\Models\InventoryStock;
+use App\Models\InventoryUnit;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -25,7 +29,7 @@ class ProductController extends Controller
             $cat = $request->category;
             $query->where(function ($q) use ($cat) {
                 $q->where('category', $cat)
-                  ->orWhereHas('categoryRel', fn ($cq) => $cq->where('slug', $cat));
+                    ->orWhereHas('categoryRel', fn ($cq) => $cq->where('slug', $cat));
             });
         }
 
@@ -33,7 +37,7 @@ class ProductController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'ilike', "%{$search}%")
-                  ->orWhere('brand', 'ilike', "%{$search}%");
+                    ->orWhere('brand', 'ilike', "%{$search}%");
             });
         }
 
@@ -51,12 +55,12 @@ class ProductController extends Controller
 
     public function update(Request $request, string $id): JsonResponse
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
-        if (! $user->isOwner()) {
+        if (! ($user->isOwner() || $user->canManageInventory())) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. Product catalog editing is restricted to store owners.',
+                'message' => 'Unauthorized. Product catalog editing is restricted to authorized personnel.',
             ], 403);
         }
 
@@ -72,7 +76,7 @@ class ProductController extends Controller
         ]);
 
         if (! empty($validated['category_id'])) {
-            $cat = \App\Models\Category::find($validated['category_id']);
+            $cat = Category::find($validated['category_id']);
             if ($cat) {
                 $validated['category'] = $cat->slug;
             }
@@ -89,7 +93,7 @@ class ProductController extends Controller
 
     public function destroy(Request $request, string $id): JsonResponse
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
         if (! $user->isOwner()) {
             return response()->json([
@@ -103,17 +107,17 @@ class ProductController extends Controller
 
         DB::transaction(function () use ($product, $variantIds) {
             // Archive and soft-delete any active inventory units so they no longer appear in in-stock inventory or valuation
-            \App\Models\InventoryUnit::whereIn('variant_id', $variantIds)
+            InventoryUnit::whereIn('variant_id', $variantIds)
                 ->whereIn('status', ['in_stock', 'out'])
                 ->update(['status' => 'archived']);
 
-            \App\Models\InventoryUnit::whereIn('variant_id', $variantIds)->delete();
+            InventoryUnit::whereIn('variant_id', $variantIds)->delete();
 
             // Zero out quantity on hand in stock counter
-            \App\Models\InventoryStock::whereIn('variant_id', $variantIds)->update(['quantity_on_hand' => 0]);
+            InventoryStock::whereIn('variant_id', $variantIds)->update(['quantity_on_hand' => 0]);
 
             // Soft-delete variants and product
-            \App\Models\ProductVariant::whereIn('id', $variantIds)->delete();
+            ProductVariant::whereIn('id', $variantIds)->delete();
             $product->update(['is_active' => false]);
             $product->delete();
         });
@@ -127,12 +131,12 @@ class ProductController extends Controller
 
     public function updateVariant(Request $request, string $id): JsonResponse
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
-        if (! $user->isOwner()) {
+        if (! ($user->isOwner() || $user->canManageInventory())) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. Editing product variants is restricted to store owners.',
+                'message' => 'Unauthorized. Editing product variants is restricted to authorized personnel.',
             ], 403);
         }
 
@@ -151,14 +155,14 @@ class ProductController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => "Variant updated successfully.",
+            'message' => 'Variant updated successfully.',
             'data' => $variant->fresh(['product']),
         ]);
     }
 
     public function destroyVariant(Request $request, string $id): JsonResponse
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
         if (! $user->isOwner()) {
             return response()->json([
@@ -171,14 +175,14 @@ class ProductController extends Controller
 
         DB::transaction(function () use ($variant) {
             // Archive and soft-delete any active inventory units for this variant
-            \App\Models\InventoryUnit::where('variant_id', $variant->id)
+            InventoryUnit::where('variant_id', $variant->id)
                 ->whereIn('status', ['in_stock', 'out'])
                 ->update(['status' => 'archived']);
 
-            \App\Models\InventoryUnit::where('variant_id', $variant->id)->delete();
+            InventoryUnit::where('variant_id', $variant->id)->delete();
 
             // Zero out quantity on hand
-            \App\Models\InventoryStock::where('variant_id', $variant->id)->update(['quantity_on_hand' => 0]);
+            InventoryStock::where('variant_id', $variant->id)->update(['quantity_on_hand' => 0]);
 
             // Soft-delete the variant
             $variant->delete();
@@ -186,18 +190,18 @@ class ProductController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => "Variant removed successfully. Historical records are preserved.",
+            'message' => 'Variant removed successfully. Historical records are preserved.',
         ]);
     }
 
     public function store(Request $request): JsonResponse
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
-        if (! $user->isOwner()) {
+        if (! ($user->isOwner() || $user->canIntakeStock() || $user->canManageInventory())) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. Product catalog creation is restricted to store owners/administrators.',
+                'message' => 'Unauthorized. Product catalog creation is restricted to authorized personnel.',
             ], 403);
         }
 
@@ -218,7 +222,7 @@ class ProductController extends Controller
         // Auto-resolve category slug from category_id if needed
         $categorySlug = $validated['category'] ?? 'gadgets';
         if (! empty($validated['category_id'])) {
-            $cat = \App\Models\Category::find($validated['category_id']);
+            $cat = Category::find($validated['category_id']);
             if ($cat) {
                 $categorySlug = $cat->slug;
                 if (! isset($validated['has_serials'])) {
@@ -260,12 +264,12 @@ class ProductController extends Controller
 
     public function addVariant(Request $request, string $id): JsonResponse
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
-        if (! $user->isOwner()) {
+        if (! ($user->isOwner() || $user->canIntakeStock() || $user->canManageInventory())) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. Adding product variants is restricted to store owners/administrators.',
+                'message' => 'Unauthorized. Adding product variants is restricted to authorized personnel.',
             ], 403);
         }
 

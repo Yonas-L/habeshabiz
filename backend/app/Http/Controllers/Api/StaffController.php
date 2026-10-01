@@ -104,6 +104,10 @@ class StaffController extends Controller
             'phone' => ['required', 'string', 'max:25'],
             'email' => ['nullable', 'email', 'max:100'],
             'can_discount' => ['nullable', 'boolean'],
+            'can_handover' => ['nullable', 'boolean'],
+            'can_intake_stock' => ['nullable', 'boolean'],
+            'can_view_costs' => ['nullable', 'boolean'],
+            'can_manage_inventory' => ['nullable', 'boolean'],
         ]);
 
         $tenantId = $currentUser->tenant_id ?? TenantScope::getActiveTenantId();
@@ -128,8 +132,11 @@ class StaffController extends Controller
             'password' => Hash::make($tempPassword),
             'role' => 'salesperson',
             'permissions' => [
-                'can_view_costs' => false,
+                'can_view_costs' => $request->boolean('can_view_costs', false),
                 'can_discount' => $request->boolean('can_discount', false),
+                'can_handover' => $request->boolean('can_handover', false),
+                'can_intake_stock' => $request->boolean('can_intake_stock', false),
+                'can_manage_inventory' => $request->boolean('can_manage_inventory', false),
             ],
             'is_active' => true,
         ]);
@@ -142,6 +149,7 @@ class StaffController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'phone' => $user->phone,
+                'permissions' => $user->permissions,
             ]
         );
 
@@ -153,6 +161,80 @@ class StaffController extends Controller
                 'temporary_password' => $tempPassword,
             ],
         ], 201);
+    }
+
+    /**
+     * Update an existing staff member's details and granular permissions.
+     */
+    public function update(Request $request, int $id): JsonResponse
+    {
+        /** @var User $currentUser */
+        $currentUser = $request->user();
+        if (! $currentUser->isOwner()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only business owners can update staff members.',
+            ], 403);
+        }
+
+        if ($currentUser->id === $id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot modify your own administrator permissions here.',
+            ], 422);
+        }
+
+        $staff = User::where('tenant_id', $currentUser->tenant_id)->findOrFail($id);
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:100'],
+            'phone' => ['required', 'string', 'max:25'],
+            'email' => ['nullable', 'email', 'max:100', 'unique:users,email,'.$staff->id],
+            'can_discount' => ['nullable', 'boolean'],
+            'can_handover' => ['nullable', 'boolean'],
+            'can_intake_stock' => ['nullable', 'boolean'],
+            'can_view_costs' => ['nullable', 'boolean'],
+            'can_manage_inventory' => ['nullable', 'boolean'],
+        ]);
+
+        $currentPermissions = is_array($staff->permissions) ? $staff->permissions : [];
+        $newPermissions = array_merge($currentPermissions, [
+            'can_discount' => $request->boolean('can_discount', false),
+            'can_handover' => $request->boolean('can_handover', false),
+            'can_intake_stock' => $request->boolean('can_intake_stock', false),
+            'can_view_costs' => $request->boolean('can_view_costs', false),
+            'can_manage_inventory' => $request->boolean('can_manage_inventory', false),
+        ]);
+
+        $updateData = [
+            'name' => $validated['name'],
+            'phone' => $validated['phone'],
+            'permissions' => $newPermissions,
+        ];
+
+        if (array_key_exists('email', $validated) && ! empty($validated['email'])) {
+            $updateData['email'] = $validated['email'];
+        }
+
+        $staff->update($updateData);
+
+        AuditLog::record(
+            action: 'staff_updated',
+            entityType: 'User',
+            entityId: (string) $staff->id,
+            newValues: [
+                'name' => $staff->name,
+                'phone' => $staff->phone,
+                'email' => $staff->email,
+                'permissions' => $newPermissions,
+            ]
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => "Staff member {$staff->name} updated successfully.",
+            'data' => $staff,
+        ]);
     }
 
     /**

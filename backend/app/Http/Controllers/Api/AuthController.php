@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -49,6 +50,9 @@ class AuthController extends Controller
                     'permissions' => $user->permissions ?? [],
                     'can_view_costs' => $user->canViewCosts(),
                     'can_discount' => $user->canDiscount(),
+                    'can_handover' => $user->canHandover(),
+                    'can_intake_stock' => $user->canIntakeStock(),
+                    'can_manage_inventory' => $user->canManageInventory(),
                 ],
                 'tenant' => $user->tenant ? [
                     'id' => $user->tenant->id,
@@ -80,6 +84,9 @@ class AuthController extends Controller
                     'permissions' => $user->permissions ?? [],
                     'can_view_costs' => $user->canViewCosts(),
                     'can_discount' => $user->canDiscount(),
+                    'can_handover' => $user->canHandover(),
+                    'can_intake_stock' => $user->canIntakeStock(),
+                    'can_manage_inventory' => $user->canManageInventory(),
                 ],
                 'tenant' => $user->tenant ? [
                     'id' => $user->tenant->id,
@@ -126,7 +133,7 @@ class AuthController extends Controller
             'password' => Hash::make($validated['new_password']),
         ]);
 
-        \App\Models\AuditLog::record(
+        AuditLog::record(
             action: 'password_changed',
             entityType: 'User',
             entityId: (string) $user->id,
@@ -151,7 +158,7 @@ class AuthController extends Controller
 
         $user->update($validated);
 
-        \App\Models\AuditLog::record(
+        AuditLog::record(
             action: 'profile_updated',
             entityType: 'User',
             entityId: (string) $user->id,
@@ -170,6 +177,9 @@ class AuthController extends Controller
                 'permissions' => $user->permissions ?? [],
                 'can_view_costs' => $user->canViewCosts(),
                 'can_discount' => $user->canDiscount(),
+                'can_handover' => $user->canHandover(),
+                'can_intake_stock' => $user->canIntakeStock(),
+                'can_manage_inventory' => $user->canManageInventory(),
             ],
         ]);
     }

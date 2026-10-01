@@ -30,6 +30,9 @@ export interface User {
   permissions: Record<string, boolean>;
   can_view_costs: boolean;
   can_discount: boolean;
+  can_handover?: boolean;
+  can_intake_stock?: boolean;
+  can_manage_inventory?: boolean;
 }
 
 export interface ProductVariant {
@@ -460,7 +463,14 @@ export interface StaffMember {
   phone: string | null;
   role: string;
   is_active: boolean;
-  permissions?: Record<string, boolean>;
+  permissions?: {
+    can_discount?: boolean;
+    can_handover?: boolean;
+    can_intake_stock?: boolean;
+    can_view_costs?: boolean;
+    can_manage_inventory?: boolean;
+    [key: string]: boolean | undefined;
+  };
   created_at: string;
   stats: {
     sales_count_week: number;
@@ -1225,9 +1235,36 @@ export const api = {
   // Staff Management (Owner)
   getStaff: () => request<StaffMember[]>('/staff'),
 
-  createStaff: (data: { name: string; phone: string; email?: string; can_discount?: boolean }) =>
+  createStaff: (data: {
+    name: string;
+    phone: string;
+    email?: string;
+    can_discount?: boolean;
+    can_handover?: boolean;
+    can_intake_stock?: boolean;
+    can_view_costs?: boolean;
+    can_manage_inventory?: boolean;
+  }) =>
     request<{ user: User; temporary_password: string }>('/staff', {
       method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateStaff: (
+    id: number,
+    data: {
+      name: string;
+      phone: string;
+      email?: string;
+      can_discount?: boolean;
+      can_handover?: boolean;
+      can_intake_stock?: boolean;
+      can_view_costs?: boolean;
+      can_manage_inventory?: boolean;
+    }
+  ) =>
+    request<StaffMember>(`/staff/${id}`, {
+      method: 'PUT',
       body: JSON.stringify(data),
     }),
 

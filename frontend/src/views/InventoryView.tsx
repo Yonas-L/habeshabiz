@@ -303,6 +303,10 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   };
 
   const isOwner = user?.role === 'owner';
+  const canIntake = isOwner || !!user?.can_intake_stock || !!user?.permissions?.can_intake_stock;
+  const canHandover = isOwner || !!user?.can_handover || !!user?.permissions?.can_handover;
+  const canManageInv = isOwner || !!user?.can_manage_inventory || !!user?.permissions?.can_manage_inventory;
+  const canAction = isOwner || canIntake || canManageInv;
 
   // Toggle expand / collapse for product model row in In Stock tab
   const toggleExpand = (productId: string) => {
@@ -821,17 +825,19 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           </div>
         </div>
 
-        {/* Right: Owner Action Buttons (Hidden on mobile as accessible via FAB & in-card action) */}
-        {isOwner && (
+        {/* Right: Action Buttons (Hidden on mobile as accessible via FAB & in-card action) */}
+        {(isOwner || canIntake) && (
           <div className="hidden sm:flex items-center gap-2 shrink-0 justify-end">
-            <button
-              onClick={() => setIsCategoryModalOpen(true)}
-              className="h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 active:scale-95 cursor-pointer"
-              title="Manage product categories"
-            >
-              <FolderCog className="w-4 h-4 text-slate-400 dark:text-slate-500" />
-              <span className="hidden lg:inline">Categories</span>
-            </button>
+            {isOwner && (
+              <button
+                onClick={() => setIsCategoryModalOpen(true)}
+                className="h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 active:scale-95 cursor-pointer"
+                title="Manage product categories"
+              >
+                <FolderCog className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                <span className="hidden lg:inline">Categories</span>
+              </button>
+            )}
 
             <button
               onClick={() => {
@@ -897,23 +903,23 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   <th className="py-2.5 px-3.5 whitespace-nowrap font-mono">Stock</th>
                   <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Price ETB</th>
                   {canViewCost && <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Cost ETB</th>}
-                  {isOwner && <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Action</th>}
+                  {canAction && <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Action</th>}
                   <th className="py-2.5 px-2"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-slate-700 dark:text-slate-300">
                 {loading ? (
                   <tr>
-                    <td colSpan={canViewCost ? (isOwner ? 6 : 5) : (isOwner ? 5 : 4)} className="py-8 text-center">
+                    <td colSpan={canViewCost ? (canAction ? 6 : 5) : (canAction ? 5 : 4)} className="py-8 text-center">
                       <CustomPageLoader mode="app" fullScreen={false} />
                     </td>
                   </tr>
                 ) : inStockProducts.length === 0 ? (
                   <tr>
-                    <td colSpan={canViewCost ? (isOwner ? 6 : 5) : (isOwner ? 5 : 4)} className="py-16 text-center text-slate-400">
+                    <td colSpan={canViewCost ? (canAction ? 6 : 5) : (canAction ? 5 : 4)} className="py-16 text-center text-slate-400">
                       <Package className="w-8 h-8 mx-auto mb-2 text-slate-300 dark:text-slate-600" />
                       <p className="font-semibold text-slate-600 dark:text-slate-400">No products currently in stock</p>
-                      {isOwner && (
+                      {canIntake && (
                         <p className="text-xs text-slate-400 mt-0.5">Use the "+ Add" button to receive new items into counter inventory.</p>
                       )}
                     </td>
@@ -992,29 +998,33 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                           )}
 
                           {/* Col 5: Actions */}
-                          {isOwner && (
+                          {canAction && (
                             <td className="py-2.5 px-3.5 text-right">
                               <div className="inline-flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                                <button
-                                  onClick={() => {
-                                    setIntakeInitialProductId(item.product.id);
-                                    setIntakeInitialVariantId(undefined);
-                                    setShowIntakeModal(true);
-                                  }}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-700 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors shadow-2xs active:scale-95 cursor-pointer"
-                                  title={`Add stock for ${item.product.name}`}
-                                >
-                                  <Plus className="w-3 h-3" />
-                                  <span>Add</span>
-                                </button>
-                                <button
-                                  onClick={() => setEditingProduct(item.product)}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shadow-2xs cursor-pointer"
-                                  title="Edit product"
-                                >
-                                  <Edit3 className="w-3 h-3" />
-                                  <span>Edit</span>
-                                </button>
+                                {(isOwner || canIntake) && (
+                                  <button
+                                    onClick={() => {
+                                      setIntakeInitialProductId(item.product.id);
+                                      setIntakeInitialVariantId(undefined);
+                                      setShowIntakeModal(true);
+                                    }}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-700 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors shadow-2xs active:scale-95 cursor-pointer"
+                                    title={`Add stock for ${item.product.name}`}
+                                  >
+                                    <Plus className="w-3 h-3" />
+                                    <span>Add</span>
+                                  </button>
+                                )}
+                                {(isOwner || canManageInv) && (
+                                  <button
+                                    onClick={() => setEditingProduct(item.product)}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shadow-2xs cursor-pointer"
+                                    title="Edit product"
+                                  >
+                                    <Edit3 className="w-3 h-3" />
+                                    <span>Edit</span>
+                                  </button>
+                                )}
                               </div>
                             </td>
                           )}
@@ -1111,10 +1121,10 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                               )}
 
                               {/* Col 5: Action */}
-                              {isOwner && (
+                              {(isOwner || canHandover || canManageInv) && (
                                 <td className="py-2.5 px-3.5 text-right whitespace-nowrap">
                                   <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
-                                    {unit.source_type === 'consignment' && (
+                                    {(isOwner || canManageInv) && unit.source_type === 'consignment' && (
                                       <button
                                         onClick={() => {
                                           setReturnToVendorUnit(unit);
@@ -1127,7 +1137,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                                         <span>Return</span>
                                       </button>
                                     )}
-                                    <button
+                                    {(isOwner || canHandover) && (
+                                      <button
                                       onClick={() => {
                                         setHandoverTargetUnit(unit);
                                         setHandoverTo('');
@@ -1142,6 +1153,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                                       <UserCheck className="w-3 h-3" />
                                       <span>Handover</span>
                                     </button>
+                                  )}
                                   </div>
                                 </td>
                               )}
@@ -1190,7 +1202,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                                   {vb.costBasis > 0 ? Number(vb.costBasis).toLocaleString() : '—'}
                                 </td>
                               )}
-                              {isOwner && (
+                              {(isOwner || canIntake) && (
                                 <td className="py-2.5 px-3.5 text-right">
                                   <button
                                     onClick={() => {
@@ -1333,20 +1345,20 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   <th className="py-2.5 px-3.5 whitespace-nowrap font-mono">IMEI</th>
                   <th className="py-2.5 px-3.5 text-center whitespace-nowrap">Status</th>
                   {canViewCost && <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Cost ETB</th>}
-                  {isOwner && <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Action</th>}
+                  {canAction && <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Action</th>}
                   <th className="py-2.5 px-2"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-slate-700 dark:text-slate-300">
                 {loading ? (
                   <tr>
-                    <td colSpan={canViewCost ? (isOwner ? 6 : 5) : (isOwner ? 5 : 4)} className="py-8 text-center">
+                    <td colSpan={canViewCost ? (canAction ? 6 : 5) : (canAction ? 5 : 4)} className="py-8 text-center">
                       <CustomPageLoader mode="app" fullScreen={false} />
                     </td>
                   </tr>
                 ) : units.length === 0 ? (
                   <tr>
-                    <td colSpan={canViewCost ? (isOwner ? 6 : 5) : (isOwner ? 5 : 4)} className="py-16 text-center text-slate-400">
+                    <td colSpan={canViewCost ? (canAction ? 6 : 5) : (canAction ? 5 : 4)} className="py-16 text-center text-slate-400">
                       {statusFilter === 'out'
                         ? 'No items are currently out with staff or brokers.'
                         : statusFilter === 'sold'
@@ -1518,10 +1530,10 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                         )}
 
                         {/* Contextual Action Button */}
-                        {isOwner && (
+                        {(isOwner || canHandover || canManageInv) && (
                           <td className="py-2.5 px-3.5 text-right whitespace-nowrap">
                             <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
-                              {unit.source_type === 'consignment' && unit.status === 'in_stock' && (
+                              {(isOwner || canManageInv) && unit.source_type === 'consignment' && unit.status === 'in_stock' && (
                                 <button
                                   onClick={() => {
                                     setReturnToVendorUnit(unit);
@@ -1535,7 +1547,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                                 </button>
                               )}
 
-                              {unit.status === 'in_stock' && (
+                              {(isOwner || canHandover) && unit.status === 'in_stock' && (
                                 <button
                                   onClick={() => {
                                     setHandoverTargetUnit(unit);
@@ -1553,7 +1565,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                                 </button>
                               )}
 
-                              {unit.status === 'out' && (
+                              {(isOwner || canHandover) && unit.status === 'out' && (
                                 <div className="flex items-center gap-1.5">
                                   <button
                                     onClick={() => openMarkSoldModal(unit)}
@@ -3455,8 +3467,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         </div>
       )}
 
-      {/* Scalable Stock Intake Modal, Category Management & Edit Product Modal (Owner Only) */}
-      {isOwner && (
+      {/* Scalable Stock Intake Modal, Category Management & Edit Product Modal */}
+      {(isOwner || canIntake || canManageInv) && (
         <>
           {showIntakeModal && (
             <StockIntakeModal

@@ -94,6 +94,9 @@ class OnboardingController extends Controller
                     'permissions' => $result['user']->permissions ?? [],
                     'can_view_costs' => $result['user']->canViewCosts(),
                     'can_discount' => $result['user']->canDiscount(),
+                    'can_handover' => $result['user']->canHandover(),
+                    'can_intake_stock' => $result['user']->canIntakeStock(),
+                    'can_manage_inventory' => $result['user']->canManageInventory(),
                 ],
                 'tenant' => [
                     'id' => $result['tenant']->id,
