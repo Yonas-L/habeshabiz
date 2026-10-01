@@ -130,6 +130,32 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
     return getCategoryArchetype(currentCategory?.slug, currentCategory?.name);
   }, [currentCategory]);
 
+  const productExistingStorages = useMemo(() => {
+    return Array.from(new Set(variants.map(v => v.storage).filter(Boolean) as string[]));
+  }, [variants]);
+
+  const productExistingColors = useMemo(() => {
+    return Array.from(new Set(variants.map(v => v.color).filter(Boolean) as string[]));
+  }, [variants]);
+
+  const quickPhoneStorageOptions = useMemo(() => {
+    const defaults = ['64GB', '128GB', '256GB', '512GB', '1TB', '2TB'];
+    return Array.from(new Set([...productExistingStorages, ...defaults]));
+  }, [productExistingStorages]);
+
+  const quickLaptopStorageOptions = useMemo(() => {
+    const defaults = ['256GB', '512GB', '1TB', '2TB', '4TB'];
+    return Array.from(new Set([...productExistingStorages, ...defaults]));
+  }, [productExistingStorages]);
+
+  const quickPhoneRamOptions = ['4GB', '6GB', '8GB', '12GB', '16GB'];
+  const quickLaptopRamOptions = ['8GB', '16GB', '24GB', '32GB', '64GB'];
+
+  const quickColors = useMemo(() => {
+    const defaults = ['Natural Titanium', 'Space Black', 'White Titanium', 'Black Titanium', 'Desert Titanium', 'Midnight', 'Starlight', 'Silver', 'Gold', 'Blue', 'Deep Purple'];
+    return Array.from(new Set([...productExistingColors, ...defaults]));
+  }, [productExistingColors]);
+
   const resetNewVariantInputs = () => {
     setNewStorage('');
     setNewRam('');
@@ -486,88 +512,211 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
 
                 {/* Context-aware dynamic fields */}
                 {activeArchetype === 'laptop' && (
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                        Storage
-                      </label>
-                      <input
-                        type="text"
-                        value={newStorage}
-                        onChange={(e) => setNewStorage(e.target.value)}
-                        placeholder="e.g. 512GB, 1TB"
-                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
-                      />
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                          Storage
+                        </label>
+                        <div className="flex flex-wrap gap-1 mb-1.5">
+                          {quickLaptopStorageOptions.map((st) => (
+                            <button
+                              key={st}
+                              type="button"
+                              onClick={() => setNewStorage(st)}
+                              className={`px-2 py-0.5 rounded text-[11px] font-medium transition-all ${
+                                newStorage === st
+                                  ? 'bg-emerald-600 text-white font-bold shadow-sm'
+                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                              }`}
+                            >
+                              {st}
+                            </button>
+                          ))}
+                        </div>
+                        <input
+                          type="text"
+                          value={newStorage}
+                          onChange={(e) => setNewStorage(e.target.value)}
+                          placeholder="e.g. 512GB, 1TB"
+                          className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                          RAM
+                        </label>
+                        <div className="flex flex-wrap gap-1 mb-1.5">
+                          {quickLaptopRamOptions.map((ram) => (
+                            <button
+                              key={ram}
+                              type="button"
+                              onClick={() => setNewRam(ram)}
+                              className={`px-2 py-0.5 rounded text-[11px] font-medium transition-all ${
+                                newRam === ram
+                                  ? 'bg-emerald-600 text-white font-bold shadow-sm'
+                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                              }`}
+                            >
+                              {ram}
+                            </button>
+                          ))}
+                        </div>
+                        <input
+                          type="text"
+                          value={newRam}
+                          onChange={(e) => setNewRam(e.target.value)}
+                          placeholder="e.g. 16GB, 32GB"
+                          className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                        RAM
-                      </label>
-                      <input
-                        type="text"
-                        value={newRam}
-                        onChange={(e) => setNewRam(e.target.value)}
-                        placeholder="e.g. 16GB, 32GB"
-                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                        Color
-                      </label>
-                      <input
-                        type="text"
-                        value={newColor}
-                        onChange={(e) => setNewColor(e.target.value)}
-                        placeholder="e.g. Space Black"
-                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                        Chip / CPU
-                      </label>
-                      <input
-                        type="text"
-                        value={newProcessor}
-                        onChange={(e) => setNewProcessor(e.target.value)}
-                        placeholder="e.g. M5, M5 Pro"
-                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
-                      />
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                          Color
+                        </label>
+                        <div className="flex flex-wrap gap-1 mb-1.5">
+                          {quickColors.slice(0, 6).map((col) => (
+                            <button
+                              key={col}
+                              type="button"
+                              onClick={() => setNewColor(col)}
+                              className={`px-2 py-0.5 rounded text-[10px] font-medium transition-all ${
+                                newColor === col
+                                  ? 'bg-emerald-600 text-white font-bold shadow-sm'
+                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                              }`}
+                            >
+                              {col}
+                            </button>
+                          ))}
+                        </div>
+                        <input
+                          type="text"
+                          value={newColor}
+                          onChange={(e) => setNewColor(e.target.value)}
+                          placeholder="e.g. Space Black"
+                          className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                          Chip / CPU
+                        </label>
+                        <div className="flex flex-wrap gap-1 mb-1.5">
+                          {['M3', 'M3 Pro', 'M4', 'M4 Pro', 'Core i7', 'Core i9', 'Ryzen 7'].map((chip) => (
+                            <button
+                              key={chip}
+                              type="button"
+                              onClick={() => setNewProcessor(chip)}
+                              className={`px-2 py-0.5 rounded text-[10px] font-medium transition-all ${
+                                newProcessor === chip
+                                  ? 'bg-emerald-600 text-white font-bold shadow-sm'
+                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                              }`}
+                            >
+                              {chip}
+                            </button>
+                          ))}
+                        </div>
+                        <input
+                          type="text"
+                          value={newProcessor}
+                          onChange={(e) => setNewProcessor(e.target.value)}
+                          placeholder="e.g. M4, M4 Pro"
+                          className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
+                        />
+                      </div>
                     </div>
                   </div>
                 )}
 
                 {activeArchetype === 'phone_tablet' && (
-                  <div className="grid grid-cols-3 gap-2.5">
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                        Storage
-                      </label>
-                      <input
-                        type="text"
-                        value={newStorage}
-                        onChange={(e) => setNewStorage(e.target.value)}
-                        placeholder="e.g. 128GB, 256GB"
-                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
-                      />
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                          Storage
+                        </label>
+                        <div className="flex flex-wrap gap-1 mb-1.5">
+                          {quickPhoneStorageOptions.map((st) => (
+                            <button
+                              key={st}
+                              type="button"
+                              onClick={() => setNewStorage(st)}
+                              className={`px-2 py-0.5 rounded text-[11px] font-medium transition-all ${
+                                newStorage === st
+                                  ? 'bg-emerald-600 text-white font-bold shadow-sm'
+                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                              }`}
+                            >
+                              {st}
+                            </button>
+                          ))}
+                        </div>
+                        <input
+                          type="text"
+                          value={newStorage}
+                          onChange={(e) => setNewStorage(e.target.value)}
+                          placeholder="e.g. 128GB, 256GB"
+                          className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                          RAM (Optional)
+                        </label>
+                        <div className="flex flex-wrap gap-1 mb-1.5">
+                          {quickPhoneRamOptions.map((ram) => (
+                            <button
+                              key={ram}
+                              type="button"
+                              onClick={() => setNewRam(ram)}
+                              className={`px-2 py-0.5 rounded text-[11px] font-medium transition-all ${
+                                newRam === ram
+                                  ? 'bg-emerald-600 text-white font-bold shadow-sm'
+                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                              }`}
+                            >
+                              {ram}
+                            </button>
+                          ))}
+                        </div>
+                        <input
+                          type="text"
+                          value={newRam}
+                          onChange={(e) => setNewRam(e.target.value)}
+                          placeholder="e.g. 8GB"
+                          className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                        RAM (Optional)
-                      </label>
-                      <input
-                        type="text"
-                        value={newRam}
-                        onChange={(e) => setNewRam(e.target.value)}
-                        placeholder="e.g. 8GB"
-                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
-                      />
-                    </div>
+
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
                         Color
                       </label>
+                      <div className="flex flex-wrap gap-1 mb-1.5">
+                        {quickColors.slice(0, 8).map((col) => (
+                          <button
+                            key={col}
+                            type="button"
+                            onClick={() => setNewColor(col)}
+                            className={`px-2 py-0.5 rounded text-[10px] font-medium transition-all ${
+                              newColor === col
+                                ? 'bg-emerald-600 text-white font-bold shadow-sm'
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                            }`}
+                          >
+                            {col}
+                          </button>
+                        ))}
+                      </div>
                       <input
                         type="text"
                         value={newColor}

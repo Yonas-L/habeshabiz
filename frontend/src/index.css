@@ -477,24 +477,27 @@ html.dark ::-webkit-scrollbar-thumb:hover {
     print-color-adjust: exact !important;
   }
 
-  body * {
-    visibility: hidden;
+  /*
+   * Step 1: Hide EVERYTHING in the body with display:none so it occupies
+   * zero layout space (visibility:hidden alone keeps elements in flow and
+   * causes phantom extra pages).
+   */
+  body > * {
+    display: none !important;
   }
 
-  #printable-invoice,
-  #printable-invoice *,
-  #printable-statement,
-  #printable-statement * {
-    visibility: visible;
-  }
-
-  /* Unclip modal wrappers when printing */
-  .printable-modal-backdrop {
+  /*
+   * Step 2: Re-show only the modal backdrop ancestor so the statement
+   * is reachable, but keep it as a zero-chrome pass-through wrapper.
+   */
+  body > .printable-modal-backdrop,
+  body .printable-modal-backdrop {
+    display: block !important;
     position: static !important;
     background: transparent !important;
     padding: 0 !important;
+    margin: 0 !important;
     overflow: visible !important;
-    display: block !important;
     height: auto !important;
     width: 100% !important;
     max-height: none !important;
@@ -503,6 +506,7 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   }
 
   .printable-modal-card {
+    display: block !important;
     position: static !important;
     background: #ffffff !important;
     box-shadow: none !important;
@@ -516,8 +520,14 @@ html.dark ::-webkit-scrollbar-thumb:hover {
     padding: 0 !important;
   }
 
+  /* Action bar: hide it so it never bleeds onto the printed page */
+  .no-print {
+    display: none !important;
+  }
+
   #printable-invoice,
   #printable-statement {
+    display: block !important;
     position: static !important;
     width: 100% !important;
     max-width: 100% !important;
@@ -530,10 +540,6 @@ html.dark ::-webkit-scrollbar-thumb:hover {
     border-radius: 0 !important;
     overflow: visible !important;
     box-sizing: border-box !important;
-  }
-
-  .no-print {
-    display: none !important;
   }
 
   /* Force optimal ink contrast and remove dark backgrounds in print */
