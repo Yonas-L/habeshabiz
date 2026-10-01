@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Smartphone,
   Store,
@@ -15,6 +15,9 @@ import {
   Lock,
   Phone,
   MapPin,
+  UploadCloud,
+  ImageIcon,
+  Trash2,
 } from 'lucide-react';
 import { api, type OnboardingPayload, type User as ApiUser, type Tenant as ApiTenant } from '../api/client';
 import { toast } from 'sonner';
@@ -81,12 +84,45 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSuccess, onCan
 
   // Step 2: Form fields
   const [businessName, setBusinessName] = useState('');
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
   const [ownerName, setOwnerName] = useState('');
   const [ownerPhone, setOwnerPhone] = useState('+251 9');
   const [ownerEmail, setOwnerEmail] = useState('');
   const [password, setPassword] = useState('');
   const [city, setCity] = useState('Addis Ababa');
   const [teamSize, setTeamSize] = useState('2-5');
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file (PNG, JPG, SVG, WebP)');
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Logo file size must be less than 2MB');
+      return;
+    }
+
+    setLogoFile(file);
+    const previewUrl = URL.createObjectURL(file);
+    setLogoPreview(previewUrl);
+  };
+
+  const handleRemoveLogo = () => {
+    setLogoFile(null);
+    if (logoPreview) {
+      URL.revokeObjectURL(logoPreview);
+      setLogoPreview(null);
+    }
+    if (logoInputRef.current) {
+      logoInputRef.current.value = '';
+    }
+  };
 
   // Submission state
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -152,6 +188,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSuccess, onCan
       password,
       city: city.trim() || 'Addis Ababa',
       team_size: teamSize,
+      logo: logoFile || undefined,
     };
 
     try {
@@ -257,9 +294,6 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSuccess, onCan
               <h1 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
                 Understood. We haven't saved your details.
               </h1>
-              <h2 className="text-sm font-semibold text-slate-500 dark:text-slate-400 font-sans">
-                ገባን። ዝርዝርዎን አላስቀመጥንም።
-              </h2>
             </div>
             <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
               <button
@@ -622,6 +656,68 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSuccess, onCan
                   </div>
                 </div>
 
+                {/* Business Logo (Optional) */}
+                <div className="sm:col-span-2 p-3.5 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3.5">
+                      <div className="w-12 h-12 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center justify-center shrink-0 overflow-hidden shadow-xs relative">
+                        {logoPreview ? (
+                          <img
+                            src={logoPreview}
+                            alt="Logo preview"
+                            className="w-full h-full object-contain p-1"
+                          />
+                        ) : (
+                          <div className="flex flex-col items-center justify-center text-slate-400 dark:text-slate-500">
+                            <ImageIcon className="w-5 h-5 text-slate-300 dark:text-slate-600" />
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <label className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                            Business Logo
+                          </label>
+                          <span className="text-[10px] text-slate-400 font-normal">
+                            (Optional)
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                          Featured on sales receipts, statements, and shop navigation.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
+                      <input
+                        ref={logoInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"
+                        className="hidden"
+                        onChange={handleLogoChange}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => logoInputRef.current?.click()}
+                        className="h-8 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/60 text-xs font-semibold text-slate-700 dark:text-slate-200 transition-colors cursor-pointer flex items-center gap-1.5"
+                      >
+                        <UploadCloud className="w-3.5 h-3.5 text-slate-500" />
+                        <span>{logoPreview ? 'Change' : 'Upload Logo'}</span>
+                      </button>
+                      {logoPreview && (
+                        <button
+                          type="button"
+                          onClick={handleRemoveLogo}
+                          className="h-8 px-2.5 rounded-lg border border-rose-200 dark:border-rose-900/50 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-rose-600 dark:text-rose-400 text-xs transition-colors cursor-pointer flex items-center"
+                          title="Remove logo"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
                 {/* Owner Name */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
@@ -777,8 +873,25 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSuccess, onCan
               <div className="rounded-xl border border-slate-200 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800 text-xs overflow-hidden">
                 <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50/50 dark:bg-slate-900/40">
                   <span className="text-slate-500 dark:text-slate-400 font-medium">Business</span>
-                  <span className="font-semibold text-slate-900 dark:text-white">{businessName}</span>
+                  <div className="flex items-center gap-2">
+                    {logoPreview && (
+                      <img
+                        src={logoPreview}
+                        alt="Logo"
+                        className="w-5 h-5 rounded-md object-contain border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+                      />
+                    )}
+                    <span className="font-semibold text-slate-900 dark:text-white">{businessName}</span>
+                  </div>
                 </div>
+                {logoPreview && (
+                  <div className="flex items-center justify-between px-4 py-2.5">
+                    <span className="text-slate-500 dark:text-slate-400 font-medium">Brand Logo</span>
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                      <Check className="w-3 h-3" /> Attached
+                    </span>
+                  </div>
+                )}
                 <div className="flex items-center justify-between px-4 py-2.5">
                   <span className="text-slate-500 dark:text-slate-400 font-medium">Business Vertical</span>
                   <span className="font-semibold text-emerald-700 dark:text-emerald-400">

@@ -10,6 +10,7 @@ use App\Services\TenantOnboardingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 class OnboardingController extends Controller
@@ -58,7 +59,14 @@ class OnboardingController extends Controller
             'password' => ['required', 'string', 'min:6'],
             'city' => ['required', 'string', 'max:100'],
             'team_size' => ['required', 'string'],
+            'logo' => ['nullable', 'image', 'mimes:jpeg,png,jpg,webp,svg', 'max:2048'],
+            'logo_url' => ['nullable', 'string', 'max:2048'],
         ]);
+
+        if ($request->hasFile('logo')) {
+            $path = $request->file('logo')->store('logos', 'public');
+            $validated['logo_url'] = Storage::disk('public')->url($path);
+        }
 
         $result = DB::transaction(function () use ($validated, $whitelistEntry, $email, $businessName) {
             $onboardingResult = $this->onboardingService->onboard($validated);

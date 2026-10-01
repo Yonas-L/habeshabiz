@@ -1320,8 +1320,8 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                       )}
                     </div>
 
-                    {/* Radio Cards for Existing Variants */}
-                    {selectedProduct.variants && selectedProduct.variants.length > 0 ? (
+                    {/* Radio Cards for Existing Variants — hidden while adding a new one */}
+                    {!isCreatingVariant && selectedProduct.variants && selectedProduct.variants.length > 0 ? (
                       <div
                         ref={variantListRef}
                         className="max-h-[236px] overflow-y-auto pr-1.5 overscroll-contain"
@@ -1385,38 +1385,38 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                             );
                           })}
 
-                          {/* Add New Variant Tile */}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setIsCreatingVariant(true);
-                              resetVariantInputs();
-                            }}
-                            className={`flex items-center gap-2.5 p-3 rounded-xl border border-dashed text-xs font-semibold transition-all cursor-pointer ${
-                              isCreatingVariant
-                                ? 'border-emerald-600 dark:border-emerald-500 bg-emerald-50/40 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-500/20'
-                                : 'border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-50/50 dark:hover:bg-slate-800/30'
-                            }`}
-                          >
-                            <span className="w-4 h-4 rounded-full border border-dashed border-slate-400 dark:border-slate-500 flex items-center justify-center shrink-0">
-                              <Plus className="w-2.5 h-2.5" />
-                            </span>
-                            <span className="truncate">+ New Variant (e.g. 2TB)...</span>
-                          </button>
+                          {!isCreatingVariant && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsCreatingVariant(true);
+                                resetVariantInputs();
+                              }}
+                              className="flex items-center gap-2.5 p-3 rounded-xl border border-dashed text-xs font-semibold transition-all cursor-pointer border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-50/50 dark:hover:bg-slate-800/30"
+                            >
+                              <span className="w-4 h-4 rounded-full border border-dashed border-slate-400 dark:border-slate-500 flex items-center justify-center shrink-0">
+                                <Plus className="w-2.5 h-2.5" />
+                              </span>
+                              <span className="truncate">+ New Variant (e.g. 2TB)...</span>
+                            </button>
+                          )}
                         </div>
                       </div>
-                    ) : (
+                    ) : !isCreatingVariant ? (
                       <div className="p-3.5 rounded-xl border border-dashed border-amber-300 dark:border-amber-800/60 bg-amber-50/50 dark:bg-amber-950/20 text-xs text-amber-800 dark:text-amber-300 flex items-center justify-between">
                         <span>No specifications defined yet for this model.</span>
                         <button
                           type="button"
-                          onClick={() => setIsCreatingVariant(true)}
+                          onClick={() => {
+                            setIsCreatingVariant(true);
+                            resetVariantInputs();
+                          }}
                           className="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs cursor-pointer"
                         >
                           Add Initial Variant
                         </button>
                       </div>
-                    )}
+                    ) : null}
 
                     {/* Inline New Variant Builder */}
                     {isCreatingVariant && (

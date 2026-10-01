@@ -644,6 +644,7 @@ export interface OnboardingPayload {
   password: string;
   city: string;
   team_size: string;
+  logo?: File | null;
 }
 
 export interface SettingsProfileResponse {
@@ -690,11 +691,25 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(credentials),
     }),
-  onboard: (data: OnboardingPayload) =>
-    request<{ token: string; user: User; tenant: Tenant }>('/onboard', {
+  onboard: (data: OnboardingPayload) => {
+    if (data.logo instanceof File) {
+      const formData = new FormData();
+      Object.entries(data).forEach(([key, val]) => {
+        if (val !== undefined && val !== null) {
+          formData.append(key, val);
+        }
+      });
+      return request<{ token: string; user: User; tenant: Tenant }>('/onboard', {
+        method: 'POST',
+        body: formData,
+      });
+    }
+
+    return request<{ token: string; user: User; tenant: Tenant }>('/onboard', {
       method: 'POST',
       body: JSON.stringify(data),
-    }),
+    });
+  },
   joinWaitlist: (payload: WaitlistPayload) =>
     request<{ message: string }>('/waitlist', {
       method: 'POST',

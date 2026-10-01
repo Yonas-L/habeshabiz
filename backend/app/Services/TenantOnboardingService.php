@@ -42,7 +42,7 @@ class TenantOnboardingService
                     'address' => $city,
                     'team_size' => $teamSize,
                     'tin_number' => $data['tin_number'] ?? null,
-                    'logo_url' => null,
+                    'logo_url' => $data['logo_url'] ?? null,
                     'footer_note' => 'Thank you for your business. Defect coverage valid for 7 days with intact warranty and receipt.',
                     'secondary_currencies' => ['USD'],
                     'vat_registered' => false,

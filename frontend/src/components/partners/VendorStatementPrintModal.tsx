@@ -1,7 +1,8 @@
 import React from 'react';
 import type { PartnerStatementData } from '../../api/client';
-import { Printer, X, Link, Check, ShieldCheck } from 'lucide-react';
+import { Printer, X, Link, Check, ShieldCheck, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { downloadPdf } from '../../utils/downloadPdf';
 
 interface VendorStatementPrintModalProps {
   isOpen: boolean;
@@ -37,6 +38,7 @@ export const VendorStatementPrintModal: React.FC<VendorStatementPrintModalProps>
   data,
 }) => {
   const [copiedLink, setCopiedLink] = React.useState(false);
+  const [isDownloading, setIsDownloading] = React.useState(false);
 
   if (!isOpen) return null;
 
@@ -53,14 +55,15 @@ export const VendorStatementPrintModal: React.FC<VendorStatementPrintModalProps>
   const issuedDateSlash = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
 
   const handlePrint = () => {
-    const originalTitle = document.title;
     const sanitizedContact = (contact.name || 'Partner').replace(/[^a-zA-Z0-9_-]/g, '_');
     const sanitizedRange = (range.formatted_range || 'Statement').replace(/[^a-zA-Z0-9_-]/g, '_');
-    document.title = `Statement_${sanitizedContact}_${sanitizedRange}`;
-    window.print();
-    setTimeout(() => {
-      document.title = originalTitle;
-    }, 1000);
+    const filename = `Statement_${sanitizedContact}_${sanitizedRange}`;
+    downloadPdf(
+      'printable-statement',
+      filename,
+      () => setIsDownloading(true),
+      () => setIsDownloading(false),
+    );
   };
 
   const handleCopyLink = () => {
@@ -110,11 +113,21 @@ export const VendorStatementPrintModal: React.FC<VendorStatementPrintModalProps>
             <button
               type="button"
               onClick={handlePrint}
-              className="h-8 px-3.5 rounded-md bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-[0.98]"
-              title="Print document or download as PDF"
+              disabled={isDownloading}
+              className="h-8 px-3.5 rounded-md bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
+              title="Download statement as PDF"
             >
-              <Printer className="w-3.5 h-3.5" />
-              <span>Print or Download PDF</span>
+              {isDownloading ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Generating…</span>
+                </>
+              ) : (
+                <>
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Download PDF</span>
+                </>
+              )}
             </button>
             <button
               type="button"

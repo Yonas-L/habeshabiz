@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { AccountLogo } from '../../utils/bankLogos';
 import { SwapDeviceModal } from '../inventory/SwapDeviceModal';
+import { downloadPdf } from '../../utils/downloadPdf';
 
 interface SalesOrderDrawerProps {
   order: SalesOrder | null;
@@ -55,6 +56,7 @@ export const SalesOrderDrawer: React.FC<SalesOrderDrawerProps> = ({
   const [copiedReceipt, setCopiedReceipt] = useState(false);
   const [copiedImei, setCopiedImei] = useState<string | null>(null);
   const [showInternalAudit, setShowInternalAudit] = useState(false);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
 
   // Warranty Swap state
   const [swapUnitTarget, setSwapUnitTarget] = useState<InventoryUnit | null>(null);
@@ -314,7 +316,13 @@ Thank you for choosing Habeshabiz Electronics!
   };
 
   const handlePrint = () => {
-    window.print();
+    const filename = `Invoice_${order.order_number}`;
+    downloadPdf(
+      'printable-invoice',
+      filename,
+      () => setIsDownloadingPdf(true),
+      () => setIsDownloadingPdf(false),
+    );
   };
 
   return (
@@ -348,10 +356,11 @@ Thank you for choosing Habeshabiz Electronics!
             </button>
             <button
               onClick={handlePrint}
-              title="Print Official Slip"
-              className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              disabled={isDownloadingPdf}
+              title="Download invoice as PDF"
+              className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50"
             >
-              <Printer className="w-4 h-4" />
+              {isDownloadingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
             </button>
           </div>
         }
@@ -426,10 +435,11 @@ Thank you for choosing Habeshabiz Electronics!
                 <button
                   type="button"
                   onClick={handlePrint}
-                  className="h-9 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs flex items-center gap-1.5 active:scale-95 cursor-pointer shrink-0"
+                  disabled={isDownloadingPdf}
+                  className="h-9 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs flex items-center gap-1.5 active:scale-95 cursor-pointer shrink-0 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>Print Slip</span>
+                  {isDownloadingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Printer className="w-3.5 h-3.5" />}
+                  <span>{isDownloadingPdf ? 'Generating…' : 'Download PDF'}</span>
                 </button>
               </div>
             </div>

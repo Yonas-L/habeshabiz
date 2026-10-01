@@ -499,19 +499,40 @@ html.dark ::-webkit-scrollbar-thumb:hover {
     visibility: visible !important;
   }
 
-  /* Collapse the backdrop's own fixed/overflow chrome */
+  /* Collapse the backdrop's own fixed/overflow chrome — zero out ALL
+   * spacing so it contributes no height above or below the content */
   .printable-modal-backdrop {
     position: static !important;
+    display: block !important;
     background: transparent !important;
     padding: 0 !important;
     margin: 0 !important;
     overflow: visible !important;
     height: auto !important;
+    min-height: 0 !important;
     width: 100% !important;
     max-height: none !important;
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
+    /* Reset flex/grid layout so no implicit spacing is added */
     display: block !important;
+    align-items: unset !important;
+    justify-content: unset !important;
+    gap: 0 !important;
+  }
+
+  /* Zero out every ancestor between body and the printable-modal-backdrop
+   * so they contribute zero height (visibility:hidden keeps them in flow
+   * but we still need to strip their padding/margin/min-height) */
+  body > *,
+  body > * > *,
+  body > * > * > *,
+  body > * > * > * > * {
+    padding: 0 !important;
+    margin: 0 !important;
+    min-height: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
   }
 
   /*
@@ -539,6 +560,9 @@ html.dark ::-webkit-scrollbar-thumb:hover {
     border-radius: 0 !important;
     margin: 0 !important;
     padding: 0 !important;
+    /* Kill flex-child auto margins (my-auto, relative centering) */
+    flex: none !important;
+    align-self: auto !important;
   }
 
   /* Reset the aside and its inner scroll wrapper inside SlideOverDrawer */
