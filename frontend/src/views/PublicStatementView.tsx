@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { PartnerStatementData } from '../api/client';
-import { api } from '../api/client';
+import { api, resolveImageUrl } from '../api/client';
 import { CustomPageLoader } from '../components/loading/CustomPageLoader';
 import {
   Printer,
@@ -135,7 +135,7 @@ export const PublicStatementView: React.FC<PublicStatementViewProps> = ({ token 
             <div className="flex items-start gap-5">
               {business.logo_url ? (
                 <img
-                  src={business.logo_url}
+                  src={resolveImageUrl(business.logo_url) || business.logo_url}
                   alt={business.name}
                   className="h-20 sm:h-24 w-auto max-w-[280px] object-contain rounded-2xl shadow-xs shrink-0"
                 />

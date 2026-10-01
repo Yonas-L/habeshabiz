@@ -75,15 +75,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return (words[0][0] + words[1][0]).toUpperCase();
   }, [tenant?.name]);
 
+  const rawLogoUrl = tenant?.settings?.logo_url || (tenant as any)?.logo_url || null;
+
   const [logoLoadFailed, setLogoLoadFailed] = React.useState(false);
 
   React.useEffect(() => {
     setLogoLoadFailed(false);
-  }, [tenant?.settings?.logo_url]);
+  }, [rawLogoUrl]);
 
   const resolvedLogoUrl = React.useMemo(() => {
-    return resolveImageUrl(tenant?.settings?.logo_url);
-  }, [tenant?.settings?.logo_url]);
+    return resolveImageUrl(rawLogoUrl);
+  }, [rawLogoUrl]);
 
   const mainNav: {
     id: NavTab;
@@ -122,12 +124,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Brand Header */}
         <div className="px-2 py-2.5 flex items-center justify-between gap-2.5 border-b border-slate-100 dark:border-slate-800/80">
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
-            <div className="w-9 h-9 rounded-xl bg-slate-900 dark:bg-slate-800 border border-slate-700/30 text-white flex items-center justify-center font-bold text-xs tracking-tight shrink-0 shadow-xs overflow-hidden">
+            <div
+              className={`w-10 h-10 aspect-square rounded-full shrink-0 flex items-center justify-center overflow-hidden border shadow-xs transition-colors ${
+                resolvedLogoUrl && !logoLoadFailed
+                  ? 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700/80 p-0.5'
+                  : 'bg-gradient-to-br from-slate-900 to-slate-800 dark:from-slate-800 dark:to-slate-700 border-slate-700/30 text-white font-bold text-xs tracking-tight'
+              }`}
+            >
               {resolvedLogoUrl && !logoLoadFailed ? (
                 <img
                   src={resolvedLogoUrl}
                   alt={tenant?.name || 'Business Logo'}
-                  className="w-full h-full object-contain p-0.5"
+                  className="w-full h-full object-contain rounded-full"
                   onError={() => setLogoLoadFailed(true)}
                 />
               ) : (
@@ -373,12 +381,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="pt-[calc(1.1rem+env(safe-area-inset-top,0px))] px-4 pb-3.5 border-b border-slate-100 dark:border-slate-800/80 shrink-0">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5 min-w-0 flex-1">
-              <div className="w-10 h-10 rounded-2xl bg-slate-900 dark:bg-slate-800 border border-slate-700/40 text-white flex items-center justify-center font-black text-xs tracking-tight shrink-0 shadow-xs overflow-hidden">
+              <div
+                className={`w-10 h-10 aspect-square rounded-full shrink-0 flex items-center justify-center overflow-hidden border shadow-xs transition-colors ${
+                  resolvedLogoUrl && !logoLoadFailed
+                    ? 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700/80 p-0.5'
+                    : 'bg-gradient-to-br from-slate-900 to-slate-800 dark:from-slate-800 dark:to-slate-700 border-slate-700/40 text-white font-black text-xs tracking-tight'
+                }`}
+              >
                 {resolvedLogoUrl && !logoLoadFailed ? (
                   <img
                     src={resolvedLogoUrl}
                     alt={tenant?.name || 'Business Logo'}
-                    className="w-full h-full object-contain p-0.5"
+                    className="w-full h-full object-contain rounded-full"
                     onError={() => setLogoLoadFailed(true)}
                   />
                 ) : (

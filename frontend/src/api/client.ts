@@ -562,14 +562,24 @@ export function removeAuthToken(): void {
 
 export function resolveImageUrl(url: string | null | undefined): string | null {
   if (!url) return null;
-  if (url.startsWith('data:') || url.startsWith('blob:')) return url;
-  if (url.startsWith('http://') || url.startsWith('https://')) return url;
-  const storageIndex = url.indexOf('/storage/');
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith('data:') || trimmed.startsWith('blob:')) return trimmed;
+
+  const storageIndex = trimmed.indexOf('/storage/');
   if (storageIndex !== -1) {
-    const path = url.slice(storageIndex);
+    const path = trimmed.slice(storageIndex);
     return RAW_API_URL ? `${RAW_API_URL}${path}` : path;
   }
-  return RAW_API_URL ? `${RAW_API_URL}${url.startsWith('/') ? '' : '/'}${url}` : url;
+
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    if (typeof window !== 'undefined' && window.location.protocol === 'https:' && trimmed.startsWith('http://')) {
+      return trimmed.replace(/^http:\/\//i, 'https://');
+    }
+    return trimmed;
+  }
+
+  return RAW_API_URL ? `${RAW_API_URL}${trimmed.startsWith('/') ? '' : '/'}${trimmed}` : trimmed;
 }
 
 export class ApiError extends Error {

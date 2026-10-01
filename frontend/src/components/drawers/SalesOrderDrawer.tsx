@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import type { SalesOrder, User, FinancialAccount, InventoryUnit, Tenant } from '../../api/client';
-import { api } from '../../api/client';
+import { api, resolveImageUrl } from '../../api/client';
 import { SlideOverDrawer } from './SlideOverDrawer';
 import { toast } from 'sonner';
 import {
@@ -528,7 +528,7 @@ Thank you for choosing Habeshabiz Electronics!
           <div className="flex items-center gap-3">
             {tenant?.settings?.logo_url && (
               <img
-                src={tenant.settings.logo_url}
+                src={resolveImageUrl(tenant.settings.logo_url) || tenant.settings.logo_url}
                 alt={tenant.name}
                 className="w-10 h-10 object-contain rounded-lg border border-slate-200 dark:border-slate-700 p-0.5"
               />

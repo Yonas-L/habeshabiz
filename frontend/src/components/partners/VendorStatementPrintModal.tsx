@@ -1,5 +1,6 @@
 import React from 'react';
 import type { PartnerStatementData } from '../../api/client';
+import { resolveImageUrl } from '../../api/client';
 import { Printer, X, Link, Check, ShieldCheck, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { downloadPdf } from '../../utils/downloadPdf';
@@ -146,7 +147,7 @@ export const VendorStatementPrintModal: React.FC<VendorStatementPrintModalProps>
             <div className="flex items-start gap-3.5">
               {business.logo_url ? (
                 <img
-                  src={business.logo_url}
+                  src={resolveImageUrl(business.logo_url) || business.logo_url}
                   alt={business.name}
                   className="h-16 sm:h-20 w-auto max-w-[240px] object-contain rounded-2xl shrink-0"
                 />
