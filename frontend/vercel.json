@@ -1,6 +1,14 @@
 {
   "rewrites": [
     {
+      "source": "/storage/:path*",
+      "destination": "https://habeshabiz-backend.onrender.com/storage/:path*"
+    },
+    {
+      "source": "/api/:path*",
+      "destination": "https://habeshabiz-backend.onrender.com/api/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

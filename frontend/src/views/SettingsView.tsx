@@ -76,8 +76,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           setTinNumber(res.tenant.tin_number || '');
           setFooterNote(res.tenant.footer_note || '');
           setCurrencyCode(res.tenant.currency_code || 'ETB');
-          setSecondaryCurrencies(res.tenant.secondary_currencies || ['USD']);
-          setLogoUrl(res.tenant.logo_url || null);
+          const cleanLogo = resolveImageUrl(res.tenant.logo_url) || res.tenant.logo_url || null;
+          setLogoUrl(cleanLogo);
 
           if (tenant && user) {
             const updatedTenant: Tenant = {
@@ -92,7 +92,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 tin_number: res.tenant.tin_number,
                 footer_note: res.tenant.footer_note,
                 secondary_currencies: res.tenant.secondary_currencies,
-                logo_url: res.tenant.logo_url,
+                logo_url: cleanLogo,
               },
             };
             onProfileUpdated(updatedTenant, user);
@@ -150,7 +150,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             tin_number: res.tenant.tin_number,
             footer_note: res.tenant.footer_note,
             secondary_currencies: res.tenant.secondary_currencies,
-            logo_url: res.tenant.logo_url,
+            logo_url: resolveImageUrl(res.tenant.logo_url) || res.tenant.logo_url,
           },
         };
 
@@ -186,7 +186,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     try {
       setIsUploadingLogo(true);
       const res = await api.uploadBusinessLogo(file);
-      setLogoUrl(res.logo_url);
+      const cleanLogoUrl = resolveImageUrl(res.logo_url) || res.logo_url;
+      setLogoUrl(cleanLogoUrl);
       toast.success('Business logo uploaded');
 
       if (tenant && user) {
@@ -194,7 +195,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           ...tenant,
           settings: {
             ...tenant.settings,
-            logo_url: res.logo_url,
+            logo_url: cleanLogoUrl,
           },
         };
         onProfileUpdated(updatedTenant, user);

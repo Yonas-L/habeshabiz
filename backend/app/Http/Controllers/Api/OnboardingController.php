@@ -65,7 +65,7 @@ class OnboardingController extends Controller
 
         if ($request->hasFile('logo')) {
             $path = $request->file('logo')->store('logos', 'public');
-            $validated['logo_url'] = Storage::disk('public')->url($path);
+            $validated['logo_url'] = Tenant::normalizeStorageUrl('/storage/' . $path);
         }
 
         $result = DB::transaction(function () use ($validated, $whitelistEntry, $email, $businessName) {

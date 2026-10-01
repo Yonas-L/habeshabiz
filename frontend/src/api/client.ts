@@ -545,7 +545,15 @@ export interface StaffTask {
   created_at: string;
 }
 
-const RAW_API_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+const DEFAULT_BACKEND_URL = 'https://habeshabiz-backend.onrender.com';
+
+const RAW_API_URL = (
+  import.meta.env.VITE_API_URL ||
+  (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? ''
+    : DEFAULT_BACKEND_URL)
+).replace(/\/$/, '');
+
 const API_BASE = RAW_API_URL ? `${RAW_API_URL}/api/v1` : '/api/v1';
 
 export function getAuthToken(): string | null {
@@ -566,20 +574,30 @@ export function resolveImageUrl(url: string | null | undefined): string | null {
   if (!trimmed) return null;
   if (trimmed.startsWith('data:') || trimmed.startsWith('blob:')) return trimmed;
 
+  const backendOrigin =
+    RAW_API_URL ||
+    (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+      ? ''
+      : DEFAULT_BACKEND_URL);
+
   const storageIndex = trimmed.indexOf('/storage/');
   if (storageIndex !== -1) {
     const path = trimmed.slice(storageIndex);
-    return RAW_API_URL ? `${RAW_API_URL}${path}` : path;
+    return backendOrigin ? `${backendOrigin}${path}` : path;
   }
 
   if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    if (trimmed.includes('localhost') || trimmed.includes('127.0.0.1')) {
+      const cleanPath = trimmed.replace(/^https?:\/\/[^\/]+/, '');
+      return backendOrigin ? `${backendOrigin}${cleanPath}` : cleanPath;
+    }
     if (typeof window !== 'undefined' && window.location.protocol === 'https:' && trimmed.startsWith('http://')) {
       return trimmed.replace(/^http:\/\//i, 'https://');
     }
     return trimmed;
   }
 
-  return RAW_API_URL ? `${RAW_API_URL}${trimmed.startsWith('/') ? '' : '/'}${trimmed}` : trimmed;
+  return backendOrigin ? `${backendOrigin}${trimmed.startsWith('/') ? '' : '/'}${trimmed}` : trimmed;
 }
 
 export class ApiError extends Error {

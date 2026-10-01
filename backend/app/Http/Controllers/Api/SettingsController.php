@@ -199,7 +199,7 @@ class SettingsController extends Controller
         $tenant = $user->tenant;
 
         $path = $request->file('logo')->store('logos', 'public');
-        $url = Storage::disk('public')->url($path);
+        $url = Tenant::normalizeStorageUrl('/storage/' . $path);
 
         $settings = $tenant->settings ?? [];
         $settings['logo_url'] = $url;
