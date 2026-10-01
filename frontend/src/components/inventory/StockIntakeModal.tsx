@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import type { ProductCategory, Product, Contact, ProductVariant } from '../../api/client';
 import { api } from '../../api/client';
@@ -86,6 +86,7 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [selectedProductId, setSelectedProductId] = useState<string>('');
   const [selectedVariantId, setSelectedVariantId] = useState<string>('');
+  const variantListRef = useRef<HTMLDivElement>(null);
 
   // Local products state to dynamically update when new models/variants are created
   const [localProducts, setLocalProducts] = useState<Product[]>(products);
@@ -334,6 +335,16 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
       setSellingPrice(formatCurrencyInput(v.default_selling_price));
     }
   };
+
+  // Smoothly scroll selected variant into view inside the fixed-height list
+  useEffect(() => {
+    if (selectedVariantId && variantListRef.current) {
+      const el = variantListRef.current.querySelector<HTMLElement>(`[data-variant-id="${selectedVariantId}"]`);
+      if (el) {
+        el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    }
+  }, [selectedVariantId]);
 
   const resetVariantInputs = () => {
     setVariantStorage('');
@@ -1311,82 +1322,88 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
 
                     {/* Radio Cards for Existing Variants */}
                     {selectedProduct.variants && selectedProduct.variants.length > 0 ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                        {selectedProduct.variants.map((v) => {
-                          const isSelected = selectedVariantId === v.id && !isCreatingVariant;
-                          const specValues = v.specs ? Object.values(v.specs).map(String) : [];
-                          const specLabel = [v.ram ? `${v.ram} RAM` : null, ...specValues].filter(Boolean).join(' • ');
+                      <div
+                        ref={variantListRef}
+                        className="max-h-[236px] overflow-y-auto pr-1.5 overscroll-contain"
+                      >
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-0.5">
+                          {selectedProduct.variants.map((v) => {
+                            const isSelected = selectedVariantId === v.id && !isCreatingVariant;
+                            const specValues = v.specs ? Object.values(v.specs).map(String) : [];
+                            const specLabel = [v.ram ? `${v.ram} RAM` : null, ...specValues].filter(Boolean).join(' • ');
 
-                          return (
-                            <button
-                              type="button"
-                              key={v.id}
-                              onClick={() => {
-                                setIsCreatingVariant(false);
-                                handleVariantChange(v.id);
-                              }}
-                              className={`relative text-left flex items-center justify-between p-3 rounded-xl border text-xs cursor-pointer transition-all ${
-                                isSelected
-                                  ? 'border-emerald-600 dark:border-emerald-500 bg-emerald-50/70 dark:bg-emerald-950/30 ring-1 ring-emerald-600/30 dark:ring-emerald-500/30 shadow-xs'
-                                  : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50/60 dark:hover:bg-slate-800/40'
-                              }`}
-                            >
-                              <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                                <span
-                                  className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
-                                    isSelected
-                                      ? 'border-emerald-600 bg-emerald-600 dark:border-emerald-500 dark:bg-emerald-500'
-                                      : 'border-slate-300 dark:border-slate-600 bg-transparent'
-                                  }`}
-                                >
-                                  {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
-                                </span>
-                                <div className="min-w-0">
-                                  <div className="font-bold text-slate-900 dark:text-white truncate flex items-center gap-1.5">
-                                    <span>{v.storage || 'Standard'}</span>
-                                    {v.color && (
-                                      <span className="text-[10px] font-normal text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 truncate">
-                                        {v.color}
-                                      </span>
+                            return (
+                              <button
+                                type="button"
+                                key={v.id}
+                                data-variant-id={v.id}
+                                onClick={() => {
+                                  setIsCreatingVariant(false);
+                                  handleVariantChange(v.id);
+                                }}
+                                className={`relative text-left flex items-center justify-between p-3 rounded-xl border text-xs cursor-pointer transition-all ${
+                                  isSelected
+                                    ? 'border-emerald-600 dark:border-emerald-500 bg-emerald-50/70 dark:bg-emerald-950/30 ring-1 ring-emerald-600/30 dark:ring-emerald-500/30 shadow-xs'
+                                    : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50/60 dark:hover:bg-slate-800/40'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                                  <span
+                                    className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
+                                      isSelected
+                                        ? 'border-emerald-600 bg-emerald-600 dark:border-emerald-500 dark:bg-emerald-500'
+                                        : 'border-slate-300 dark:border-slate-600 bg-transparent'
+                                    }`}
+                                  >
+                                    {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+                                  </span>
+                                  <div className="min-w-0">
+                                    <div className="font-bold text-slate-900 dark:text-white truncate flex items-center gap-1.5">
+                                      <span>{v.storage || 'Standard'}</span>
+                                      {v.color && (
+                                        <span className="text-[10px] font-normal text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 truncate">
+                                          {v.color}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {specLabel && (
+                                      <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
+                                        {specLabel}
+                                      </div>
                                     )}
                                   </div>
-                                  {specLabel && (
-                                    <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
-                                      {specLabel}
-                                    </div>
-                                  )}
                                 </div>
-                              </div>
-                              {v.default_selling_price && (
-                                <div className="text-right shrink-0">
-                                  <span className="text-[10px] font-mono font-bold text-slate-700 dark:text-slate-300 block">
-                                    {Number(v.default_selling_price).toLocaleString()}
-                                  </span>
-                                  <span className="text-[8px] text-slate-400 uppercase">ETB</span>
-                                </div>
-                              )}
-                            </button>
-                          );
-                        })}
+                                {v.default_selling_price && (
+                                  <div className="text-right shrink-0">
+                                    <span className="text-[10px] font-mono font-bold text-slate-700 dark:text-slate-300 block">
+                                      {Number(v.default_selling_price).toLocaleString()}
+                                    </span>
+                                    <span className="text-[8px] text-slate-400 uppercase">ETB</span>
+                                  </div>
+                                )}
+                              </button>
+                            );
+                          })}
 
-                        {/* Add New Variant Tile */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsCreatingVariant(true);
-                            resetVariantInputs();
-                          }}
-                          className={`flex items-center gap-2.5 p-3 rounded-xl border border-dashed text-xs font-semibold transition-all cursor-pointer ${
-                            isCreatingVariant
-                              ? 'border-emerald-600 dark:border-emerald-500 bg-emerald-50/40 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-500/20'
-                              : 'border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-50/50 dark:hover:bg-slate-800/30'
-                          }`}
-                        >
-                          <span className="w-4 h-4 rounded-full border border-dashed border-slate-400 dark:border-slate-500 flex items-center justify-center shrink-0">
-                            <Plus className="w-2.5 h-2.5" />
-                          </span>
-                          <span className="truncate">+ New Variant (e.g. 2TB)...</span>
-                        </button>
+                          {/* Add New Variant Tile */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsCreatingVariant(true);
+                              resetVariantInputs();
+                            }}
+                            className={`flex items-center gap-2.5 p-3 rounded-xl border border-dashed text-xs font-semibold transition-all cursor-pointer ${
+                              isCreatingVariant
+                                ? 'border-emerald-600 dark:border-emerald-500 bg-emerald-50/40 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-500/20'
+                                : 'border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-50/50 dark:hover:bg-slate-800/30'
+                            }`}
+                          >
+                            <span className="w-4 h-4 rounded-full border border-dashed border-slate-400 dark:border-slate-500 flex items-center justify-center shrink-0">
+                              <Plus className="w-2.5 h-2.5" />
+                            </span>
+                            <span className="truncate">+ New Variant (e.g. 2TB)...</span>
+                          </button>
+                        </div>
                       </div>
                     ) : (
                       <div className="p-3.5 rounded-xl border border-dashed border-amber-300 dark:border-amber-800/60 bg-amber-50/50 dark:bg-amber-950/20 text-xs text-amber-800 dark:text-amber-300 flex items-center justify-between">
