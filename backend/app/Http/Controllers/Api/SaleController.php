@@ -36,10 +36,10 @@ class SaleController extends Controller
         /** @var User|null $user */
         $user = $request->user();
         $isOwner = $user ? $user->isOwner() : false;
-        $canViewCost = $user ? $user->canViewCosts() : false;
+        $canViewCost = $user ? ($user->isOwner() || $user->canViewCosts()) : false;
 
-        // Salespeople only see and track what they sold or was sold on their behalf
-        if (! $isOwner && $user) {
+        // Salespeople only see what they sold unless they have store inventory/return management privileges
+        if (! $isOwner && $user && ! $user->canManageInventory()) {
             $query->where('salesperson_id', $user->id);
         }
 
@@ -77,7 +77,7 @@ class SaleController extends Controller
 
         // Base counts query scoped to user role permissions
         $countsQuery = SalesOrder::query();
-        if (! $isOwner && $user) {
+        if (! $isOwner && $user && ! $user->canManageInventory()) {
             $countsQuery->where('salesperson_id', $user->id);
         }
 

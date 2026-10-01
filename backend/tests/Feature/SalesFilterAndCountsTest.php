@@ -1,12 +1,10 @@
 <?php
 
-use App\Models\Contact;
 use App\Models\FinancialAccount;
 use App\Models\InventoryUnit;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\SalesOrder;
-use App\Models\SalesOrderItem;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Scopes\TenantScope;
@@ -201,4 +199,32 @@ test('salesperson receives tab counts scoped to their own sales', function () {
         'exchange' => 0,
     ]);
     expect(count($data['data']))->toBe(2);
+});
+
+test('salesperson with can_manage_inventory privilege can see all store sales for returns', function () {
+    $inventoryStaff = User::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Kebede Returns Manager',
+        'email' => 'kebede_returns@example.com',
+        'password' => Hash::make('password'),
+        'role' => 'salesperson',
+        'permissions' => [
+            'can_manage_inventory' => true,
+        ],
+    ]);
+
+    $response = $this->actingAs($inventoryStaff)
+        ->getJson('/api/v1/sales');
+
+    $response->assertOk();
+    $data = $response->json();
+
+    // Kebede can see all 4 orders across the store to process returns and warranty swaps
+    expect($data['counts'])->toBe([
+        'all' => 4,
+        'paid' => 2,
+        'credit' => 2,
+        'exchange' => 1,
+    ]);
+    expect(count($data['data']))->toBe(4);
 });

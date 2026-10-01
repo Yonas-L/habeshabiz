@@ -34,6 +34,8 @@ interface SalesOrderDrawerProps {
   tenant?: Tenant | null;
   accounts?: FinancialAccount[];
   onPaymentCollected?: (updatedOrder: SalesOrder) => void;
+  onInitiateReturn?: (order: SalesOrder) => void;
+  onInitiateSwap?: (order: SalesOrder) => void;
 }
 
 export const SalesOrderDrawer: React.FC<SalesOrderDrawerProps> = ({
@@ -44,6 +46,8 @@ export const SalesOrderDrawer: React.FC<SalesOrderDrawerProps> = ({
   tenant,
   accounts,
   onPaymentCollected,
+  onInitiateReturn,
+  onInitiateSwap,
 }) => {
   const [order, setOrder] = useState<SalesOrder | null>(initialOrder);
   const [internalAccounts, setInternalAccounts] = useState<FinancialAccount[]>(accounts || []);
@@ -88,6 +92,7 @@ export const SalesOrderDrawer: React.FC<SalesOrderDrawerProps> = ({
   }, [accounts, isOpen]);
 
   const isOwner = user?.role === 'owner';
+  const canManageInv = isOwner || !!user?.can_manage_inventory || !!user?.permissions?.can_manage_inventory;
 
   const swappableUnits = useMemo(() => {
     if (!order) return [];
@@ -374,11 +379,27 @@ Thank you for choosing Habeshabiz Electronics!
               </div>
 
               <div className="flex items-center gap-2">
-                {isOwner && swappableUnits.length > 0 && (
+                {canManageInv && swappableUnits.length > 0 && onInitiateReturn && (
                   <button
                     type="button"
                     onClick={() => {
-                      if (swappableUnits.length === 1) {
+                      if (order) onInitiateReturn(order);
+                    }}
+                    className="h-9 px-3.5 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/60 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 border border-rose-200/60 dark:border-rose-800/60 text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 active:scale-95 cursor-pointer shrink-0"
+                    title="Process customer return"
+                  >
+                    <Undo2 className="w-3.5 h-3.5" />
+                    <span>Return</span>
+                  </button>
+                )}
+
+                {canManageInv && swappableUnits.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onInitiateSwap && order) {
+                        onInitiateSwap(order);
+                      } else if (swappableUnits.length === 1) {
                         setSwapUnitTarget(swappableUnits[0]);
                       } else {
                         setShowMultiSwapPicker(true);
@@ -440,11 +461,27 @@ Thank you for choosing Habeshabiz Electronics!
                   <span className="truncate">{copiedReceipt ? 'Copied' : 'Share Receipt'}</span>
                 </button>
 
-                {isOwner && swappableUnits.length > 0 && (
+                {canManageInv && swappableUnits.length > 0 && onInitiateReturn && (
                   <button
                     type="button"
                     onClick={() => {
-                      if (swappableUnits.length === 1) {
+                      if (order) onInitiateReturn(order);
+                    }}
+                    className="flex-1 h-9 px-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/60 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 border border-rose-200/60 dark:border-rose-800/60 text-xs font-bold transition-all shadow-2xs flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
+                    title="Process customer return"
+                  >
+                    <Undo2 className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">Return</span>
+                  </button>
+                )}
+
+                {canManageInv && swappableUnits.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onInitiateSwap && order) {
+                        onInitiateSwap(order);
+                      } else if (swappableUnits.length === 1) {
                         setSwapUnitTarget(swappableUnits[0]);
                       } else {
                         setShowMultiSwapPicker(true);

@@ -50,6 +50,7 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
 
   // Customer Return Modal State (matching stock sold page)
   const isOwner = user?.role === 'owner';
+  const canManageInv = isOwner || !!user?.can_manage_inventory || !!user?.permissions?.can_manage_inventory;
   const [returnTargetUnit, setReturnTargetUnit] = useState<InventoryUnit | null>(null);
   const [returnReason, setReturnReason] = useState('');
   const [returnCondition, setReturnCondition] = useState('inspection_needed');
@@ -175,7 +176,7 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
     }
   };
 
-  const canViewCost = user?.can_view_costs ?? false;
+  const canViewCost = isOwner || !!user?.can_view_costs || !!user?.permissions?.can_view_costs;
 
   const totalVolume = sales.reduce((sum, s) => {
     const gross = parseFloat(String(s.total_amount)) || 0;
@@ -352,20 +353,20 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
                 <th className="py-2.5 px-3.5 whitespace-nowrap font-mono">IMEI</th>
                 <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Total</th>
                 <th className="py-2.5 px-3.5 text-center whitespace-nowrap">Status</th>
-                {isOwner && <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Action</th>}
+                {canManageInv && <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Action</th>}
                 <th className="py-2.5 px-2"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-slate-700 dark:text-slate-300">
               {loading ? (
                 <tr>
-                  <td colSpan={isOwner ? 8 : 7} className="py-8 text-center">
+                  <td colSpan={canManageInv ? 8 : 7} className="py-8 text-center">
                     <CustomPageLoader mode="app" fullScreen={false} />
                   </td>
                 </tr>
               ) : sales.length === 0 ? (
                 <tr>
-                  <td colSpan={isOwner ? 8 : 7} className="py-16 text-center text-slate-400">
+                  <td colSpan={canManageInv ? 8 : 7} className="py-16 text-center text-slate-400">
                     <Receipt className="w-8 h-8 mx-auto mb-2 text-slate-300 dark:text-slate-600" />
                     <p className="font-semibold text-slate-600 dark:text-slate-400">No sales found</p>
                     <p className="text-xs text-slate-400 mt-0.5">Completed checkout orders will appear here.</p>
@@ -521,7 +522,7 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
                       </td>
 
                       {/* Col 7: Action */}
-                      {isOwner && (
+                      {canManageInv && (
                         <td className="py-2.5 px-3.5 text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                             {returnableUnits.length > 0 ? (
@@ -681,7 +682,7 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
                     </div>
 
                     <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                      {isOwner && (
+                      {canManageInv && (
                         returnableUnits.length > 0 ? (
                           <>
                             <button
@@ -735,6 +736,14 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
         onClose={() => setSelectedOrder(null)}
         user={user}
         tenant={tenant}
+        onInitiateReturn={(order) => {
+          setSelectedOrder(null);
+          handleInitiateReturn(order);
+        }}
+        onInitiateSwap={(order) => {
+          setSelectedOrder(null);
+          handleInitiateSwap(order);
+        }}
         onPaymentCollected={(updatedOrder) => {
           setSelectedOrder(updatedOrder);
           loadSales();
