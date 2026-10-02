@@ -237,8 +237,43 @@ test('pos vendor direct sale completes JIT transaction in single step', function
     // Bank: 100,000 - 50,000 (vendor payout) + 62,000 (customer payment) = 112,000
     expect((float) $this->bankAccount->fresh()->current_balance)->toBe(112000.00);
 
+    // Paid-now vendor direct sale MUST NOT create phantom open payable
+    expect(Debt::where('contact_id', $vendor->id)->where('status', 'open')->count())->toBe(0);
+    expect(Debt::where('contact_id', $vendor->id)->where('status', 'settled')->count())->toBe(1);
+
     // Attempting duplicate sale with same IMEI must fail with 422
     $duplicateResponse = $this->actingAs($this->owner)->postJson('/api/v1/sales/vendor-direct', $payload);
     $duplicateResponse->assertStatus(422)
         ->assertJsonValidationErrors(['imei_or_serial']);
+});
+
+test('pos vendor direct sale with owed creates exactly one open payable debt', function () {
+    $vendor = Contact::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Broker Chala',
+        'roles' => ['peer_vendor'],
+    ]);
+
+    $payload = [
+        'variant_id' => $this->variant128->id,
+        'imei_or_serial' => '354890123456888',
+        'condition' => 'Brand New',
+        'vendor_contact_id' => $vendor->id,
+        'vendor_cost' => 45000.00,
+        'vendor_payment_method' => 'owed',
+        'selling_price' => 55000.00,
+        'paid_amount' => 55000.00,
+        'payment_method' => 'cash',
+        'financial_account_id' => $this->bankAccount->id,
+    ];
+
+    $response = $this->actingAs($this->owner)->postJson('/api/v1/sales/vendor-direct', $payload);
+    $response->assertStatus(201)
+        ->assertJsonPath('success', true);
+
+    $debts = Debt::where('contact_id', $vendor->id)->get();
+    // Exactly ONE debt created (no duplicates between SaleController and RecordSaleAction)
+    expect($debts->count())->toBe(1);
+    expect($debts->first()->status)->toBe('open');
+    expect((float) $debts->first()->remaining_amount)->toBe(45000.00);
 });

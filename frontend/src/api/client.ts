@@ -1186,6 +1186,7 @@ export const api = {
     due_date?: string;
     notes?: string;
     disburse_account_id?: string;
+    cash_flow_direction?: 'in' | 'out' | 'none';
   }) =>
     request<Debt>('/debts', {
       method: 'POST',

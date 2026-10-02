@@ -5,6 +5,7 @@ namespace App\Actions;
 use App\Models\AuditLog;
 use App\Models\Contact;
 use App\Models\Debt;
+use App\Models\DebtPayment;
 use App\Models\FinancialAccount;
 use App\Models\FinancialTransaction;
 use App\Models\InventoryStock;
@@ -262,21 +263,54 @@ class RecordSaleAction
                     }
                     $unitCost = $vendorCost;
 
-                    // Automatically create an outstanding payable to the peer vendor
                     $payableAmount = $vendorCost * $qty;
-                    Debt::create([
-                        'tenant_id' => $tenantId,
-                        'contact_id' => $vendorContactId,
-                        'type' => 'payable',
-                        'reference_type' => 'brokered_sourcing',
-                        'reference_id' => $order->id,
-                        'original_amount' => $payableAmount,
-                        'paid_amount' => 0.0,
-                        'remaining_amount' => $payableAmount,
-                        'due_date' => now()->addDays(7),
-                        'status' => 'open',
-                        'notes' => "Brokered sourcing for Order #{$order->order_number}",
-                    ]);
+                    $isPaidNow = ! empty($itemData['vendor_paid_now']);
+                    $vendorAccountId = $itemData['vendor_payment_account_id'] ?? null;
+
+                    if ($isPaidNow) {
+                        $brokeredDebt = Debt::create([
+                            'tenant_id' => $tenantId,
+                            'contact_id' => $vendorContactId,
+                            'type' => 'payable',
+                            'reference_type' => 'brokered_sourcing',
+                            'reference_id' => $order->id,
+                            'original_amount' => $payableAmount,
+                            'paid_amount' => $payableAmount,
+                            'remaining_amount' => 0.0,
+                            'due_date' => now(),
+                            'status' => 'settled',
+                            'notes' => "Brokered sourcing for Order #{$order->order_number} (Paid on spot)",
+                        ]);
+
+                        if ($vendorAccountId) {
+                            DebtPayment::create([
+                                'tenant_id' => $tenantId,
+                                'debt_id' => $brokeredDebt->id,
+                                'financial_account_id' => $vendorAccountId,
+                                'amount' => $payableAmount,
+                                'payment_date' => now(),
+                                'notes' => 'Settled immediately at POS sale',
+                                'created_by' => $data['salesperson_id'] ?? auth()->id(),
+                            ]);
+                        }
+                    } else {
+                        // Automatically create an outstanding payable to the peer vendor
+                        $brokeredDebt = Debt::create([
+                            'tenant_id' => $tenantId,
+                            'contact_id' => $vendorContactId,
+                            'type' => 'payable',
+                            'reference_type' => 'brokered_sourcing',
+                            'reference_id' => $order->id,
+                            'original_amount' => $payableAmount,
+                            'paid_amount' => 0.0,
+                            'remaining_amount' => $payableAmount,
+                            'due_date' => now()->addDays(7),
+                            'status' => 'open',
+                            'notes' => "Brokered sourcing for Order #{$order->order_number}",
+                        ]);
+
+                        Debt::applyOpenAdvancesToPayable($brokeredDebt);
+                    }
                 } else {
                     // Internal Stock
                     if (! empty($itemData['inventory_unit_id'])) {

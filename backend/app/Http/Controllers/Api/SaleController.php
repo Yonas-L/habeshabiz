@@ -433,24 +433,9 @@ class SaleController extends Controller
                     'date' => now(),
                     'created_by' => $user->id,
                 ]);
-            } elseif ($validated['vendor_payment_method'] === 'owed' && $vendorCost > 0) {
-                $debt = Debt::create([
-                    'tenant_id' => $tenantId,
-                    'contact_id' => $validated['vendor_contact_id'],
-                    'type' => 'payable',
-                    'reference_type' => 'vendor_direct_sale',
-                    'reference_id' => $unit->id,
-                    'original_amount' => $vendorCost,
-                    'paid_amount' => 0.0,
-                    'remaining_amount' => $vendorCost,
-                    'due_date' => now()->addDays(7),
-                    'status' => 'open',
-                    'notes' => 'Vendor sourcing payable for SN: '.($imei ?: 'N/A'),
-                ]);
-                Debt::applyOpenAdvancesToPayable($debt);
             }
 
-            // 4. Create the SalesOrder via RecordSaleAction
+            // 4. Create the SalesOrder via RecordSaleAction (handles unified debt and payment sync)
             $saleData = [
                 'customer_id' => $validated['customer_id'] ?? null,
                 'customer_name' => $validated['customer_name'] ?? null,
@@ -469,6 +454,8 @@ class SaleController extends Controller
                         'sourcing_type' => 'brokered_neighbour',
                         'vendor_contact_id' => $validated['vendor_contact_id'],
                         'vendor_cost' => $vendorCost,
+                        'vendor_paid_now' => ($validated['vendor_payment_method'] === 'paid_now'),
+                        'vendor_payment_account_id' => $validated['vendor_payment_account_id'] ?? null,
                     ],
                 ],
             ];

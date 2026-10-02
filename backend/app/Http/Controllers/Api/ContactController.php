@@ -15,6 +15,7 @@ class ContactController extends Controller
     public function index(Request $request): JsonResponse
     {
         $query = Contact::query()
+            ->with('debts')
             ->withCount(['debts', 'salesOrders', 'brokeredItems', 'suppliedUnits']);
 
         if ($request->filled('role')) {

@@ -42,6 +42,7 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
   const [notes, setNotes] = useState('');
   const [disburseAccountId, setDisburseAccountId] = useState('');
   const [cashMovement, setCashMovement] = useState(false);
+  const [cashSubMode, setCashSubMode] = useState<'standard' | 'alternative'>('standard');
   const [submitting, setSubmitting] = useState(false);
 
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -61,6 +62,7 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
       setNotes('');
       setDisburseAccountId(treasuryAccounts[0]?.id || '');
       setCashMovement(false);
+      setCashSubMode('standard');
       loadContacts();
     }
   }, [isOpen, defaultType]);
@@ -86,6 +88,16 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
       setLoadingContacts(false);
     }
   };
+
+  const effectiveDirection: 'in' | 'out' | undefined = !cashMovement
+    ? undefined
+    : debtType === 'receivable'
+    ? cashSubMode === 'standard'
+      ? 'in'
+      : 'out'
+    : cashSubMode === 'standard'
+    ? 'out'
+    : 'in';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -113,18 +125,24 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
         due_date: dueDate || undefined,
         notes: notes.trim() || undefined,
         disburse_account_id: cashMovement && disburseAccountId ? disburseAccountId : undefined,
+        cash_flow_direction: effectiveDirection,
       });
 
-      toast.success(
-        debtType === 'receivable' ? 'Receivable recorded' : 'Payable recorded',
-        {
-          description: `${parseFloat(amount).toLocaleString()} ETB — ${
-            contactMode === 'existing'
-              ? contacts.find((c) => c.id === contactId)?.name
-              : contactName
-          }`,
-        }
-      );
+      const successTitle = !cashMovement
+        ? debtType === 'receivable'
+          ? 'Receivable recorded'
+          : 'Payable recorded'
+        : effectiveDirection === 'in'
+        ? 'Payment received & recorded'
+        : 'Payout disbursed & recorded';
+
+      toast.success(successTitle, {
+        description: `${parseFloat(amount).toLocaleString()} ETB — ${
+          contactMode === 'existing'
+            ? contacts.find((c) => c.id === contactId)?.name
+            : contactName
+        }`,
+      });
 
       if (onCreated) onCreated();
       if (onSuccess) onSuccess();
@@ -135,8 +153,6 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
       setSubmitting(false);
     }
   };
-
-  if (!isOpen) return null;
 
   if (!isOpen) return null;
 
@@ -350,7 +366,7 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
           </div>
 
           {/* Cash Movement Toggle */}
-          <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 space-y-2.5">
+          <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 space-y-3">
             <label className="flex items-start gap-2.5 cursor-pointer">
               <input
                 type="checkbox"
@@ -368,31 +384,64 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
                 <span className="text-xs font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
                   <Wallet className="w-3.5 h-3.5 text-slate-400" />
                   {debtType === 'receivable'
-                    ? 'Disburse cash now'
-                    : 'Receive cash now'}
+                    ? 'Receive cash now'
+                    : 'Pay cash out now'}
                 </span>
                 <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5">
                   {debtType === 'receivable'
-                    ? 'Money leaves your account immediately'
-                    : 'Borrowed funds deposited into your account'}
+                    ? 'Money enters your account immediately (Customer deposit or cash received)'
+                    : 'Money leaves your account immediately (Peer vendor payout or bill payment)'}
                 </span>
               </div>
             </label>
 
             {cashMovement && (
-              <select
-                value={disburseAccountId}
-                onChange={(e) => setDisburseAccountId(e.target.value)}
-                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 focus:border-slate-900 dark:focus:border-slate-600"
-                required
-              >
-                <option value="">— Select Account —</option>
-                {treasuryAccounts.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name} ({Number(a.current_balance).toLocaleString()} ETB)
-                  </option>
-                ))}
-              </select>
+              <div className="space-y-2.5 pt-2 border-t border-slate-200/70 dark:border-slate-800">
+                {/* Intent Sub-Mode Selector */}
+                <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100/90 dark:bg-slate-800/90 rounded-lg text-[11px] font-semibold">
+                  <button
+                    type="button"
+                    onClick={() => setCashSubMode('standard')}
+                    className={`py-1 px-2 rounded-md transition-all text-center truncate cursor-pointer ${
+                      cashSubMode === 'standard'
+                        ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs font-bold'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    {debtType === 'receivable' ? 'Customer Payment (In)' : 'Vendor Payout (Out)'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCashSubMode('alternative')}
+                    className={`py-1 px-2 rounded-md transition-all text-center truncate cursor-pointer ${
+                      cashSubMode === 'alternative'
+                        ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs font-bold'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    {debtType === 'receivable' ? 'Disburse Loan (Out)' : 'Borrowed Funds (In)'}
+                  </button>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                    {effectiveDirection === 'in' ? 'Deposit Into Account' : 'Pay From Account'}
+                  </label>
+                  <select
+                    value={disburseAccountId}
+                    onChange={(e) => setDisburseAccountId(e.target.value)}
+                    className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 focus:border-slate-900 dark:focus:border-slate-600"
+                    required
+                  >
+                    <option value="">— Select Account —</option>
+                    {treasuryAccounts.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name} ({Number(a.current_balance).toLocaleString()} ETB)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
             )}
           </div>
         </form>
@@ -413,7 +462,7 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
           >
             {submitting ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : debtType === 'receivable' ? (
+            ) : effectiveDirection === 'in' || (!cashMovement && debtType === 'receivable') ? (
               <ArrowDownLeft className="w-3.5 h-3.5 text-emerald-400 dark:text-emerald-600" />
             ) : (
               <ArrowUpRight className="w-3.5 h-3.5 text-rose-400 dark:text-rose-600" />
@@ -421,6 +470,10 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
             <span>
               {submitting
                 ? 'Recording...'
+                : cashMovement
+                ? effectiveDirection === 'in'
+                  ? 'Record & Receive Cash'
+                  : 'Record & Pay Out Cash'
                 : debtType === 'receivable'
                 ? 'Record Receivable'
                 : 'Record Payable'}

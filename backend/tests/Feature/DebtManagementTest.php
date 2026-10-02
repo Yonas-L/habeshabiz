@@ -102,6 +102,64 @@ test('owner can manually record a payable with immediate cash receipt', function
     expect((float) $this->cashAccount->fresh()->current_balance)->toBe(150000.00);
 });
 
+test('owner can record peer vendor payout with immediate cash out which settles payable', function () {
+    $vendor = Contact::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Broker Dawit',
+        'roles' => ['peer_vendor'],
+    ]);
+
+    $response = $this->actingAs($this->owner)->postJson('/api/v1/debts', [
+        'type' => 'payable',
+        'contact_id' => $vendor->id,
+        'amount' => 30000.00,
+        'disburse_account_id' => $this->cashAccount->id,
+        'cash_flow_direction' => 'out',
+        'notes' => 'Settled accessory batch payout to Dawit',
+    ]);
+
+    $response->assertStatus(201)
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.status', 'settled')
+        ->assertJsonPath('data.remaining_amount', '0.00')
+        ->assertJsonPath('data.paid_amount', '30000.00');
+
+    // Balance decreased by 30,000 ETB
+    expect((float) $this->cashAccount->fresh()->current_balance)->toBe(70000.00);
+
+    // No open debt remaining
+    expect(Debt::where('contact_id', $vendor->id)->where('status', 'open')->count())->toBe(0);
+});
+
+test('owner can record customer payment with immediate cash in which settles receivable', function () {
+    $customer = Contact::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Sara Buyer',
+        'roles' => ['customer'],
+    ]);
+
+    $response = $this->actingAs($this->owner)->postJson('/api/v1/debts', [
+        'type' => 'receivable',
+        'contact_id' => $customer->id,
+        'amount' => 15000.00,
+        'disburse_account_id' => $this->cashAccount->id,
+        'cash_flow_direction' => 'in',
+        'notes' => 'Advance deposit for upcoming order',
+    ]);
+
+    $response->assertStatus(201)
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.status', 'settled')
+        ->assertJsonPath('data.remaining_amount', '0.00')
+        ->assertJsonPath('data.paid_amount', '15000.00');
+
+    // Balance increased by 15,000 ETB
+    expect((float) $this->cashAccount->fresh()->current_balance)->toBe(115000.00);
+
+    // No open debt remaining
+    expect(Debt::where('contact_id', $customer->id)->where('status', 'open')->count())->toBe(0);
+});
+
 test('salesperson is forbidden from creating manual debts (403)', function () {
     $this->actingAs($this->seller)->postJson('/api/v1/debts', [
         'type' => 'payable',

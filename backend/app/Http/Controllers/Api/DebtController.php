@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Contact;
 use App\Models\Debt;
+use App\Models\DebtPayment;
 use App\Models\FinancialAccount;
 use App\Models\FinancialTransaction;
 use App\Scopes\TenantScope;
@@ -19,7 +20,7 @@ class DebtController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $query = Debt::with(['contact', 'payments.financialAccount']);
+        $query = Debt::with(['contact.debts', 'payments.financialAccount']);
 
         if ($request->filled('type')) {
             $query->where('type', $request->type);
@@ -68,6 +69,7 @@ class DebtController extends Controller
             'due_date' => ['nullable', 'date'],
             'notes' => ['nullable', 'string'],
             'disburse_account_id' => ['nullable', 'exists:financial_accounts,id'],
+            'cash_flow_direction' => ['nullable', 'string', 'in:in,out,none'],
         ]);
 
         $debt = DB::transaction(function () use ($validated, $user) {
@@ -81,13 +83,20 @@ class DebtController extends Controller
             if (! $contactId) {
                 $existingContact = null;
                 if ($contactPhone) {
+                    $phoneDigits = preg_replace('/[^\d]/', '', $contactPhone);
+                    $suffix = substr($phoneDigits, -9);
                     $existingContact = Contact::where('tenant_id', $tenantId)
-                        ->where('phone', $contactPhone)
+                        ->where(function ($q) use ($contactPhone, $suffix) {
+                            $q->where('phone', $contactPhone);
+                            if (strlen($suffix) >= 9) {
+                                $q->orWhere('phone', 'like', "%{$suffix}");
+                            }
+                        })
                         ->first();
                 }
                 if (! $existingContact && $contactName) {
                     $existingContact = Contact::where('tenant_id', $tenantId)
-                        ->where('name', $contactName)
+                        ->where('name', 'ilike', $contactName)
                         ->first();
                 }
 
@@ -117,6 +126,30 @@ class DebtController extends Controller
 
             $amount = (float) $validated['amount'];
             $type = $validated['type'];
+            $hasCashMovement = ! empty($validated['disburse_account_id']);
+            $direction = $validated['cash_flow_direction'] ?? ($type === 'receivable' ? 'out' : 'in');
+
+            $account = null;
+            if ($hasCashMovement) {
+                $account = FinancialAccount::where('tenant_id', $tenantId)->findOrFail($validated['disburse_account_id']);
+            }
+
+            // Determine if this cash movement immediately settles the obligation:
+            // Payable + Cash Out = immediate vendor payout / bill paid -> SETTLED
+            // Receivable + Cash In = immediate customer deposit / cash received -> SETTLED
+            // Otherwise = open obligation (pure credit, or lent loan, or borrowed fund)
+            $isImmediateSettlement = false;
+            if ($hasCashMovement) {
+                if ($type === 'payable' && $direction === 'out') {
+                    $isImmediateSettlement = true;
+                } elseif ($type === 'receivable' && $direction === 'in') {
+                    $isImmediateSettlement = true;
+                }
+            }
+
+            $paidAmount = $isImmediateSettlement ? $amount : 0.0;
+            $remainingAmount = $isImmediateSettlement ? 0.0 : $amount;
+            $status = $isImmediateSettlement ? 'settled' : 'open';
 
             $debt = Debt::create([
                 'tenant_id' => $tenantId,
@@ -125,54 +158,93 @@ class DebtController extends Controller
                 'reference_type' => 'direct_credit',
                 'reference_id' => null,
                 'original_amount' => $amount,
-                'paid_amount' => 0,
-                'remaining_amount' => $amount,
-                'due_date' => $validated['due_date'] ?? null,
-                'status' => 'open',
+                'paid_amount' => $paidAmount,
+                'remaining_amount' => $remainingAmount,
+                'due_date' => $isImmediateSettlement ? now() : ($validated['due_date'] ?? null),
+                'status' => $status,
                 'notes' => $validated['notes'] ?? null,
             ]);
 
-            // Handle immediate cash disbursement or borrowing deposit if requested
-            if (! empty($validated['disburse_account_id'])) {
-                $account = FinancialAccount::findOrFail($validated['disburse_account_id']);
-                $contactName = $contact ? $contact->name : 'Contact';
+            // Handle cash movement & financial transactions
+            if ($hasCashMovement && $account) {
+                $contactLabel = $contact ? $contact->name : 'Contact';
+                $notesDesc = ! empty($validated['notes']) ? ": {$validated['notes']}" : '';
 
-                if ($type === 'receivable') {
-                    // Money disbursed/lent from our account to the borrower
+                if ($direction === 'out') {
+                    // Money leaves our account immediately
                     if ((float) $account->current_balance < $amount) {
                         throw \Illuminate\Validation\ValidationException::withMessages([
-                            'disburse_account_id' => ["Insufficient balance in account '{$account->name}'."],
+                            'disburse_account_id' => ["Insufficient balance in account '{$account->name}'. Available: ".number_format((float) $account->current_balance, 2)." ETB, Required: ".number_format($amount, 2)." ETB."],
                         ]);
                     }
                     $account->decrement('current_balance', $amount);
+
+                    $txType = $type === 'payable' ? 'supplier_payment' : 'loan_disbursement';
+                    $txDesc = $type === 'payable'
+                        ? "Peer vendor payout to {$contactLabel}{$notesDesc}"
+                        : "Cash lent/disbursed to {$contactLabel}{$notesDesc}";
 
                     FinancialTransaction::create([
                         'tenant_id' => $tenantId,
                         'transaction_number' => 'TXN-'.strtoupper(Str::random(8)),
                         'source_account_id' => $account->id,
-                        'type' => 'loan_disbursement',
+                        'type' => $txType,
                         'amount' => $amount,
                         'contact_id' => $contactId,
-                        'description' => "Cash lent/disbursed to {$contactName}".(! empty($validated['notes']) ? ": {$validated['notes']}" : ''),
+                        'description' => $txDesc,
                         'date' => now(),
                         'created_by' => $user->id,
                     ]);
-                } else {
-                    // Borrowed funds deposited into our account
+
+                    if ($isImmediateSettlement) {
+                        DebtPayment::create([
+                            'tenant_id' => $tenantId,
+                            'debt_id' => $debt->id,
+                            'financial_account_id' => $account->id,
+                            'amount' => $amount,
+                            'payment_date' => now(),
+                            'reference_number' => 'PAYOUT-DIRECT',
+                            'notes' => 'Settled via direct cash payout',
+                            'created_by' => $user->id,
+                        ]);
+                    }
+                } elseif ($direction === 'in') {
+                    // Money enters our account immediately
                     $account->increment('current_balance', $amount);
+
+                    $txType = $type === 'receivable' ? 'customer_payment' : 'borrowed_funds';
+                    $txDesc = $type === 'receivable'
+                        ? "Payment received from {$contactLabel}{$notesDesc}"
+                        : "Borrowed cash received from {$contactLabel}{$notesDesc}";
 
                     FinancialTransaction::create([
                         'tenant_id' => $tenantId,
                         'transaction_number' => 'TXN-'.strtoupper(Str::random(8)),
                         'destination_account_id' => $account->id,
-                        'type' => 'borrowed_funds',
+                        'type' => $txType,
                         'amount' => $amount,
                         'contact_id' => $contactId,
-                        'description' => "Borrowed cash received from {$contactName}".(! empty($validated['notes']) ? ": {$validated['notes']}" : ''),
+                        'description' => $txDesc,
                         'date' => now(),
                         'created_by' => $user->id,
                     ]);
+
+                    if ($isImmediateSettlement) {
+                        DebtPayment::create([
+                            'tenant_id' => $tenantId,
+                            'debt_id' => $debt->id,
+                            'financial_account_id' => $account->id,
+                            'amount' => $amount,
+                            'payment_date' => now(),
+                            'reference_number' => 'RECEIPT-DIRECT',
+                            'notes' => 'Settled via direct cash receipt',
+                            'created_by' => $user->id,
+                        ]);
+                    }
                 }
+            } elseif (! $hasCashMovement && $type === 'payable') {
+                // If pure credit payable, apply any existing vendor advances
+                Debt::applyOpenAdvancesToPayable($debt);
             }
 
             AuditLog::record(
@@ -183,8 +255,10 @@ class DebtController extends Controller
                     'type' => $debt->type,
                     'contact' => $contact?->name,
                     'amount' => $debt->original_amount,
+                    'status' => $debt->status,
                     'due_date' => $debt->due_date,
-                    'with_disbursement' => ! empty($validated['disburse_account_id']),
+                    'with_disbursement' => $hasCashMovement,
+                    'direction' => $hasCashMovement ? $direction : null,
                 ]
             );
 
@@ -196,7 +270,7 @@ class DebtController extends Controller
             'message' => $debt->type === 'receivable'
                 ? "Receivable obligation for {$debt->original_amount} ETB recorded."
                 : "Payable obligation for {$debt->original_amount} ETB recorded.",
-            'data' => $debt->load(['contact', 'payments.financialAccount']),
+            'data' => $debt->load(['contact.debts', 'payments.financialAccount']),
         ], 201);
     }
 
@@ -255,7 +329,7 @@ class DebtController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Debt record updated successfully.',
-            'data' => $debt->fresh(['contact', 'payments.financialAccount']),
+            'data' => $debt->fresh(['contact.debts', 'payments.financialAccount']),
         ]);
     }
 
