@@ -580,8 +580,9 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
   };
 
   const variantLabel = (v: ProductVariant) => {
+    const ramLabel = v.ram ? (v.ram.toLowerCase().includes('ram') ? v.ram : `${v.ram} RAM`) : null;
     const specParts = v.specs ? Object.values(v.specs).map(String) : [];
-    const parts = [v.storage, v.ram ? `${v.ram} RAM` : null, v.color, ...specParts].filter(Boolean);
+    const parts = [v.storage, ramLabel, v.color, ...specParts].filter(Boolean);
     return parts.length > 0 ? parts.join(' · ') : 'Standard';
   };
 
@@ -724,6 +725,19 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                             </div>
                             <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 truncate">
                               {p.brand ? `${p.brand} · ` : ''}{cat}{p.has_serials ? ' · Serialized IMEI' : ''}
+                              {(() => {
+                                const previews = Array.from(
+                                  new Set(
+                                    (p.variants || [])
+                                      .map((v) => {
+                                        const ramStr = v.ram ? (v.ram.toLowerCase().includes('ram') ? v.ram : `${v.ram} RAM`) : null;
+                                        return [v.storage, ramStr].filter(Boolean).join('/');
+                                      })
+                                      .filter(Boolean)
+                                  )
+                                ).slice(0, 3);
+                                return previews.length > 0 ? ` · ${previews.join(', ')}` : '';
+                              })()}
                             </div>
                           </div>
                         </div>
@@ -871,6 +885,11 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                               <span className="font-mono font-bold text-slate-900 dark:text-white text-[11px] truncate">
                                 {u.imei_or_serial || 'No Serial'}
                               </span>
+                              {selectedVariant && (selectedVariant.storage || selectedVariant.ram) && (
+                                <span className="inline-flex items-center text-[9px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/80 px-1.5 py-0.2 rounded font-mono">
+                                  {[selectedVariant.storage, selectedVariant.ram ? (selectedVariant.ram.toLowerCase().includes('ram') ? selectedVariant.ram : `${selectedVariant.ram} RAM`) : null].filter(Boolean).join('/')}
+                                </span>
+                              )}
                               {u.battery_health && (
                                 <span className="inline-flex items-center gap-0.5 text-[10px] font-mono font-medium text-slate-500 dark:text-slate-400">
                                   <Battery className="w-3 h-3 text-slate-400 shrink-0" />

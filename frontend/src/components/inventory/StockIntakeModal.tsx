@@ -1596,8 +1596,13 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                                     {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
                                   </span>
                                   <div className="min-w-0">
-                                    <div className="font-bold text-slate-900 dark:text-white truncate flex items-center gap-1.5">
+                                    <div className="font-bold text-slate-900 dark:text-white truncate flex items-center gap-1.5 flex-wrap">
                                       <span>{v.storage || 'Standard'}</span>
+                                      {v.ram && (
+                                        <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 px-1.5 py-0.2 rounded bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200/50 dark:border-emerald-800/50">
+                                          {v.ram.toLowerCase().includes('ram') ? v.ram : `${v.ram} RAM`}
+                                        </span>
+                                      )}
                                       {v.color && (
                                         <span className="text-[10px] font-normal text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 truncate">
                                           {v.color}
@@ -1770,7 +1775,22 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                       <thead className="bg-slate-50 dark:bg-slate-900/60 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-200/80 dark:border-slate-800">
                         <tr>
                           <th className="py-2 px-2.5 w-7 text-center">#</th>
-                          <th className="py-2 px-2.5">Variant</th>
+                          <th className="py-2 px-2.5">
+                            <div className="flex items-center justify-between">
+                              <span>Variant (RAM / Storage)</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setIsCreatingVariant(true);
+                                  resetVariantInputs();
+                                }}
+                                className="text-[9px] text-emerald-600 dark:text-emerald-400 font-bold hover:underline cursor-pointer lowercase"
+                                title="Add new RAM/storage variant to model"
+                              >
+                                + new spec
+                              </button>
+                            </div>
+                          </th>
                           <th className="py-2 px-2.5">Serial / IMEI *</th>
                           {isPhone && <th className="py-2 px-2 w-20">Battery %</th>}
                           <th className="py-2 px-2.5 w-28">Cost (ETB) *</th>
@@ -1788,11 +1808,15 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                                 onChange={(e) => handleUpdateBatchItem(idx, { variant_id: e.target.value })}
                                 className="w-full h-8 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold focus:outline-none"
                               >
-                                {(selectedProduct?.variants || []).map((v) => (
-                                  <option key={v.id} value={v.id}>
-                                    {v.storage || 'Std'}{v.color ? ` · ${v.color}` : ''}
-                                  </option>
-                                ))}
+                                {(selectedProduct?.variants || []).map((v) => {
+                                  const ramLabel = v.ram ? (v.ram.toLowerCase().includes('ram') ? v.ram : `${v.ram} RAM`) : null;
+                                  const label = [v.storage, ramLabel, v.color].filter(Boolean).join(' · ') || 'Standard';
+                                  return (
+                                    <option key={v.id} value={v.id}>
+                                      {label}
+                                    </option>
+                                  );
+                                })}
                               </select>
                             </td>
                             <td className="py-2 px-2.5">
@@ -1894,17 +1918,33 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
 
                         <div className="grid grid-cols-2 gap-2">
                           <div>
-                            <label className="block text-[10px] text-slate-400 mb-0.5">Variant</label>
+                            <div className="flex items-center justify-between mb-0.5">
+                              <label className="text-[10px] text-slate-400">Variant</label>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setIsCreatingVariant(true);
+                                  resetVariantInputs();
+                                }}
+                                className="text-[9px] text-emerald-600 dark:text-emerald-400 font-bold hover:underline"
+                              >
+                                + new spec
+                              </button>
+                            </div>
                             <select
                               value={item.variant_id}
                               onChange={(e) => handleUpdateBatchItem(idx, { variant_id: e.target.value })}
                               className="w-full h-8 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium focus:outline-none"
                             >
-                              {(selectedProduct?.variants || []).map((v) => (
-                                <option key={v.id} value={v.id}>
-                                  {v.storage || 'Std'}{v.color ? ` · ${v.color}` : ''}
-                                </option>
-                              ))}
+                              {(selectedProduct?.variants || []).map((v) => {
+                                const ramLabel = v.ram ? (v.ram.toLowerCase().includes('ram') ? v.ram : `${v.ram} RAM`) : null;
+                                const label = [v.storage, ramLabel, v.color].filter(Boolean).join(' · ') || 'Standard';
+                                return (
+                                  <option key={v.id} value={v.id}>
+                                    {label}
+                                  </option>
+                                );
+                              })}
                             </select>
                           </div>
                           <div>

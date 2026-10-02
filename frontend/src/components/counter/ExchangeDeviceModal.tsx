@@ -76,6 +76,7 @@ export const ExchangeDeviceModal: React.FC<ExchangeDeviceModalProps> = ({
   const [newCatId, setNewCatId] = useState<string>('');
   const [newProductName, setNewProductName] = useState<string>('');
   const [newStorage, setNewStorage] = useState<string>('128GB');
+  const [newRam, setNewRam] = useState<string>('');
   const [newColor, setNewColor] = useState<string>('Black');
   const [isCreatingNewProduct, setIsCreatingNewProduct] = useState(false);
 
@@ -239,6 +240,7 @@ export const ExchangeDeviceModal: React.FC<ExchangeDeviceModalProps> = ({
         variants: [
           {
             storage: newStorage.trim() || undefined,
+            ram: newRam.trim() || undefined,
             color: newColor.trim() || undefined,
           },
         ],
@@ -291,7 +293,8 @@ export const ExchangeDeviceModal: React.FC<ExchangeDeviceModalProps> = ({
     const prod = products.find((p) => p.variants.some((v) => v.id === selectedVariantId));
     const variant = prod?.variants.find((v) => v.id === selectedVariantId);
 
-    const vLabel = [variant?.storage, variant?.color].filter(Boolean).join(' · ') || 'Standard';
+    const ramLabel = variant?.ram ? (variant.ram.toLowerCase().includes('ram') ? variant.ram : `${variant.ram} RAM`) : null;
+    const vLabel = [variant?.storage, ramLabel, variant?.color].filter(Boolean).join(' · ') || 'Standard';
 
     onConfirmExchange({
       variant_id: selectedVariantId,
@@ -406,7 +409,7 @@ export const ExchangeDeviceModal: React.FC<ExchangeDeviceModalProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <div>
                   <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
                     Storage
@@ -416,6 +419,18 @@ export const ExchangeDeviceModal: React.FC<ExchangeDeviceModalProps> = ({
                     placeholder="128GB"
                     value={newStorage}
                     onChange={(e) => setNewStorage(e.target.value)}
+                    className="w-full h-8 px-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                    RAM / Memory
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="8GB"
+                    value={newRam}
+                    onChange={(e) => setNewRam(e.target.value)}
                     className="w-full h-8 px-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-900 dark:text-white"
                   />
                 </div>
@@ -495,7 +510,8 @@ export const ExchangeDeviceModal: React.FC<ExchangeDeviceModalProps> = ({
                   <div className="flex flex-wrap gap-1.5">
                     {activeVariants.map((v) => {
                       const isSel = selectedVariantId === v.id;
-                      const label = [v.storage, v.color].filter(Boolean).join(' · ') || 'Standard';
+                      const ramLabel = v.ram ? (v.ram.toLowerCase().includes('ram') ? v.ram : `${v.ram} RAM`) : null;
+                      const label = [v.storage, ramLabel, v.color].filter(Boolean).join(' · ') || 'Standard';
                       return (
                         <button
                           key={v.id}

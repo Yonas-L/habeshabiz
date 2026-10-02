@@ -50,6 +50,7 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
   const [customProductName, setCustomProductName] = useState('');
   const [selectedVariantId, setSelectedVariantId] = useState<string>('');
   const [storage, setStorage] = useState('128GB');
+  const [ram, setRam] = useState('');
   const [color, setColor] = useState('');
   const [imeiOrSerial, setImeiOrSerial] = useState('');
   const [condition, setCondition] = useState('new');
@@ -101,6 +102,7 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
           if (prod.variants && prod.variants.length > 0) {
             setSelectedVariantId(prod.variants[0].id);
             if (prod.variants[0].storage) setStorage(prod.variants[0].storage);
+            if (prod.variants[0].ram) setRam(prod.variants[0].ram);
             if (prod.variants[0].color) setColor(prod.variants[0].color);
             if (prod.variants[0].default_selling_price) {
               const defPrice = formatCurrencyInput(prod.variants[0].default_selling_price);
@@ -209,6 +211,7 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
         product_name: finalProductName,
         variant_id: selectedVariantId || undefined,
         storage: storage.trim() || undefined,
+        ram: ram.trim() || undefined,
         color: color.trim() || undefined,
         imei_or_serial: imeiOrSerial.trim() || undefined,
         condition,
@@ -239,6 +242,7 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
       setSellingPrice('');
       setPaidAmount('');
       setVendorCost('');
+      setRam('');
       setNotes('');
 
       onSaleSuccess();
@@ -320,6 +324,7 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
                     if (prod?.variants && prod.variants.length > 0) {
                       setSelectedVariantId(prod.variants[0].id);
                       if (prod.variants[0].storage) setStorage(prod.variants[0].storage);
+                      if (prod.variants[0].ram) setRam(prod.variants[0].ram);
                       if (prod.variants[0].color) setColor(prod.variants[0].color);
                     }
                   }}
@@ -360,21 +365,26 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
                       setSelectedVariantId(vid);
                       const v = selectedProduct.variants.find((item) => item.id === vid);
                       if (v?.storage) setStorage(v.storage);
+                      if (v?.ram) setRam(v.ram);
                       if (v?.color) setColor(v.color);
                     }}
                     className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none cursor-pointer"
                   >
-                    {selectedProduct.variants.map((v) => (
-                      <option key={v.id} value={v.id}>
-                        {v.storage || 'Standard'}{v.color ? ` · ${v.color}` : ''}
-                      </option>
-                    ))}
+                    {selectedProduct.variants.map((v) => {
+                      const ramLabel = v.ram ? (v.ram.toLowerCase().includes('ram') ? v.ram : `${v.ram} RAM`) : null;
+                      const label = [v.storage, ramLabel, v.color].filter(Boolean).join(' · ') || 'Standard';
+                      return (
+                        <option key={v.id} value={v.id}>
+                          {label}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
               ) : null}
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
               <div>
                 <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
                   Storage
@@ -384,6 +394,19 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
                   placeholder="e.g. 256GB"
                   value={storage}
                   onChange={(e) => setStorage(e.target.value)}
+                  className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                  RAM / Memory
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. 8GB, 12GB"
+                  value={ram}
+                  onChange={(e) => setRam(e.target.value)}
                   className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
                 />
               </div>
