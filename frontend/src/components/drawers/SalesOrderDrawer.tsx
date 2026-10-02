@@ -22,10 +22,13 @@ import {
   Wrench,
   Undo2,
   ArrowLeftRight,
+  Receipt,
+  ExternalLink,
 } from 'lucide-react';
 import { AccountLogo } from '../../utils/bankLogos';
 import { SwapDeviceModal } from '../inventory/SwapDeviceModal';
 import { downloadPdf } from '../../utils/downloadPdf';
+import { formatPurchaseAge } from '../../utils/dateUtils';
 
 interface SalesOrderDrawerProps {
   order: SalesOrder | null;
@@ -518,11 +521,197 @@ Thank you for choosing Habeshabiz Electronics!
           </div>
         }
     >
-      {/* Printable Invoice & Receipt Document */}
-      <div
-        id="printable-invoice"
-        className="p-5 sm:p-6 rounded-xl bg-white dark:bg-[#101622] border border-slate-200/90 dark:border-slate-800 space-y-5 animate-receipt"
-      >
+      <div className="space-y-4">
+        {/* Sold Device Notice Banner — exact parity with Stock Sold drawer */}
+        {order && order.items.map((item, idx) => {
+          const unit = item.inventory_unit;
+          const purchaseDate = unit?.created_at || order.order_date;
+          const datePurchasedFormatted = purchaseDate
+            ? new Date(purchaseDate).toLocaleDateString(undefined, {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+              })
+            : '—';
+          const dateSoldFormatted = order.order_date
+            ? new Date(order.order_date).toLocaleDateString(undefined, {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+              })
+            : 'Recorded as Sold';
+          const purchaseAge = formatPurchaseAge(purchaseDate);
+
+          const exchangeAllowance = Number(order.exchange_allowance || 0);
+          const hasExchange = exchangeAllowance > 0 || Boolean(order.exchange_unit_id) || Boolean(order.exchange_unit);
+          const exUnit = order.exchange_unit;
+          const paidCash = Number(order.paid_amount || 0);
+          const totalOrderPrice = Number(order.total_amount || item.unit_price || 0);
+          const isPaid = order.payment_status === 'paid' || (hasExchange && (paidCash + exchangeAllowance >= totalOrderPrice));
+          const finalItemPrice = Number(item.unit_price || order.total_amount);
+
+          return (
+            <div
+              key={item.id || idx}
+              className="no-print p-3.5 rounded-xl bg-purple-50/80 dark:bg-purple-950/40 border border-purple-200/80 dark:border-purple-800/60 text-xs text-purple-900 dark:text-purple-200 space-y-2 animate-in fade-in"
+            >
+              <div className="font-bold flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                  <span>Sold Device Record</span>
+                  {order.items.length > 1 && (
+                    <span className="text-[10px] text-purple-700 dark:text-purple-300 font-normal">
+                      ({item.variant?.product?.name || 'Device'}{unit?.imei_or_serial ? ` · ${unit.imei_or_serial}` : ''})
+                    </span>
+                  )}
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-200/60 dark:bg-purple-800/50 text-purple-800 dark:text-purple-300 font-semibold font-mono">
+                  {purchaseAge} since purchase
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 text-[11px] pt-1">
+                <div>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">Date Sold:</span>
+                  <div className="font-semibold text-slate-900 dark:text-white mt-0.5">
+                    {dateSoldFormatted}
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">Date Purchased:</span>
+                  <div className="font-semibold text-slate-900 dark:text-white mt-0.5">
+                    {datePurchasedFormatted}
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">Sales Order:</span>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="font-mono font-bold text-purple-700 dark:text-purple-300">
+                      #{order.order_number}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        document.getElementById('printable-invoice')?.scrollIntoView({ behavior: 'smooth' });
+                      }}
+                      className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-purple-700 dark:text-purple-300 hover:underline cursor-pointer"
+                      title="View Sales Order Receipt"
+                    >
+                      <ExternalLink className="w-2.5 h-2.5" />
+                      <span>View</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">Customer:</span>
+                  <div className="font-semibold text-slate-900 dark:text-white mt-0.5 truncate">
+                    {order.customer?.name || 'Walk-in Customer'}
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">Final Sale Price:</span>
+                  <div className="font-mono font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                    {finalItemPrice.toLocaleString()} ETB
+                  </div>
+                </div>
+
+                {order.salesperson && (
+                  <div>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">Salesperson:</span>
+                    <div className="font-semibold text-slate-900 dark:text-white mt-0.5 truncate">
+                      {order.salesperson.name}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Trade-In and Settlement Details */}
+              <div className="pt-2.5 border-t border-purple-200/70 dark:border-purple-800/50 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-purple-800 dark:text-purple-300 flex items-center gap-1">
+                    {hasExchange ? <Repeat className="w-3 h-3 text-purple-600 dark:text-purple-400" /> : <Receipt className="w-3 h-3 text-purple-600 dark:text-purple-400" />}
+                    {hasExchange ? 'Trade-In Settlement Breakdown' : 'Payment Method & Settlement'}
+                  </span>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isPaid ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'}`}>
+                    {isPaid ? 'Settled in Full' : 'Credit Balance Due'}
+                  </span>
+                </div>
+
+                <div className="bg-white/80 dark:bg-slate-900/60 rounded-xl p-2.5 border border-purple-200/50 dark:border-purple-800/40 space-y-2 text-[11px]">
+                  {hasExchange && (
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">Customer Traded-In Device:</span>
+                        <div className="font-bold text-purple-900 dark:text-purple-200 flex items-center gap-1 flex-wrap">
+                          <span>{exUnit?.variant?.product?.name || 'Customer Trade-in Device'}</span>
+                          {[exUnit?.variant?.storage, exUnit?.variant?.color].filter(Boolean).length > 0 && (
+                            <span className="font-normal text-slate-500 text-[10px]">
+                              ({[exUnit?.variant?.storage, exUnit?.variant?.color].filter(Boolean).join(' • ')})
+                            </span>
+                          )}
+                        </div>
+                        {exUnit?.imei_or_serial && (
+                          <div className="font-mono text-[10px] text-purple-700 dark:text-purple-400 mt-0.5">
+                            SN: {exUnit.imei_or_serial}
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="font-mono font-bold text-purple-700 dark:text-purple-300 text-xs">
+                          −{exchangeAllowance.toLocaleString()} ETB
+                        </div>
+                        <span className="text-[9px] text-purple-600 dark:text-purple-400 font-medium">Trade Allowance</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className={`flex items-start justify-between gap-2 ${hasExchange ? 'pt-2 border-t border-slate-100 dark:border-slate-800' : ''}`}>
+                    <div>
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">
+                        {hasExchange ? 'Cash / Transfer Settlement:' : 'Direct Payment:'}
+                      </span>
+                      <div className="font-semibold text-slate-900 dark:text-white mt-0.5">
+                        {formatPaymentMethod(order.payment_method)}
+                      </div>
+                      {order.financial_account?.name && (
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                          Account: {order.financial_account.name}
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-xs">
+                        +{paidCash.toLocaleString()} ETB
+                      </div>
+                      <span className="text-[9px] text-emerald-600/80 dark:text-emerald-400/80 font-medium">
+                        {hasExchange ? 'Cash Difference' : 'Amount Paid'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {hasExchange && (
+                    <div className="flex items-center justify-between pt-1.5 border-t border-purple-100 dark:border-purple-800/40 text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                      <span>Settlement Formula:</span>
+                      <span className="font-mono text-slate-700 dark:text-slate-300">
+                        {exchangeAllowance.toLocaleString()} trade + {paidCash.toLocaleString()} cash = {(exchangeAllowance + paidCash).toLocaleString()} ETB
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Printable Invoice & Receipt Document */}
+        <div
+          id="printable-invoice"
+          className="p-5 sm:p-6 rounded-xl bg-white dark:bg-[#101622] border border-slate-200/90 dark:border-slate-800 space-y-5 animate-receipt"
+        >
         {/* Header: Company + Ref */}
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-3">
@@ -851,6 +1040,7 @@ Thank you for choosing Habeshabiz Electronics!
           )}
         </div>
       )}
+      </div>
     </SlideOverDrawer>
 
       {/* Collect Balance Modal */}
