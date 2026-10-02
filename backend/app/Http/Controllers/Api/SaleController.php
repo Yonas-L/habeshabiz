@@ -373,15 +373,26 @@ class SaleController extends Controller
                 $variantId = $variant->id;
             }
 
-            // 2. Create the InventoryUnit marked directly as 'sold'
             $imei = ! empty($validated['imei_or_serial']) ? trim($validated['imei_or_serial']) : null;
             if ($imei) {
-                $existing = \App\Models\InventoryUnit::where('tenant_id', $tenantId)
+                $existingActive = \App\Models\InventoryUnit::where('tenant_id', $tenantId)
                     ->whereIn('status', ['in_stock', 'reserved', 'out'])
                     ->where('imei_or_serial', $imei)
                     ->exists();
-                if ($existing) {
-                    throw new \InvalidArgumentException("IMEI/Serial '{$imei}' is already in active shop inventory.");
+                if ($existingActive) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'imei_or_serial' => ["IMEI/Serial '{$imei}' is already in active shop inventory."],
+                    ]);
+                }
+
+                $existingSold = \App\Models\InventoryUnit::where('tenant_id', $tenantId)
+                    ->where('status', 'sold')
+                    ->where('imei_or_serial', $imei)
+                    ->exists();
+                if ($existingSold) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'imei_or_serial' => ["IMEI/Serial '{$imei}' has already been recorded as sold."],
+                    ]);
                 }
             }
 

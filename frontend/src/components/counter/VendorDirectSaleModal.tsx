@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import type { Product, ProductCategory, Contact, FinancialAccount } from '../../api/client';
 import { api } from '../../api/client';
@@ -74,6 +74,7 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
   const [customerPhone, setCustomerPhone] = useState('');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
 
   useEffect(() => {
     setLiveContacts(contacts);
@@ -195,7 +196,12 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
       return;
     }
 
+    if (submitting || submittingRef.current) {
+      return;
+    }
+
     try {
+      submittingRef.current = true;
       setSubmitting(true);
 
       const payload = {
@@ -220,11 +226,20 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
         notes: notes.trim() || undefined,
       };
 
-      const res = await api.vendorDirectSale(payload);
+      const order = await api.vendorDirectSale(payload);
 
-      toast.success(`Vendor Direct Sale Completed: Order #${res.data.order_number}`, {
+      const orderNumber = (order as any)?.order_number || (order as any)?.data?.order_number || 'Completed';
+
+      toast.success(`Vendor Direct Sale Completed: Order #${orderNumber}`, {
         description: `Customer paid ${paidAmountNum.toLocaleString()} ETB. Sourced from vendor directly.`,
       });
+
+      // Clear dynamic inputs to prevent duplicate submission
+      setImeiOrSerial('');
+      setSellingPrice('');
+      setPaidAmount('');
+      setVendorCost('');
+      setNotes('');
 
       onSaleSuccess();
       onClose();
@@ -232,6 +247,7 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
       toast.error('Failed to complete vendor direct sale', { description: err.message });
     } finally {
       setSubmitting(false);
+      submittingRef.current = false;
     }
   };
 

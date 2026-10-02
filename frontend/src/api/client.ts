@@ -1144,7 +1144,7 @@ export const api = {
     customer_phone?: string;
     notes?: string;
   }) =>
-    request<{ success: boolean; message: string; data: SalesOrder }>('/sales/vendor-direct', {
+    request<SalesOrder>('/sales/vendor-direct', {
       method: 'POST',
       body: JSON.stringify(data),
     }),

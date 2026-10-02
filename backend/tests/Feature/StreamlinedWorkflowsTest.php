@@ -236,4 +236,9 @@ test('pos vendor direct sale completes JIT transaction in single step', function
 
     // Bank: 100,000 - 50,000 (vendor payout) + 62,000 (customer payment) = 112,000
     expect((float) $this->bankAccount->fresh()->current_balance)->toBe(112000.00);
+
+    // Attempting duplicate sale with same IMEI must fail with 422
+    $duplicateResponse = $this->actingAs($this->owner)->postJson('/api/v1/sales/vendor-direct', $payload);
+    $duplicateResponse->assertStatus(422)
+        ->assertJsonValidationErrors(['imei_or_serial']);
 });
