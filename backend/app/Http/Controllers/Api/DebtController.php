@@ -139,6 +139,11 @@ class DebtController extends Controller
 
                 if ($type === 'receivable') {
                     // Money disbursed/lent from our account to the borrower
+                    if ((float) $account->current_balance < $amount) {
+                        throw \Illuminate\Validation\ValidationException::withMessages([
+                            'disburse_account_id' => ["Insufficient balance in account '{$account->name}'."],
+                        ]);
+                    }
                     $account->decrement('current_balance', $amount);
 
                     FinancialTransaction::create([

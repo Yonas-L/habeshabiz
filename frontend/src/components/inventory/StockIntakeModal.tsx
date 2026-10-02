@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import type { ProductCategory, Product, Contact, ProductVariant } from '../../api/client';
+import type { ProductCategory, Product, Contact, ProductVariant, FinancialAccount, Debt } from '../../api/client';
 import { api } from '../../api/client';
 import { toast } from 'sonner';
 import { formatCurrencyInput, parseFormattedNumber } from '../../utils/numberUtils';
@@ -16,6 +16,9 @@ import {
   Building2,
   Check,
   Clock,
+  Copy,
+  Trash2,
+  ShieldAlert,
 } from 'lucide-react';
 import { PartnerFormModal } from '../partners/PartnerFormModal';
 
@@ -25,6 +28,8 @@ interface StockIntakeModalProps {
   categories: ProductCategory[];
   products: Product[];
   contacts: Contact[];
+  accounts?: FinancialAccount[];
+  isOwner?: boolean;
   onIntakeSuccess: () => void;
   onOpenCategoryManager?: () => void;
   initialProductId?: string;
@@ -71,12 +76,27 @@ function getCategoryArchetype(catSlug?: string, catName?: string): CategoryArche
   return 'general';
 }
 
+export interface BatchDeviceItem {
+  id: string;
+  variant_id: string;
+  imei_or_serial: string;
+  battery_health?: string;
+  cycle_count?: string;
+  sim_type?: 'physical' | 'esim' | 'dual' | 'na';
+  condition: string;
+  cost_basis: string;
+  selling_price?: string;
+  notes?: string;
+}
+
 export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
   isOpen,
   onClose,
   categories,
   products,
   contacts,
+  accounts = [],
+  isOwner = false,
   onIntakeSuccess,
   onOpenCategoryManager,
   initialProductId,
@@ -112,8 +132,9 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
   const [isCreatingVariant, setIsCreatingVariant] = useState(false);
   const [isSubmittingVariant, setIsSubmittingVariant] = useState(false);
 
-  // Intake Parameters
-  const [bulkMode, setBulkMode] = useState(false);
+  // Intake Parameters & Modes
+  const [intakeMode, setIntakeMode] = useState<'single' | 'batch' | 'bulk'>('single');
+  const [batchItems, setBatchItems] = useState<BatchDeviceItem[]>([]);
   const [singleImei, setSingleImei] = useState('');
   const [bulkImeisText, setBulkImeisText] = useState('');
   const [quantity, setQuantity] = useState('1');
@@ -132,6 +153,14 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
   const [location, setLocation] = useState('Shop Counter');
   const [notes, setNotes] = useState('');
   const [isSubmittingIntake, setIsSubmittingIntake] = useState(false);
+
+  // Cost Funding State
+  const [fundingSource, setFundingSource] = useState<'unpaid' | 'shop_account' | 'debtor_offset' | 'split'>('unpaid');
+  const [paymentAccountId, setPaymentAccountId] = useState<string>('');
+  const [selectedDebtorContactId, setSelectedDebtorContactId] = useState<string>('');
+  const [splitOffsetAmount, setSplitOffsetAmount] = useState<string>('');
+  const [splitCashAmount, setSplitCashAmount] = useState<string>('');
+  const [receivableDebts, setReceivableDebts] = useState<Debt[]>([]);
 
   useEffect(() => {
     setLocalProducts(products);
@@ -504,6 +533,77 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
     }
   };
 
+  // Batch Device Helpers
+  const handleAddBatchItem = () => {
+    const last = batchItems[batchItems.length - 1];
+    const vId = last?.variant_id || selectedVariantId || (selectedProduct?.variants[0]?.id ?? '');
+    const v = selectedProduct?.variants.find((item) => item.id === vId);
+    const defPrice = v?.default_selling_price ? formatCurrencyInput(v.default_selling_price) : (last?.selling_price || '');
+    setBatchItems((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        variant_id: vId,
+        imei_or_serial: '',
+        battery_health: last?.battery_health || '100',
+        cycle_count: last?.cycle_count || '0',
+        sim_type: last?.sim_type || 'physical',
+        condition: last?.condition || 'new',
+        cost_basis: last?.cost_basis || '',
+        selling_price: defPrice,
+        notes: '',
+      },
+    ]);
+  };
+
+  const handleDuplicateBatchItem = (index: number) => {
+    const source = batchItems[index];
+    const newItem: BatchDeviceItem = {
+      ...source,
+      id: crypto.randomUUID(),
+      imei_or_serial: '', // Blank IMEI for fast entry of next unit
+    };
+    const updated = [...batchItems];
+    updated.splice(index + 1, 0, newItem);
+    setBatchItems(updated);
+    toast.success('Device row duplicated');
+  };
+
+  const handleRemoveBatchItem = (index: number) => {
+    if (batchItems.length <= 1) {
+      toast.error('Batch must contain at least one device');
+      return;
+    }
+    setBatchItems((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleUpdateBatchItem = (index: number, patch: Partial<BatchDeviceItem>) => {
+    setBatchItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)));
+  };
+
+  const switchToBatchMode = () => {
+    setIntakeMode('batch');
+    if (batchItems.length === 0) {
+      const vId = selectedVariantId || (selectedProduct?.variants[0]?.id ?? '');
+      const v = selectedProduct?.variants.find((item) => item.id === vId);
+      const defPrice = v?.default_selling_price ? formatCurrencyInput(v.default_selling_price) : (sellingPrice || '');
+      setBatchItems([
+        {
+          id: crypto.randomUUID(),
+          variant_id: vId,
+          imei_or_serial: singleImei || '',
+          battery_health: batteryHealth || '100',
+          cycle_count: cycleCount || '0',
+          sim_type: simType || 'physical',
+          condition: condition || 'new',
+          cost_basis: costBasis || '',
+          selling_price: defPrice,
+          notes: '',
+        },
+      ]);
+    }
+  };
+
   // Parse bulk IMEIs
   const parsedImeis = useMemo(() => {
     if (!bulkImeisText.trim()) return [];
@@ -514,7 +614,7 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
   }, [bulkImeisText]);
 
   const duplicateImeisInBulk = useMemo(() => {
-    if (!bulkMode || parsedImeis.length === 0) return [];
+    if (intakeMode !== 'bulk' || parsedImeis.length === 0) return [];
     const counts = new Map<string, number>();
     for (const item of parsedImeis) {
       const lower = item.toLowerCase();
@@ -525,22 +625,30 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
       if (count > 1) dupes.push(key);
     });
     return dupes;
-  }, [bulkMode, parsedImeis]);
+  }, [intakeMode, parsedImeis]);
 
   // Total units and cost calculations
   const totalUnitsToReceive = useMemo(() => {
     if (hasSerials) {
-      return bulkMode ? parsedImeis.length : singleImei.trim() ? 1 : 0;
+      if (intakeMode === 'batch') return batchItems.length;
+      if (intakeMode === 'bulk') return parsedImeis.length;
+      return singleImei.trim() ? 1 : 0;
     }
     const q = parseInt(quantity, 10);
     return isNaN(q) || q <= 0 ? 0 : q;
-  }, [hasSerials, bulkMode, parsedImeis.length, singleImei, quantity]);
+  }, [hasSerials, intakeMode, batchItems.length, parsedImeis.length, singleImei, quantity]);
 
   const totalInvestmentCost = useMemo(() => {
+    if (intakeMode === 'batch') {
+      return batchItems.reduce((acc, item) => {
+        const c = parseFormattedNumber(item.cost_basis) || 0;
+        return acc + c;
+      }, 0);
+    }
     const cost = parseFormattedNumber(costBasis);
     if (!cost || cost <= 0) return 0;
     return totalUnitsToReceive * cost;
-  }, [costBasis, totalUnitsToReceive]);
+  }, [intakeMode, batchItems, costBasis, totalUnitsToReceive]);
 
   const isPhone = useMemo(() => {
     const catSlug = activeCategory?.slug || '';
@@ -554,46 +662,143 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
     );
   }, [activeCategory, selectedProduct]);
 
+  // Load receivable debts
+  useEffect(() => {
+    if (isOpen) {
+      api.getDebts({ type: 'receivable' })
+        .then((res) => setReceivableDebts(res))
+        .catch(() => {});
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (accounts.length > 0 && !paymentAccountId) {
+      setPaymentAccountId(accounts[0].id);
+    }
+  }, [accounts, paymentAccountId]);
+
+  const debtorsWithBalance = useMemo(() => {
+    const map = new Map<string, { contact: Contact; totalOwed: number }>();
+    for (const d of receivableDebts) {
+      if (!d.contact_id || !d.contact) continue;
+      const remaining = Number(d.remaining_amount || 0);
+      if (remaining <= 0) continue;
+      const existing = map.get(d.contact_id);
+      if (existing) {
+        existing.totalOwed += remaining;
+      } else {
+        map.set(d.contact_id, { contact: d.contact, totalOwed: remaining });
+      }
+    }
+    return Array.from(map.values());
+  }, [receivableDebts]);
+
+  const selectedAccount = useMemo(() => {
+    return accounts.find((a) => a.id === paymentAccountId) || accounts[0];
+  }, [accounts, paymentAccountId]);
+
+  const isAccountOverdrawn = useMemo(() => {
+    if (!isOwner || !selectedAccount || selectedAccount.current_balance === null) return false;
+    const balance = Number(selectedAccount.current_balance);
+    if (fundingSource === 'shop_account') {
+      return totalInvestmentCost > balance;
+    }
+    if (fundingSource === 'split') {
+      const cash = parseFormattedNumber(splitCashAmount) || 0;
+      return cash > balance;
+    }
+    return false;
+  }, [isOwner, selectedAccount, fundingSource, totalInvestmentCost, splitCashAmount]);
+
+  const handleSplitOffsetChange = (val: string) => {
+    setSplitOffsetAmount(val);
+    const offset = parseFormattedNumber(val) || 0;
+    const remainder = Math.max(0, totalInvestmentCost - offset);
+    setSplitCashAmount(formatCurrencyInput(remainder));
+  };
+
   // Submit Stock Intake
   const handleSubmitIntake = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!selectedVariantId) {
-      toast.error('Please select a product specification');
-      return;
-    }
-
-    const costNum = parseFormattedNumber(costBasis);
-    if (costNum === null || costNum < 0) {
-      toast.error('Please enter a valid cost per unit');
-      return;
-    }
-
-    if (hasSerials) {
-      if (bulkMode && parsedImeis.length === 0) {
-        toast.error('Please enter at least one Serial or IMEI');
+    if (intakeMode === 'batch') {
+      if (batchItems.length === 0) {
+        toast.error('Please add at least one device');
         return;
       }
-      if (bulkMode && duplicateImeisInBulk.length > 0) {
-        toast.error(
-          `Duplicate IMEIs detected (${duplicateImeisInBulk.slice(0, 3).join(', ')}). Each unit must be unique.`
-        );
-        return;
+      for (let i = 0; i < batchItems.length; i++) {
+        const it = batchItems[i];
+        if (!it.variant_id) {
+          toast.error(`Device #${i + 1} has no specification selected`);
+          return;
+        }
+        const c = parseFormattedNumber(it.cost_basis);
+        if (c === null || c < 0) {
+          toast.error(`Device #${i + 1} has an invalid cost`);
+          return;
+        }
+        if (hasSerials && !it.imei_or_serial.trim()) {
+          toast.error(`Device #${i + 1} requires an IMEI or Serial #`);
+          return;
+        }
       }
-      if (!bulkMode && !singleImei.trim()) {
-        toast.error('Please enter the device Serial or IMEI');
-        return;
+
+      // Check duplicate IMEIs in batch
+      if (hasSerials) {
+        const imeis = batchItems.map((it) => it.imei_or_serial.trim().toLowerCase()).filter(Boolean);
+        const seen = new Set<string>();
+        for (const imei of imeis) {
+          if (seen.has(imei)) {
+            toast.error(`Duplicate Serial/IMEI detected (${imei}) within batch`);
+            return;
+          }
+          seen.add(imei);
+        }
       }
     } else {
-      const q = parseInt(quantity, 10);
-      if (isNaN(q) || q <= 0) {
-        toast.error('Please enter a valid quantity');
+      if (!selectedVariantId) {
+        toast.error('Please select a product specification');
         return;
+      }
+
+      const costNum = parseFormattedNumber(costBasis);
+      if (costNum === null || costNum < 0) {
+        toast.error('Please enter a valid cost per unit');
+        return;
+      }
+
+      if (hasSerials) {
+        if (intakeMode === 'bulk' && parsedImeis.length === 0) {
+          toast.error('Please enter at least one Serial or IMEI');
+          return;
+        }
+        if (intakeMode === 'bulk' && duplicateImeisInBulk.length > 0) {
+          toast.error(
+            `Duplicate IMEIs detected (${duplicateImeisInBulk.slice(0, 3).join(', ')}). Each unit must be unique.`
+          );
+          return;
+        }
+        if (intakeMode === 'single' && !singleImei.trim()) {
+          toast.error('Please enter the device Serial or IMEI');
+          return;
+        }
+      } else {
+        const q = parseInt(quantity, 10);
+        if (isNaN(q) || q <= 0) {
+          toast.error('Please enter a valid quantity');
+          return;
+        }
       }
     }
 
     if (sourceType === 'consignment' && !supplierId) {
       toast.error('Please select the broker/vendor partner');
+      return;
+    }
+
+    // Overdraft validation for shop purchase
+    if (sourceType === 'purchase' && (fundingSource === 'shop_account' || fundingSource === 'split') && isAccountOverdrawn) {
+      toast.error('Insufficient balance in selected account');
       return;
     }
 
@@ -611,31 +816,63 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
         }
       }
 
-      const payload: any = {
-        variant_id: selectedVariantId,
-        cost_basis: costNum,
-        condition,
-        location: location || 'Shop Counter',
-        notes: notes.trim() || null,
-        source_type: sourceType,
-        supplier_contact_id: supplierId || null,
-        return_deadline: calculatedReturnDeadline,
-        selling_price: parseFormattedNumber(sellingPrice) ?? undefined,
-      };
+      let payload: any;
 
-      if (hasSerials) {
-        if (bulkMode) {
-          payload.imeis = parsedImeis;
-        } else {
-          payload.imei_or_serial = singleImei.trim();
-        }
-        if (isPhone) {
-          payload.battery_health = batteryHealth ? parseInt(batteryHealth, 10) : null;
-          payload.cycle_count = cycleCount ? parseInt(cycleCount, 10) : null;
-          payload.sim_type = simType;
-        }
+      if (intakeMode === 'batch') {
+        payload = {
+          units: batchItems.map((it) => ({
+            variant_id: it.variant_id,
+            imei_or_serial: it.imei_or_serial.trim() || undefined,
+            cost_basis: parseFormattedNumber(it.cost_basis) ?? 0,
+            selling_price: parseFormattedNumber(it.selling_price) ?? undefined,
+            condition: it.condition,
+            battery_health: it.battery_health ? parseInt(it.battery_health, 10) : undefined,
+            cycle_count: it.cycle_count ? parseInt(it.cycle_count, 10) : undefined,
+            sim_type: it.sim_type,
+            notes: it.notes?.trim() || undefined,
+            location: location || 'Shop Counter',
+          })),
+          source_type: sourceType,
+          supplier_contact_id: supplierId || undefined,
+          return_deadline: calculatedReturnDeadline,
+          funding_source: sourceType === 'purchase' ? fundingSource : undefined,
+          payment_account_id: (sourceType === 'purchase' && (fundingSource === 'shop_account' || fundingSource === 'split')) ? (paymentAccountId || undefined) : undefined,
+          payment_amount: (sourceType === 'purchase' && (fundingSource === 'shop_account' || fundingSource === 'split')) ? (fundingSource === 'split' ? (parseFormattedNumber(splitCashAmount) ?? undefined) : totalInvestmentCost) : undefined,
+          receivable_contact_id: (sourceType === 'purchase' && (fundingSource === 'debtor_offset' || fundingSource === 'split')) ? (selectedDebtorContactId || undefined) : undefined,
+          offset_amount: (sourceType === 'purchase' && (fundingSource === 'debtor_offset' || fundingSource === 'split')) ? (fundingSource === 'split' ? (parseFormattedNumber(splitOffsetAmount) ?? undefined) : totalInvestmentCost) : undefined,
+        };
       } else {
-        payload.quantity = parseInt(quantity, 10) || 1;
+        payload = {
+          variant_id: selectedVariantId,
+          cost_basis: parseFormattedNumber(costBasis) ?? 0,
+          selling_price: parseFormattedNumber(sellingPrice) ?? undefined,
+          condition,
+          location: location || 'Shop Counter',
+          notes: notes.trim() || null,
+          source_type: sourceType,
+          supplier_contact_id: supplierId || null,
+          return_deadline: calculatedReturnDeadline,
+          funding_source: sourceType === 'purchase' ? fundingSource : undefined,
+          payment_account_id: (sourceType === 'purchase' && (fundingSource === 'shop_account' || fundingSource === 'split')) ? (paymentAccountId || undefined) : undefined,
+          payment_amount: (sourceType === 'purchase' && (fundingSource === 'shop_account' || fundingSource === 'split')) ? (fundingSource === 'split' ? (parseFormattedNumber(splitCashAmount) ?? undefined) : totalInvestmentCost) : undefined,
+          receivable_contact_id: (sourceType === 'purchase' && (fundingSource === 'debtor_offset' || fundingSource === 'split')) ? (selectedDebtorContactId || undefined) : undefined,
+          offset_amount: (sourceType === 'purchase' && (fundingSource === 'debtor_offset' || fundingSource === 'split')) ? (fundingSource === 'split' ? (parseFormattedNumber(splitOffsetAmount) ?? undefined) : totalInvestmentCost) : undefined,
+        };
+
+        if (hasSerials) {
+          if (intakeMode === 'bulk') {
+            payload.imeis = parsedImeis;
+          } else {
+            payload.imei_or_serial = singleImei.trim();
+          }
+          if (isPhone) {
+            payload.battery_health = batteryHealth ? parseInt(batteryHealth, 10) : null;
+            payload.cycle_count = cycleCount ? parseInt(cycleCount, 10) : null;
+            payload.sim_type = simType;
+          }
+        } else {
+          payload.quantity = parseInt(quantity, 10) || 1;
+        }
       }
 
       await api.intakeInventoryUnit(payload);
@@ -647,6 +884,7 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
       // Reset fields
       setSingleImei('');
       setBulkImeisText('');
+      setBatchItems([]);
       setQuantity('1');
       setCostBasis('');
       setSellingPrice('');
@@ -1480,17 +1718,17 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
           <div className="space-y-3 pt-2">
             <div className="flex items-center justify-between">
               <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                {hasSerials ? 'Serial / IMEI' : 'Batch Quantity'} <span className="text-rose-500">*</span>
+                {hasSerials ? 'Intake Mode & Devices' : 'Batch Quantity'} <span className="text-rose-500">*</span>
               </label>
 
-              {/* Single / Bulk Toggle */}
+              {/* Single / Batch / Bulk Toggle */}
               {hasSerials && (
                 <div className="p-0.5 bg-slate-100 dark:bg-slate-800 rounded-lg flex text-[10px] font-semibold">
                   <button
                     type="button"
-                    onClick={() => setBulkMode(false)}
+                    onClick={() => setIntakeMode('single')}
                     className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
-                      !bulkMode
+                      intakeMode === 'single'
                         ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs font-bold'
                         : 'text-slate-500 dark:text-slate-400'
                     }`}
@@ -1499,9 +1737,20 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setBulkMode(true)}
+                    onClick={switchToBatchMode}
                     className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
-                      bulkMode
+                      intakeMode === 'batch'
+                        ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs font-bold'
+                        : 'text-slate-500 dark:text-slate-400'
+                    }`}
+                  >
+                    Batch Devices
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIntakeMode('bulk')}
+                    className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+                      intakeMode === 'bulk'
                         ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs font-bold'
                         : 'text-slate-500 dark:text-slate-400'
                     }`}
@@ -1513,7 +1762,208 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
             </div>
 
             {hasSerials ? (
-              bulkMode ? (
+              intakeMode === 'batch' ? (
+                <div className="space-y-3">
+                  {/* Desktop Table */}
+                  <div className="hidden sm:block overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 dark:bg-slate-900/60 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-200/80 dark:border-slate-800">
+                        <tr>
+                          <th className="py-2 px-2.5 w-7 text-center">#</th>
+                          <th className="py-2 px-2.5">Variant</th>
+                          <th className="py-2 px-2.5">Serial / IMEI *</th>
+                          {isPhone && <th className="py-2 px-2 w-20">Battery %</th>}
+                          <th className="py-2 px-2.5 w-28">Cost (ETB) *</th>
+                          <th className="py-2 px-2.5 w-28">Price (ETB)</th>
+                          <th className="py-2 px-2 text-right w-16">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 bg-white dark:bg-slate-900/40">
+                        {batchItems.map((item, idx) => (
+                          <tr key={item.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+                            <td className="py-2 px-2 text-center text-slate-400 font-mono text-[11px]">{idx + 1}</td>
+                            <td className="py-2 px-2.5">
+                              <select
+                                value={item.variant_id}
+                                onChange={(e) => handleUpdateBatchItem(idx, { variant_id: e.target.value })}
+                                className="w-full h-8 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold focus:outline-none"
+                              >
+                                {(selectedProduct?.variants || []).map((v) => (
+                                  <option key={v.id} value={v.id}>
+                                    {v.storage || 'Std'}{v.color ? ` · ${v.color}` : ''}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+                            <td className="py-2 px-2.5">
+                              <input
+                                type="text"
+                                required
+                                placeholder="359871..."
+                                value={item.imei_or_serial}
+                                onChange={(e) => handleUpdateBatchItem(idx, { imei_or_serial: e.target.value })}
+                                className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-slate-900/20"
+                              />
+                            </td>
+                            {isPhone && (
+                              <td className="py-2 px-2">
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max="100"
+                                  value={item.battery_health || ''}
+                                  onChange={(e) => handleUpdateBatchItem(idx, { battery_health: e.target.value })}
+                                  className="w-full h-8 px-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-center font-mono text-xs focus:outline-none"
+                                />
+                              </td>
+                            )}
+                            <td className="py-2 px-2.5">
+                              <input
+                                type="text"
+                                required
+                                placeholder="Cost"
+                                value={item.cost_basis}
+                                onChange={(e) => handleUpdateBatchItem(idx, { cost_basis: formatCurrencyInput(e.target.value) })}
+                                className="w-full h-8 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono font-bold text-xs focus:outline-none"
+                              />
+                            </td>
+                            <td className="py-2 px-2.5">
+                              <input
+                                type="text"
+                                placeholder="Opt."
+                                value={item.selling_price || ''}
+                                onChange={(e) => handleUpdateBatchItem(idx, { selling_price: formatCurrencyInput(e.target.value) })}
+                                className="w-full h-8 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono text-xs focus:outline-none"
+                              />
+                            </td>
+                            <td className="py-2 px-2 text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDuplicateBatchItem(idx)}
+                                  title="Duplicate device row"
+                                  className="p-1 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                >
+                                  <Copy className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveBatchItem(idx)}
+                                  disabled={batchItems.length <= 1}
+                                  title="Remove device row"
+                                  className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 disabled:opacity-30 transition-colors cursor-pointer"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Mobile Cards */}
+                  <div className="sm:hidden space-y-2.5">
+                    {batchItems.map((item, idx) => (
+                      <div key={item.id} className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-slate-900 dark:text-white font-mono">
+                            Device #{idx + 1}
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleDuplicateBatchItem(idx)}
+                              className="px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 text-[10px] font-semibold flex items-center gap-1 text-slate-600 dark:text-slate-300 cursor-pointer"
+                            >
+                              <Copy className="w-3 h-3" />
+                              Duplicate
+                            </button>
+                            {batchItems.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveBatchItem(idx)}
+                                className="p-1 rounded-lg text-slate-400 hover:text-rose-600 cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[10px] text-slate-400 mb-0.5">Variant</label>
+                            <select
+                              value={item.variant_id}
+                              onChange={(e) => handleUpdateBatchItem(idx, { variant_id: e.target.value })}
+                              className="w-full h-8 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium focus:outline-none"
+                            >
+                              {(selectedProduct?.variants || []).map((v) => (
+                                <option key={v.id} value={v.id}>
+                                  {v.storage || 'Std'}{v.color ? ` · ${v.color}` : ''}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] text-slate-400 mb-0.5">Serial / IMEI *</label>
+                            <input
+                              type="text"
+                              placeholder="Serial #"
+                              value={item.imei_or_serial}
+                              onChange={(e) => handleUpdateBatchItem(idx, { imei_or_serial: e.target.value })}
+                              className="w-full h-8 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono text-xs focus:outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2">
+                          {isPhone && (
+                            <div>
+                              <label className="block text-[10px] text-slate-400 mb-0.5">Battery %</label>
+                              <input
+                                type="number"
+                                value={item.battery_health || ''}
+                                onChange={(e) => handleUpdateBatchItem(idx, { battery_health: e.target.value })}
+                                className="w-full h-8 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-center font-mono text-xs focus:outline-none"
+                              />
+                            </div>
+                          )}
+                          <div className={isPhone ? '' : 'col-span-2'}>
+                            <label className="block text-[10px] text-slate-400 mb-0.5">Cost (ETB) *</label>
+                            <input
+                              type="text"
+                              value={item.cost_basis}
+                              onChange={(e) => handleUpdateBatchItem(idx, { cost_basis: formatCurrencyInput(e.target.value) })}
+                              className="w-full h-8 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono font-bold text-xs focus:outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] text-slate-400 mb-0.5">Price (ETB)</label>
+                            <input
+                              type="text"
+                              value={item.selling_price || ''}
+                              onChange={(e) => handleUpdateBatchItem(idx, { selling_price: formatCurrencyInput(e.target.value) })}
+                              className="w-full h-8 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono text-xs focus:outline-none"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleAddBatchItem}
+                    className="w-full h-9 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-600 text-slate-600 dark:text-slate-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Another Device to Batch</span>
+                  </button>
+                </div>
+              ) : intakeMode === 'bulk' ? (
                 <div>
                   <textarea
                     rows={3}
@@ -1601,8 +2051,8 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
               </div>
             )}
 
-            {/* Phone Specific Battery & SIM */}
-            {hasSerials && isPhone && (
+            {/* Phone Specific Battery & SIM for single mode */}
+            {hasSerials && isPhone && intakeMode === 'single' && (
               <div className="grid grid-cols-3 gap-3 pt-1">
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1.5 flex items-center gap-1">
@@ -1741,54 +2191,87 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
             )}
 
             {/* Financial Inputs (Cost Basis, Selling Price, Location) */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
-                  {sourceType === 'consignment' ? 'Agreed Payout (ETB)' : 'Cost Basis (ETB)'} <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  required
-                  placeholder="e.g. 85,000"
-                  value={costBasis}
-                  onChange={(e) => setCostBasis(formatCurrencyInput(e.target.value))}
-                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-bold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
-                />
+            {intakeMode === 'batch' ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="p-3 rounded-xl bg-slate-50/80 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                  <div>
+                    <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block">
+                      Total Batch Cost ({batchItems.length} units)
+                    </span>
+                    <span className="text-[10px] text-slate-400">Sum of device costs in batch</span>
+                  </div>
+                  <span className="text-sm font-mono font-bold text-slate-900 dark:text-white">
+                    {totalInvestmentCost.toLocaleString()} ETB
+                  </span>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
+                    Shop Location
+                  </label>
+                  <select
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none cursor-pointer"
+                  >
+                    <option value="Shop Counter">Shop Counter</option>
+                    <option value="Display Showcase">Display Showcase</option>
+                    <option value="Backroom Safe">Backroom Safe</option>
+                  </select>
+                </div>
               </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
+                    {sourceType === 'consignment' ? 'Agreed Payout (ETB)' : 'Cost Basis (ETB)'} <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    required
+                    placeholder="e.g. 85,000"
+                    value={costBasis}
+                    onChange={(e) => setCostBasis(formatCurrencyInput(e.target.value))}
+                    className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-bold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
-                  Selling Price (ETB)
-                </label>
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  placeholder="e.g. 95,000"
-                  value={sellingPrice}
-                  onChange={(e) => setSellingPrice(formatCurrencyInput(e.target.value))}
-                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
-                />
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+                      Selling Price (ETB)
+                    </label>
+                    <span className="text-[10px] text-slate-400 font-medium">Optional</span>
+                  </div>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="e.g. 95,000 (Optional)"
+                    value={sellingPrice}
+                    onChange={(e) => setSellingPrice(formatCurrencyInput(e.target.value))}
+                    className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
+                    Shop Location
+                  </label>
+                  <select
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none cursor-pointer"
+                  >
+                    <option value="Shop Counter">Shop Counter</option>
+                    <option value="Display Showcase">Display Showcase</option>
+                    <option value="Backroom Safe">Backroom Safe</option>
+                  </select>
+                </div>
               </div>
+            )}
 
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
-                  Shop Location
-                </label>
-                <select
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none cursor-pointer"
-                >
-                  <option value="Shop Counter">Shop Counter</option>
-                  <option value="Display Showcase">Display Showcase</option>
-                  <option value="Backroom Safe">Backroom Safe</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Projected Margin Indicator */}
-            {(() => {
+            {/* Projected Margin Indicator (Single/Bulk mode) */}
+            {intakeMode !== 'batch' && (() => {
               const cost = parseFormattedNumber(costBasis);
               const price = parseFormattedNumber(sellingPrice);
               if (cost !== null && price !== null && cost > 0 && price > 0) {
@@ -1813,6 +2296,205 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
               }
               return null;
             })()}
+
+            {/* Cost Funding Selector (Only for Shop Owned / Purchase) */}
+            {sourceType === 'purchase' && (
+              <div className="p-3.5 rounded-2xl bg-slate-50/80 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                    Cost Funding Source
+                  </label>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    Total: {totalInvestmentCost.toLocaleString()} ETB
+                  </span>
+                </div>
+
+                {/* Funding Source Segmented Tabs */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 p-1 bg-slate-200/60 dark:bg-slate-800/80 rounded-xl text-[11px] font-semibold">
+                  <button
+                    type="button"
+                    onClick={() => setFundingSource('unpaid')}
+                    className={`py-1.5 px-2 rounded-lg text-center transition-all cursor-pointer ${
+                      fundingSource === 'unpaid'
+                        ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-bold'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    Pay Later
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFundingSource('shop_account')}
+                    className={`py-1.5 px-2 rounded-lg text-center transition-all cursor-pointer ${
+                      fundingSource === 'shop_account'
+                        ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-bold'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    Shop Account
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFundingSource('debtor_offset');
+                      if (!selectedDebtorContactId && debtorsWithBalance.length > 0) {
+                        setSelectedDebtorContactId(debtorsWithBalance[0].contact.id);
+                      }
+                    }}
+                    className={`py-1.5 px-2 rounded-lg text-center transition-all cursor-pointer ${
+                      fundingSource === 'debtor_offset'
+                        ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-bold'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    Debtor Offset
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFundingSource('split');
+                      if (!selectedDebtorContactId && debtorsWithBalance.length > 0) {
+                        setSelectedDebtorContactId(debtorsWithBalance[0].contact.id);
+                        const debtorMax = debtorsWithBalance[0].totalOwed;
+                        const defaultOffset = Math.min(debtorMax, totalInvestmentCost / 2);
+                        setSplitOffsetAmount(formatCurrencyInput(defaultOffset));
+                        setSplitCashAmount(formatCurrencyInput(Math.max(0, totalInvestmentCost - defaultOffset)));
+                      }
+                    }}
+                    className={`py-1.5 px-2 rounded-lg text-center transition-all cursor-pointer ${
+                      fundingSource === 'split'
+                        ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-bold'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    Split Funding
+                  </button>
+                </div>
+
+                {/* Sub-panels according to selected funding source */}
+                {fundingSource === 'unpaid' && (
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5 px-1 py-0.5">
+                    <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span>Recorded as supplier payable debt. No shop bank or cash balance is deducted now.</span>
+                  </div>
+                )}
+
+                {fundingSource === 'shop_account' && (
+                  <div className="space-y-2 pt-1">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+                        Payment Account
+                      </label>
+                      {isAccountOverdrawn && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200 dark:border-rose-900/60">
+                          <ShieldAlert className="w-3 h-3" />
+                          Insufficient balance
+                        </span>
+                      )}
+                    </div>
+                    <select
+                      value={paymentAccountId}
+                      onChange={(e) => setPaymentAccountId(e.target.value)}
+                      className={`w-full h-10 px-3 rounded-xl border bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none cursor-pointer ${
+                        isAccountOverdrawn ? 'border-rose-300 dark:border-rose-700 ring-1 ring-rose-500/20' : 'border-slate-200 dark:border-slate-700'
+                      }`}
+                    >
+                      {accounts.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.name}
+                          {isOwner && a.current_balance !== null ? ` (${Number(a.current_balance).toLocaleString()} ETB)` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {fundingSource === 'debtor_offset' && (
+                  <div className="space-y-2 pt-1">
+                    <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+                      Debtor with Open Balance
+                    </label>
+                    {debtorsWithBalance.length === 0 ? (
+                      <div className="p-2.5 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 text-xs text-slate-400">
+                        No contacts currently owe money to offset against.
+                      </div>
+                    ) : (
+                      <select
+                        value={selectedDebtorContactId}
+                        onChange={(e) => setSelectedDebtorContactId(e.target.value)}
+                        className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none cursor-pointer"
+                      >
+                        {debtorsWithBalance.map((d) => (
+                          <option key={d.contact.id} value={d.contact.id}>
+                            {d.contact.name} (Owes {d.totalOwed.toLocaleString()} ETB)
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                )}
+
+                {fundingSource === 'split' && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                        Debtor Contact
+                      </label>
+                      <select
+                        value={selectedDebtorContactId}
+                        onChange={(e) => setSelectedDebtorContactId(e.target.value)}
+                        className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none cursor-pointer"
+                      >
+                        {debtorsWithBalance.map((d) => (
+                          <option key={d.contact.id} value={d.contact.id}>
+                            {d.contact.name} ({d.totalOwed.toLocaleString()} ETB)
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        type="text"
+                        placeholder="Offset Amount (ETB)"
+                        value={splitOffsetAmount}
+                        onChange={(e) => handleSplitOffsetChange(formatCurrencyInput(e.target.value))}
+                        className="w-full h-9 px-3 mt-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-medium text-slate-900 dark:text-white focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+                          Shop Account
+                        </label>
+                        {isAccountOverdrawn && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-50 text-rose-600 border border-rose-200">
+                            Insufficient
+                          </span>
+                        )}
+                      </div>
+                      <select
+                        value={paymentAccountId}
+                        onChange={(e) => setPaymentAccountId(e.target.value)}
+                        className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none cursor-pointer"
+                      >
+                        {accounts.map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.name}
+                            {isOwner && a.current_balance !== null ? ` (${Number(a.current_balance).toLocaleString()} ETB)` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        type="text"
+                        placeholder="Bank Cash Amount (ETB)"
+                        value={splitCashAmount}
+                        onChange={(e) => setSplitCashAmount(formatCurrencyInput(e.target.value))}
+                        className="w-full h-9 px-3 mt-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-medium text-slate-900 dark:text-white focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Supplier / Broker & Notes */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1898,10 +2580,14 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
               form="intake-form"
               disabled={
                 isSubmittingIntake ||
-                !selectedVariantId ||
-                !costBasis ||
+                (intakeMode === 'batch'
+                  ? batchItems.length === 0
+                  : (!selectedVariantId || !costBasis)) ||
                 totalUnitsToReceive === 0 ||
-                (bulkMode && duplicateImeisInBulk.length > 0)
+                (intakeMode === 'bulk' && duplicateImeisInBulk.length > 0) ||
+                (sourceType === 'purchase' &&
+                  (fundingSource === 'shop_account' || fundingSource === 'split') &&
+                  isAccountOverdrawn)
               }
               className="h-10 px-5 rounded-xl bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 text-white dark:text-slate-900 text-xs font-bold transition-all shadow-xs flex items-center gap-2 disabled:opacity-50 active:scale-[0.98] cursor-pointer"
             >

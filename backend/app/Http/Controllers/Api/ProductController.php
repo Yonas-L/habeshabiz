@@ -41,8 +41,10 @@ class ProductController extends Controller
             });
         }
 
-        if (! $request->boolean('include_inactive')) {
-            $query->where('is_active', true);
+        if ($request->boolean('archived')) {
+            $query->where('is_archived', true);
+        } elseif (! $request->boolean('include_inactive')) {
+            $query->where('is_active', true)->where('is_archived', false);
         }
 
         $products = $query->orderBy('name')->get();
@@ -91,6 +93,54 @@ class ProductController extends Controller
         ]);
     }
 
+    public function archive(Request $request, string $id): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        if (! $user->isOwner()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. Archiving products is restricted to store owners.',
+            ], 403);
+        }
+
+        $product = Product::findOrFail($id);
+        $product->update([
+            'is_archived' => true,
+            'is_active' => false,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Product '{$product->name}' moved to archive.",
+            'data' => $product,
+        ]);
+    }
+
+    public function unarchive(Request $request, string $id): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        if (! $user->isOwner()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. Restoring products is restricted to store owners.',
+            ], 403);
+        }
+
+        $product = Product::findOrFail($id);
+        $product->update([
+            'is_archived' => false,
+            'is_active' => true,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Product '{$product->name}' restored from archive.",
+            'data' => $product,
+        ]);
+    }
+
     public function destroy(Request $request, string $id): JsonResponse
     {
         /** @var User $user */
@@ -105,26 +155,38 @@ class ProductController extends Controller
         $product = Product::with(['variants'])->findOrFail($id);
         $variantIds = $product->variants->pluck('id')->toArray();
 
-        DB::transaction(function () use ($product, $variantIds) {
-            // Archive and soft-delete any active inventory units so they no longer appear in in-stock inventory or valuation
-            InventoryUnit::whereIn('variant_id', $variantIds)
-                ->whereIn('status', ['in_stock', 'out'])
-                ->update(['status' => 'archived']);
+        $hasSales = \App\Models\SalesOrderItem::whereIn('variant_id', $variantIds)->exists();
+        $hasUnits = InventoryUnit::whereIn('variant_id', $variantIds)->exists();
 
-            InventoryUnit::whereIn('variant_id', $variantIds)->delete();
+        DB::transaction(function () use ($product, $variantIds, $hasSales, $hasUnits) {
+            if ($hasSales || $hasUnits) {
+                // Archive and soft-delete active inventory units
+                InventoryUnit::whereIn('variant_id', $variantIds)
+                    ->whereIn('status', ['in_stock', 'out'])
+                    ->update(['status' => 'archived']);
 
-            // Zero out quantity on hand in stock counter
-            InventoryStock::whereIn('variant_id', $variantIds)->update(['quantity_on_hand' => 0]);
+                InventoryUnit::whereIn('variant_id', $variantIds)
+                    ->where('status', 'archived')
+                    ->delete();
 
-            // Soft-delete variants and product
-            ProductVariant::whereIn('id', $variantIds)->delete();
-            $product->update(['is_active' => false]);
-            $product->delete();
+                // Zero out stock count
+                InventoryStock::whereIn('variant_id', $variantIds)->update(['quantity_on_hand' => 0]);
+
+                // Soft-delete variants and product
+                ProductVariant::whereIn('id', $variantIds)->delete();
+                $product->update(['is_active' => false, 'is_archived' => true]);
+                $product->delete();
+            } else {
+                // Completely safe for permanent hard purge
+                InventoryStock::whereIn('variant_id', $variantIds)->delete();
+                ProductVariant::whereIn('id', $variantIds)->forceDelete();
+                $product->forceDelete();
+            }
         });
 
         return response()->json([
             'success' => true,
-            'message' => "Product '{$product->name}' removed successfully. All historical sales and records are preserved.",
+            'message' => "Product '{$product->name}' deleted successfully. Historical ledger records are preserved.",
             'deleted' => true,
         ]);
     }

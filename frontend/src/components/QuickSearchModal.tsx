@@ -281,7 +281,7 @@ export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({
       {
         id: 'act-stock-intake',
         type: 'action',
-        title: 'New Stock Intake',
+        title: 'Add Stock',
         subtitle: 'Receive devices or accessories into inventory',
         icon: Package,
         onSelect: () => onNavigate({ tab: 'inventory', action: 'stock_intake' }),

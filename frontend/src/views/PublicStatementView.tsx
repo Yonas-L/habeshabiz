@@ -38,6 +38,7 @@ export const PublicStatementView: React.FC<PublicStatementViewProps> = ({ token 
   const [data, setData] = useState<PartnerStatementData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
 
   const loadStatement = async () => {
     try {
@@ -46,12 +47,21 @@ export const PublicStatementView: React.FC<PublicStatementViewProps> = ({ token 
       const searchParams = new URLSearchParams(window.location.search);
       const startDate = searchParams.get('start_date') || undefined;
       const endDate = searchParams.get('end_date') || undefined;
+      const accountsParam = searchParams.get('accounts');
 
       const res = await api.getPublicStatement(token, {
         start_date: startDate,
         end_date: endDate,
       });
       setData(res);
+
+      if (accountsParam === 'none') {
+        setSelectedAccountIds([]);
+      } else if (accountsParam) {
+        setSelectedAccountIds(accountsParam.split(','));
+      } else {
+        setSelectedAccountIds((res.business.bank_accounts || []).map((a) => a.id));
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to load statement. Link may be invalid or expired.');
     } finally {
@@ -378,28 +388,40 @@ export const PublicStatementView: React.FC<PublicStatementViewProps> = ({ token 
           </div>
 
           {/* Payment Remittance Accounts */}
-          {business.bank_accounts && business.bank_accounts.length > 0 && isReceivable && (
-            <div className="pt-5 border-t border-slate-200 space-y-2.5">
+          {business.bank_accounts && business.bank_accounts.length > 0 && isReceivable && selectedAccountIds.length > 0 && (
+            <div className="pt-4 border-t border-slate-200 space-y-2">
               <span className="text-[10px] font-black uppercase tracking-widest text-slate-600 block">
                 Remittance Accounts
               </span>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                {business.bank_accounts.map((acc) => (
-                  <div
-                    key={acc.id}
-                    className="p-3.5 rounded-lg bg-white border border-slate-200/90 shadow-2xs font-mono"
-                  >
-                    <span className="text-[10px] font-bold text-slate-500 font-sans uppercase tracking-wider block">
-                      {acc.name}
-                    </span>
-                    <span className="font-black text-sm text-slate-900 block mt-0.5">
-                      {acc.account_number || 'Cashier Desk'}
-                    </span>
-                    <span className="text-[10px] text-slate-500 capitalize block mt-0.5 font-sans">
-                      {acc.type.replace(/_/g, ' ')}
-                    </span>
-                  </div>
-                ))}
+              <div className="rounded border border-slate-200 overflow-hidden bg-slate-50/50">
+                <table className="w-full text-left">
+                  <tbody className="divide-y divide-slate-100 text-xs">
+                    {business.bank_accounts
+                      .filter((acc) => selectedAccountIds.includes(acc.id))
+                      .map((acc) => (
+                        <tr key={acc.id} className="hover:bg-slate-50">
+                          <td className="py-2 px-3 w-8 align-middle">
+                            {acc.logo ? (
+                              <img src={resolveImageUrl(acc.logo) || acc.logo} alt="" className="w-5 h-5 rounded object-contain inline-block" />
+                            ) : (
+                              <div className="w-5 h-5 rounded bg-slate-200 flex items-center justify-center text-[9px] font-bold text-slate-600">
+                                {acc.name.charAt(0)}
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-2 px-3 align-middle font-semibold text-slate-900 text-xs">
+                            {acc.name}
+                            <span className="ml-2 text-[10px] text-slate-400 font-normal capitalize">
+                              ({acc.type.replace(/_/g, ' ')})
+                            </span>
+                          </td>
+                          <td className="py-2 px-3 align-middle text-right font-mono font-bold text-xs text-slate-900">
+                            {acc.account_number || 'Cashier Desk'}
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}

@@ -217,6 +217,7 @@ class AccountController extends Controller
             'asset_details' => ['nullable', 'array'],
             'is_active' => ['nullable', 'boolean'],
             'balance_adjustment' => ['nullable', 'numeric'],
+            'current_balance' => ['nullable', 'numeric', 'min:0'],
         ]);
 
         $oldValues = $account->only(['name', 'type', 'account_number', 'currency', 'logo', 'is_custom_asset', 'asset_details', 'is_active', 'current_balance']);
@@ -246,7 +247,9 @@ class AccountController extends Controller
             $account->is_active = $validated['is_active'];
         }
 
-        if (isset($validated['balance_adjustment'])) {
+        if (array_key_exists('current_balance', $validated) && $validated['current_balance'] !== null) {
+            $account->current_balance = (float) $validated['current_balance'];
+        } elseif (isset($validated['balance_adjustment'])) {
             $account->current_balance += (float) $validated['balance_adjustment'];
         }
 

@@ -22,6 +22,7 @@ class Product extends Model
         'category',
         'has_serials',
         'is_active',
+        'is_archived',
     ];
 
     protected function casts(): array
@@ -29,7 +30,18 @@ class Product extends Model
         return [
             'has_serials' => 'boolean',
             'is_active' => 'boolean',
+            'is_archived' => 'boolean',
         ];
+    }
+
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true)->where('is_archived', false);
+    }
+
+    public function scopeArchived($query)
+    {
+        return $query->where('is_archived', true);
     }
 
     public function categoryRel(): BelongsTo

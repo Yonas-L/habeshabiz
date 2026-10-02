@@ -40,6 +40,9 @@ export const VendorStatementPrintModal: React.FC<VendorStatementPrintModalProps>
 }) => {
   const [copiedLink, setCopiedLink] = React.useState(false);
   const [isDownloading, setIsDownloading] = React.useState(false);
+  const [selectedAccountIds, setSelectedAccountIds] = React.useState<string[]>(() =>
+    (data.business.bank_accounts || []).map((a) => a.id)
+  );
 
   if (!isOpen) return null;
 
@@ -76,6 +79,11 @@ export const VendorStatementPrintModal: React.FC<VendorStatementPrintModalProps>
     const params = new URLSearchParams();
     if (range.start_date) params.set('start_date', range.start_date);
     if (range.end_date) params.set('end_date', range.end_date);
+    if (selectedAccountIds.length === 0) {
+      params.set('accounts', 'none');
+    } else if (selectedAccountIds.length < (business.bank_accounts || []).length) {
+      params.set('accounts', selectedAccountIds.join(','));
+    }
     const qs = params.toString();
     const url = `${origin}/statement/${contact.statement_token}${qs ? `?${qs}` : ''}`;
     navigator.clipboard.writeText(url);
@@ -139,6 +147,51 @@ export const VendorStatementPrintModal: React.FC<VendorStatementPrintModalProps>
             </button>
           </div>
         </div>
+
+        {/* Remittance Accounts Selector Toolbar (No Print) */}
+        {business.bank_accounts && business.bank_accounts.length > 0 && isReceivable && (
+          <div className="no-print px-5 py-2.5 bg-slate-100/70 dark:bg-slate-800/40 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center gap-2 text-xs">
+            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Include Accounts:</span>
+            {business.bank_accounts.map((acc) => {
+              const isChecked = selectedAccountIds.includes(acc.id);
+              return (
+                <label
+                  key={acc.id}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-medium cursor-pointer transition-colors border ${
+                    isChecked
+                      ? 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white shadow-2xs'
+                      : 'bg-transparent border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedAccountIds([...selectedAccountIds, acc.id]);
+                      } else {
+                        setSelectedAccountIds(selectedAccountIds.filter((id) => id !== acc.id));
+                      }
+                    }}
+                    className="w-3.5 h-3.5 rounded text-slate-900 focus:ring-0 cursor-pointer"
+                  />
+                  <span>{acc.name}</span>
+                </label>
+              );
+            })}
+            <button
+              type="button"
+              onClick={() =>
+                setSelectedAccountIds(
+                  selectedAccountIds.length === business.bank_accounts.length ? [] : business.bank_accounts.map((a) => a.id)
+                )
+              }
+              className="text-[11px] text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 underline ml-auto cursor-pointer"
+            >
+              {selectedAccountIds.length === business.bank_accounts.length ? 'Clear all' : 'Select all'}
+            </button>
+          </div>
+        )}
 
         {/* Printable Executive Statement Document */}
         <div id="printable-statement" className="p-6 sm:p-10 space-y-6 bg-white dark:bg-[#0f1422] text-slate-900 dark:text-slate-100 print:p-0 print:bg-white print:text-slate-900">
@@ -390,28 +443,40 @@ export const VendorStatementPrintModal: React.FC<VendorStatementPrintModalProps>
           </div>
 
           {/* Payment Remittance Accounts */}
-          {business.bank_accounts && business.bank_accounts.length > 0 && isReceivable && (
-            <div className="pt-5 border-t border-slate-200 dark:border-slate-800 print:border-slate-300 space-y-2.5">
+          {business.bank_accounts && business.bank_accounts.length > 0 && isReceivable && selectedAccountIds.length > 0 && (
+            <div className="pt-4 border-t border-slate-200 dark:border-slate-800 print:border-slate-300 space-y-2">
               <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 print:text-slate-600 block">
                 Remittance Accounts
               </span>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                {business.bank_accounts.map((acc) => (
-                  <div
-                    key={acc.id}
-                    className="p-3 rounded-md bg-slate-50/80 dark:bg-slate-900/40 print:bg-slate-50/40 border border-slate-200 dark:border-slate-800 print:border-slate-300 font-mono"
-                  >
-                    <span className="text-[10px] font-bold text-slate-400 print:text-slate-500 font-sans uppercase tracking-wider block">
-                      {acc.name}
-                    </span>
-                    <span className="font-black text-sm text-slate-900 dark:text-white print:text-slate-900 block mt-0.5">
-                      {acc.account_number || 'Cashier Desk'}
-                    </span>
-                    <span className="text-[10px] text-slate-400 print:text-slate-500 capitalize block mt-0.5 font-sans">
-                      {acc.type.replace(/_/g, ' ')}
-                    </span>
-                  </div>
-                ))}
+              <div className="rounded border border-slate-200 dark:border-slate-800 print:border-slate-300 overflow-hidden bg-slate-50/40 dark:bg-slate-900/30 print:bg-white">
+                <table className="w-full text-left">
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800 print:divide-slate-200 text-xs">
+                    {business.bank_accounts
+                      .filter((acc) => selectedAccountIds.includes(acc.id))
+                      .map((acc) => (
+                        <tr key={acc.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30">
+                          <td className="py-2 px-3 w-8 align-middle">
+                            {acc.logo ? (
+                              <img src={resolveImageUrl(acc.logo) || acc.logo} alt="" className="w-5 h-5 rounded object-contain inline-block" />
+                            ) : (
+                              <div className="w-5 h-5 rounded bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-[9px] font-bold text-slate-600 dark:text-slate-300">
+                                {acc.name.charAt(0)}
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-2 px-3 align-middle font-semibold text-slate-900 dark:text-white print:text-slate-900 text-xs">
+                            {acc.name}
+                            <span className="ml-2 text-[10px] text-slate-400 print:text-slate-500 font-normal capitalize">
+                              ({acc.type.replace(/_/g, ' ')})
+                            </span>
+                          </td>
+                          <td className="py-2 px-3 align-middle text-right font-mono font-bold text-xs text-slate-900 dark:text-white print:text-slate-900">
+                            {acc.account_number || 'Cashier Desk'}
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}

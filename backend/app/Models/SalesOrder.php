@@ -27,6 +27,10 @@ class SalesOrder extends Model
         'payment_method',
         'financial_account_id',
         'exchange_unit_id',
+        'is_vendor_sourced',
+        'vendor_contact_id',
+        'vendor_cost_basis',
+        'vendor_payment_status',
         'notes',
         'order_date',
     ];
@@ -39,6 +43,8 @@ class SalesOrder extends Model
             'exchange_allowance' => 'decimal:2',
             'total_bonus_amount' => 'decimal:2',
             'paid_amount' => 'decimal:2',
+            'is_vendor_sourced' => 'boolean',
+            'vendor_cost_basis' => 'decimal:2',
             'order_date' => 'datetime',
         ];
     }
@@ -46,6 +52,11 @@ class SalesOrder extends Model
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Contact::class, 'customer_id')->withTrashed();
+    }
+
+    public function vendor(): BelongsTo
+    {
+        return $this->belongsTo(Contact::class, 'vendor_contact_id')->withTrashed();
     }
 
     public function salesperson(): BelongsTo

@@ -65,6 +65,11 @@ class ExpenseController extends Controller
             $amount = (float) $validated['amount'];
 
             // Deduct from financial account (paying technician/service/vendor)
+            if ((float) $account->current_balance < $amount) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'financial_account_id' => ["Insufficient balance in account '{$account->name}'."],
+                ]);
+            }
             $account->decrement('current_balance', $amount);
 
             $vendorBilling = $validated['vendor_billing'] ?? 'shop';

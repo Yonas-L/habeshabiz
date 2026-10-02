@@ -52,7 +52,7 @@ export const SpeedDialFAB: React.FC<SpeedDialFABProps> = ({
       : []),
     {
       id: 'intake',
-      label: 'Stock Intake',
+      label: 'Add Stock',
       icon: PackagePlus,
       onClick: () => {
         handleClose();

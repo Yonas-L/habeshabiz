@@ -35,6 +35,10 @@ class InventoryUnit extends Model
         'swapped_from_unit_id',
         'swapped_replacement_unit_id',
         'source_type',
+        'funding_source',
+        'payment_account_id',
+        'receivable_contact_id',
+        'receivable_offset_amount',
         'supplier_contact_id',
         'exchange_sales_order_id',
         'location',
@@ -55,6 +59,7 @@ class InventoryUnit extends Model
             'cycle_count' => 'integer',
             'cost_basis' => 'decimal:2',
             'selling_price' => 'decimal:2',
+            'receivable_offset_amount' => 'decimal:2',
             'customer_waiting' => 'boolean',
             'customer_waiting_at' => 'datetime',
             'is_repaired' => 'boolean',
@@ -76,6 +81,16 @@ class InventoryUnit extends Model
     public function supplier(): BelongsTo
     {
         return $this->belongsTo(Contact::class, 'supplier_contact_id')->withTrashed();
+    }
+
+    public function paymentAccount(): BelongsTo
+    {
+        return $this->belongsTo(FinancialAccount::class, 'payment_account_id')->withTrashed();
+    }
+
+    public function receivableContact(): BelongsTo
+    {
+        return $this->belongsTo(Contact::class, 'receivable_contact_id')->withTrashed();
     }
 
     public function exchangeSalesOrder(): BelongsTo

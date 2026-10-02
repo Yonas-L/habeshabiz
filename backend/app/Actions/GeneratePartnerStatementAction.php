@@ -693,7 +693,7 @@ class GeneratePartnerStatementAction
                     'bank_accounts' => \App\Models\FinancialAccount::where('tenant_id', $contact->tenant_id)
                         ->where('is_active', true)
                         ->whereIn('type', ['bank', 'mobile_money'])
-                        ->get(['id', 'name', 'account_number', 'type'])
+                        ->get(['id', 'name', 'account_number', 'type', 'logo'])
                         ->toArray(),
                 ];
             })(),

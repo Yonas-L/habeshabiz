@@ -105,6 +105,8 @@ Route::prefix('v1')->group(function () {
         Route::post('/products', [ProductController::class, 'store']);
         Route::put('/products/{id}', [ProductController::class, 'update']);
         Route::delete('/products/{id}', [ProductController::class, 'destroy']);
+        Route::post('/products/{id}/archive', [ProductController::class, 'archive']);
+        Route::post('/products/{id}/unarchive', [ProductController::class, 'unarchive']);
         Route::post('/products/{id}/variants', [ProductController::class, 'addVariant']);
         Route::put('/variants/{id}', [ProductController::class, 'updateVariant']);
         Route::delete('/variants/{id}', [ProductController::class, 'destroyVariant']);
@@ -127,6 +129,7 @@ Route::prefix('v1')->group(function () {
         // Sales & Brokered Sourcing
         Route::get('/sales', [SaleController::class, 'index']);
         Route::post('/sales', [SaleController::class, 'store']);
+        Route::post('/sales/vendor-direct', [SaleController::class, 'storeVendorDirect']);
         Route::post('/sales/{id}/collect', [SaleController::class, 'collectPayment']);
 
         // Debts: Receivables & Payables Ledger

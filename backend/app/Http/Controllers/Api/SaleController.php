@@ -301,4 +301,189 @@ class SaleController extends Controller
             'data' => $updatedOrder,
         ]);
     }
+
+    public function storeVendorDirect(Request $request, RecordSaleAction $action): JsonResponse
+    {
+        $validated = $request->validate([
+            // Device specifications
+            'product_id' => ['nullable', 'exists:products,id'],
+            'variant_id' => ['nullable', 'exists:product_variants,id'],
+            'product_name' => ['required_without_all:product_id,variant_id', 'nullable', 'string', 'max:255'],
+            'storage' => ['nullable', 'string', 'max:50'],
+            'ram' => ['nullable', 'string', 'max:50'],
+            'color' => ['nullable', 'string', 'max:50'],
+            'imei_or_serial' => ['nullable', 'string', 'max:100'],
+            'condition' => ['nullable', 'string', 'max:50'],
+
+            // Vendor details
+            'vendor_contact_id' => ['required', 'exists:contacts,id'],
+            'vendor_cost' => ['required', 'numeric', 'min:0'],
+            'vendor_payment_method' => ['required', 'string', 'in:owed,paid_now'],
+            'vendor_payment_account_id' => ['required_if:vendor_payment_method,paid_now', 'nullable', 'exists:financial_accounts,id'],
+
+            // Sale & Customer details
+            'selling_price' => ['required', 'numeric', 'min:0'],
+            'paid_amount' => ['required', 'numeric', 'min:0'],
+            'payment_method' => ['required', 'string', 'in:cash,telebirr,cbe,bank_transfer,credit'],
+            'financial_account_id' => ['nullable', 'exists:financial_accounts,id'],
+            'customer_id' => ['nullable', 'exists:contacts,id'],
+            'customer_name' => ['nullable', 'string', 'max:255'],
+            'customer_phone' => ['nullable', 'string', 'max:50'],
+            'notes' => ['nullable', 'string'],
+        ]);
+
+        /** @var User $user */
+        $user = $request->user();
+        $tenantId = $user->tenant_id;
+
+        // Check overdraft if vendor is paid now from bank
+        $vendorCost = (float) $validated['vendor_cost'];
+        if ($validated['vendor_payment_method'] === 'paid_now' && $vendorCost > 0) {
+            $vendorAcc = FinancialAccount::where('tenant_id', $tenantId)->findOrFail($validated['vendor_payment_account_id']);
+            if ((float) $vendorAcc->current_balance < $vendorCost) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Insufficient balance in {$vendorAcc->name}. Balance is " . number_format($vendorAcc->current_balance, 2) . " ETB, but {$vendorCost} ETB is required. Overdrafts are not permitted.",
+                ], 422);
+            }
+        }
+
+        $order = DB::transaction(function () use ($validated, $user, $tenantId, $vendorCost, $action) {
+            // 1. Resolve Product & Variant
+            $variantId = $validated['variant_id'] ?? null;
+            if (! $variantId) {
+                $productId = $validated['product_id'] ?? null;
+                if (! $productId) {
+                    $product = \App\Models\Product::create([
+                        'tenant_id' => $tenantId,
+                        'name' => $validated['product_name'],
+                        'category' => 'phone_tablet',
+                        'has_serials' => true,
+                        'is_active' => true,
+                    ]);
+                    $productId = $product->id;
+                }
+                $variant = \App\Models\ProductVariant::create([
+                    'product_id' => $productId,
+                    'storage' => $validated['storage'] ?? null,
+                    'ram' => $validated['ram'] ?? null,
+                    'color' => $validated['color'] ?? null,
+                    'default_selling_price' => $validated['selling_price'],
+                ]);
+                $variantId = $variant->id;
+            }
+
+            // 2. Create the InventoryUnit marked directly as 'sold'
+            $imei = ! empty($validated['imei_or_serial']) ? trim($validated['imei_or_serial']) : null;
+            if ($imei) {
+                $existing = \App\Models\InventoryUnit::where('tenant_id', $tenantId)
+                    ->whereIn('status', ['in_stock', 'reserved', 'out'])
+                    ->where('imei_or_serial', $imei)
+                    ->exists();
+                if ($existing) {
+                    throw new \InvalidArgumentException("IMEI/Serial '{$imei}' is already in active shop inventory.");
+                }
+            }
+
+            $unit = \App\Models\InventoryUnit::create([
+                'tenant_id' => $tenantId,
+                'variant_id' => $variantId,
+                'imei_or_serial' => $imei,
+                'condition' => $validated['condition'] ?? 'Brand New',
+                'cost_basis' => $vendorCost,
+                'selling_price' => (float) $validated['selling_price'],
+                'status' => 'sold',
+                'source_type' => 'vendor_direct',
+                'supplier_contact_id' => $validated['vendor_contact_id'],
+                'funding_source' => $validated['vendor_payment_method'] === 'paid_now' ? 'bank' : 'payable_owed',
+                'payment_account_id' => $validated['vendor_payment_account_id'] ?? null,
+                'sold_at' => now(),
+                'notes' => 'Vendor Sourced JIT Direct Sale',
+            ]);
+
+            // 3. Handle Vendor Payment
+            if ($validated['vendor_payment_method'] === 'paid_now' && $vendorCost > 0) {
+                $vendorAcc = FinancialAccount::where('tenant_id', $tenantId)->findOrFail($validated['vendor_payment_account_id']);
+                if ((float) $vendorAcc->current_balance < $vendorCost) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'vendor_payment_account_id' => ["Insufficient balance in account '{$vendorAcc->name}'."],
+                    ]);
+                }
+                $vendorAcc->decrement('current_balance', $vendorCost);
+
+                FinancialTransaction::create([
+                    'tenant_id' => $tenantId,
+                    'transaction_number' => 'TXN-'.strtoupper(\Illuminate\Support\Str::random(8)),
+                    'source_account_id' => $vendorAcc->id,
+                    'type' => 'supplier_payment',
+                    'amount' => $vendorCost,
+                    'contact_id' => $validated['vendor_contact_id'],
+                    'description' => "Vendor direct payout for IMEI: " . ($imei ?: 'N/A'),
+                    'date' => now(),
+                    'created_by' => $user->id,
+                ]);
+            } elseif ($validated['vendor_payment_method'] === 'owed' && $vendorCost > 0) {
+                $debt = Debt::create([
+                    'tenant_id' => $tenantId,
+                    'contact_id' => $validated['vendor_contact_id'],
+                    'type' => 'payable',
+                    'reference_type' => 'vendor_direct_sale',
+                    'reference_id' => $unit->id,
+                    'original_amount' => $vendorCost,
+                    'paid_amount' => 0.0,
+                    'remaining_amount' => $vendorCost,
+                    'due_date' => now()->addDays(7),
+                    'status' => 'open',
+                    'notes' => 'Vendor sourcing payable for SN: '.($imei ?: 'N/A'),
+                ]);
+                Debt::applyOpenAdvancesToPayable($debt);
+            }
+
+            // 4. Create the SalesOrder via RecordSaleAction
+            $saleData = [
+                'customer_id' => $validated['customer_id'] ?? null,
+                'customer_name' => $validated['customer_name'] ?? null,
+                'customer_phone' => $validated['customer_phone'] ?? null,
+                'salesperson_id' => $user->id,
+                'paid_amount' => (float) $validated['paid_amount'],
+                'payment_method' => $validated['payment_method'],
+                'financial_account_id' => $validated['financial_account_id'] ?? null,
+                'notes' => $validated['notes'] ?? 'Vendor Direct Sale',
+                'items' => [
+                    [
+                        'variant_id' => $variantId,
+                        'inventory_unit_id' => $unit->id,
+                        'quantity' => 1,
+                        'unit_price' => (float) $validated['selling_price'],
+                        'sourcing_type' => 'brokered_neighbour',
+                        'vendor_contact_id' => $validated['vendor_contact_id'],
+                        'vendor_cost' => $vendorCost,
+                    ],
+                ],
+            ];
+
+            $order = $action->execute($saleData);
+            $order->update([
+                'is_vendor_sourced' => true,
+                'vendor_contact_id' => $validated['vendor_contact_id'],
+                'vendor_cost_basis' => $vendorCost,
+                'vendor_payment_status' => $validated['vendor_payment_method'] === 'paid_now' ? 'paid' : 'owed',
+            ]);
+
+            return $order->fresh([
+                'customer',
+                'vendor',
+                'salesperson',
+                'financialAccount',
+                'items.variant.product',
+                'items.inventoryUnit',
+            ]);
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Vendor direct sale completed successfully.',
+            'data' => $order,
+        ], 201);
+    }
 }

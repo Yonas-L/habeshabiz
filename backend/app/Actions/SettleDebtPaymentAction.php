@@ -130,6 +130,9 @@ class SettleDebtPaymentAction
 
             // If Payable: We are paying supplier/peer vendor -> money leaves our account
             if ($debt->isPayable()) {
+                if ((float) $account->current_balance < $amount) {
+                    throw new InvalidArgumentException("Insufficient balance in account '{$account->name}'. Available: " . number_format($account->current_balance, 2) . " ETB, Required: " . number_format($amount, 2) . " ETB.");
+                }
                 $account->decrement('current_balance', $amount);
 
                 FinancialTransaction::create([

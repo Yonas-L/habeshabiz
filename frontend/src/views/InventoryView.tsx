@@ -30,6 +30,7 @@ import {
   Repeat,
   ArrowLeftRight,
   DollarSign,
+  Trash2,
 } from 'lucide-react';
 import { InventoryUnitDrawer } from '../components/drawers/InventoryUnitDrawer';
 import { SalesOrderDrawer } from '../components/drawers/SalesOrderDrawer';
@@ -358,12 +359,26 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
   const handleRestoreProduct = async (p: Product) => {
     try {
-      await api.updateProduct(p.id, { is_active: true });
+      await api.unarchiveProduct(p.id);
       toast.success(`"${p.name}" restored to active catalog`);
       loadInventory();
       onInventoryChange?.();
     } catch (err: any) {
       toast.error('Failed to restore product', { description: err.message });
+    }
+  };
+
+  const handleDeleteProduct = async (p: Product) => {
+    if (!window.confirm(`Permanently delete "${p.name}"? If there is historical sales history, financial records remain safely preserved.`)) {
+      return;
+    }
+    try {
+      await api.deleteProduct(p.id);
+      toast.success(`"${p.name}" deleted successfully`);
+      loadInventory();
+      onInventoryChange?.();
+    } catch (err: any) {
+      toast.error('Failed to delete product', { description: err.message });
     }
   };
 
@@ -848,7 +863,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               className="h-10 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs flex items-center gap-2 active:scale-[0.98] cursor-pointer"
             >
               <Plus className="w-4 h-4 text-emerald-400 dark:text-emerald-500" />
-              <span>Stock Intake</span>
+              <span>Add Stock</span>
             </button>
           </div>
         )}
@@ -1326,6 +1341,14 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                               >
                                 <Edit3 className="w-3 h-3" />
                                 <span>Edit</span>
+                              </button>
+                              <button
+                                onClick={() => handleDeleteProduct(prod)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-rose-600 dark:text-rose-400 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors shadow-2xs cursor-pointer"
+                                title="Permanently delete product"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                <span>Delete</span>
                               </button>
                             </div>
                           </td>
@@ -1895,6 +1918,13 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                       >
                         <Edit3 className="w-3 h-3" />
                         <span>Edit</span>
+                      </button>
+                      <button
+                        onClick={() => handleDeleteProduct(prod)}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 active:scale-95"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        <span>Delete</span>
                       </button>
                     </div>
                   )}
@@ -3481,6 +3511,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               categories={categories}
               products={activeProducts}
               contacts={contacts}
+              accounts={accounts}
+              isOwner={isOwner}
               initialProductId={intakeInitialProductId}
               initialVariantId={intakeInitialVariantId}
               onIntakeSuccess={() => {

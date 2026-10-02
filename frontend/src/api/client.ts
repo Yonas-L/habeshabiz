@@ -73,6 +73,7 @@ export interface Product {
   category_rel?: ProductCategory | null;
   has_serials: boolean;
   is_active?: boolean;
+  is_archived?: boolean;
   variants: ProductVariant[];
 }
 
@@ -114,8 +115,12 @@ export interface InventoryUnit {
   swapped_sales_order?: SalesOrder;
   swapped_from_unit?: InventoryUnit;
   swapped_replacement_unit?: InventoryUnit;
-  source_type?: 'purchase' | 'consignment' | 'exchange';
+  source_type?: 'purchase' | 'consignment' | 'exchange' | 'vendor_direct';
   supplier_contact_id?: string | null;
+  funding_source?: string | null;
+  payment_account_id?: string | null;
+  receivable_contact_id?: string | null;
+  receivable_offset_amount?: string | number | null;
   exchange_sales_order_id?: string | null;
   return_deadline?: string | null;
   handover_payout?: string | number | null;
@@ -250,6 +255,7 @@ export interface PartnerStatementData {
       name: string;
       account_number: string | null;
       type: string;
+      logo?: string | null;
     }>;
   };
   ledger: StatementLedgerRow[];
@@ -295,6 +301,11 @@ export interface SalesOrder {
   payment_method: string;
   financial_account_id?: string | null;
   financial_account?: FinancialAccount;
+  is_vendor_sourced?: boolean;
+  vendor_contact_id?: string | null;
+  vendor_cost_basis?: string | number | null;
+  vendor_payment_status?: string | null;
+  vendor?: Contact | null;
   order_date: string;
   notes?: string | null;
   items: SalesOrderItem[];
@@ -843,6 +854,16 @@ export const api = {
       method: 'DELETE',
     }),
 
+  archiveProduct: (id: string) =>
+    request<{ success: boolean; message: string; data: Product }>(`/products/${id}/archive`, {
+      method: 'POST',
+    }),
+
+  unarchiveProduct: (id: string) =>
+    request<{ success: boolean; message: string; data: Product }>(`/products/${id}/unarchive`, {
+      method: 'POST',
+    }),
+
   updateVariant: (
     id: string,
     data: {
@@ -908,9 +929,9 @@ export const api = {
   },
 
   intakeInventoryUnit: (data: {
-    variant_id: string;
-    cost_basis: number;
-    condition: string;
+    variant_id?: string;
+    cost_basis?: number;
+    condition?: string;
     quantity?: number;
     imei_or_serial?: string | null;
     imeis?: string[];
@@ -923,6 +944,22 @@ export const api = {
     battery_health?: number | null;
     cycle_count?: number | null;
     sim_type?: string;
+    funding_source?: 'none' | 'account' | 'debtor_offset' | 'split';
+    payment_account_id?: string | null;
+    receivable_contact_id?: string | null;
+    receivable_offset_amount?: number;
+    units?: Array<{
+      variant_id: string;
+      imei_or_serial?: string | null;
+      battery_health?: number | null;
+      cycle_count?: number | null;
+      sim_type?: string;
+      condition: string;
+      cost_basis: number;
+      selling_price?: number | null;
+      location?: string;
+      notes?: string | null;
+    }>;
   }) =>
     request<{ data: InventoryUnit; units_created: number }>('/inventory/units', {
       method: 'POST',
@@ -1085,6 +1122,33 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
+  vendorDirectSale: (data: {
+    product_id?: string;
+    variant_id?: string;
+    product_name?: string;
+    storage?: string;
+    ram?: string;
+    color?: string;
+    imei_or_serial?: string;
+    condition?: string;
+    vendor_contact_id: string;
+    vendor_cost: number;
+    vendor_payment_method: 'paid_now' | 'owed';
+    vendor_payment_account_id?: string | null;
+    selling_price: number;
+    paid_amount: number;
+    payment_method: 'cash' | 'telebirr' | 'cbe' | 'bank_transfer' | 'credit';
+    financial_account_id?: string | null;
+    customer_id?: string | null;
+    customer_name?: string;
+    customer_phone?: string;
+    notes?: string;
+  }) =>
+    request<{ success: boolean; message: string; data: SalesOrder }>('/sales/vendor-direct', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
   collectSalesPayment: (
     orderId: string,
     data: {
@@ -1180,6 +1244,7 @@ export const api = {
     is_active?: boolean;
     asset_details?: Record<string, any> | null;
     balance_adjustment?: number;
+    current_balance?: number;
     logo?: string | null;
   }) =>
     request<FinancialAccount>(`/accounts/${id}`, {

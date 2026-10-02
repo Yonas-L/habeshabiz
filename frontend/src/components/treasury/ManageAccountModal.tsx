@@ -73,8 +73,8 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
         setAccountType(editAccount.type);
         setAccountNumber(editAccount.account_number || '');
         setCurrency(editAccount.currency || 'ETB');
-        setOpeningBalance('');
-        setBalanceAdjustment('');
+        setOpeningBalance(editAccount.current_balance != null ? String(editAccount.current_balance) : '0');
+        setBalanceAdjustment(editAccount.current_balance != null ? String(editAccount.current_balance) : '0');
         setLogo(editAccount.logo || null);
         if (editAccount.asset_details && typeof editAccount.asset_details === 'object') {
           setAssetDetails(
@@ -144,7 +144,7 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
           currency: currency || 'ETB',
           asset_details: Object.keys(details).length > 0 ? details : null,
           logo: logo ?? null,
-          ...(balanceAdjustment ? { balance_adjustment: parseFloat(balanceAdjustment) } : {}),
+          ...(balanceAdjustment !== '' ? { current_balance: parseFloat(balanceAdjustment) } : {}),
         });
         toast.success('Account updated', { description: name });
       } else {
@@ -390,21 +390,22 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
             </div>
             <div>
               <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                {isEditing ? 'Balance Adjustment' : 'Opening Balance'}
+                {isEditing ? 'Current Balance' : 'Opening Balance'}
               </label>
               <input
                 type="number"
                 step="0.01"
+                min="0"
                 value={isEditing ? balanceAdjustment : openingBalance}
                 onChange={(e) =>
                   isEditing ? setBalanceAdjustment(e.target.value) : setOpeningBalance(e.target.value)
                 }
-                placeholder={isEditing ? '+500 or -200' : '0.00'}
+                placeholder="0.00"
                 className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs font-mono font-bold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
               />
               {isEditing && (
                 <p className="text-[10px] text-slate-400 mt-1">
-                  Positive adds, negative subtracts from current balance
+                  Direct balance update
                 </p>
               )}
             </div>

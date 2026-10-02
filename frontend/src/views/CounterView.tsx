@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { AccountLogo } from '../utils/bankLogos';
 import { ExchangeDeviceModal, type ExchangeDevicePayload } from '../components/counter/ExchangeDeviceModal';
+import { VendorDirectSaleModal } from '../components/counter/VendorDirectSaleModal';
 import type { ProductCategory } from '../api/client';
 
 interface CounterViewProps {
@@ -92,6 +93,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
   // Exchange / Trade-In State
   const [exchangeDevice, setExchangeDevice] = useState<ExchangeDevicePayload | null>(null);
   const [isExchangeModalOpen, setIsExchangeModalOpen] = useState(false);
+  const [isVendorDirectModalOpen, setIsVendorDirectModalOpen] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -667,6 +669,18 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                     <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   </div>
                 )}
+
+                {/* Source from Vendor Action */}
+                <button
+                  type="button"
+                  onClick={() => setIsVendorDirectModalOpen(true)}
+                  className="h-9 sm:h-10 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all shrink-0 cursor-pointer"
+                  title="Source device directly from vendor (1-Step POS Sale)"
+                >
+                  <Handshake className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Source from Vendor</span>
+                  <span className="sm:hidden">Vendor</span>
+                </button>
               </div>
             )}
 
@@ -1003,6 +1017,12 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                       <span>
                         +{netEstimatedBonus.toLocaleString()} ETB Bonus · +{upsellBonusPerUnit.toLocaleString()} above target
                       </span>
+                    </div>
+                  )}
+                  {unitPriceNum > 0 && outgoingUnitCost > 0 && unitPriceNum < outgoingUnitCost && (
+                    <div className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-[11px] font-semibold text-rose-700 dark:text-rose-300">
+                      <AlertTriangle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                      <span>Below cost by {(outgoingUnitCost - unitPriceNum).toLocaleString()} ETB</span>
                     </div>
                   )}
                 </div>
@@ -1603,6 +1623,22 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
             setPaidAmount(String(newDiff));
           }
           toast.success(`Exchange attached: ${payload.product_name}`);
+        }}
+      />
+
+      {/* 1-Step Vendor Direct Sale Modal */}
+      <VendorDirectSaleModal
+        isOpen={isVendorDirectModalOpen}
+        onClose={() => setIsVendorDirectModalOpen(false)}
+        products={products}
+        categories={categories}
+        contacts={contacts}
+        accounts={accounts}
+        isOwner={user?.role === 'owner'}
+        initialProductId={selectedProductId || undefined}
+        onSaleSuccess={() => {
+          loadData();
+          onSaleSuccess();
         }}
       />
     </div>

@@ -141,24 +141,83 @@ class InventoryController extends Controller
             ], 403);
         }
 
-        $validated = $request->validate([
-            'variant_id' => ['required', 'exists:product_variants,id'],
-            'imei_or_serial' => ['nullable', 'string', 'max:100'],
-            'imeis' => ['nullable', 'array'],
-            'imeis.*' => ['string', 'max:100'],
-            'quantity' => ['nullable', 'integer', 'min:1'],
-            'battery_health' => ['nullable', 'integer', 'min:0', 'max:100'],
-            'cycle_count' => ['nullable', 'integer', 'min:0'],
-            'sim_type' => ['nullable', 'string', 'in:physical,esim,dual,na'],
-            'condition' => ['required', 'string', 'max:50'],
-            'cost_basis' => ['required', 'numeric', 'min:0'],
-            'selling_price' => ['nullable', 'numeric', 'min:0'],
-            'source_type' => ['nullable', 'string', 'in:purchase,consignment'],
-            'supplier_contact_id' => ['nullable', 'exists:contacts,id'],
-            'return_deadline' => ['nullable', 'date'],
-            'location' => ['nullable', 'string', 'max:100'],
-            'notes' => ['nullable', 'string'],
-        ]);
+        $isBatch = $request->has('units') && is_array($request->input('units'));
+
+        if ($isBatch) {
+            $validated = $request->validate([
+                'units' => ['required', 'array', 'min:1'],
+                'units.*.variant_id' => ['required', 'exists:product_variants,id'],
+                'units.*.imei_or_serial' => ['nullable', 'string', 'max:100'],
+                'units.*.battery_health' => ['nullable', 'integer', 'min:0', 'max:100'],
+                'units.*.cycle_count' => ['nullable', 'integer', 'min:0'],
+                'units.*.sim_type' => ['nullable', 'string', 'in:physical,esim,dual,na'],
+                'units.*.condition' => ['required', 'string', 'max:50'],
+                'units.*.cost_basis' => ['required', 'numeric', 'min:0'],
+                'units.*.selling_price' => ['nullable', 'numeric', 'min:0'],
+                'units.*.location' => ['nullable', 'string', 'max:100'],
+                'units.*.notes' => ['nullable', 'string'],
+                'source_type' => ['nullable', 'string', 'in:purchase,consignment'],
+                'supplier_contact_id' => ['nullable', 'exists:contacts,id'],
+                'return_deadline' => ['nullable', 'date'],
+                'funding_source' => ['nullable', 'string', 'in:none,account,debtor_offset,split'],
+                'payment_account_id' => ['nullable', 'exists:financial_accounts,id'],
+                'receivable_contact_id' => ['nullable', 'exists:contacts,id'],
+                'receivable_offset_amount' => ['nullable', 'numeric', 'min:0'],
+            ]);
+
+            $unitItems = $validated['units'];
+        } else {
+            $validated = $request->validate([
+                'variant_id' => ['required', 'exists:product_variants,id'],
+                'imei_or_serial' => ['nullable', 'string', 'max:100'],
+                'imeis' => ['nullable', 'array'],
+                'imeis.*' => ['string', 'max:100'],
+                'quantity' => ['nullable', 'integer', 'min:1'],
+                'battery_health' => ['nullable', 'integer', 'min:0', 'max:100'],
+                'cycle_count' => ['nullable', 'integer', 'min:0'],
+                'sim_type' => ['nullable', 'string', 'in:physical,esim,dual,na'],
+                'condition' => ['required', 'string', 'max:50'],
+                'cost_basis' => ['required', 'numeric', 'min:0'],
+                'selling_price' => ['nullable', 'numeric', 'min:0'],
+                'source_type' => ['nullable', 'string', 'in:purchase,consignment'],
+                'supplier_contact_id' => ['nullable', 'exists:contacts,id'],
+                'return_deadline' => ['nullable', 'date'],
+                'funding_source' => ['nullable', 'string', 'in:none,account,debtor_offset,split'],
+                'payment_account_id' => ['nullable', 'exists:financial_accounts,id'],
+                'receivable_contact_id' => ['nullable', 'exists:contacts,id'],
+                'receivable_offset_amount' => ['nullable', 'numeric', 'min:0'],
+                'location' => ['nullable', 'string', 'max:100'],
+                'notes' => ['nullable', 'string'],
+            ]);
+
+            $imeisList = [];
+            if (! empty($validated['imeis']) && is_array($validated['imeis'])) {
+                $imeisList = array_values(array_filter(array_map('trim', $validated['imeis'])));
+            } elseif (! empty($validated['imei_or_serial'])) {
+                $parsed = preg_split('/[\r\n,]+/', trim($validated['imei_or_serial']));
+                $imeisList = array_values(array_filter(array_map('trim', $parsed)));
+            }
+
+            $variant = ProductVariant::with('product')->findOrFail($validated['variant_id']);
+            $hasSerials = (bool) ($variant->product?->has_serials ?? true);
+            $countToCreate = $hasSerials ? count($imeisList) : max(1, (int) ($validated['quantity'] ?? 1));
+
+            $unitItems = [];
+            for ($i = 0; $i < $countToCreate; $i++) {
+                $unitItems[] = [
+                    'variant_id' => $variant->id,
+                    'imei_or_serial' => $hasSerials ? ($imeisList[$i] ?? null) : null,
+                    'battery_health' => $validated['battery_health'] ?? null,
+                    'cycle_count' => $validated['cycle_count'] ?? null,
+                    'sim_type' => $validated['sim_type'] ?? 'na',
+                    'condition' => $validated['condition'],
+                    'cost_basis' => (float) $validated['cost_basis'],
+                    'selling_price' => ! empty($validated['selling_price']) ? (float) $validated['selling_price'] : null,
+                    'location' => $validated['location'] ?? 'Shop Counter',
+                    'notes' => $validated['notes'] ?? null,
+                ];
+            }
+        }
 
         if (($validated['source_type'] ?? 'purchase') === 'consignment' && empty($validated['supplier_contact_id'])) {
             return response()->json([
@@ -167,39 +226,28 @@ class InventoryController extends Controller
             ], 422);
         }
 
-        if (empty($validated['sim_type'])) {
-            $validated['sim_type'] = 'na';
+        // Fetch variants for validation and display
+        $variantIds = collect($unitItems)->pluck('variant_id')->unique();
+        $variants = ProductVariant::with('product')->whereIn('id', $variantIds)->get()->keyBy('id');
+
+        $submittedImeis = [];
+        foreach ($unitItems as $item) {
+            $v = $variants[$item['variant_id']] ?? null;
+            $hasSerials = (bool) ($v?->product?->has_serials ?? true);
+            $imei = ! empty($item['imei_or_serial']) ? trim($item['imei_or_serial']) : null;
+            if ($hasSerials && empty($imei)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Serial number or IMEI is required for '.($v?->display_name ?? 'serialized device').'.',
+                ], 422);
+            }
+            if (! empty($imei)) {
+                $submittedImeis[] = $imei;
+            }
         }
 
-        $variant = ProductVariant::with('product')->findOrFail($validated['variant_id']);
-
-        // Update default selling price if provided
-        if (! empty($validated['selling_price'])) {
-            $variant->update(['default_selling_price' => $validated['selling_price']]);
-        }
-
-        $hasSerials = (bool) ($variant->product?->has_serials ?? true);
-
-        // Parse list of submitted IMEIs
-        $imeisList = [];
-        if (! empty($validated['imeis']) && is_array($validated['imeis'])) {
-            $imeisList = array_values(array_filter(array_map('trim', $validated['imeis'])));
-        } elseif (! empty($validated['imei_or_serial'])) {
-            $parsed = preg_split('/[\r\n,]+/', trim($validated['imei_or_serial']));
-            $imeisList = array_values(array_filter(array_map('trim', $parsed)));
-        }
-
-        // For serialized products, IMEI is required
-        if ($hasSerials && empty($imeisList)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Serial number or IMEI is required for serialized products.',
-            ], 422);
-        }
-
-        // Check for duplicates within the submitted IMEIs
-        if (! empty($imeisList)) {
-            $duplicates = array_diff_assoc($imeisList, array_unique($imeisList));
+        if (! empty($submittedImeis)) {
+            $duplicates = array_diff_assoc($submittedImeis, array_unique($submittedImeis));
             if (! empty($duplicates)) {
                 return response()->json([
                     'success' => false,
@@ -207,11 +255,10 @@ class InventoryController extends Controller
                 ], 422);
             }
 
-            // Check if any submitted IMEI already exists in active inventory for this tenant
             $tenantId = $user->tenant_id;
             $existing = InventoryUnit::where('tenant_id', $tenantId)
                 ->whereIn('status', ['in_stock', 'reserved', 'out'])
-                ->whereIn('imei_or_serial', $imeisList)
+                ->whereIn('imei_or_serial', $submittedImeis)
                 ->pluck('imei_or_serial')
                 ->all();
 
@@ -223,88 +270,288 @@ class InventoryController extends Controller
             }
         }
 
+        // Calculate total cost basis
+        $totalCost = (float) collect($unitItems)->sum(fn ($u) => (float) $u['cost_basis']);
+
+        // Determine funding allocation
+        $fundingSource = $validated['funding_source'] ?? (! empty($validated['payment_account_id']) ? 'account' : 'none');
+        $paymentAccountId = $validated['payment_account_id'] ?? null;
+        $receivableContactId = $validated['receivable_contact_id'] ?? null;
+        $receivableOffsetAmount = (float) ($validated['receivable_offset_amount'] ?? 0);
+
+        $bankAmount = 0.0;
+        $offsetAmount = 0.0;
+
+        if ($fundingSource === 'account') {
+            if (empty($paymentAccountId)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Please select a shop payment account to fund this stock intake.',
+                ], 422);
+            }
+            $bankAmount = $totalCost;
+        } elseif ($fundingSource === 'debtor_offset') {
+            if (empty($receivableContactId)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Please select a debtor contact for the receivable offset.',
+                ], 422);
+            }
+            $offsetAmount = $receivableOffsetAmount > 0 ? min($totalCost, $receivableOffsetAmount) : $totalCost;
+        } elseif ($fundingSource === 'split') {
+            if (empty($paymentAccountId)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Please select a payment account for split funding.',
+                ], 422);
+            }
+            if (empty($receivableContactId)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Please select a debtor contact for split funding.',
+                ], 422);
+            }
+            $offsetAmount = min($totalCost, $receivableOffsetAmount);
+            $bankAmount = max(0, $totalCost - $offsetAmount);
+        }
+
+        // Overdraft guard: verify bank balance
+        $account = null;
+        if ($bankAmount > 0 && ! empty($paymentAccountId)) {
+            $account = FinancialAccount::where('tenant_id', $user->tenant_id)->findOrFail($paymentAccountId);
+            if ((float) $account->current_balance < $bankAmount) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'payment_account_id' => ["Insufficient balance in account '{$account->name}'."],
+                ]);
+            }
+        }
+
+        // Debtor balance guard: verify open receivable debts
+        if ($offsetAmount > 0 && ! empty($receivableContactId)) {
+            $debtor = Contact::where('tenant_id', $user->tenant_id)->findOrFail($receivableContactId);
+            $openDebt = (float) Debt::where('tenant_id', $user->tenant_id)
+                ->where('contact_id', $receivableContactId)
+                ->where('type', 'receivable')
+                ->whereIn('status', ['open', 'partially_paid'])
+                ->sum('remaining_amount');
+
+            if ($openDebt < $offsetAmount) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'receivable_offset_amount' => ["Requested offset exceeds {$debtor->name}'s open debt balance of ".number_format($openDebt, 2)." ETB."],
+                ]);
+            }
+        }
+
         $createdUnits = [];
-        $costBasis = (float) $validated['cost_basis'];
 
-        DB::transaction(function () use ($validated, $variant, $hasSerials, $imeisList, $costBasis, $user, &$createdUnits) {
-            $countToCreate = $hasSerials
-                ? count($imeisList)
-                : max(1, (int) ($validated['quantity'] ?? 1));
+        DB::transaction(function () use (
+            $validated,
+            $unitItems,
+            $variants,
+            $fundingSource,
+            $paymentAccountId,
+            $receivableContactId,
+            $offsetAmount,
+            $bankAmount,
+            $totalCost,
+            $account,
+            $user,
+            &$createdUnits
+        ) {
+            $tenantId = $user->tenant_id;
+            $itemsCount = count($unitItems);
 
-            for ($i = 0; $i < $countToCreate; $i++) {
-                $imei = $hasSerials ? ($imeisList[$i] ?? null) : null;
-                if ($hasSerials && empty($imei)) {
-                    continue;
+            foreach ($unitItems as $item) {
+                $variant = $variants[$item['variant_id']];
+                $costBasis = (float) $item['cost_basis'];
+                $unitOffset = $itemsCount > 0 ? round($offsetAmount / $itemsCount, 2) : 0;
+
+                // Update default selling price if provided
+                if (! empty($item['selling_price'])) {
+                    $variant->update(['default_selling_price' => $item['selling_price']]);
                 }
 
                 $unit = InventoryUnit::create([
-                    'tenant_id' => $user->tenant_id,
+                    'tenant_id' => $tenantId,
                     'variant_id' => $variant->id,
-                    'imei_or_serial' => $imei,
-                    'battery_health' => $validated['battery_health'] ?? null,
-                    'cycle_count' => $validated['cycle_count'] ?? null,
-                    'sim_type' => $validated['sim_type'],
-                    'condition' => $validated['condition'],
+                    'imei_or_serial' => ! empty($item['imei_or_serial']) ? trim($item['imei_or_serial']) : null,
+                    'battery_health' => $item['battery_health'] ?? null,
+                    'cycle_count' => $item['cycle_count'] ?? null,
+                    'sim_type' => $item['sim_type'] ?? 'na',
+                    'condition' => $item['condition'],
                     'cost_basis' => $costBasis,
+                    'selling_price' => ! empty($item['selling_price']) ? (float) $item['selling_price'] : null,
                     'status' => 'in_stock',
                     'source_type' => $validated['source_type'] ?? 'purchase',
+                    'funding_source' => $fundingSource,
+                    'payment_account_id' => $paymentAccountId,
+                    'receivable_contact_id' => $receivableContactId,
+                    'receivable_offset_amount' => $unitOffset,
                     'supplier_contact_id' => $validated['supplier_contact_id'] ?? null,
                     'return_deadline' => $validated['return_deadline'] ?? null,
-                    'location' => $validated['location'] ?? 'Shop Counter',
-                    'notes' => $validated['notes'] ?? null,
+                    'location' => $item['location'] ?? 'Shop Counter',
+                    'notes' => $item['notes'] ?? null,
                 ]);
 
                 $createdUnits[] = $unit;
 
-                // Start payable debt the minute a vendor item is stocked into inventory
-                if (! empty($validated['supplier_contact_id']) && $costBasis > 0) {
-                    $intakeDebt = Debt::create([
-                        'tenant_id' => $user->tenant_id,
-                        'contact_id' => $validated['supplier_contact_id'],
-                        'type' => 'payable',
-                        'reference_type' => 'stock_intake',
-                        'reference_id' => $unit->id,
-                        'original_amount' => $costBasis,
-                        'paid_amount' => 0.0,
-                        'remaining_amount' => $costBasis,
-                        'due_date' => $validated['return_deadline'] ?? now()->addDays(30),
-                        'status' => 'open',
-                        'notes' => ($variant->product?->name ?? 'Device').($imei ? " (SN: {$imei})" : ''),
+                // Sync InventoryStock for this variant
+                $stock = InventoryStock::firstOrCreate(
+                    ['tenant_id' => $tenantId, 'variant_id' => $variant->id],
+                    ['quantity_on_hand' => 0, 'average_cost' => $costBasis]
+                );
+
+                $currentQty = $stock->quantity_on_hand;
+                $currentAvg = (float) $stock->average_cost;
+                $newTotalQty = $currentQty + 1;
+                $newAvgCost = $newTotalQty > 0
+                    ? (($currentQty * $currentAvg) + $costBasis) / $newTotalQty
+                    : $costBasis;
+
+                $stock->update([
+                    'quantity_on_hand' => $newTotalQty,
+                    'average_cost' => round($newAvgCost, 2),
+                ]);
+            }
+
+            // 1. Debtor Receivable Offset
+            if ($offsetAmount > 0 && ! empty($receivableContactId)) {
+                $remOffset = $offsetAmount;
+                $openDebts = Debt::where('tenant_id', $tenantId)
+                    ->where('contact_id', $receivableContactId)
+                    ->where('type', 'receivable')
+                    ->whereIn('status', ['open', 'partially_paid'])
+                    ->orderBy('created_at')
+                    ->get();
+
+                foreach ($openDebts as $debt) {
+                    if ($remOffset <= 0) {
+                        break;
+                    }
+                    $applied = min($remOffset, (float) $debt->remaining_amount);
+
+                    DebtPayment::create([
+                        'tenant_id' => $tenantId,
+                        'debt_id' => $debt->id,
+                        'financial_account_id' => null,
+                        'amount' => $applied,
+                        'payment_date' => now(),
+                        'reference_number' => 'OFFSET-INTAKE',
+                        'notes' => 'Offset against stock intake',
+                        'created_by' => $user->id,
                     ]);
 
-                    Debt::applyOpenAdvancesToPayable($intakeDebt);
+                    $newPaid = (float) $debt->paid_amount + $applied;
+                    $newRemaining = max(0, (float) $debt->original_amount - $newPaid);
+                    $debt->update([
+                        'paid_amount' => $newPaid,
+                        'remaining_amount' => $newRemaining,
+                        'status' => $newRemaining <= 0 ? 'settled' : 'partially_paid',
+                    ]);
+
+                    if ($debt->reference_type === 'sales_order' && ! empty($debt->reference_id)) {
+                        $order = \App\Models\SalesOrder::find($debt->reference_id);
+                        if ($order) {
+                            $orderPaid = (float) $order->paid_amount + $applied;
+                            $orderRemaining = max(0, (float) $order->total_amount - $orderPaid);
+                            $order->update([
+                                'paid_amount' => $orderPaid,
+                                'payment_status' => $orderRemaining <= 0 ? 'paid' : 'partial',
+                            ]);
+                        }
+                    }
+
+                    $remOffset -= $applied;
                 }
             }
 
-            // Sync InventoryStock record
-            $stock = InventoryStock::firstOrCreate(
-                ['tenant_id' => $user->tenant_id, 'variant_id' => $variant->id],
-                ['quantity_on_hand' => 0, 'average_cost' => $costBasis]
-            );
+            // 2. Bank Account Deduction
+            if ($bankAmount > 0 && $account) {
+                $account->decrement('current_balance', $bankAmount);
 
-            $currentQty = $stock->quantity_on_hand;
-            $currentAvg = (float) $stock->average_cost;
-            $newTotalQty = $currentQty + $countToCreate;
-            $newAvgCost = $newTotalQty > 0
-                ? (($currentQty * $currentAvg) + ($countToCreate * $costBasis)) / $newTotalQty
-                : $costBasis;
+                FinancialTransaction::create([
+                    'tenant_id' => $tenantId,
+                    'transaction_number' => 'TXN-'.strtoupper(\Illuminate\Support\Str::random(8)),
+                    'source_account_id' => $account->id,
+                    'type' => 'supplier_payment',
+                    'amount' => $bankAmount,
+                    'contact_id' => $validated['supplier_contact_id'] ?? null,
+                    'description' => 'Stock intake funding for '.count($createdUnits).' unit(s)',
+                    'date' => now(),
+                    'created_by' => $user->id,
+                ]);
+            }
 
-            $stock->update([
-                'quantity_on_hand' => $newTotalQty,
-                'average_cost' => round($newAvgCost, 2),
-            ]);
+            // 3. Supplier Debt Tracking (if vendor is selected)
+            if (! empty($validated['supplier_contact_id']) && $totalCost > 0) {
+                if ($fundingSource === 'none') {
+                    // Open debt: shop owes vendor
+                    $intakeDebt = Debt::create([
+                        'tenant_id' => $tenantId,
+                        'contact_id' => $validated['supplier_contact_id'],
+                        'type' => 'payable',
+                        'reference_type' => 'stock_intake',
+                        'reference_id' => $createdUnits[0]->id ?? null,
+                        'original_amount' => $totalCost,
+                        'paid_amount' => 0.0,
+                        'remaining_amount' => $totalCost,
+                        'due_date' => $validated['return_deadline'] ?? now()->addDays(30),
+                        'status' => 'open',
+                        'notes' => 'Stock intake: '.count($createdUnits).' unit(s)',
+                    ]);
+                    Debt::applyOpenAdvancesToPayable($intakeDebt);
+                } else {
+                    // Fully funded debt record for complete vendor ledger statement history
+                    $intakeDebt = Debt::create([
+                        'tenant_id' => $tenantId,
+                        'contact_id' => $validated['supplier_contact_id'],
+                        'type' => 'payable',
+                        'reference_type' => 'stock_intake',
+                        'reference_id' => $createdUnits[0]->id ?? null,
+                        'original_amount' => $totalCost,
+                        'paid_amount' => $totalCost,
+                        'remaining_amount' => 0.0,
+                        'due_date' => now(),
+                        'status' => 'settled',
+                        'notes' => 'Stock intake (paid via '.($fundingSource === 'account' ? 'Bank' : ($fundingSource === 'debtor_offset' ? 'Debtor Offset' : 'Split')).')',
+                    ]);
+
+                    if ($bankAmount > 0 && $account) {
+                        DebtPayment::create([
+                            'tenant_id' => $tenantId,
+                            'debt_id' => $intakeDebt->id,
+                            'financial_account_id' => $account->id,
+                            'amount' => $bankAmount,
+                            'payment_date' => now(),
+                            'notes' => 'Paid from bank account',
+                            'created_by' => $user->id,
+                        ]);
+                    }
+
+                    if ($offsetAmount > 0) {
+                        DebtPayment::create([
+                            'tenant_id' => $tenantId,
+                            'debt_id' => $intakeDebt->id,
+                            'financial_account_id' => null,
+                            'amount' => $offsetAmount,
+                            'payment_date' => now(),
+                            'notes' => 'Offset against debtor receivable',
+                            'created_by' => $user->id,
+                        ]);
+                    }
+                }
+            }
 
             AuditLog::record(
                 action: 'stock_intake',
                 entityType: 'InventoryUnit',
-                entityId: (string) ($createdUnits[0]->id ?? $variant->id),
+                entityId: (string) ($createdUnits[0]->id ?? $user->id),
                 newValues: [
-                    'product' => $variant->product?->name,
-                    'variant' => $variant->display_name,
-                    'units_count' => $countToCreate,
-                    'cost_basis' => $costBasis,
-                    'condition' => $validated['condition'],
-                    'location' => $validated['location'] ?? 'Shop Counter',
+                    'units_count' => count($createdUnits),
+                    'total_cost' => $totalCost,
+                    'funding_source' => $fundingSource,
+                    'bank_amount' => $bankAmount,
+                    'offset_amount' => $offsetAmount,
                 ]
             );
         });
@@ -314,7 +561,7 @@ class InventoryController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => "Successfully recorded {$unitLabel} of {$variant->display_name} into stock.",
+            'message' => "Successfully recorded {$unitLabel} into stock.",
             'data' => $createdUnits[0]->load('variant.product'),
             'units_created' => $count,
         ], 201);
