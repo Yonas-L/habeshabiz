@@ -591,6 +591,19 @@ Thank you for choosing Habeshabiz Electronics!
             <span className="text-[10px] text-slate-400">Served by </span>
             <span className="text-[10px] font-semibold text-slate-600 dark:text-slate-300">{order.salesperson?.name || 'Sales Staff'}</span>
           </div>
+          {(order.is_vendor_sourced || order.vendor || order.items.some(i => i.sourcing_type === 'brokered_neighbour' || i.inventory_unit?.source_type === 'vendor_direct')) && (
+            <div className="col-span-2 mt-1 pt-1.5 border-t border-slate-100 dark:border-slate-800/60 flex items-center justify-between text-xs">
+              <span className="text-[11px] text-amber-700 dark:text-amber-300 font-medium flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                Vendor Sourced: <strong className="font-semibold text-slate-800 dark:text-slate-100">{order.vendor?.name || order.items.find(i => i.vendor_contact)?.vendor_contact?.name || 'Partner Vendor'}</strong>
+              </span>
+              {order.vendor_cost_basis != null && (
+                <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400">
+                  Cost: {Number(order.vendor_cost_basis).toLocaleString()} ETB ({order.vendor_payment_status || 'settled'})
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Itemized Table */}
@@ -612,6 +625,8 @@ Thank you for choosing Habeshabiz Electronics!
                 const conditionStr = formatCondition(unit?.condition);
                 const simStr = formatSimType(unit?.sim_type);
                 const lineTotal = item.quantity * (parseFloat(String(item.unit_price)) || 0);
+                const isVendoredItem = (order.is_vendor_sourced && order.items.length === 1) || item.sourcing_type === 'brokered_neighbour' || unit?.source_type === 'vendor_direct';
+                const itemVendor = item.vendor_contact?.name || order.vendor?.name;
 
                 return (
                   <tr key={item.id || idx} className="align-top">
@@ -620,6 +635,12 @@ Thank you for choosing Habeshabiz Electronics!
                       <div className="font-semibold text-slate-900 dark:text-white text-xs flex items-center flex-wrap gap-1">
                         <span>{item.variant?.product?.name || 'Device'}</span>
                         {specString && <span className="font-normal text-slate-400">· {specString}</span>}
+                        {isVendoredItem && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-sans font-medium bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/40">
+                            <span className="w-1 h-1 rounded-full bg-amber-500 shrink-0" />
+                            <span>{itemVendor ? `Vendor: ${itemVendor}` : 'Vendor Sourced'}</span>
+                          </span>
+                        )}
                         {(unit?.source_type === 'exchange' || Boolean(unit?.exchange_sales_order_id)) && (
                           <span className="text-[10px] font-medium text-slate-400 font-sans">
                             Exchanged

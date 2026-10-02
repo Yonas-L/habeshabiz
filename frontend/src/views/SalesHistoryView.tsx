@@ -479,14 +479,32 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
 
                       {/* Col 4: IMEI */}
                       <td className="py-2.5 px-3.5 font-mono text-xs whitespace-nowrap">
-                        <div className="space-y-1">
-                          {order.items.map((item, idx) => (
-                            <div key={idx} className="font-bold text-emerald-600 dark:text-emerald-400">
-                              {item.inventory_unit?.imei_or_serial || (
-                                <span className="text-slate-400 font-sans italic text-[11px] font-normal">—</span>
-                              )}
-                            </div>
-                          ))}
+                        <div className="space-y-1.5">
+                          {order.items.map((item, idx) => {
+                            const isVendored = order.is_vendor_sourced || item.sourcing_type === 'brokered_neighbour' || item.inventory_unit?.source_type === 'vendor_direct';
+                            const vendorName = item.vendor_contact?.name || order.vendor?.name;
+
+                            return (
+                              <div key={idx} className="flex flex-col gap-0.5">
+                                <div className="font-bold text-emerald-600 dark:text-emerald-400">
+                                  {item.inventory_unit?.imei_or_serial || (
+                                    <span className="text-slate-400 font-sans italic text-[11px] font-normal">—</span>
+                                  )}
+                                </div>
+                                {isVendored && (
+                                  <div className="flex items-center">
+                                    <span
+                                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9.5px] font-sans font-medium bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/40"
+                                      title={vendorName ? `Sourced from vendor: ${vendorName}` : 'Vendor sourced'}
+                                    >
+                                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                                      <span className="truncate max-w-[110px]">{vendorName || 'Vendor'}</span>
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       </td>
 
@@ -650,19 +668,43 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
                       const pName = item.variant?.product?.name || 'Device';
                       const spec = [item.variant?.storage, item.variant?.color].filter(Boolean).join(' • ');
                       const imei = item.inventory_unit?.imei_or_serial;
+                      const isVendored = order.is_vendor_sourced || item.sourcing_type === 'brokered_neighbour' || item.inventory_unit?.source_type === 'vendor_direct';
+                      const vendorName = item.vendor_contact?.name || order.vendor?.name;
 
                       return (
                         <div key={idx} className="flex items-center justify-between text-xs">
                           <div className="min-w-0 flex-1 pr-2">
-                            <span className="font-medium text-slate-800 dark:text-slate-200 truncate block">
-                              {item.quantity > 1 ? `${item.quantity}× ` : ''}{pName}
-                            </span>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-medium text-slate-800 dark:text-slate-200 truncate block">
+                                {item.quantity > 1 ? `${item.quantity}× ` : ''}{pName}
+                              </span>
+                              {isVendored && !imei && (
+                                <span
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-sans font-medium bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/40 shrink-0"
+                                  title={vendorName ? `Sourced from vendor: ${vendorName}` : 'Vendor sourced'}
+                                >
+                                  <span className="w-1 h-1 rounded-full bg-amber-500 shrink-0" />
+                                  <span className="truncate max-w-[80px]">{vendorName || 'Vendor'}</span>
+                                </span>
+                              )}
+                            </div>
                             {spec && <span className="text-[10px] text-slate-400 block">{spec}</span>}
                           </div>
                           {imei && (
-                            <span className="font-mono text-[11px] font-bold text-emerald-600 dark:text-emerald-400 shrink-0">
-                              {imei}
-                            </span>
+                            <div className="flex flex-col items-end gap-0.5 shrink-0">
+                              <span className="font-mono text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                                {imei}
+                              </span>
+                              {isVendored && (
+                                <span
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-sans font-medium bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/40"
+                                  title={vendorName ? `Sourced from vendor: ${vendorName}` : 'Vendor sourced'}
+                                >
+                                  <span className="w-1 h-1 rounded-full bg-amber-500 shrink-0" />
+                                  <span className="truncate max-w-[80px]">{vendorName || 'Vendor'}</span>
+                                </span>
+                              )}
+                            </div>
                           )}
                         </div>
                       );

@@ -22,6 +22,7 @@ class SaleController extends Controller
     {
         $query = SalesOrder::with([
             'customer',
+            'vendor',
             'salesperson',
             'financialAccount',
             'exchangeUnit.variant.product',
