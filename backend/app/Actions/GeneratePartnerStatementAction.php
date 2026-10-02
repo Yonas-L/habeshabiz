@@ -388,17 +388,30 @@ class GeneratePartnerStatementAction
             ->pluck('inventory_unit_id')
             ->all();
 
-        $allDebtedUnitIds = array_unique(array_merge($existingStockIntakeUnitIds, $soldUnitIdsWithDebt));
+        $brokeredOrderIds = $debts->where('reference_type', 'brokered_sourcing')->pluck('reference_id')->filter()->all();
+        $brokeredUnitIds = \App\Models\SalesOrderItem::whereIn('sales_order_id', $brokeredOrderIds)
+            ->whereNotNull('inventory_unit_id')
+            ->pluck('inventory_unit_id')
+            ->all();
+
+        $vendorDirectSaleUnitIds = $debts->where('reference_type', 'vendor_direct_sale')->pluck('reference_id')->filter()->all();
+
+        $allDebtedUnitIds = array_unique(array_merge(
+            $existingStockIntakeUnitIds,
+            $soldUnitIdsWithDebt,
+            $brokeredUnitIds,
+            $vendorDirectSaleUnitIds
+        ));
 
         $vendorUnitsWithoutDebt = InventoryUnit::where('supplier_contact_id', $contact->id)
             ->where('cost_basis', '>', 0)
-            ->where('source_type', '!=', 'exchange')
+            ->whereNotIn('source_type', ['exchange', 'vendor_direct'])
             ->whereNull('exchange_sales_order_id')
             ->whereNotIn('id', $allDebtedUnitIds)
             ->with(['variant.product'])
             ->get()
             ->filter(function ($u) use ($debts) {
-                if ($u->source_type === 'exchange' || ! empty($u->exchange_sales_order_id)) {
+                if ($u->source_type === 'exchange' || $u->source_type === 'vendor_direct' || ! empty($u->exchange_sales_order_id)) {
                     return false;
                 }
                 if ($u->imei_or_serial) {
@@ -554,7 +567,7 @@ class GeneratePartnerStatementAction
 
         $unDebtStockPayable = (float) InventoryUnit::where('supplier_contact_id', $contact->id)
             ->where('status', 'in_stock')
-            ->where('source_type', '!=', 'exchange')
+            ->whereNotIn('source_type', ['exchange', 'vendor_direct'])
             ->whereNull('exchange_sales_order_id')
             ->whereNotIn('id', $allDebtedUnitIds)
             ->sum('cost_basis');
