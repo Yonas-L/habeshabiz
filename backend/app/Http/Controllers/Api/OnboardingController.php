@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\PlatformSetting;
 use App\Models\PlatformSignupAttempt;
 use App\Models\PlatformWhitelist;
+use App\Models\Tenant;
 use App\Services\TenantOnboardingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;

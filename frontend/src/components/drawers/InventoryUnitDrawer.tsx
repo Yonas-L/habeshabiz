@@ -38,6 +38,7 @@ interface InventoryUnitDrawerProps {
   onSelectForSale?: (unit: InventoryUnit) => void;
   onOpenHandover?: (unit: InventoryUnit) => void;
   onOpenCustomerReturn?: (unit: InventoryUnit) => void;
+  onOpenRepairExpense?: (unit: InventoryUnit) => void;
   onOpenRepairedRestock?: (unit: InventoryUnit) => void;
   onOpenSwap?: (unit: InventoryUnit) => void;
   onOpenReceiveFixed?: (unit: InventoryUnit) => void;
@@ -70,6 +71,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
   onSelectForSale,
   onOpenHandover,
   onOpenCustomerReturn,
+  onOpenRepairExpense,
   onOpenRepairedRestock,
   onOpenSwap,
   onOpenReceiveFixed,
@@ -497,21 +499,38 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
                 </button>
               )}
 
-              {/* RETURNED / FIXED: Repaired & Restock */}
-              {(isReturned || currentUnit.status === 'fixed') && (isOwner || canManageInv) && onOpenRepairedRestock && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    onOpenRepairedRestock(currentUnit);
-                    onClose();
-                  }}
-                  className={`h-9 px-4 rounded-xl text-white text-xs font-bold transition-all shadow-xs active:scale-95 flex items-center gap-1.5 ${
-                    currentUnit.status === 'fixed' ? 'bg-teal-600 hover:bg-teal-700' : 'bg-blue-600 hover:bg-blue-700'
-                  }`}
-                >
-                  <Wrench className="w-3.5 h-3.5" />
-                  <span>Restock Repaired Device</span>
-                </button>
+              {/* RETURNED / FIXED: Record Repair Cost & Repaired Restock */}
+              {(isReturned || currentUnit.status === 'fixed') && (isOwner || canManageInv) && (
+                <>
+                  {onOpenRepairExpense && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onOpenRepairExpense(currentUnit);
+                        onClose();
+                      }}
+                      className="h-9 px-3.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition-all shadow-xs active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Wrench className="w-3.5 h-3.5" />
+                      <span>Log Repair Cost</span>
+                    </button>
+                  )}
+                  {onOpenRepairedRestock && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onOpenRepairedRestock(currentUnit);
+                        onClose();
+                      }}
+                      className={`h-9 px-4 rounded-xl text-white text-xs font-bold transition-all shadow-xs active:scale-95 flex items-center gap-1.5 cursor-pointer ${
+                        currentUnit.status === 'fixed' ? 'bg-teal-600 hover:bg-teal-700' : 'bg-emerald-600 hover:bg-emerald-700'
+                      }`}
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Restock Repaired Device</span>
+                    </button>
+                  )}
+                </>
               )}
 
               {/* WITH VENDOR: Receive Fixed & Vendor Swap */}

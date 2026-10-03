@@ -3577,6 +3577,10 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           setReturnDestination('repair');
           setReturnNotes('');
         }}
+        onOpenRepairExpense={(unit) => {
+          setRepairExpenseTargetUnit(unit);
+          setShowRepairExpenseModal(true);
+        }}
         onOpenRepairedRestock={(unit) => openRepairedRestock(unit)}
         onOpenSwap={(unit) => setSwapTargetUnit(unit)}
         onOpenReceiveFixed={(unit) => {
