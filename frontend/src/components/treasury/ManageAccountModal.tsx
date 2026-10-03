@@ -49,6 +49,8 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
   const [currency, setCurrency] = useState('ETB');
   const [openingBalance, setOpeningBalance] = useState('');
   const [balanceAdjustment, setBalanceAdjustment] = useState('');
+  const [feeType, setFeeType] = useState<'none' | 'percentage' | 'fixed'>('none');
+  const [feeAmount, setFeeAmount] = useState('');
   const [assetDetails, setAssetDetails] = useState<{ key: string; value: string }[]>([]);
   const [logo, setLogo] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -75,6 +77,8 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
         setCurrency(editAccount.currency || 'ETB');
         setOpeningBalance(editAccount.current_balance != null ? String(editAccount.current_balance) : '0');
         setBalanceAdjustment(editAccount.current_balance != null ? String(editAccount.current_balance) : '0');
+        setFeeType(editAccount.default_fee_type === 'percentage' || editAccount.default_fee_type === 'fixed' ? editAccount.default_fee_type : 'none');
+        setFeeAmount(editAccount.default_fee_amount != null && Number(editAccount.default_fee_amount) > 0 ? String(Number(editAccount.default_fee_amount)) : '');
         setLogo(editAccount.logo || null);
         if (editAccount.asset_details && typeof editAccount.asset_details === 'object') {
           setAssetDetails(
@@ -93,6 +97,8 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
         setCurrency(defaultType === 'asset_fx' ? 'USD' : 'ETB');
         setOpeningBalance('');
         setBalanceAdjustment('');
+        setFeeType('none');
+        setFeeAmount('');
         setLogo(null);
         setAssetDetails([]);
       }
@@ -136,6 +142,8 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
         }
       });
 
+      const parsedFee = feeType !== 'none' && feeAmount ? parseFloat(feeAmount) : 0;
+
       if (isEditing && editAccount) {
         await api.updateAccount(editAccount.id, {
           name: name.trim(),
@@ -144,6 +152,8 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
           currency: currency || 'ETB',
           asset_details: Object.keys(details).length > 0 ? details : null,
           logo: logo ?? null,
+          default_fee_type: feeType,
+          default_fee_amount: parsedFee,
           ...(balanceAdjustment !== '' ? { current_balance: parseFloat(balanceAdjustment) } : {}),
         });
         toast.success('Account updated', { description: name });
@@ -154,6 +164,8 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
           account_number: accountNumber.trim() || undefined,
           currency: currency || 'ETB',
           opening_balance: openingBalance ? parseFloat(openingBalance) : 0,
+          default_fee_type: feeType,
+          default_fee_amount: parsedFee,
           is_custom_asset: isAssetType,
           asset_details: Object.keys(details).length > 0 ? details : undefined,
           logo: logo ?? undefined,
@@ -410,6 +422,86 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
               )}
             </div>
           </div>
+
+          {/* Outgoing Transaction Fee (Optional) */}
+          {!isAssetType && (
+            <div className="p-3 rounded-2xl bg-slate-50/90 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-[11px] font-bold text-slate-800 dark:text-slate-200 block">
+                    Outgoing Transaction Fee (Optional)
+                  </span>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-relaxed">
+                    Auto-applied on transfers & payouts to keep your bank balance in sync with carrier/bank charges.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-12 gap-2">
+                {/* Fee Type Pill Selector */}
+                <div className="col-span-12 sm:col-span-6 flex rounded-xl bg-white dark:bg-slate-800 p-0.5 border border-slate-200 dark:border-slate-700">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFeeType('none');
+                      setFeeAmount('');
+                    }}
+                    className={`flex-1 py-1 text-[10px] font-bold rounded-lg transition-all ${
+                      feeType === 'none'
+                        ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
+                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    No Fee
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFeeType('percentage')}
+                    className={`flex-1 py-1 text-[10px] font-bold rounded-lg transition-all ${
+                      feeType === 'percentage'
+                        ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
+                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    % Percent
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFeeType('fixed')}
+                    className={`flex-1 py-1 text-[10px] font-bold rounded-lg transition-all ${
+                      feeType === 'fixed'
+                        ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
+                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    Fixed ETB
+                  </button>
+                </div>
+
+                {/* Fee Value Input */}
+                {feeType !== 'none' ? (
+                  <div className="col-span-12 sm:col-span-6 relative">
+                    <input
+                      type="number"
+                      step={feeType === 'percentage' ? '0.01' : '1'}
+                      min="0"
+                      value={feeAmount}
+                      onChange={(e) => setFeeAmount(e.target.value)}
+                      placeholder={feeType === 'percentage' ? 'e.g. 1.5' : 'e.g. 10'}
+                      className="w-full h-8 pl-2.5 pr-12 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono font-bold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+                    />
+                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 uppercase pointer-events-none">
+                      {feeType === 'percentage' ? '%' : currency}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="col-span-12 sm:col-span-6 flex items-center text-[10px] text-slate-400 px-2 italic">
+                    0 fee per transaction
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Asset Details (for gold/fx/custom) */}
           {isAssetType && (

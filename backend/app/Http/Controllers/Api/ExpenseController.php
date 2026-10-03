@@ -22,6 +22,7 @@ class ExpenseController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
+        $tenantId = $request->user()->tenant_id;
         $query = Expense::with(['financialAccount', 'inventoryUnit.variant.product']);
 
         if ($request->has('is_owner_draw')) {
@@ -32,11 +33,24 @@ class ExpenseController extends Controller
             $query->where('category', $request->category);
         }
 
-        $expenses = $query->latest('date')->paginate(30);
+        $expenses = $query->latest('date')->paginate(50);
+
+        // Fetch transactions with fees for the tenant
+        $bankFees = FinancialTransaction::where('tenant_id', $tenantId)
+            ->where('fee', '>', 0)
+            ->with('sourceAccount')
+            ->latest('date')
+            ->get();
+
+        $totalBankFees = (float) $bankFees->sum('fee');
 
         return response()->json([
             'success' => true,
-            'data' => $expenses->items(),
+            'data' => [
+                'expenses' => $expenses->items(),
+                'bank_fees' => $bankFees,
+                'total_bank_fees' => $totalBankFees,
+            ],
             'pagination' => [
                 'current_page' => $expenses->currentPage(),
                 'last_page' => $expenses->lastPage(),
@@ -65,12 +79,15 @@ class ExpenseController extends Controller
             $amount = (float) $validated['amount'];
 
             // Deduct from financial account (paying technician/service/vendor)
-            if ((float) $account->current_balance < $amount) {
+            $fee = $account->calculateOutgoingFee($amount, isset($validated['fee']) ? (float) $validated['fee'] : null);
+            $totalDeduction = $amount + $fee;
+
+            if ((float) $account->current_balance < $totalDeduction) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
-                    'financial_account_id' => ["Insufficient balance in account '{$account->name}'."],
+                    'financial_account_id' => ["Insufficient balance in account '{$account->name}'. Available: ".number_format((float) $account->current_balance, 2)." ETB, Required: ".number_format($totalDeduction, 2)." ETB (including fee)."],
                 ]);
             }
-            $account->decrement('current_balance', $amount);
+            $account->decrement('current_balance', $totalDeduction);
 
             $vendorBilling = $validated['vendor_billing'] ?? 'shop';
             $vendorContactId = $validated['vendor_contact_id'] ?? null;
@@ -271,6 +288,7 @@ class ExpenseController extends Controller
                 'source_account_id' => $account->id,
                 'type' => ($validated['is_owner_draw'] ?? false) ? 'owner_draw' : 'expense',
                 'amount' => $amount,
+                'fee' => $fee,
                 'description' => $validated['description'],
                 'date' => $expense->date,
                 'created_by' => auth()->id(),

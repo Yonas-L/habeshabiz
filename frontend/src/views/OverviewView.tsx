@@ -395,7 +395,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               You Owe
             </span>
             <span className="text-[10px] sm:text-[11px] font-bold font-mono tracking-tight text-rose-600 dark:text-rose-400 mt-0.5 truncate max-w-full block">
-              −<AnimatedNumber value={capital_overview.payables} />
+              {(capital_overview.payables || 0) > 0 ? '−' : ''}<AnimatedNumber value={capital_overview.payables} />
             </span>
           </button>
 
@@ -584,12 +584,27 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 <Plus className="w-2.5 h-2.5" /> Record
               </span>
             </div>
-            <div className="text-base sm:text-2xl font-bold font-mono tracking-tight text-slate-800 dark:text-slate-200 mt-1.5">
-              −<AnimatedNumber value={monthly_performance.operating_expenses} />
-              <span className="text-[10px] sm:text-xs font-medium text-slate-400 dark:text-slate-500 ml-1 font-sans">ETB</span>
+            <div className={`text-base sm:text-2xl font-bold font-mono tracking-tight mt-1.5 ${
+              (monthly_performance.operating_expenses || 0) > 0
+                ? 'text-rose-600 dark:text-rose-400'
+                : 'text-slate-900 dark:text-white'
+            }`}>
+              {(monthly_performance.operating_expenses || 0) > 0 ? '−' : ''}
+              <AnimatedNumber value={monthly_performance.operating_expenses} />
+              <span className={`text-[10px] sm:text-xs font-medium ml-1 font-sans ${
+                (monthly_performance.operating_expenses || 0) > 0
+                  ? 'text-rose-500/70 dark:text-rose-400/70'
+                  : 'text-slate-400 dark:text-slate-500'
+              }`}>ETB</span>
             </div>
             <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 block group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-              Rent, ride, bills · <span className="underline decoration-dotted sm:inline hidden">Record +</span>
+              {(monthly_performance.transaction_fees || 0) > 0 && (monthly_performance.manual_expenses || 0) === 0 ? (
+                <span>Bank & Transfer Fees · <span className="underline decoration-dotted sm:inline hidden">Record +</span></span>
+              ) : (monthly_performance.transaction_fees || 0) > 0 ? (
+                <span>Bills + Bank Fees · <span className="underline decoration-dotted sm:inline hidden">Record +</span></span>
+              ) : (
+                <span>Rent, ride, bills · <span className="underline decoration-dotted sm:inline hidden">Record +</span></span>
+              )}
             </span>
           </button>
 

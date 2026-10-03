@@ -21,6 +21,8 @@ class FinancialAccount extends Model
         'currency',
         'logo',
         'current_balance',
+        'default_fee_type',
+        'default_fee_amount',
         'is_custom_asset',
         'asset_details',
         'is_active',
@@ -30,6 +32,7 @@ class FinancialAccount extends Model
     {
         return [
             'current_balance' => 'decimal:2',
+            'default_fee_amount' => 'decimal:4',
             'is_custom_asset' => 'boolean',
             'asset_details' => 'array',
             'is_active' => 'boolean',
@@ -54,5 +57,31 @@ class FinancialAccount extends Model
     public function expenses(): HasMany
     {
         return $this->hasMany(Expense::class);
+    }
+
+    public function calculateOutgoingFee(float|int $amount, ?float $overrideFee = null): float
+    {
+        if ($overrideFee !== null) {
+            return max(0.0, (float) $overrideFee);
+        }
+
+        if (! $this->default_fee_type || $this->default_fee_type === 'none') {
+            return 0.0;
+        }
+
+        $rate = (float) ($this->default_fee_amount ?? 0);
+        if ($rate <= 0) {
+            return 0.0;
+        }
+
+        if ($this->default_fee_type === 'fixed') {
+            return round($rate, 2);
+        }
+
+        if ($this->default_fee_type === 'percentage') {
+            return round(((float) $amount * $rate) / 100, 2);
+        }
+
+        return 0.0;
     }
 }

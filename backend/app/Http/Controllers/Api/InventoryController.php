@@ -159,10 +159,12 @@ class InventoryController extends Controller
                 'source_type' => ['nullable', 'string', 'in:purchase,consignment'],
                 'supplier_contact_id' => ['nullable', 'exists:contacts,id'],
                 'return_deadline' => ['nullable', 'date'],
-                'funding_source' => ['nullable', 'string', 'in:none,account,debtor_offset,split'],
+                'funding_source' => ['nullable', 'string', 'in:none,unpaid,account,shop_account,debtor_offset,split'],
                 'payment_account_id' => ['nullable', 'exists:financial_accounts,id'],
+                'payment_amount' => ['nullable', 'numeric', 'min:0'],
                 'receivable_contact_id' => ['nullable', 'exists:contacts,id'],
                 'receivable_offset_amount' => ['nullable', 'numeric', 'min:0'],
+                'offset_amount' => ['nullable', 'numeric', 'min:0'],
             ]);
 
             $unitItems = $validated['units'];
@@ -182,10 +184,12 @@ class InventoryController extends Controller
                 'source_type' => ['nullable', 'string', 'in:purchase,consignment'],
                 'supplier_contact_id' => ['nullable', 'exists:contacts,id'],
                 'return_deadline' => ['nullable', 'date'],
-                'funding_source' => ['nullable', 'string', 'in:none,account,debtor_offset,split'],
+                'funding_source' => ['nullable', 'string', 'in:none,unpaid,account,shop_account,debtor_offset,split'],
                 'payment_account_id' => ['nullable', 'exists:financial_accounts,id'],
+                'payment_amount' => ['nullable', 'numeric', 'min:0'],
                 'receivable_contact_id' => ['nullable', 'exists:contacts,id'],
                 'receivable_offset_amount' => ['nullable', 'numeric', 'min:0'],
+                'offset_amount' => ['nullable', 'numeric', 'min:0'],
                 'location' => ['nullable', 'string', 'max:100'],
                 'notes' => ['nullable', 'string'],
             ]);
@@ -274,10 +278,22 @@ class InventoryController extends Controller
         $totalCost = (float) collect($unitItems)->sum(fn ($u) => (float) $u['cost_basis']);
 
         // Determine funding allocation
-        $fundingSource = $validated['funding_source'] ?? (! empty($validated['payment_account_id']) ? 'account' : 'none');
+        $rawFunding = $validated['funding_source'] ?? null;
+        if ($rawFunding === 'shop_account' || $rawFunding === 'account') {
+            $fundingSource = 'account';
+        } elseif ($rawFunding === 'unpaid' || $rawFunding === 'none') {
+            $fundingSource = 'none';
+        } elseif ($rawFunding === 'debtor_offset') {
+            $fundingSource = 'debtor_offset';
+        } elseif ($rawFunding === 'split') {
+            $fundingSource = 'split';
+        } else {
+            $fundingSource = ! empty($validated['payment_account_id']) ? 'account' : 'none';
+        }
+
         $paymentAccountId = $validated['payment_account_id'] ?? null;
         $receivableContactId = $validated['receivable_contact_id'] ?? null;
-        $receivableOffsetAmount = (float) ($validated['receivable_offset_amount'] ?? 0);
+        $receivableOffsetAmount = (float) ($validated['receivable_offset_amount'] ?? $validated['offset_amount'] ?? $request->input('offset_amount', 0));
 
         $bankAmount = 0.0;
         $offsetAmount = 0.0;
@@ -317,11 +333,14 @@ class InventoryController extends Controller
 
         // Overdraft guard: verify bank balance
         $account = null;
+        $bankFee = 0.0;
         if ($bankAmount > 0 && ! empty($paymentAccountId)) {
             $account = FinancialAccount::where('tenant_id', $user->tenant_id)->findOrFail($paymentAccountId);
-            if ((float) $account->current_balance < $bankAmount) {
+            $bankFee = $account->calculateOutgoingFee($bankAmount);
+            $totalBankDeduction = $bankAmount + $bankFee;
+            if ((float) $account->current_balance < $totalBankDeduction) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
-                    'payment_account_id' => ["Insufficient balance in account '{$account->name}'."],
+                    'payment_account_id' => ["Insufficient balance in account '{$account->name}'. Available: ".number_format((float) $account->current_balance, 2)." ETB, Required: ".number_format($totalBankDeduction, 2)." ETB (including fee)."],
                 ]);
             }
         }
@@ -353,6 +372,7 @@ class InventoryController extends Controller
             $receivableContactId,
             $offsetAmount,
             $bankAmount,
+            $bankFee,
             $totalCost,
             $account,
             $user,
@@ -424,6 +444,11 @@ class InventoryController extends Controller
                     ->orderBy('created_at')
                     ->get();
 
+                $deviceSummary = collect($createdUnits)->map(function ($u) {
+                    $name = $u->variant?->product?->name ?? 'Device';
+                    return $u->imei_or_serial ? "{$name} (IMEI: {$u->imei_or_serial})" : $name;
+                })->implode(', ');
+
                 foreach ($openDebts as $debt) {
                     if ($remOffset <= 0) {
                         break;
@@ -437,7 +462,7 @@ class InventoryController extends Controller
                         'amount' => $applied,
                         'payment_date' => now(),
                         'reference_number' => 'OFFSET-INTAKE',
-                        'notes' => 'Offset against stock intake',
+                        'notes' => "Paid by device: {$deviceSummary}",
                         'created_by' => $user->id,
                     ]);
 
@@ -467,7 +492,8 @@ class InventoryController extends Controller
 
             // 2. Bank Account Deduction
             if ($bankAmount > 0 && $account) {
-                $account->decrement('current_balance', $bankAmount);
+                $totalBankDeduction = $bankAmount + $bankFee;
+                $account->decrement('current_balance', $totalBankDeduction);
 
                 FinancialTransaction::create([
                     'tenant_id' => $tenantId,
@@ -475,6 +501,7 @@ class InventoryController extends Controller
                     'source_account_id' => $account->id,
                     'type' => 'supplier_payment',
                     'amount' => $bankAmount,
+                    'fee' => $bankFee,
                     'contact_id' => $validated['supplier_contact_id'] ?? null,
                     'description' => 'Stock intake funding for '.count($createdUnits).' unit(s)',
                     'date' => now(),
@@ -482,64 +509,22 @@ class InventoryController extends Controller
                 ]);
             }
 
-            // 3. Supplier Debt Tracking (if vendor is selected)
-            if (! empty($validated['supplier_contact_id']) && $totalCost > 0) {
-                if ($fundingSource === 'none') {
-                    // Open debt: shop owes vendor
-                    $intakeDebt = Debt::create([
-                        'tenant_id' => $tenantId,
-                        'contact_id' => $validated['supplier_contact_id'],
-                        'type' => 'payable',
-                        'reference_type' => 'stock_intake',
-                        'reference_id' => $createdUnits[0]->id ?? null,
-                        'original_amount' => $totalCost,
-                        'paid_amount' => 0.0,
-                        'remaining_amount' => $totalCost,
-                        'due_date' => $validated['return_deadline'] ?? now()->addDays(30),
-                        'status' => 'open',
-                        'notes' => 'Stock intake: '.count($createdUnits).' unit(s)',
-                    ]);
-                    Debt::applyOpenAdvancesToPayable($intakeDebt);
-                } else {
-                    // Fully funded debt record for complete vendor ledger statement history
-                    $intakeDebt = Debt::create([
-                        'tenant_id' => $tenantId,
-                        'contact_id' => $validated['supplier_contact_id'],
-                        'type' => 'payable',
-                        'reference_type' => 'stock_intake',
-                        'reference_id' => $createdUnits[0]->id ?? null,
-                        'original_amount' => $totalCost,
-                        'paid_amount' => $totalCost,
-                        'remaining_amount' => 0.0,
-                        'due_date' => now(),
-                        'status' => 'settled',
-                        'notes' => 'Stock intake (paid via '.($fundingSource === 'account' ? 'Bank' : ($fundingSource === 'debtor_offset' ? 'Debtor Offset' : 'Split')).')',
-                    ]);
-
-                    if ($bankAmount > 0 && $account) {
-                        DebtPayment::create([
-                            'tenant_id' => $tenantId,
-                            'debt_id' => $intakeDebt->id,
-                            'financial_account_id' => $account->id,
-                            'amount' => $bankAmount,
-                            'payment_date' => now(),
-                            'notes' => 'Paid from bank account',
-                            'created_by' => $user->id,
-                        ]);
-                    }
-
-                    if ($offsetAmount > 0) {
-                        DebtPayment::create([
-                            'tenant_id' => $tenantId,
-                            'debt_id' => $intakeDebt->id,
-                            'financial_account_id' => null,
-                            'amount' => $offsetAmount,
-                            'payment_date' => now(),
-                            'notes' => 'Offset against debtor receivable',
-                            'created_by' => $user->id,
-                        ]);
-                    }
-                }
+            // 3. Supplier Debt Tracking (only when unfunded / pay later)
+            if (! empty($validated['supplier_contact_id']) && $totalCost > 0 && $fundingSource === 'none') {
+                $intakeDebt = Debt::create([
+                    'tenant_id' => $tenantId,
+                    'contact_id' => $validated['supplier_contact_id'],
+                    'type' => 'payable',
+                    'reference_type' => 'stock_intake',
+                    'reference_id' => $createdUnits[0]->id ?? null,
+                    'original_amount' => $totalCost,
+                    'paid_amount' => 0.0,
+                    'remaining_amount' => $totalCost,
+                    'due_date' => $validated['return_deadline'] ?? now()->addDays(30),
+                    'status' => 'open',
+                    'notes' => 'Stock intake: '.count($createdUnits).' unit(s)',
+                ]);
+                Debt::applyOpenAdvancesToPayable($intakeDebt);
             }
 
             AuditLog::record(

@@ -416,12 +416,15 @@ class SaleController extends Controller
             // 3. Handle Vendor Payment
             if ($validated['vendor_payment_method'] === 'paid_now' && $vendorCost > 0) {
                 $vendorAcc = FinancialAccount::where('tenant_id', $tenantId)->findOrFail($validated['vendor_payment_account_id']);
-                if ((float) $vendorAcc->current_balance < $vendorCost) {
+                $vendorFee = $vendorAcc->calculateOutgoingFee($vendorCost);
+                $totalVendorDeduction = $vendorCost + $vendorFee;
+
+                if ((float) $vendorAcc->current_balance < $totalVendorDeduction) {
                     throw \Illuminate\Validation\ValidationException::withMessages([
-                        'vendor_payment_account_id' => ["Insufficient balance in account '{$vendorAcc->name}'."],
+                        'vendor_payment_account_id' => ["Insufficient balance in account '{$vendorAcc->name}'. Available: ".number_format((float) $vendorAcc->current_balance, 2)." ETB, Required: ".number_format($totalVendorDeduction, 2)." ETB (including fee)."],
                     ]);
                 }
-                $vendorAcc->decrement('current_balance', $vendorCost);
+                $vendorAcc->decrement('current_balance', $totalVendorDeduction);
 
                 FinancialTransaction::create([
                     'tenant_id' => $tenantId,
@@ -429,6 +432,7 @@ class SaleController extends Controller
                     'source_account_id' => $vendorAcc->id,
                     'type' => 'supplier_payment',
                     'amount' => $vendorCost,
+                    'fee' => $vendorFee,
                     'contact_id' => $validated['vendor_contact_id'],
                     'description' => "Vendor direct payout for IMEI: " . ($imei ?: 'N/A'),
                     'date' => now(),

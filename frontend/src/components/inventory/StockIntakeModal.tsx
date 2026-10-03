@@ -835,10 +835,11 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
           source_type: sourceType,
           supplier_contact_id: supplierId || undefined,
           return_deadline: calculatedReturnDeadline,
-          funding_source: sourceType === 'purchase' ? fundingSource : undefined,
+          funding_source: sourceType === 'purchase' ? (fundingSource === 'shop_account' ? 'account' : fundingSource === 'unpaid' ? 'none' : fundingSource) : undefined,
           payment_account_id: (sourceType === 'purchase' && (fundingSource === 'shop_account' || fundingSource === 'split')) ? (paymentAccountId || undefined) : undefined,
           payment_amount: (sourceType === 'purchase' && (fundingSource === 'shop_account' || fundingSource === 'split')) ? (fundingSource === 'split' ? (parseFormattedNumber(splitCashAmount) ?? undefined) : totalInvestmentCost) : undefined,
           receivable_contact_id: (sourceType === 'purchase' && (fundingSource === 'debtor_offset' || fundingSource === 'split')) ? (selectedDebtorContactId || undefined) : undefined,
+          receivable_offset_amount: (sourceType === 'purchase' && (fundingSource === 'debtor_offset' || fundingSource === 'split')) ? (fundingSource === 'split' ? (parseFormattedNumber(splitOffsetAmount) ?? undefined) : totalInvestmentCost) : undefined,
           offset_amount: (sourceType === 'purchase' && (fundingSource === 'debtor_offset' || fundingSource === 'split')) ? (fundingSource === 'split' ? (parseFormattedNumber(splitOffsetAmount) ?? undefined) : totalInvestmentCost) : undefined,
         };
       } else {
@@ -852,10 +853,11 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
           source_type: sourceType,
           supplier_contact_id: supplierId || null,
           return_deadline: calculatedReturnDeadline,
-          funding_source: sourceType === 'purchase' ? fundingSource : undefined,
+          funding_source: sourceType === 'purchase' ? (fundingSource === 'shop_account' ? 'account' : fundingSource === 'unpaid' ? 'none' : fundingSource) : undefined,
           payment_account_id: (sourceType === 'purchase' && (fundingSource === 'shop_account' || fundingSource === 'split')) ? (paymentAccountId || undefined) : undefined,
           payment_amount: (sourceType === 'purchase' && (fundingSource === 'shop_account' || fundingSource === 'split')) ? (fundingSource === 'split' ? (parseFormattedNumber(splitCashAmount) ?? undefined) : totalInvestmentCost) : undefined,
           receivable_contact_id: (sourceType === 'purchase' && (fundingSource === 'debtor_offset' || fundingSource === 'split')) ? (selectedDebtorContactId || undefined) : undefined,
+          receivable_offset_amount: (sourceType === 'purchase' && (fundingSource === 'debtor_offset' || fundingSource === 'split')) ? (fundingSource === 'split' ? (parseFormattedNumber(splitOffsetAmount) ?? undefined) : totalInvestmentCost) : undefined,
           offset_amount: (sourceType === 'purchase' && (fundingSource === 'debtor_offset' || fundingSource === 'split')) ? (fundingSource === 'split' ? (parseFormattedNumber(splitOffsetAmount) ?? undefined) : totalInvestmentCost) : undefined,
         };
 
@@ -2542,9 +2544,9 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">
                     {sourceType === 'consignment' ? (
-                      <span>Broker Partner <span className="text-rose-500">*</span></span>
+                      <span>Broker <span className="text-rose-500">*</span></span>
                     ) : (
-                      'Supplier / Source (Optional)'
+                      <span>Supplier <span className="font-normal text-slate-400">(optional)</span></span>
                     )}
                   </label>
                   <button
@@ -2567,13 +2569,15 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                   }`}
                 >
                   <option value="">
-                    {sourceType === 'consignment' ? '-- Select Broker (Required) --' : '-- Direct / Walk-in --'}
+                    {sourceType === 'consignment' ? 'Select broker' : 'None'}
                   </option>
-                  {liveContacts.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} {c.phone ? `(${c.phone})` : ''}
-                    </option>
-                  ))}
+                  {liveContacts
+                    .filter((c) => (c.roles || []).some((r) => r !== 'customer'))
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} {c.phone ? `(${c.phone})` : ''}
+                      </option>
+                    ))}
                 </select>
               </div>
 

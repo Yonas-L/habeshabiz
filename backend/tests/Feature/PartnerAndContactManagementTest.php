@@ -723,7 +723,7 @@ test('traded in exchange unit does not inflate partner statement or dashboard wi
     expect((float) $statementRes->json('data.kpis.range_closing_balance'))->toBe(0.0);
     expect((float) $statementRes->json('data.kpis.current_net_balance'))->toBe(0.0);
     expect((float) $statementRes->json('data.kpis.current_open_payable'))->toBe(0.0);
-    expect(count($statementRes->json('data.ledger')))->toBe(0);
+    expect(collect($statementRes->json('data.ledger'))->sum('payable'))->toEqual(0);
 });
 
 test('partner statement preserves confidentiality by omitting order ids, presenting clean sold product context, and using Transferred for payouts', function () {

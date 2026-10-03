@@ -158,7 +158,8 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
     const brokers = contacts.filter((c) => c.roles.includes('peer_vendor')).length;
     const suppliers = contacts.filter((c) => c.roles.includes('supplier')).length;
     const partners = contacts.filter((c) => c.roles.includes('partner')).length;
-    return { total, brokers, suppliers, partners };
+    const customers = contacts.filter((c) => c.roles.includes('customer')).length;
+    return { total, brokers, suppliers, partners, customers };
   }, [contacts]);
 
   const getRoleBadge = (role: string) => {
@@ -257,7 +258,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
             { id: 'peer_vendor', label: 'Brokers', count: stats.brokers },
             { id: 'supplier', label: 'Suppliers', count: stats.suppliers },
             { id: 'partner', label: 'Partners', count: stats.partners },
-            { id: 'customer', label: 'Customers', count: null },
+            { id: 'customer', label: 'Customers', count: stats.customers },
           ].map((tab) => (
             <button
               key={tab.id}

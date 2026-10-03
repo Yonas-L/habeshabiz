@@ -271,6 +271,11 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
                   <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
                     {account.type.replace(/_/g, ' ')}
                   </span>
+                  {account.default_fee_type && account.default_fee_type !== 'none' && Number(account.default_fee_amount) > 0 && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200/60 dark:border-amber-900/40">
+                      Outgoing Fee: {Number(account.default_fee_amount)}{account.default_fee_type === 'percentage' ? '%' : ' ETB'}
+                    </span>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-3 mt-1 text-xs text-slate-500 dark:text-slate-400">

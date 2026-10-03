@@ -146,16 +146,49 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
     }
   };
 
+  const calculateDefaultFee = (srcId: string, amtStr: string): string => {
+    const all = [...treasuryAccounts, ...assetAccounts];
+    const src = all.find((a) => a.id === srcId);
+    if (!src || !src.default_fee_type || src.default_fee_type === 'none') {
+      return '0';
+    }
+    const amt = parseFloat(amtStr) || 0;
+    const rate = Number(src.default_fee_amount) || 0;
+    if (rate <= 0) return '0';
+    if (src.default_fee_type === 'fixed') {
+      return String(rate);
+    }
+    if (src.default_fee_type === 'percentage') {
+      const calc = (amt * rate) / 100;
+      return String(Math.round(calc * 100) / 100);
+    }
+    return '0';
+  };
+
   const handleOpenTransfer = (preselectedSourceId?: string) => {
+    let chosenSourceId = '';
     if (preselectedSourceId) {
+      chosenSourceId = preselectedSourceId;
       setSourceAccountId(preselectedSourceId);
       const other = treasuryAccounts.find((a) => a.id !== preselectedSourceId);
       if (other) setDestAccountId(other.id);
     } else if (treasuryAccounts.length >= 2) {
+      chosenSourceId = treasuryAccounts[0].id;
       setSourceAccountId(treasuryAccounts[0].id);
       setDestAccountId(treasuryAccounts[1].id);
     }
+    setTransferFee(calculateDefaultFee(chosenSourceId, transferAmount));
     setShowTransferModal(true);
+  };
+
+  const handleSourceAccountChange = (newSrcId: string) => {
+    setSourceAccountId(newSrcId);
+    setTransferFee(calculateDefaultFee(newSrcId, transferAmount));
+  };
+
+  const handleTransferAmountChange = (newAmt: string) => {
+    setTransferAmount(newAmt);
+    setTransferFee(calculateDefaultFee(sourceAccountId, newAmt));
   };
 
   const handleTransferSubmit = async (e: React.FormEvent) => {
@@ -426,11 +459,18 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                     </div>
                   </div>
 
-                  {acc.account_number && (
-                    <div className="mt-2 font-mono text-[11px] text-slate-400 dark:text-slate-500">
-                      {acc.account_number}
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2 mt-2">
+                    {acc.account_number && (
+                      <span className="font-mono text-[11px] text-slate-400 dark:text-slate-500">
+                        {acc.account_number}
+                      </span>
+                    )}
+                    {acc.default_fee_type && acc.default_fee_type !== 'none' && Number(acc.default_fee_amount) > 0 && (
+                      <span className="inline-flex items-center text-[9px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-200/60 dark:border-amber-900/40">
+                        Fee: {Number(acc.default_fee_amount)}{acc.default_fee_type === 'percentage' ? '%' : ' ETB'}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-end justify-between">
@@ -510,6 +550,13 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                     <p className="text-[10px] text-slate-400 capitalize truncate mt-0.5">
                       {acc.type.replace(/_/g, ' ')}
                     </p>
+                  )}
+                  {acc.default_fee_type && acc.default_fee_type !== 'none' && Number(acc.default_fee_amount) > 0 && (
+                    <div className="mt-1">
+                      <span className="inline-flex items-center text-[8px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-1 py-0.2 rounded border border-amber-200/60 dark:border-amber-900/40">
+                        Fee: {Number(acc.default_fee_amount)}{acc.default_fee_type === 'percentage' ? '%' : ' ETB'}
+                      </span>
+                    </div>
                   )}
                 </div>
 
@@ -751,7 +798,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                   </label>
                   <select
                     value={sourceAccountId}
-                    onChange={(e) => setSourceAccountId(e.target.value)}
+                    onChange={(e) => handleSourceAccountChange(e.target.value)}
                     className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700"
                     required
                   >
@@ -815,7 +862,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                     type="number"
                     step="0.01"
                     value={transferAmount}
-                    onChange={(e) => setTransferAmount(e.target.value)}
+                    onChange={(e) => handleTransferAmountChange(e.target.value)}
                     placeholder="e.g. 50000"
                     className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700"
                     required
@@ -823,9 +870,16 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Bank Fee ETB
-                  </label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                      Bank Fee ETB
+                    </label>
+                    {selectedSource?.default_fee_type && selectedSource.default_fee_type !== 'none' && Number(selectedSource.default_fee_amount) > 0 && (
+                      <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded">
+                        Auto ({Number(selectedSource.default_fee_amount)}{selectedSource.default_fee_type === 'percentage' ? '%' : ' ETB'})
+                      </span>
+                    )}
+                  </div>
                   <input
                     type="number"
                     step="0.01"
@@ -852,15 +906,25 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
 
               {/* Transfer Preview Card */}
               {selectedSource && selectedDest && transferAmount && (
-                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-slate-900 dark:text-white">{selectedSource.name}</span>
-                    <ArrowRightLeft className="w-3.5 h-3.5 text-slate-400" />
-                    <span className="font-bold text-slate-900 dark:text-white">{selectedDest.name}</span>
+                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-slate-900 dark:text-white">{selectedSource.name}</span>
+                      <ArrowRightLeft className="w-3.5 h-3.5 text-slate-400" />
+                      <span className="font-bold text-slate-900 dark:text-white">{selectedDest.name}</span>
+                    </div>
+                    <span className="font-mono font-bold text-slate-900 dark:text-white">
+                      {parseFloat(transferAmount || '0').toLocaleString()} ETB
+                    </span>
                   </div>
-                  <span className="font-mono font-bold text-slate-900 dark:text-white">
-                    {parseFloat(transferAmount || '0').toLocaleString()} ETB
-                  </span>
+                  {parseFloat(transferFee || '0') > 0 && (
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-200/50 dark:border-slate-700/50 font-mono">
+                      <span>Total Outflow ({selectedSource.name}):</span>
+                      <span className="font-bold text-rose-600 dark:text-rose-400">
+                        {(parseFloat(transferAmount || '0') + parseFloat(transferFee || '0')).toLocaleString()} ETB (Amount + {parseFloat(transferFee).toLocaleString()} Fee)
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
 

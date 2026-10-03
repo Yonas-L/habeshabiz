@@ -451,6 +451,26 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
             </div>
           </div>
 
+          {(() => {
+            const selectedAcc = availableAccounts.find((a) => a.id === accountId);
+            const amtNum = parseFloat(amount) || 0;
+            if (!selectedAcc || !selectedAcc.default_fee_type || selectedAcc.default_fee_type === 'none' || amtNum <= 0) return null;
+            const rate = Number(selectedAcc.default_fee_amount) || 0;
+            if (rate <= 0) return null;
+            const fee = selectedAcc.default_fee_type === 'fixed' ? rate : Math.round(((amtNum * rate) / 100) * 100) / 100;
+            return (
+              <div className="flex items-center justify-between text-[11px] px-2.5 py-1.5 rounded-lg bg-amber-50/90 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-900/40 text-amber-800 dark:text-amber-300">
+                <span className="flex items-center gap-1">
+                  <span className="font-bold">Outgoing Fee ({rate}{selectedAcc.default_fee_type === 'percentage' ? '%' : ' ETB'}):</span>
+                  <span>+{fee.toLocaleString()} ETB</span>
+                </span>
+                <span className="font-semibold text-slate-600 dark:text-slate-300">
+                  Total deducted: <span className="font-bold font-mono text-slate-900 dark:text-white">{(amtNum + fee).toLocaleString()} ETB</span>
+                </span>
+              </div>
+            );
+          })()}
+
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
               Description / Note

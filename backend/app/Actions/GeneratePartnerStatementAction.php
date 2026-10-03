@@ -349,6 +349,18 @@ class GeneratePartnerStatementAction
                         'balance_effect' => $debt->type === 'payable' ? (float) $payment->amount : - (float) $payment->amount,
                         'reference_number' => 'BILATERAL-OFFSET',
                     ];
+                } elseif ($payment->reference_number === 'OFFSET-INTAKE' || $payment->reference_number === 'DEVICE-OFFSET' || str_contains($payment->notes ?? '', 'device') || str_contains($payment->notes ?? '', 'Offset') || str_contains($payment->notes ?? '', 'Paid by device')) {
+                    $rawEntries[] = [
+                        'id' => "pay-{$payment->id}",
+                        'date' => $payDate,
+                        'type' => 'device_offset',
+                        'type_label' => 'Paid by Device',
+                        'context' => $payment->notes ?: 'Paid by device intake offset',
+                        'payable' => $debt->type === 'payable' ? - (float) $payment->amount : 0.0,
+                        'receivable' => $debt->type === 'receivable' ? - (float) $payment->amount : 0.0,
+                        'balance_effect' => $debt->type === 'payable' ? (float) $payment->amount : - (float) $payment->amount,
+                        'reference_number' => 'DEVICE-OFFSET',
+                    ];
                 } elseif ($debt->type === 'payable') {
                     $accText = ($accountName && $accountName !== 'Wire') ? " ({$accountName})" : '';
                     $cleanPayRef = ($payment->reference_number && !str_starts_with($payment->reference_number, 'ORD-')) ? $payment->reference_number : null;
@@ -380,6 +392,74 @@ class GeneratePartnerStatementAction
             }
         }
 
+        // Customer purchases (sales orders where this contact is the buyer and no credit debt exists)
+        $creditOrderIds = $debts->where('reference_type', 'sales_order')->pluck('reference_id')->filter()->all();
+        $customerOrders = SalesOrder::where('customer_id', $contact->id)
+            ->whereNotIn('id', $creditOrderIds)
+            ->with(['items.variant.product', 'items.inventoryUnit', 'financialAccount', 'exchangeUnit.variant.product'])
+            ->get();
+
+        foreach ($customerOrders as $co) {
+            $total = (float) $co->total_amount;
+            if ($total <= 0) {
+                continue;
+            }
+            $orderDate = Carbon::parse($co->order_date ?? $co->created_at);
+            $itemDesc = $co->items->isNotEmpty()
+                ? $co->items->map(function ($it) {
+                    $pName = $it->variant?->product?->name ?? 'Item';
+                    $sn = $it->inventoryUnit?->imei_or_serial ? " (SN: {$it->inventoryUnit->imei_or_serial})" : '';
+                    $qty = $it->quantity > 1 ? " x{$it->quantity}" : '';
+                    return "{$pName}{$sn}{$qty}";
+                })->join(', ')
+                : 'Purchase';
+
+            $rawEntries[] = [
+                'id' => "order-{$co->id}",
+                'date' => $orderDate,
+                'type' => 'customer_purchase',
+                'type_label' => 'Purchase',
+                'context' => $itemDesc,
+                'payable' => 0.0,
+                'receivable' => $total,
+                'balance_effect' => $total,
+                'reference_number' => null,
+            ];
+
+            $tradeIn = min($total, (float) ($co->exchange_allowance ?? 0));
+            $paid = min($total - $tradeIn, (float) $co->paid_amount);
+            if ($paid > 0) {
+                $acc = $co->financialAccount?->name;
+                $rawEntries[] = [
+                    'id' => "order-pay-{$co->id}",
+                    'date' => $orderDate,
+                    'type' => 'payment_received',
+                    'type_label' => 'Payment Received',
+                    'context' => $acc ? "Paid ({$acc})" : 'Paid',
+                    'payable' => 0.0,
+                    'receivable' => -$paid,
+                    'balance_effect' => -$paid,
+                    'reference_number' => null,
+                ];
+            }
+            if ($tradeIn > 0) {
+                $xUnit = $co->exchangeUnit;
+                $xName = $xUnit?->variant?->product?->name ?? 'Device';
+                $xSn = $xUnit?->imei_or_serial ? " (IMEI: {$xUnit->imei_or_serial})" : '';
+                $rawEntries[] = [
+                    'id' => "order-tradein-{$co->id}",
+                    'date' => $orderDate,
+                    'type' => 'device_offset',
+                    'type_label' => 'Paid by Device',
+                    'context' => "Trade-in: {$xName}{$xSn}",
+                    'payable' => 0.0,
+                    'receivable' => -$tradeIn,
+                    'balance_effect' => -$tradeIn,
+                    'reference_number' => null,
+                ];
+            }
+        }
+
         // Units supplied by this vendor that do not have an existing debt record (e.g. stocked directly)
         $existingStockIntakeUnitIds = $debts->where('reference_type', 'stock_intake')->pluck('reference_id')->filter()->all();
         $consignmentOrderIds = $debts->where('reference_type', 'consignment_sale')->pluck('reference_id')->filter()->all();
@@ -408,6 +488,10 @@ class GeneratePartnerStatementAction
             ->whereNotIn('source_type', ['exchange', 'vendor_direct'])
             ->whereNull('exchange_sales_order_id')
             ->whereNotIn('id', $allDebtedUnitIds)
+            ->where(function ($q) {
+                $q->whereNull('funding_source')
+                    ->orWhere('funding_source', 'none');
+            })
             ->with(['variant.product'])
             ->get()
             ->filter(function ($u) use ($debts) {
@@ -538,10 +622,15 @@ class GeneratePartnerStatementAction
                 $rangePayableSum += $entry['payable'];
             } elseif ($entry['type'] === 'payment_sent' || $entry['type'] === 'repair_offset' || $entry['type'] === 'vendor_return') {
                 $rangePaidSentSum += abs($entry['payable']);
-            } elseif ($entry['type'] === 'sales_credit' || $entry['type'] === 'handover_holding' || $entry['type'] === 'repair_claim' || $entry['type'] === 'payout_advance' || $entry['type'] === 'manual_receivable') {
+            } elseif ($entry['type'] === 'sales_credit' || $entry['type'] === 'handover_holding' || $entry['type'] === 'repair_claim' || $entry['type'] === 'payout_advance' || $entry['type'] === 'manual_receivable' || $entry['type'] === 'customer_purchase') {
                 $rangeReceivableSum += $entry['receivable'];
-            } elseif ($entry['type'] === 'payment_received') {
-                $rangeReceivedSum += abs($entry['receivable']);
+            } elseif ($entry['type'] === 'payment_received' || $entry['type'] === 'device_offset' || $entry['type'] === 'bilateral_offset') {
+                if ($entry['receivable'] < 0) {
+                    $rangeReceivedSum += abs($entry['receivable']);
+                }
+                if ($entry['payable'] < 0) {
+                    $rangePaidSentSum += abs($entry['payable']);
+                }
             }
 
             $ledger[] = [
@@ -570,6 +659,10 @@ class GeneratePartnerStatementAction
             ->whereNotIn('source_type', ['exchange', 'vendor_direct'])
             ->whereNull('exchange_sales_order_id')
             ->whereNotIn('id', $allDebtedUnitIds)
+            ->where(function ($q) {
+                $q->whereNull('funding_source')
+                    ->orWhere('funding_source', 'none');
+            })
             ->sum('cost_basis');
 
         $currentOpenPayable += $unDebtStockPayable;

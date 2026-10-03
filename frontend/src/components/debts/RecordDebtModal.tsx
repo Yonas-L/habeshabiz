@@ -99,6 +99,20 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
     ? 'out'
     : 'in';
 
+  const selectedDisburseAccount = treasuryAccounts.find((a) => a.id === disburseAccountId);
+  const amountNum = parseFloat(amount) || 0;
+  const disburseFee = React.useMemo(() => {
+    if (effectiveDirection !== 'out' || !selectedDisburseAccount) return 0;
+    if (!selectedDisburseAccount.default_fee_type || selectedDisburseAccount.default_fee_type === 'none') return 0;
+    const rate = Number(selectedDisburseAccount.default_fee_amount) || 0;
+    if (rate <= 0) return 0;
+    if (selectedDisburseAccount.default_fee_type === 'fixed') return rate;
+    if (selectedDisburseAccount.default_fee_type === 'percentage') {
+      return Math.round(((amountNum * rate) / 100) * 100) / 100;
+    }
+    return 0;
+  }, [effectiveDirection, selectedDisburseAccount, amountNum]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!amount || parseFloat(amount) <= 0) {
@@ -440,6 +454,17 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
                       </option>
                     ))}
                   </select>
+                  {effectiveDirection === 'out' && selectedDisburseAccount && selectedDisburseAccount.default_fee_type && selectedDisburseAccount.default_fee_type !== 'none' && Number(selectedDisburseAccount.default_fee_amount) > 0 && amountNum > 0 && (
+                    <div className="flex items-center justify-between text-[11px] px-2.5 py-1.5 rounded-lg bg-amber-50/90 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-900/40 text-amber-800 dark:text-amber-300 mt-1.5">
+                      <span className="flex items-center gap-1">
+                        <span className="font-bold">Outgoing Fee ({Number(selectedDisburseAccount.default_fee_amount)}{selectedDisburseAccount.default_fee_type === 'percentage' ? '%' : ' ETB'}):</span>
+                        <span>+{disburseFee.toLocaleString()} ETB</span>
+                      </span>
+                      <span className="font-semibold text-slate-600 dark:text-slate-300">
+                        Total deducted: <span className="font-bold font-mono text-slate-900 dark:text-white">{(amountNum + disburseFee).toLocaleString()} ETB</span>
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

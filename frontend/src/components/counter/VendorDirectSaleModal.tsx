@@ -148,11 +148,25 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
     return accounts.find((a) => a.id === vendorAccountId) || null;
   }, [accounts, vendorAccountId]);
 
+  const vendorFee = useMemo(() => {
+    if (vendorPaymentType !== 'immediate_account' || !selectedVendorAccount) return 0;
+    if (!selectedVendorAccount.default_fee_type || selectedVendorAccount.default_fee_type === 'none') return 0;
+    const rate = Number(selectedVendorAccount.default_fee_amount) || 0;
+    if (rate <= 0) return 0;
+    if (selectedVendorAccount.default_fee_type === 'fixed') return rate;
+    if (selectedVendorAccount.default_fee_type === 'percentage') {
+      return Math.round(((vendorCostNum * rate) / 100) * 100) / 100;
+    }
+    return 0;
+  }, [vendorPaymentType, selectedVendorAccount, vendorCostNum]);
+
+  const totalVendorDeduction = vendorCostNum + vendorFee;
+
   const isVendorAccountOverdrawn = useMemo(() => {
     if (vendorPaymentType !== 'immediate_account') return false;
     if (!isOwner || !selectedVendorAccount || selectedVendorAccount.current_balance === null) return false;
-    return vendorCostNum > Number(selectedVendorAccount.current_balance);
-  }, [vendorPaymentType, isOwner, selectedVendorAccount, vendorCostNum]);
+    return totalVendorDeduction > Number(selectedVendorAccount.current_balance);
+  }, [vendorPaymentType, isOwner, selectedVendorAccount, totalVendorDeduction]);
 
   // Auto-sync paidAmount when sellingPrice changes (if paid was equal or empty)
   const handleSellingPriceChange = (val: string) => {
@@ -597,6 +611,17 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
                     </option>
                   ))}
                 </select>
+                {selectedVendorAccount && selectedVendorAccount.default_fee_type && selectedVendorAccount.default_fee_type !== 'none' && Number(selectedVendorAccount.default_fee_amount) > 0 && vendorCostNum > 0 && (
+                  <div className="flex items-center justify-between text-[11px] px-2.5 py-1.5 rounded-lg bg-amber-50/90 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-900/40 text-amber-800 dark:text-amber-300">
+                    <span className="flex items-center gap-1">
+                      <span className="font-bold">Outgoing Fee ({Number(selectedVendorAccount.default_fee_amount)}{selectedVendorAccount.default_fee_type === 'percentage' ? '%' : ' ETB'}):</span>
+                      <span>+{vendorFee.toLocaleString()} ETB</span>
+                    </span>
+                    <span className="font-semibold text-slate-600 dark:text-slate-300">
+                      Total deducted: <span className="font-bold font-mono text-slate-900 dark:text-white">{totalVendorDeduction.toLocaleString()} ETB</span>
+                    </span>
+                  </div>
+                )}
               </div>
             )}
           </div>

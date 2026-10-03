@@ -353,7 +353,7 @@ export const VendorStatementPrintModal: React.FC<VendorStatementPrintModalProps>
                                 ? 'bg-sky-50 dark:bg-sky-950/60 print:bg-sky-50 text-sky-700 dark:text-sky-400 print:text-sky-800'
                                 : row.type === 'repair_claim'
                                 ? 'bg-rose-50 dark:bg-rose-950/60 print:bg-rose-50 text-rose-700 dark:text-rose-400 print:text-rose-800'
-                                : row.type === 'sales_credit' || row.type === 'handover_holding' || row.type === 'manual_receivable'
+                                : row.type === 'sales_credit' || row.type === 'handover_holding' || row.type === 'manual_receivable' || row.type === 'customer_purchase'
                                 ? 'bg-purple-50 dark:bg-purple-950/60 print:bg-purple-50 text-purple-700 dark:text-purple-300 print:text-purple-800'
                                 : row.type === 'payout_advance'
                                 ? 'bg-indigo-50 dark:bg-indigo-950/60 print:bg-indigo-50 text-indigo-700 dark:text-indigo-400 print:text-indigo-800'

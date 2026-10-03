@@ -7,6 +7,7 @@ use App\Models\Contact;
 use App\Models\Debt;
 use App\Models\Expense;
 use App\Models\FinancialAccount;
+use App\Models\FinancialTransaction;
 use App\Models\InventoryStock;
 use App\Models\InventoryUnit;
 use App\Models\SalesOrder;
@@ -113,9 +114,14 @@ class DashboardController extends Controller
         })->sum('profit');
         $monthlyGrossProfit = max(0.0, $itemProfits - $monthlyDiscounts);
 
-        $monthlyExpenses = (float) Expense::whereBetween('date', [$startOfMonth, $endOfMonth])
+        $monthlyManualExpenses = (float) Expense::whereBetween('date', [$startOfMonth, $endOfMonth])
             ->where('is_owner_draw', false)
             ->sum('amount');
+
+        $monthlyTransactionFees = (float) FinancialTransaction::whereBetween('date', [$startOfMonth, $endOfMonth])
+            ->sum('fee');
+
+        $monthlyExpenses = $monthlyManualExpenses + $monthlyTransactionFees;
 
         $monthlyOwnerDraws = (float) Expense::whereBetween('date', [$startOfMonth, $endOfMonth])
             ->where('is_owner_draw', true)
@@ -279,6 +285,8 @@ class DashboardController extends Controller
                     'revenue' => $monthlyRevenue,
                     'gross_profit' => $monthlyGrossProfit,
                     'operating_expenses' => $monthlyExpenses,
+                    'manual_expenses' => $monthlyManualExpenses,
+                    'transaction_fees' => $monthlyTransactionFees,
                     'owner_draws' => $monthlyOwnerDraws,
                     'net_profit' => $monthlyNetProfit,
                 ],

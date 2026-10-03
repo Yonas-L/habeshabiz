@@ -43,6 +43,8 @@ class AccountController extends Controller
                     'currency' => $acc->currency,
                     'logo' => $acc->logo,
                     'current_balance' => null, // Hidden from staff
+                    'default_fee_type' => $acc->default_fee_type ?? 'none',
+                    'default_fee_amount' => $acc->default_fee_amount ?? 0,
                     'is_custom_asset' => false,
                     'is_active' => $acc->is_active,
                 ];
@@ -155,6 +157,8 @@ class AccountController extends Controller
             'currency' => ['nullable', 'string', 'max:10'],
             'logo' => ['nullable', 'string'],
             'opening_balance' => ['nullable', 'numeric', 'min:0'],
+            'default_fee_type' => ['nullable', 'in:none,percentage,fixed'],
+            'default_fee_amount' => ['nullable', 'numeric', 'min:0'],
             'is_custom_asset' => ['nullable', 'boolean'],
             'asset_details' => ['nullable', 'array'],
         ]);
@@ -170,6 +174,8 @@ class AccountController extends Controller
             'currency' => $validated['currency'] ?? 'ETB',
             'logo' => $validated['logo'] ?? null,
             'current_balance' => $validated['opening_balance'] ?? 0,
+            'default_fee_type' => $validated['default_fee_type'] ?? 'none',
+            'default_fee_amount' => $validated['default_fee_amount'] ?? 0,
             'is_custom_asset' => $isCustomAsset,
             'asset_details' => $validated['asset_details'] ?? null,
             'is_active' => true,
@@ -184,6 +190,8 @@ class AccountController extends Controller
                 'type' => $account->type,
                 'currency' => $account->currency,
                 'opening_balance' => $account->current_balance,
+                'default_fee_type' => $account->default_fee_type,
+                'default_fee_amount' => $account->default_fee_amount,
             ]
         );
 
@@ -213,6 +221,8 @@ class AccountController extends Controller
             'account_number' => ['nullable', 'string', 'max:100'],
             'currency' => ['nullable', 'string', 'max:10'],
             'logo' => ['nullable', 'string'],
+            'default_fee_type' => ['nullable', 'in:none,percentage,fixed'],
+            'default_fee_amount' => ['nullable', 'numeric', 'min:0'],
             'is_custom_asset' => ['nullable', 'boolean'],
             'asset_details' => ['nullable', 'array'],
             'is_active' => ['nullable', 'boolean'],
@@ -220,7 +230,7 @@ class AccountController extends Controller
             'current_balance' => ['nullable', 'numeric', 'min:0'],
         ]);
 
-        $oldValues = $account->only(['name', 'type', 'account_number', 'currency', 'logo', 'is_custom_asset', 'asset_details', 'is_active', 'current_balance']);
+        $oldValues = $account->only(['name', 'type', 'account_number', 'currency', 'logo', 'default_fee_type', 'default_fee_amount', 'is_custom_asset', 'asset_details', 'is_active', 'current_balance']);
 
         if (array_key_exists('name', $validated)) {
             $account->name = $validated['name'];
@@ -236,6 +246,12 @@ class AccountController extends Controller
         }
         if (array_key_exists('logo', $validated)) {
             $account->logo = $validated['logo'];
+        }
+        if (array_key_exists('default_fee_type', $validated)) {
+            $account->default_fee_type = $validated['default_fee_type'] ?? 'none';
+        }
+        if (array_key_exists('default_fee_amount', $validated)) {
+            $account->default_fee_amount = $validated['default_fee_amount'] ?? 0;
         }
         if (array_key_exists('is_custom_asset', $validated)) {
             $account->is_custom_asset = $validated['is_custom_asset'];

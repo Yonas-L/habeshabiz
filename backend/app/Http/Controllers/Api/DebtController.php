@@ -172,12 +172,15 @@ class DebtController extends Controller
 
                 if ($direction === 'out') {
                     // Money leaves our account immediately
-                    if ((float) $account->current_balance < $amount) {
+                    $fee = $account->calculateOutgoingFee($amount, isset($validated['fee']) ? (float) $validated['fee'] : null);
+                    $totalDeduction = $amount + $fee;
+
+                    if ((float) $account->current_balance < $totalDeduction) {
                         throw \Illuminate\Validation\ValidationException::withMessages([
-                            'disburse_account_id' => ["Insufficient balance in account '{$account->name}'. Available: ".number_format((float) $account->current_balance, 2)." ETB, Required: ".number_format($amount, 2)." ETB."],
+                            'disburse_account_id' => ["Insufficient balance in account '{$account->name}'. Available: ".number_format((float) $account->current_balance, 2)." ETB, Required: ".number_format($totalDeduction, 2)." ETB (including fee)."],
                         ]);
                     }
-                    $account->decrement('current_balance', $amount);
+                    $account->decrement('current_balance', $totalDeduction);
 
                     $txType = $type === 'payable' ? 'supplier_payment' : 'loan_disbursement';
                     $txDesc = $type === 'payable'
@@ -190,6 +193,7 @@ class DebtController extends Controller
                         'source_account_id' => $account->id,
                         'type' => $txType,
                         'amount' => $amount,
+                        'fee' => $fee,
                         'contact_id' => $contactId,
                         'description' => $txDesc,
                         'date' => now(),

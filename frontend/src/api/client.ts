@@ -343,6 +343,8 @@ export interface FinancialAccount {
   account_number: string | null;
   currency: string;
   current_balance: string | number;
+  default_fee_type?: 'none' | 'percentage' | 'fixed' | null;
+  default_fee_amount?: string | number | null;
   is_custom_asset: boolean;
   is_active?: boolean;
   asset_details?: Record<string, any> | null;
@@ -448,6 +450,8 @@ export interface DashboardData {
     revenue: number;
     gross_profit: number;
     operating_expenses: number;
+    manual_expenses?: number;
+    transaction_fees?: number;
     owner_draws: number;
     net_profit: number;
   };
@@ -722,6 +726,27 @@ export interface UpdateSettingsPayload {
   secondary_currencies?: string[];
   owner_name?: string;
   owner_phone?: string;
+}
+
+export interface BankFeeItem {
+  id: string;
+  type: string;
+  amount: number;
+  fee: number;
+  description: string;
+  date: string;
+  source_account?: {
+    id: string;
+    name: string;
+    type: string;
+    currency: string;
+  } | null;
+}
+
+export interface ExpensesData {
+  expenses: Expense[];
+  bank_fees: BankFeeItem[];
+  total_bank_fees: number;
 }
 
 export const api = {
@@ -1227,6 +1252,8 @@ export const api = {
     account_number?: string;
     currency?: string;
     opening_balance?: number;
+    default_fee_type?: 'none' | 'percentage' | 'fixed' | null;
+    default_fee_amount?: number | null;
     is_custom_asset?: boolean;
     asset_details?: Record<string, any>;
     logo?: string | null;
@@ -1241,6 +1268,8 @@ export const api = {
     type?: string;
     account_number?: string | null;
     currency?: string;
+    default_fee_type?: 'none' | 'percentage' | 'fixed' | null;
+    default_fee_amount?: number | null;
     is_custom_asset?: boolean;
     is_active?: boolean;
     asset_details?: Record<string, any> | null;
@@ -1332,7 +1361,7 @@ export const api = {
     const query = new URLSearchParams();
     if (params?.is_owner_draw !== undefined) query.set('is_owner_draw', String(params.is_owner_draw));
     if (params?.category) query.set('category', params.category);
-    return request<Expense[]>(`/expenses?${query.toString()}`);
+    return request<ExpensesData>(`/expenses?${query.toString()}`);
   },
 
   recordExpense: (data: { financial_account_id: string; inventory_unit_id?: string; category: string; amount: number; is_owner_draw?: boolean; vendor_billing?: 'shop' | 'vendor_deduct' | 'vendor_reimburse'; vendor_contact_id?: string; description: string; date?: string }) =>
