@@ -16,6 +16,7 @@ import {
   Settings,
   Handshake,
   ScrollText,
+  FileBarChart,
   X,
   ChevronRight,
   Sun,
@@ -31,6 +32,7 @@ export type NavTab =
   | 'debts'
   | 'treasury'
   | 'expenses'
+  | 'reports'
   | 'staff'
   | 'logs'
   | 'settings';
@@ -116,6 +118,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'debts', label: 'Receivable & Payable', icon: CreditCard, badge: openDebtsCount, shortcut: '⌘6' },
     { id: 'treasury', label: 'Bank Accounts', icon: Landmark, shortcut: '⌘7' },
     { id: 'expenses', label: 'Expenses', icon: DollarSign, shortcut: '⌘8' },
+    { id: 'reports', label: 'Reports', icon: FileBarChart, shortcut: '⌘R' },
   ];
 
   const sidebarInner = (
@@ -691,7 +694,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onLogout();
                 }}
                 title="Sign Out"
-                className="w-8 h-8 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-800/80 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 flex items-center justify-center active:scale-90 transition-all cursor-pointer"
+                className="w-8 h-8 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white flex items-center justify-center active:scale-90 transition-all cursor-pointer"
               >
                 <LogOut className="w-4 h-4" />
               </button>

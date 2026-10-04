@@ -1,0 +1,35 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "ai-color-palette",
+        "value": "*",
+        "files": [
+          "frontend/src/views/OverviewView.tsx"
+        ],
+        "createdAt": "2026-10-04T06:51:21.325Z",
+        "reason": "Agent: purple is an intentional semantic token for Owner Draws, separating personal withdrawals from profit, loss, income, and operating expense states."
+      },
+      {
+        "rule": "overused-font",
+        "value": "plus jakarta sans",
+        "createdAt": "2026-10-04T06:51:21.440Z",
+        "reason": "Agent: Plus Jakarta Sans is the established app-wide typeface and changing it would be an unrelated product-wide redesign."
+      },
+      {
+        "rule": "bounce-easing",
+        "value": "liquidspringin",
+        "createdAt": "2026-10-04T06:51:21.548Z",
+        "reason": "Agent: this named modal entrance intentionally uses a restrained spring overshoot for spatial feedback."
+      },
+      {
+        "rule": "bounce-easing",
+        "value": "cubic-bezier(0.34, 1.4, 0.64, 1)",
+        "createdAt": "2026-10-04T06:51:21.651Z",
+        "reason": "Agent: this easing is scoped to the intentional modal spring entrance, not a general-purpose transition."
+      }
+    ]
+  }
+}

@@ -1,12 +1,15 @@
 <?php
 
+use App\Models\Category;
 use App\Models\Contact;
 use App\Models\Debt;
+use App\Models\DebtPayment;
 use App\Models\FinancialAccount;
-use App\Models\InventoryStock;
 use App\Models\InventoryUnit;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\SalesOrder;
+use App\Models\SalesOrderItem;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Scopes\TenantScope;
@@ -257,7 +260,7 @@ test('can retrieve partner statement and running ledger', function () {
     ]);
 
     // Make a 30,000 payment towards what we owe them
-    \App\Models\DebtPayment::create([
+    DebtPayment::create([
         'tenant_id' => $this->tenant->id,
         'debt_id' => $payableDebt->id,
         'financial_account_id' => $this->cbe->id,
@@ -401,23 +404,18 @@ test('vendor product intake starts payable at -100k while in stock, selling does
     $intakeRes->assertStatus(201);
     $unitId = $intakeRes->json('data.id');
 
-    // Verify payable debt was immediately created upon stock intake
+    // Verify NO debt was created at consignment intake
     $intakeDebt = Debt::where('contact_id', $vendor->id)
         ->where('reference_type', 'stock_intake')
         ->where('reference_id', $unitId)
         ->first();
-    expect($intakeDebt)->not->toBeNull();
-    expect((float) $intakeDebt->original_amount)->toBe(100000.0);
-    expect((float) $intakeDebt->remaining_amount)->toBe(100000.0);
-    expect($intakeDebt->status)->toBe('open');
+    expect($intakeDebt)->toBeNull();
 
-    // 2. Check vendor statement while unit is still in stock
+    // 2. Check vendor statement while unit is still in stock (zero balance, phone under supplied units)
     $statementRes1 = $this->actingAs($this->user, 'sanctum')->getJson("/api/v1/contacts/{$vendor->id}/statement");
     $statementRes1->assertOk();
-    // Closing balance must immediately start at -100,000 ETB (we owe vendor 100k)
-    expect((float) $statementRes1->json('data.kpis.range_closing_balance'))->toBe(-100000.0);
-    expect($statementRes1->json('data.ledger.0.type_label'))->toBe('Item Received');
-    expect((float) $statementRes1->json('data.ledger.0.payable'))->toBe(100000.0);
+    expect((float) $statementRes1->json('data.kpis.range_closing_balance'))->toBe(0.0);
+    expect($statementRes1->json('data.kpis.supplied_units_count'))->toBe(1);
 
     // 3. Sell the device to an end customer for 120,000 ETB
     $saleRes = $this->actingAs($this->user, 'sanctum')->postJson('/api/v1/sales', [
@@ -436,10 +434,15 @@ test('vendor product intake starts payable at -100k while in stock, selling does
     ]);
     $saleRes->assertStatus(201);
 
-    // Verify NO duplicate debt was created on sale
+    // Verify payable debt was created on sale
+    $saleDebt = Debt::where('contact_id', $vendor->id)
+        ->where('reference_type', 'consignment_sale')
+        ->first();
+    expect($saleDebt)->not->toBeNull();
+    expect((float) $saleDebt->original_amount)->toBe(100000.0);
     expect(Debt::where('contact_id', $vendor->id)->count())->toBe(1);
 
-    // Statement balance should remain -100,000 ETB (not doubled to -200k!)
+    // Statement balance should now be -100,000 ETB
     $statementRes2 = $this->actingAs($this->user, 'sanctum')->getJson("/api/v1/contacts/{$vendor->id}/statement");
     $statementRes2->assertOk();
     expect((float) $statementRes2->json('data.kpis.range_closing_balance'))->toBe(-100000.0);
@@ -454,9 +457,9 @@ test('vendor product intake starts payable at -100k while in stock, selling does
     ]);
     $wireRes->assertStatus(201);
 
-    // Intake debt is partially paid (20,000 remaining)
-    $intakeDebt->refresh();
-    expect((float) $intakeDebt->remaining_amount)->toBe(20000.0);
+    // Consignment sale debt is partially paid (20,000 remaining)
+    $saleDebt->refresh();
+    expect((float) $saleDebt->remaining_amount)->toBe(20000.0);
 
     // Statement balance is now -20,000 ETB
     $statementRes3 = $this->actingAs($this->user, 'sanctum')->getJson("/api/v1/contacts/{$vendor->id}/statement");
@@ -480,14 +483,15 @@ test('vendor product intake starts payable at -100k while in stock, selling does
     $statementRes4->assertOk();
     expect((float) $statementRes4->json('data.kpis.range_closing_balance'))->toBe(40000.0);
 
-    // 6. Intake a 2nd unit worth 50,000 ETB from Dagi
+    // 6. Intake a 2nd unit worth 50,000 ETB from Dagi on store credit
     $intakeRes2 = $this->actingAs($this->user, 'sanctum')->postJson('/api/v1/inventory/units', [
         'variant_id' => $variant->id,
         'imei_or_serial' => '888777666555444',
         'condition' => 'new',
         'cost_basis' => 50000.00,
         'selling_price' => 65000.00,
-        'source_type' => 'consignment',
+        'source_type' => 'purchase',
+        'funding_source' => 'none',
         'supplier_contact_id' => $vendor->id,
     ]);
     $intakeRes2->assertStatus(201);
@@ -578,13 +582,14 @@ test('returning an already-paid vendor unit creates vendor_return_refund receiva
         'default_selling_price' => 140000.0,
     ]);
 
-    // 1. Intake unit (120,000 ETB payable created)
+    // 1. Intake unit as purchase on credit (120,000 ETB payable created)
     $intakeRes = $this->actingAs($this->user, 'sanctum')->postJson('/api/v1/inventory/units', [
         'variant_id' => $variant->id,
         'imei_or_serial' => '998877665544332',
         'condition' => 'new',
         'cost_basis' => 120000.00,
-        'source_type' => 'consignment',
+        'source_type' => 'purchase',
+        'funding_source' => 'none',
         'supplier_contact_id' => $vendor->id,
     ]);
     $intakeRes->assertStatus(201);
@@ -678,14 +683,14 @@ test('traded in exchange unit does not inflate partner statement or dashboard wi
         'is_active' => true,
     ]);
 
-    $product = \App\Models\Product::create([
+    $product = Product::create([
         'tenant_id' => $this->tenant->id,
         'name' => 'Trade In Phone',
         'category' => 'smartphones',
         'has_serials' => true,
         'is_active' => true,
     ]);
-    $variant = \App\Models\ProductVariant::create([
+    $variant = ProductVariant::create([
         'tenant_id' => $this->tenant->id,
         'product_id' => $product->id,
         'storage' => '256GB',
@@ -693,7 +698,7 @@ test('traded in exchange unit does not inflate partner statement or dashboard wi
         'default_selling_price' => 100000,
     ]);
 
-    $salesOrder = \App\Models\SalesOrder::create([
+    $salesOrder = SalesOrder::create([
         'tenant_id' => $this->tenant->id,
         'order_number' => 'ORD-EXCHANGE-TEST',
         'salesperson_id' => $this->user->id,
@@ -706,7 +711,7 @@ test('traded in exchange unit does not inflate partner statement or dashboard wi
         'order_date' => now(),
     ]);
 
-    $unit = \App\Models\InventoryUnit::create([
+    $unit = InventoryUnit::create([
         'tenant_id' => $this->tenant->id,
         'variant_id' => $variant->id,
         'imei_or_serial' => 'EXCHANGE-SN-999',
@@ -734,20 +739,20 @@ test('partner statement preserves confidentiality by omitting order ids, present
         'is_active' => true,
     ]);
 
-    $category = \App\Models\Category::create([
+    $category = Category::create([
         'tenant_id' => $this->tenant->id,
         'name' => 'Phones',
-        'slug' => 'phones-' . uniqid(),
+        'slug' => 'phones-'.uniqid(),
     ]);
 
-    $product = \App\Models\Product::create([
+    $product = Product::create([
         'tenant_id' => $this->tenant->id,
         'category_id' => $category->id,
         'name' => 'Samsung S24 Ultra',
         'brand' => 'Samsung',
     ]);
 
-    $variant = \App\Models\ProductVariant::create([
+    $variant = ProductVariant::create([
         'tenant_id' => $this->tenant->id,
         'product_id' => $product->id,
         'storage' => '256GB',
@@ -755,7 +760,7 @@ test('partner statement preserves confidentiality by omitting order ids, present
         'default_selling_price' => 150000.00,
     ]);
 
-    $order = \App\Models\SalesOrder::create([
+    $order = SalesOrder::create([
         'tenant_id' => $this->tenant->id,
         'order_number' => 'ORD-CONFIDENTIAL-999',
         'total_amount' => 150000.00,
@@ -765,7 +770,7 @@ test('partner statement preserves confidentiality by omitting order ids, present
         'order_date' => now(),
     ]);
 
-    \App\Models\SalesOrderItem::create([
+    SalesOrderItem::create([
         'tenant_id' => $this->tenant->id,
         'sales_order_id' => $order->id,
         'variant_id' => $variant->id,
@@ -791,7 +796,7 @@ test('partner statement preserves confidentiality by omitting order ids, present
     ]);
 
     // Settle with a payment sent
-    \App\Models\DebtPayment::create([
+    DebtPayment::create([
         'tenant_id' => $this->tenant->id,
         'debt_id' => $debt->id,
         'financial_account_id' => $this->cbe->id,
@@ -818,9 +823,3 @@ test('partner statement preserves confidentiality by omitting order ids, present
     expect($ledger[1]['context'])->not->toContain('Wire payout');
     expect($ledger[1]['context'])->toContain($this->cbe->name);
 });
-
-
-
-
-
-

@@ -228,8 +228,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               {stockPct > 0 && (
                 <div
                   style={{
-                    width: isBarAnimated ? `${stockPct}%` : '0%',
-                    transition: 'width 800ms cubic-bezier(0.16, 1, 0.3, 1)',
+                    width: `${stockPct}%`,
+                    transform: `scaleX(${isBarAnimated ? 1 : 0})`,
+                    transformOrigin: 'left center',
+                    transition: 'transform 800ms cubic-bezier(0.16, 1, 0.3, 1)',
                   }}
                   className="h-full bg-slate-400 rounded-full"
                   title={`Stock: ${stockPct}%`}
@@ -238,8 +240,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               {cashPct > 0 && (
                 <div
                   style={{
-                    width: isBarAnimated ? `${cashPct}%` : '0%',
-                    transition: 'width 800ms cubic-bezier(0.16, 1, 0.3, 1)',
+                    width: `${cashPct}%`,
+                    transform: `scaleX(${isBarAnimated ? 1 : 0})`,
+                    transformOrigin: 'left center',
+                    transition: 'transform 800ms cubic-bezier(0.16, 1, 0.3, 1)',
                   }}
                   className="h-full bg-blue-400 rounded-full"
                   title={`${hasGranularAssets ? 'Liquid Finance' : 'Cash'}: ${cashPct}%`}
@@ -248,8 +252,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               {recPct > 0 && (
                 <div
                   style={{
-                    width: isBarAnimated ? `${recPct}%` : '0%',
-                    transition: 'width 800ms cubic-bezier(0.16, 1, 0.3, 1)',
+                    width: `${recPct}%`,
+                    transform: `scaleX(${isBarAnimated ? 1 : 0})`,
+                    transformOrigin: 'left center',
+                    transition: 'transform 800ms cubic-bezier(0.16, 1, 0.3, 1)',
                   }}
                   className="h-full bg-emerald-400 rounded-full"
                   title={`Receivables: ${recPct}%`}
@@ -258,8 +264,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               {hasGranularAssets && forexPct > 0 && (
                 <div
                   style={{
-                    width: isBarAnimated ? `${forexPct}%` : '0%',
-                    transition: 'width 800ms cubic-bezier(0.16, 1, 0.3, 1)',
+                    width: `${forexPct}%`,
+                    transform: `scaleX(${isBarAnimated ? 1 : 0})`,
+                    transformOrigin: 'left center',
+                    transition: 'transform 800ms cubic-bezier(0.16, 1, 0.3, 1)',
                   }}
                   className="h-full bg-indigo-400 rounded-full"
                   title={`Forex Reserves: ${forexPct}%`}
@@ -268,8 +276,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               {hasGranularAssets && goldPct > 0 && (
                 <div
                   style={{
-                    width: isBarAnimated ? `${goldPct}%` : '0%',
-                    transition: 'width 800ms cubic-bezier(0.16, 1, 0.3, 1)',
+                    width: `${goldPct}%`,
+                    transform: `scaleX(${isBarAnimated ? 1 : 0})`,
+                    transformOrigin: 'left center',
+                    transition: 'transform 800ms cubic-bezier(0.16, 1, 0.3, 1)',
                   }}
                   className="h-full bg-amber-400 rounded-full"
                   title={`Physical Gold: ${goldPct}%`}
@@ -278,8 +288,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               {otherPct > 0 && (
                 <div
                   style={{
-                    width: isBarAnimated ? `${otherPct}%` : '0%',
-                    transition: 'width 800ms cubic-bezier(0.16, 1, 0.3, 1)',
+                    width: `${otherPct}%`,
+                    transform: `scaleX(${isBarAnimated ? 1 : 0})`,
+                    transformOrigin: 'left center',
+                    transition: 'transform 800ms cubic-bezier(0.16, 1, 0.3, 1)',
                   }}
                   className={`h-full ${hasGranularAssets ? 'bg-orange-400' : 'bg-amber-400'} rounded-full`}
                   title={`Other Assets: ${otherPct}%`}
@@ -548,24 +560,28 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               <span className="text-[10px] sm:text-xs font-medium text-slate-400 dark:text-slate-500 ml-1 font-sans">ETB</span>
             </div>
             <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 block">
-              Sales volume
+              Gross sales before discounts
             </span>
           </div>
 
           {canViewCost && (
             <div className="p-3.5 sm:p-0 rounded-2xl sm:rounded-none bg-white dark:bg-[#131926] sm:bg-transparent border-2 border-slate-200/90 dark:border-slate-800 sm:border-0 shadow-xs sm:shadow-none flex flex-col justify-between">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-                  Gross Margin
+                <span className={`text-[10px] sm:text-[11px] font-bold uppercase tracking-wider ${
+                  monthly_performance.gross_profit < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'
+                }`}>
+                  Gross Profit
                 </span>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 sm:hidden" />
+                <span className={`w-1.5 h-1.5 rounded-full sm:hidden ${monthly_performance.gross_profit < 0 ? 'bg-rose-500' : 'bg-emerald-500'}`} />
               </div>
-              <div className="text-base sm:text-2xl font-bold font-mono tracking-tight text-emerald-700 dark:text-emerald-400 mt-1.5">
-                +<AnimatedNumber value={monthly_performance.gross_profit} />
-                <span className="text-[10px] sm:text-xs font-medium text-emerald-600/70 dark:text-emerald-400/70 ml-1 font-sans">ETB</span>
+              <div className={`text-base sm:text-2xl font-bold font-mono tracking-tight mt-1.5 ${
+                monthly_performance.gross_profit < 0 ? 'text-rose-700 dark:text-rose-400' : 'text-emerald-700 dark:text-emerald-400'
+              }`}>
+                {monthly_performance.gross_profit > 0 ? '+' : monthly_performance.gross_profit < 0 ? '−' : ''}<AnimatedNumber value={Math.abs(monthly_performance.gross_profit)} />
+                <span className={`text-[10px] sm:text-xs font-medium ml-1 font-sans ${monthly_performance.gross_profit < 0 ? 'text-rose-600/70 dark:text-rose-400/70' : 'text-emerald-600/70 dark:text-emerald-400/70'}`}>ETB</span>
               </div>
-              <span className="text-[10px] text-emerald-600/80 dark:text-emerald-500/80 mt-1 block">
-                Sales − unit cost
+              <span className={`text-[10px] mt-1 block ${monthly_performance.gross_profit < 0 ? 'text-rose-600/80 dark:text-rose-400/80' : 'text-emerald-600/80 dark:text-emerald-500/80'}`}>
+                Net sales − stock cost
               </span>
             </div>
           )}
@@ -611,17 +627,17 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           {canViewCost && (
             <div className="p-3.5 sm:p-0 rounded-2xl sm:rounded-none bg-white dark:bg-[#131926] sm:bg-transparent border-2 border-slate-200/90 dark:border-slate-800 sm:border-0 shadow-xs sm:shadow-none flex flex-col justify-between">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                <span className={`text-[10px] sm:text-[11px] font-bold uppercase tracking-wider ${monthly_performance.net_profit < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
                   Net Profit
                 </span>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 sm:hidden" />
+                <span className={`w-1.5 h-1.5 rounded-full sm:hidden ${monthly_performance.net_profit < 0 ? 'bg-rose-500' : 'bg-emerald-500'}`} />
               </div>
-              <div className="text-base sm:text-2xl font-bold font-mono tracking-tight text-emerald-700 dark:text-emerald-400 mt-1.5">
-                +<AnimatedNumber value={monthly_performance.net_profit} />
-                <span className="text-[10px] sm:text-xs font-medium text-emerald-600/70 dark:text-emerald-400/70 ml-1 font-sans">ETB</span>
+              <div className={`text-base sm:text-2xl font-bold font-mono tracking-tight mt-1.5 ${monthly_performance.net_profit < 0 ? 'text-rose-700 dark:text-rose-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
+                {monthly_performance.net_profit > 0 ? '+' : monthly_performance.net_profit < 0 ? '−' : ''}<AnimatedNumber value={Math.abs(monthly_performance.net_profit)} />
+                <span className={`text-[10px] sm:text-xs font-medium ml-1 font-sans ${monthly_performance.net_profit < 0 ? 'text-rose-600/70 dark:text-rose-400/70' : 'text-emerald-600/70 dark:text-emerald-400/70'}`}>ETB</span>
               </div>
-              <span className="text-[10px] text-emerald-600/80 dark:text-emerald-500/80 mt-1 block">
-                Operating profit
+              <span className={`text-[10px] mt-1 block ${monthly_performance.net_profit < 0 ? 'text-rose-600/80 dark:text-rose-400/80' : 'text-emerald-600/80 dark:text-emerald-500/80'}`}>
+                After operating expenses
               </span>
             </div>
           )}
@@ -637,7 +653,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               <span className="w-1.5 h-1.5 rounded-full bg-purple-500 sm:hidden" />
             </div>
             <div className="text-base sm:text-2xl font-bold font-mono tracking-tight text-purple-700 dark:text-purple-300 mt-1.5">
-              <AnimatedNumber value={monthly_performance.owner_draws} />
+              {monthly_performance.owner_draws > 0 ? '−' : ''}<AnimatedNumber value={Math.abs(monthly_performance.owner_draws)} />
               <span className="text-[10px] sm:text-xs font-medium text-purple-400 ml-1 font-sans">ETB</span>
             </div>
             <span className="text-[10px] text-purple-500/80 dark:text-purple-400/80 mt-1 block">

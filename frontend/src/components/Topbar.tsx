@@ -24,6 +24,7 @@ const tabTitles: Record<NavTab, { title: string; subtitle: string }> = {
   debts: { title: 'Receivable and Payable', subtitle: 'Customer credit and vendor balances' },
   treasury: { title: 'Bank Accounts', subtitle: 'Bank accounts and mobile wallets' },
   expenses: { title: 'Expenses', subtitle: 'Store operational costs and withdrawals' },
+  reports: { title: 'Reports', subtitle: 'Business performance and financial reporting' },
   staff: { title: 'Staff', subtitle: 'Team members and access permissions' },
   logs: { title: 'Audit Logs', subtitle: 'System security and audit records' },
   settings: { title: 'Settings', subtitle: 'Business profile and credentials' },
@@ -264,4 +265,3 @@ export const Topbar: React.FC<TopbarProps> = ({
     </header>
   );
 };
-

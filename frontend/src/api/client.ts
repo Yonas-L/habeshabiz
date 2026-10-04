@@ -292,6 +292,7 @@ export interface SalesOrder {
   salesperson?: User;
   total_amount: string | number;
   discount_amount: string | number;
+  write_off_amount?: string | number;
   exchange_allowance?: string | number;
   exchange_unit_id?: string | null;
   exchange_unit?: InventoryUnit;
@@ -469,6 +470,98 @@ export interface DashboardData {
   top_receivables: Debt[];
   top_payables: Debt[];
   sales_chart?: DashboardSalesChartPoint[];
+}
+
+export interface BusinessReportData {
+  period: { from: string; to: string; label: string };
+  summary: {
+    revenue: number;
+    net_revenue?: number;
+    customer_receipts: number;
+    discounts: number;
+    write_offs?: number;
+    gross_profit: number;
+    loss_making_items: number;
+    loss_amount: number;
+    loss_items: Array<{
+      id: string;
+      product: string;
+      imei_or_serial: string | null;
+      order_number: string | null;
+      order_date: string | null;
+      quantity: number;
+      unit_price: number;
+      unit_cost: number;
+      loss: number;
+    }>;
+    operating_expenses: number;
+    transaction_fees: number;
+    owner_draws: number;
+    net_profit: number;
+    result: 'profit' | 'loss' | 'break_even';
+    orders: number;
+    units_sold: number;
+    average_order_value: number;
+  };
+  sales_trend: Array<{ date: string; label: string; revenue: number; profit: number; orders: number; units: number }>;
+  sales_extremes: {
+    peak_day: { date: string; label: string; revenue: number; profit: number; orders: number; units: number } | null;
+    low_day: { date: string; label: string; revenue: number; profit: number; orders: number; units: number } | null;
+  };
+  staff_performance: Array<{ user_id: number | null; name: string; role: string | null; orders: number; units: number; revenue: number; profit: number }>;
+  vendor_activity: {
+    most_active: { id: string; name: string; units_sold: number; revenue: number; received_units: number; returned_units: number; activity_count: number } | null;
+    least_active: { id: string; name: string; units_sold: number; revenue: number; received_units: number; returned_units: number; activity_count: number } | null;
+    vendors: Array<{ id: string; name: string; units_sold: number; revenue: number; received_units: number; returned_units: number; activity_count: number }>;
+  };
+  repairs: { reported_count: number; repaired_count: number; repair_expense: number };
+  stock_position: { owned_units: number; owned_value: number; vendor_units: number; vendor_value: number };
+  cash_position: {
+    cash_and_bank: number;
+    custom_assets?: number;
+    total_liquidity_and_assets?: number;
+    accounts: Array<{ id: string; name: string; type: string; is_custom_asset?: boolean; balance: number }>;
+  };
+  reconciliation?: {
+    opening_balance: number;
+    capital_deposits: number;
+    customer_collections: number;
+    borrowed_funds: number;
+    other_income: number;
+    total_inflows: number;
+    supplier_payments: number;
+    operating_expenses: number;
+    owner_draws: number;
+    loan_disbursements: number;
+    transaction_fees: number;
+    total_outflows: number;
+    expected_closing: number;
+    closing_balance: number;
+    variance: number;
+    is_reconciled: boolean;
+  };
+  financial_position?: {
+    assets: {
+      cash_and_bank: number;
+      owned_stock: number;
+      customer_receivables: number;
+      custom_assets: number;
+      total: number;
+    };
+    liabilities: {
+      open_payables: number;
+      open_payable_count: number;
+      payables: Array<{
+        id: string;
+        contact: string;
+        reference_type: string;
+        remaining_amount: number;
+        status: string;
+      }>;
+    };
+    net_position: number;
+    consignment_note: string;
+  };
 }
 
 export interface StaffMember {
@@ -784,6 +877,9 @@ export const api = {
 
   getDashboardSummary: (month?: string) =>
     request<DashboardData>(month ? `/dashboard/summary?month=${month}` : '/dashboard/summary'),
+
+  getBusinessReport: (from: string, to: string) =>
+    request<BusinessReportData>(`/reports/summary?${new URLSearchParams({ from, to }).toString()}`),
 
   // Categories & Taxonomy
   getCategories: () => request<ProductCategory[]>('/categories'),

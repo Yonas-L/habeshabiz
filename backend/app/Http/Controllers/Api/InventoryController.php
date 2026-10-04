@@ -14,10 +14,13 @@ use App\Models\FinancialTransaction;
 use App\Models\InventoryStock;
 use App\Models\InventoryUnit;
 use App\Models\ProductVariant;
+use App\Models\SalesOrder;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class InventoryController extends Controller
 {
@@ -277,18 +280,23 @@ class InventoryController extends Controller
         // Calculate total cost basis
         $totalCost = (float) collect($unitItems)->sum(fn ($u) => (float) $u['cost_basis']);
 
-        // Determine funding allocation
-        $rawFunding = $validated['funding_source'] ?? null;
-        if ($rawFunding === 'shop_account' || $rawFunding === 'account') {
-            $fundingSource = 'account';
-        } elseif ($rawFunding === 'unpaid' || $rawFunding === 'none') {
+        // Determine funding allocation (Consignment never moves money or deducts accounts at intake)
+        $isConsignment = ($validated['source_type'] ?? 'purchase') === 'consignment';
+        if ($isConsignment) {
             $fundingSource = 'none';
-        } elseif ($rawFunding === 'debtor_offset') {
-            $fundingSource = 'debtor_offset';
-        } elseif ($rawFunding === 'split') {
-            $fundingSource = 'split';
         } else {
-            $fundingSource = ! empty($validated['payment_account_id']) ? 'account' : 'none';
+            $rawFunding = $validated['funding_source'] ?? null;
+            if ($rawFunding === 'shop_account' || $rawFunding === 'account') {
+                $fundingSource = 'account';
+            } elseif ($rawFunding === 'unpaid' || $rawFunding === 'none') {
+                $fundingSource = 'none';
+            } elseif ($rawFunding === 'debtor_offset') {
+                $fundingSource = 'debtor_offset';
+            } elseif ($rawFunding === 'split') {
+                $fundingSource = 'split';
+            } else {
+                $fundingSource = ! empty($validated['payment_account_id']) ? 'account' : 'none';
+            }
         }
 
         $paymentAccountId = $validated['payment_account_id'] ?? null;
@@ -339,8 +347,8 @@ class InventoryController extends Controller
             $bankFee = $account->calculateOutgoingFee($bankAmount);
             $totalBankDeduction = $bankAmount + $bankFee;
             if ((float) $account->current_balance < $totalBankDeduction) {
-                throw \Illuminate\Validation\ValidationException::withMessages([
-                    'payment_account_id' => ["Insufficient balance in account '{$account->name}'. Available: ".number_format((float) $account->current_balance, 2)." ETB, Required: ".number_format($totalBankDeduction, 2)." ETB (including fee)."],
+                throw ValidationException::withMessages([
+                    'payment_account_id' => ["Insufficient balance in account '{$account->name}'. Available: ".number_format((float) $account->current_balance, 2).' ETB, Required: '.number_format($totalBankDeduction, 2).' ETB (including fee).'],
                 ]);
             }
         }
@@ -355,8 +363,8 @@ class InventoryController extends Controller
                 ->sum('remaining_amount');
 
             if ($openDebt < $offsetAmount) {
-                throw \Illuminate\Validation\ValidationException::withMessages([
-                    'receivable_offset_amount' => ["Requested offset exceeds {$debtor->name}'s open debt balance of ".number_format($openDebt, 2)." ETB."],
+                throw ValidationException::withMessages([
+                    'receivable_offset_amount' => ["Requested offset exceeds {$debtor->name}'s open debt balance of ".number_format($openDebt, 2).' ETB.'],
                 ]);
             }
         }
@@ -446,6 +454,7 @@ class InventoryController extends Controller
 
                 $deviceSummary = collect($createdUnits)->map(function ($u) {
                     $name = $u->variant?->product?->name ?? 'Device';
+
                     return $u->imei_or_serial ? "{$name} (IMEI: {$u->imei_or_serial})" : $name;
                 })->implode(', ');
 
@@ -475,7 +484,7 @@ class InventoryController extends Controller
                     ]);
 
                     if ($debt->reference_type === 'sales_order' && ! empty($debt->reference_id)) {
-                        $order = \App\Models\SalesOrder::find($debt->reference_id);
+                        $order = SalesOrder::find($debt->reference_id);
                         if ($order) {
                             $orderPaid = (float) $order->paid_amount + $applied;
                             $orderRemaining = max(0, (float) $order->total_amount - $orderPaid);
@@ -497,7 +506,7 @@ class InventoryController extends Controller
 
                 FinancialTransaction::create([
                     'tenant_id' => $tenantId,
-                    'transaction_number' => 'TXN-'.strtoupper(\Illuminate\Support\Str::random(8)),
+                    'transaction_number' => 'TXN-'.strtoupper(Str::random(8)),
                     'source_account_id' => $account->id,
                     'type' => 'supplier_payment',
                     'amount' => $bankAmount,
@@ -509,8 +518,8 @@ class InventoryController extends Controller
                 ]);
             }
 
-            // 3. Supplier Debt Tracking (only when unfunded / pay later)
-            if (! empty($validated['supplier_contact_id']) && $totalCost > 0 && $fundingSource === 'none') {
+            // 3. Supplier Debt Tracking (only for shop purchase on credit / pay later, NEVER for consignment)
+            if (($validated['source_type'] ?? 'purchase') !== 'consignment' && ! empty($validated['supplier_contact_id']) && $totalCost > 0 && $fundingSource === 'none') {
                 $intakeDebt = Debt::create([
                     'tenant_id' => $tenantId,
                     'contact_id' => $validated['supplier_contact_id'],

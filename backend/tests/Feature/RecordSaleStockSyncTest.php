@@ -2,6 +2,8 @@
 
 use App\Actions\RecordSaleAction;
 use App\Models\Contact;
+use App\Models\Debt;
+use App\Models\DebtPayment;
 use App\Models\FinancialAccount;
 use App\Models\InventoryStock;
 use App\Models\InventoryUnit;
@@ -183,6 +185,7 @@ test('can collect payment on a walk-in sales order with remaining balance', func
 
     $action = new RecordSaleAction;
     $order = $action->execute([
+        'credit_sale' => true,
         'paid_amount' => 10000.00,
         'payment_method' => 'cash',
         'financial_account_id' => $this->account->id,
@@ -250,6 +253,7 @@ test('can collect payment on customer sales order and synchronizes linked debt',
     $action = new RecordSaleAction;
     $order = $action->execute([
         'customer_id' => $customer->id,
+        'credit_sale' => true,
         'paid_amount' => 20000.00,
         'payment_method' => 'cash',
         'financial_account_id' => $this->account->id,
@@ -262,7 +266,7 @@ test('can collect payment on customer sales order and synchronizes linked debt',
         ],
     ]);
 
-    $debt = \App\Models\Debt::where('reference_type', 'sales_order')
+    $debt = Debt::where('reference_type', 'sales_order')
         ->where('reference_id', $order->id)
         ->first();
 
@@ -286,7 +290,7 @@ test('can collect payment on customer sales order and synchronizes linked debt',
     expect((float) $freshDebt->paid_amount)->toBe(50000.00);
 
     // Debt payment record created
-    expect(\App\Models\DebtPayment::where('debt_id', $debt->id)->count())->toBe(1);
+    expect(DebtPayment::where('debt_id', $debt->id)->count())->toBe(1);
 });
 
 test('settling customer debt via debt payments endpoint synchronizes sales order status', function () {
@@ -321,6 +325,7 @@ test('settling customer debt via debt payments endpoint synchronizes sales order
     $action = new RecordSaleAction;
     $order = $action->execute([
         'customer_id' => $customer->id,
+        'credit_sale' => true,
         'paid_amount' => 15000.00,
         'payment_method' => 'cash',
         'financial_account_id' => $this->account->id,
@@ -333,7 +338,7 @@ test('settling customer debt via debt payments endpoint synchronizes sales order
         ],
     ]);
 
-    $debt = \App\Models\Debt::where('reference_type', 'sales_order')
+    $debt = Debt::where('reference_type', 'sales_order')
         ->where('reference_id', $order->id)
         ->first();
 

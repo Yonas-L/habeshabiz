@@ -17,6 +17,7 @@ use App\Models\User;
 use App\Scopes\TenantScope;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 
 class RecordSaleAction
@@ -28,6 +29,8 @@ class RecordSaleAction
      *     salesperson_id?: int|null,
      *     discount_amount?: float|int,
      *     paid_amount: float|int,
+     *     credit_sale?: bool,
+     *     intentional_shortfall?: bool,
      *     payment_method?: string,
      *     financial_account_id?: string|null,
      *     notes?: string|null,
@@ -140,7 +143,13 @@ class RecordSaleAction
             }
 
             $totalRawBonus = array_sum($rawItemBonuses);
-            $netOrderBonus = max(0.0, $totalRawBonus - $discount);
+            $salesperson = ! empty($data['salesperson_id'])
+                ? User::find($data['salesperson_id'])
+                : null;
+            $isSalespersonBonusEligible = $salesperson && ! $salesperson->isOwner();
+            $netOrderBonus = $isSalespersonBonusEligible
+                ? max(0.0, $totalRawBonus - $discount)
+                : 0.0;
 
             $exchangeData = $data['exchange'] ?? null;
             $exchangeAllowance = 0.0;
@@ -150,8 +159,26 @@ class RecordSaleAction
 
             // Net payable is order total minus discount minus trade-in exchange allowance
             $netPayable = max(0, $totalAmount - $discount - $exchangeAllowance);
+            $creditSale = (bool) ($data['credit_sale'] ?? (($data['payment_method'] ?? null) === 'credit'));
+            $unpaidBalance = max(0, $netPayable - $paidAmount);
+            $intentionalShortfall = (bool) ($data['intentional_shortfall'] ?? false);
+
+            if ($creditSale && $intentionalShortfall) {
+                throw ValidationException::withMessages([
+                    'intentional_shortfall' => 'A sale cannot be both a credit sale and an intentional write-off.',
+                ]);
+            }
+
+            if ($unpaidBalance > 0 && ! $creditSale && ! $intentionalShortfall) {
+                throw ValidationException::withMessages([
+                    'credit_sale' => 'The sale has an unpaid balance. Mark it as credit, record a price concession, or collect the full amount before completing checkout.',
+                ]);
+            }
+
             $paymentStatus = 'paid';
-            if ($netPayable > 0 && $paidAmount <= 0) {
+            if ($intentionalShortfall) {
+                $paymentStatus = 'paid';
+            } elseif ($netPayable > 0 && $paidAmount <= 0) {
                 $paymentStatus = 'unpaid';
             } elseif ($paidAmount < $netPayable) {
                 $paymentStatus = 'partially_paid';
@@ -164,10 +191,12 @@ class RecordSaleAction
                 'salesperson_id' => $data['salesperson_id'] ?? null,
                 'total_amount' => $totalAmount,
                 'discount_amount' => $discount,
+                'write_off_amount' => $intentionalShortfall ? $unpaidBalance : 0,
                 'exchange_allowance' => $exchangeAllowance,
                 'total_bonus_amount' => $netOrderBonus,
                 'paid_amount' => $paidAmount,
                 'payment_status' => $paymentStatus,
+                'credit_sale' => $creditSale,
                 'payment_method' => $data['payment_method'] ?? 'cash',
                 'financial_account_id' => $data['financial_account_id'] ?? null,
                 'notes' => $data['notes'] ?? null,
@@ -319,7 +348,7 @@ class RecordSaleAction
                             ->first();
 
                         if (! $unit) {
-                            throw new InvalidArgumentException("Selected inventory unit is not available in stock.");
+                            throw new InvalidArgumentException('Selected inventory unit is not available in stock.');
                         }
 
                         $unitCost = (float) $unit->cost_basis;
@@ -353,7 +382,7 @@ class RecordSaleAction
                                     'remaining_amount' => $payableAmount,
                                     'due_date' => now()->addDays(7),
                                     'status' => 'open',
-                                    'notes' => "Vendor stock payout for SN: " . ($unit->imei_or_serial ?: 'Unit') . " in Order #{$order->order_number}. Agreed vendor cut.",
+                                    'notes' => 'Vendor stock payout for SN: '.($unit->imei_or_serial ?: 'Unit')." in Order #{$order->order_number}. Agreed vendor cut.",
                                 ]);
 
                                 Debt::applyOpenAdvancesToPayable($newPayable);
@@ -439,7 +468,9 @@ class RecordSaleAction
                 $itemSettedPrice = $settedPrices[$idx] ?? $unitPrice;
 
                 // Profit earned by the shop (net of salesperson bonus)
-                $profit = max(0.0, (($unitPrice - $unitCost) * $qty) - $itemBonus);
+                // Loss-making sales must remain negative. Clamping this to zero
+                // hides below-cost sales from the owner and overstates profit.
+                $profit = (($unitPrice - $unitCost) * $qty) - $itemBonus;
 
                 SalesOrderItem::create([
                     'tenant_id' => $tenantId,
@@ -458,10 +489,11 @@ class RecordSaleAction
                 ]);
             }
 
-            // Record salesperson bonus payable if bonus was earned
-            if ($netOrderBonus > 0 && ! empty($order->salesperson_id)) {
-                $salesperson = User::find($order->salesperson_id);
-                if ($salesperson) {
+            // Record salesperson bonus payable if bonus was earned.
+            // Owners do not get a commission payable — their extra margin is business profit,
+            // not a staff expense. Owner withdrawals are recorded separately as owner draws.
+            if ($netOrderBonus > 0 && $salesperson) {
+                if (! $salesperson->isOwner()) {
                     $staffContact = Contact::firstOrCreate(
                         [
                             'tenant_id' => $tenantId,
@@ -493,8 +525,7 @@ class RecordSaleAction
             }
 
             // Record customer receivable if partially paid or unpaid
-            $unpaidBalance = $netPayable - $paidAmount;
-            if ($unpaidBalance > 0) {
+            if ($unpaidBalance > 0 && ! $intentionalShortfall) {
                 if (empty($customerId)) {
                     $walkIn = Contact::firstOrCreate(
                         [

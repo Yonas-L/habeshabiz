@@ -13,6 +13,7 @@ import {
   CreditCard,
   Landmark,
   DollarSign,
+  FileBarChart,
   Users,
   ScrollText,
   Plus,
@@ -242,6 +243,15 @@ export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({
           icon: DollarSign,
           shortcut: '⌘8',
           onSelect: () => onNavigate({ tab: 'expenses' }),
+        },
+        {
+          id: 'nav-reports',
+          type: 'navigation',
+          title: 'Business Reports',
+          subtitle: 'Profit, sales trends, stock, repairs and vendor activity',
+          icon: FileBarChart,
+          shortcut: '⌘R',
+          onSelect: () => onNavigate({ tab: 'reports' }),
         },
         {
           id: 'nav-staff',

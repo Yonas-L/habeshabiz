@@ -124,16 +124,19 @@ export const SalesOrderDrawer: React.FC<SalesOrderDrawerProps> = ({
 
   const grossAmount = parseFloat(String(order.total_amount)) || 0;
   const discountAmount = parseFloat(String(order.discount_amount || '0')) || 0;
+  const writeOffAmount = parseFloat(String(order.write_off_amount || '0')) || 0;
   const exchangeAllowance = parseFloat(String(order.exchange_allowance || '0')) || 0;
   const netPayable = Math.max(0, grossAmount - discountAmount - exchangeAllowance);
   const paidAmount = parseFloat(String(order.paid_amount)) || 0;
-  const remainingDebt = Math.max(0, netPayable - paidAmount);
+  const remainingDebt = Math.max(0, netPayable - paidAmount - writeOffAmount);
   const isPaid = order.payment_status === 'paid' || remainingDebt === 0;
+  const settledSaleValue = Math.max(0, netPayable - writeOffAmount);
 
-  const totalProfit = order.items.reduce(
+  const itemProfit = order.items.reduce(
     (sum, i) => sum + parseFloat(String(i.profit || '0')),
     0
   );
+  const totalProfit = itemProfit - discountAmount - writeOffAmount;
 
   // Date and time formatting
   const orderDateObj = new Date(order.order_date);
@@ -263,7 +266,10 @@ export const SalesOrderDrawer: React.FC<SalesOrderDrawerProps> = ({
         const batteryText = unit?.battery_health ? ` · ${unit.battery_health}% Batt` : '';
         const spec = [item.variant?.storage, item.variant?.color].filter(Boolean).join(' · ');
         const specText = spec ? ` - ${spec}` : '';
-        return `${index + 1}. ${item.quantity}x ${item.variant?.product?.name || 'Device'}${specText}${tagText}${imeiText}${batteryText}\n   ${Number(item.unit_price).toLocaleString()} ETB`;
+        const receiptUnitPrice = order.items.length === 1
+          ? settledSaleValue / Math.max(1, Number(item.quantity || 1))
+          : Number(item.unit_price);
+        return `${index + 1}. ${item.quantity}x ${item.variant?.product?.name || 'Device'}${specText}${tagText}${imeiText}${batteryText}\n   ${receiptUnitPrice.toLocaleString()} ETB`;
       })
       .join('\n\n');
 
@@ -284,7 +290,7 @@ ITEMS PURCHASED:
 ${itemsText}
 ========================================
 Subtotal: ${grossAmount.toLocaleString()} ETB
-${discountAmount > 0 ? `Discount: -${discountAmount.toLocaleString()} ETB\n` : ''}${exchangeAllowance > 0 ? `Exchanged Device: ${exchangeAllowance.toLocaleString()} ETB\n` : ''}${exchangeAllowance > 0 ? 'Cash Difference to Pay' : 'Total Net Amount'}: ${netPayable.toLocaleString()} ETB
+${discountAmount > 0 ? `Discount: -${discountAmount.toLocaleString()} ETB\n` : ''}${writeOffAmount > 0 ? `Intentional Price Concession: -${writeOffAmount.toLocaleString()} ETB\n` : ''}${exchangeAllowance > 0 ? `Exchanged Device: ${exchangeAllowance.toLocaleString()} ETB\n` : ''}${exchangeAllowance > 0 ? 'Cash Difference to Pay' : 'Final Agreed Sale Value'}: ${settledSaleValue.toLocaleString()} ETB
 Amount Paid: ${paidAmount.toLocaleString()} ETB
 ${remainingDebt > 0 ? `Balance Due: ${remainingDebt.toLocaleString()} ETB\n` : ''}========================================
 WARRANTY & TERMS:
@@ -345,7 +351,7 @@ Thank you for choosing Habeshabiz Electronics!
             }`}
           >
             {isPaid ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
-            {isPaid ? 'Paid in Full' : 'Credit Unpaid'}
+            {writeOffAmount > 0 ? 'Settled by Price Concession' : isPaid ? 'Paid in Full' : 'Credit Unpaid'}
           </span>
         }
         headerActions={
@@ -548,7 +554,9 @@ Thank you for choosing Habeshabiz Electronics!
           const paidCash = Number(order.paid_amount || 0);
           const totalOrderPrice = Number(order.total_amount || item.unit_price || 0);
           const isPaid = order.payment_status === 'paid' || (hasExchange && (paidCash + exchangeAllowance >= totalOrderPrice));
-          const finalItemPrice = Number(item.unit_price || order.total_amount);
+          const finalItemPrice = order.items.length === 1
+            ? settledSaleValue / Math.max(1, Number(item.quantity || 1))
+            : Number(item.unit_price || order.total_amount);
 
           return (
             <div
@@ -637,7 +645,7 @@ Thank you for choosing Habeshabiz Electronics!
                     {hasExchange ? 'Trade-In Settlement Breakdown' : 'Payment Method & Settlement'}
                   </span>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isPaid ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'}`}>
-                    {isPaid ? 'Settled in Full' : 'Credit Balance Due'}
+                    {writeOffAmount > 0 ? 'Settled by Price Concession' : isPaid ? 'Settled in Full' : 'Credit Balance Due'}
                   </span>
                 </div>
 
@@ -773,7 +781,7 @@ Thank you for choosing Habeshabiz Electronics!
               {formatPaymentMethod(order.payment_method)}
             </div>
             <div className={`text-[11px] font-bold mt-0.5 ${isPaid ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
-              {isPaid ? 'Paid in Full' : 'Credit Unpaid'}
+              {writeOffAmount > 0 ? 'Settled by Price Concession' : isPaid ? 'Paid in Full' : 'Credit Unpaid'}
             </div>
           </div>
           <div className="col-span-2 mt-0.5">
@@ -813,7 +821,10 @@ Thank you for choosing Habeshabiz Electronics!
                 const specString = [item.variant?.storage, item.variant?.color].filter(Boolean).join(' · ');
                 const conditionStr = formatCondition(unit?.condition);
                 const simStr = formatSimType(unit?.sim_type);
-                const lineTotal = item.quantity * (parseFloat(String(item.unit_price)) || 0);
+                const lineUnitPrice = order.items.length === 1
+                  ? settledSaleValue / Math.max(1, Number(item.quantity || 1))
+                  : parseFloat(String(item.unit_price)) || 0;
+                const lineTotal = item.quantity * lineUnitPrice;
                 const isVendoredItem = (order.is_vendor_sourced && order.items.length === 1) || item.sourcing_type === 'brokered_neighbour' || unit?.source_type === 'vendor_direct';
                 const itemVendor = item.vendor_contact?.name || order.vendor?.name;
 
@@ -894,7 +905,7 @@ Thank you for choosing Habeshabiz Electronics!
 
                     <td className="py-2.5 px-2 text-right">
                       <span className="inline-flex items-baseline gap-1 whitespace-nowrap font-mono text-slate-700 dark:text-slate-300 tabular-nums">
-                        {Number(item.unit_price).toLocaleString()}
+                        {lineUnitPrice.toLocaleString()}
                         <span className="text-[9px] text-slate-400 font-sans">ETB</span>
                       </span>
                     </td>
@@ -926,6 +937,12 @@ Thank you for choosing Habeshabiz Electronics!
               <span className="font-mono tabular-nums">−{discountAmount.toLocaleString()} ETB</span>
             </div>
           )}
+          {writeOffAmount > 0 && (
+            <div className="flex justify-between text-rose-600 dark:text-rose-400">
+              <span>Intentional price concession</span>
+              <span className="font-mono tabular-nums">−{writeOffAmount.toLocaleString()} ETB</span>
+            </div>
+          )}
           {exchangeAllowance > 0 && (
             <div className="flex justify-between text-purple-700 dark:text-purple-300 font-semibold bg-purple-50/70 dark:bg-purple-950/30 px-2 py-1 rounded-lg border border-purple-200/60 dark:border-purple-800/40">
               <span className="flex items-center gap-1 text-[11px]">
@@ -941,7 +958,7 @@ Thank you for choosing Habeshabiz Electronics!
               {exchangeAllowance > 0 ? 'Cash Difference to Pay' : 'Total'}
             </span>
             <span className="inline-flex items-baseline gap-1 whitespace-nowrap font-black font-mono text-base text-slate-900 dark:text-white tabular-nums">
-              {netPayable.toLocaleString()}
+              {settledSaleValue.toLocaleString()}
               <span className="text-xs font-bold text-slate-400 font-sans">ETB</span>
             </span>
           </div>
@@ -957,8 +974,8 @@ Thank you for choosing Habeshabiz Electronics!
           )}
           {!remainingDebt && (
             <div className="flex justify-between font-semibold text-emerald-600 dark:text-emerald-400">
-              <span>Balance</span>
-              <span>Paid in Full</span>
+              <span>{writeOffAmount > 0 ? 'Settlement' : 'Balance'}</span>
+              <span>{writeOffAmount > 0 ? 'Price concession accepted' : 'Paid in Full'}</span>
             </div>
           )}
         </div>
@@ -996,7 +1013,7 @@ Thank you for choosing Habeshabiz Electronics!
               Internal Audit
             </span>
             <span className="flex items-center gap-2 font-mono text-emerald-600 dark:text-emerald-400">
-              +{totalProfit.toLocaleString()} ETB margin
+              {totalProfit >= 0 ? '+' : '−'}{Math.abs(totalProfit).toLocaleString()} ETB net margin
               {showInternalAudit ? <ChevronUp className="w-3.5 h-3.5 text-slate-400" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />}
             </span>
           </button>

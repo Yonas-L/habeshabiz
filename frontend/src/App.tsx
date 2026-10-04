@@ -23,6 +23,7 @@ import { SalesHistoryView } from './views/SalesHistoryView';
 import { DebtsView } from './views/DebtsView';
 import { TreasuryView } from './views/TreasuryView';
 import { ExpensesView } from './views/ExpensesView';
+import { ReportsView } from './views/ReportsView';
 import { StaffView } from './views/StaffView';
 import { StaffOverviewView } from './views/StaffOverviewView';
 import { PartnersView } from './views/PartnersView';
@@ -198,6 +199,8 @@ export default function App() {
                 '6': 'debts',
                 '7': 'treasury',
                 '8': 'expenses',
+                'r': 'reports',
+                'R': 'reports',
                 '9': 'staff',
                 '0': 'logs',
                 ',': 'settings',
@@ -224,7 +227,7 @@ export default function App() {
   // Fallback to overview if active tab is restricted for non-owner role
   useEffect(() => {
     if (user && user.role !== 'owner') {
-      const ownerOnlyTabs: NavTab[] = ['partners', 'debts', 'treasury', 'expenses', 'staff', 'logs', 'settings'];
+      const ownerOnlyTabs: NavTab[] = ['partners', 'debts', 'treasury', 'expenses', 'reports', 'staff', 'logs', 'settings'];
       if (ownerOnlyTabs.includes(activeTab)) {
         setActiveTab('overview');
       }
@@ -627,6 +630,10 @@ export default function App() {
                   initialShowRecordExpense={navContext.showRecordExpense}
                   onClearInitialContext={handleClearNavContext}
                 />
+              )}
+
+              {activeTab === 'reports' && user?.role === 'owner' && (
+                <ReportsView tenant={tenant} selectedMonth={selectedMonth} />
               )}
 
               {activeTab === 'staff' && user?.role === 'owner' && (

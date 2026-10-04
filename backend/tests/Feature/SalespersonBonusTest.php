@@ -2,18 +2,20 @@
 
 use App\Actions\RecordSaleAction;
 use App\Actions\SettleDebtPaymentAction;
-use App\Models\Contact;
 use App\Models\Debt;
 use App\Models\FinancialAccount;
 use App\Models\InventoryUnit;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\SalesOrder;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Scopes\TenantScope;
+use Illuminate\Validation\ValidationException;
 
 beforeEach(function () {
     $this->tenant = Tenant::create(['name' => 'Bole Shop', 'slug' => 'bole-bonus-test']);
-    \App\Scopes\TenantScope::setForcedTenantId($this->tenant->id);
+    TenantScope::setForcedTenantId($this->tenant->id);
 
     $this->owner = User::factory()->create([
         'tenant_id' => $this->tenant->id,
@@ -125,6 +127,119 @@ test('selling at or below setted price generates no bonus debt', function () {
     ]);
 
     expect((float) $order->total_bonus_amount)->toBe(0.0);
+    expect(Debt::where('reference_type', 'salesperson_bonus')->count())->toBe(0);
+});
+
+test('owner below-cost sale records a real negative item profit', function () {
+    $action = app(RecordSaleAction::class);
+
+    $order = $action->execute([
+        'salesperson_id' => $this->owner->id,
+        'paid_amount' => 120000.00,
+        'payment_method' => 'cash',
+        'financial_account_id' => $this->account->id,
+        'items' => [
+            [
+                'variant_id' => $this->variant->id,
+                'inventory_unit_id' => $this->unit->id,
+                'quantity' => 1,
+                'unit_price' => 120000.00,
+            ],
+        ],
+    ]);
+
+    expect((float) $order->items->first()->profit)->toBe(-10000.0);
+    expect((float) $order->items->first()->bonus_amount)->toBe(0.0);
+});
+
+test('a short payment is rejected unless checkout explicitly marks the sale as credit', function () {
+    $action = app(RecordSaleAction::class);
+
+    expect(fn () => $action->execute([
+        'salesperson_id' => $this->owner->id,
+        'paid_amount' => 100000.00,
+        'payment_method' => 'cash',
+        'financial_account_id' => $this->account->id,
+        'items' => [[
+            'variant_id' => $this->variant->id,
+            'inventory_unit_id' => $this->unit->id,
+            'quantity' => 1,
+            'unit_price' => 120000.00,
+        ]],
+    ]))->toThrow(ValidationException::class);
+
+    expect(SalesOrder::count())->toBe(0);
+    expect(Debt::where('type', 'receivable')->count())->toBe(0);
+});
+
+test('an explicitly marked credit sale creates the receivable and preserves the loss', function () {
+    $action = app(RecordSaleAction::class);
+
+    $order = $action->execute([
+        'salesperson_id' => $this->owner->id,
+        'credit_sale' => true,
+        'paid_amount' => 100000.00,
+        'payment_method' => 'cash',
+        'financial_account_id' => $this->account->id,
+        'items' => [[
+            'variant_id' => $this->variant->id,
+            'inventory_unit_id' => $this->unit->id,
+            'quantity' => 1,
+            'unit_price' => 120000.00,
+        ]],
+    ]);
+
+    expect($order->credit_sale)->toBeTrue();
+    expect((float) $order->items->first()->profit)->toBe(-10000.0);
+    expect((float) Debt::where('type', 'receivable')->firstOrFail()->remaining_amount)->toBe(20000.0);
+});
+
+test('an intentional price concession closes the sale without creating a receivable', function () {
+    $action = app(RecordSaleAction::class);
+
+    $order = $action->execute([
+        'salesperson_id' => $this->owner->id,
+        'intentional_shortfall' => true,
+        'paid_amount' => 100000.00,
+        'payment_method' => 'cash',
+        'financial_account_id' => $this->account->id,
+        'items' => [[
+            'variant_id' => $this->variant->id,
+            'inventory_unit_id' => $this->unit->id,
+            'quantity' => 1,
+            'unit_price' => 120000.00,
+        ]],
+    ]);
+
+    expect($order->credit_sale)->toBeFalse();
+    expect($order->payment_status)->toBe('paid');
+    expect((float) $order->write_off_amount)->toBe(20000.0);
+    expect(Debt::where('type', 'receivable')->count())->toBe(0);
+});
+
+test('owner sale above setted price keeps the full margin as business profit without a bonus payable', function () {
+    $action = app(RecordSaleAction::class);
+
+    $order = $action->execute([
+        'salesperson_id' => $this->owner->id,
+        'paid_amount' => 160000.00,
+        'payment_method' => 'cash',
+        'financial_account_id' => $this->account->id,
+        'items' => [
+            [
+                'variant_id' => $this->variant->id,
+                'inventory_unit_id' => $this->unit->id,
+                'quantity' => 1,
+                'unit_price' => 160000.00,
+            ],
+        ],
+    ]);
+
+    $item = $order->items->first();
+
+    expect((float) $order->total_bonus_amount)->toBe(0.0);
+    expect((float) $item->bonus_amount)->toBe(0.0);
+    expect((float) $item->profit)->toBe(30000.0);
     expect(Debt::where('reference_type', 'salesperson_bonus')->count())->toBe(0);
 });
 

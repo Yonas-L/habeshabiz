@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\OnboardingController;
 use App\Http\Controllers\Api\ProductController;
+use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\SaleController;
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\StaffController;
@@ -93,6 +94,7 @@ Route::prefix('v1')->group(function () {
 
         // Dashboard & Capital Formula Overview
         Route::get('/dashboard/summary', [DashboardController::class, 'summary']);
+        Route::get('/reports/summary', [ReportController::class, 'summary']);
 
         // Categories & Taxonomy
         Route::get('/categories', [CategoryController::class, 'index']);

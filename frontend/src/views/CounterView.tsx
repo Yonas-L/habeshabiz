@@ -28,6 +28,8 @@ import {
   TrendingUp,
   Repeat,
   Wrench,
+  Clock3,
+  Flag,
 } from 'lucide-react';
 import { AccountLogo } from '../utils/bankLogos';
 import { ExchangeDeviceModal, type ExchangeDevicePayload } from '../components/counter/ExchangeDeviceModal';
@@ -83,6 +85,8 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
   const [discountValue, setDiscountValue] = useState<string>('');
   const [paidAmount, setPaidAmount] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<string>('telebirr');
+  const [isCreditSale, setIsCreditSale] = useState(false);
+  const [isWriteOff, setIsWriteOff] = useState(false);
   const [financialAccountId, setFinancialAccountId] = useState<string>('');
   const [customerId, setCustomerId] = useState<string>('');
   const [customerMode, setCustomerMode] = useState<'walk_in' | 'new' | 'existing'>('walk_in');
@@ -217,6 +221,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
   const paidNum = parseFloat(paidAmount) || 0;
   const balanceDue = Math.max(0, netCashDue - paidNum);
   const isCredit = balanceDue > 0;
+  const hasUnmarkedBalance = balanceDue > 0 && !isCreditSale && !isWriteOff;
 
   // Upsell bonus calculation
   const currentVariant = useMemo(() => {
@@ -435,6 +440,8 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
     setUnitSellingPrice('');
     setDiscountValue('');
     setPaidAmount('');
+    setIsCreditSale(false);
+    setIsWriteOff(false);
     setCustomerId('');
     setCustomerName('');
     setCustomerPhone('');
@@ -491,6 +498,10 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
       toast.error(`Sale quantity (${quantity}) exceeds available stock (${maxAvailableStock}).`);
       return;
     }
+    if (hasUnmarkedBalance) {
+      toast.error('Collect the full amount or mark this checkout as a credit sale.');
+      return;
+    }
 
     try {
       setSubmitting(true);
@@ -539,6 +550,8 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
         discount_amount: calculatedDiscountAmount,
         paid_amount: paidNum,
         payment_method: paymentMethod,
+        credit_sale: isCreditSale,
+        intentional_shortfall: isWriteOff,
         financial_account_id: paidNum > 0 ? financialAccountId : null,
         notes: notes || null,
         items: itemsPayload,
@@ -1120,7 +1133,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                       className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md transition-colors ${
                         exchangeDevice
                           ? 'bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
-                          : 'bg-slate-100 dark:bg-slate-800 hover:bg-purple-50 dark:hover:bg-purple-950/40 text-slate-600 dark:text-slate-300 hover:text-purple-600'
+                          : 'bg-slate-100 dark:bg-slate-800 hover:bg-purple-50 dark:hover:bg-purple-950/40 text-slate-800 dark:text-slate-200 hover:text-purple-700'
                       }`}
                     >
                       <Repeat className="w-3 h-3 text-purple-500" />
@@ -1208,19 +1221,35 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                     { value: 'cash', label: 'Cash', icon: Banknote },
                     { value: 'cbe', label: 'CBE Transfer', icon: CreditCard },
                     { value: 'bank_transfer', label: 'Other Bank', icon: Wallet },
+                    { value: 'credit', label: 'Credit sale', icon: Clock3 },
+                    { value: 'writeoff', label: 'Price concession', icon: Flag },
                   ].map((m) => {
                     const Icon = m.icon;
-                    const isSelected = paymentMethod === m.value;
+                    const isSelected = m.value === 'credit'
+                      ? isCreditSale
+                      : m.value === 'writeoff'
+                        ? isWriteOff
+                        : paymentMethod === m.value && !isCreditSale && !isWriteOff;
                     return (
                       <button
                         key={m.value}
                         type="button"
                         onClick={() => {
-                          setPaymentMethod(m.value);
+                          const isCreditOption = m.value === 'credit';
+                          const isWriteOffOption = m.value === 'writeoff';
+                          setPaymentMethod(isCreditOption || isWriteOffOption ? 'cash' : m.value);
+                          setIsCreditSale(isCreditOption);
+                          setIsWriteOff(isWriteOffOption);
                           const cashDue = exchangeDevice
                             ? Math.max(0, totalAfterDiscount - Number(exchangeDevice.trade_in_value || 0))
                             : totalAfterDiscount;
-                          setPaidAmount(String(cashDue));
+                          if (!isCreditOption && !isWriteOffOption) {
+                            setPaidAmount(String(cashDue));
+                          } else if (isCreditOption && paidNum >= cashDue) {
+                            setPaidAmount('0');
+                          } else if (isWriteOffOption && paidNum >= cashDue) {
+                            setPaidAmount('0');
+                          }
                         }}
                         className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border-2 text-[11px] font-semibold transition-all ${
                           isSelected
@@ -1530,10 +1559,10 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                         </div>
 
                         {isCredit && (
-                          <div className="flex justify-between text-amber-600 dark:text-amber-400 font-bold">
+                          <div className={`flex justify-between font-bold ${isCreditSale ? 'text-amber-600 dark:text-amber-400' : isWriteOff ? 'text-rose-600 dark:text-rose-400' : 'text-orange-600 dark:text-orange-400'}`}>
                             <span className="flex items-center gap-1">
                               <AlertTriangle className="w-3 h-3" />
-                              Balance Due (Credit)
+                              {isCreditSale ? 'Balance Due (Credit Sale)' : isWriteOff ? 'Intentional Shortfall (Written Off)' : 'Payment Shortfall — choose an option'}
                             </span>
                             <span className="font-mono whitespace-nowrap">{balanceDue.toLocaleString()} ETB</span>
                           </div>
@@ -1557,9 +1586,10 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                   unitPriceNum <= 0 ||
                   quantity <= 0 ||
                   maxAvailableStock <= 0 ||
-                  quantity > maxAvailableStock
+                  quantity > maxAvailableStock ||
+                  hasUnmarkedBalance
                 }
-                className="w-full h-11 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 dark:disabled:bg-slate-800 text-white disabled:text-slate-400 text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2 active:scale-[0.98] disabled:cursor-not-allowed"
+                className="w-full h-11 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 dark:disabled:bg-slate-800 text-white disabled:text-slate-700 dark:disabled:text-slate-300 text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2 active:scale-[0.98] disabled:cursor-not-allowed"
               >
                 {submitting ? (
                   <Loader2 className="w-4 h-4 animate-spin" />

@@ -296,6 +296,7 @@ test('accounts endpoint and dashboard summary calculate historical account and a
         'is_custom_asset' => false,
         'is_active' => true,
     ]);
+    $bank->forceFill(['created_at' => now()->subMonths(2)])->saveQuietly();
 
     $gold = FinancialAccount::create([
         'tenant_id' => $this->tenant->id,
@@ -305,6 +306,7 @@ test('accounts endpoint and dashboard summary calculate historical account and a
         'is_custom_asset' => true,
         'is_active' => true,
     ]);
+    $gold->forceFill(['created_at' => now()->subMonths(2)])->saveQuietly();
 
     $forex = FinancialAccount::create([
         'tenant_id' => $this->tenant->id,
@@ -314,6 +316,7 @@ test('accounts endpoint and dashboard summary calculate historical account and a
         'is_custom_asset' => true,
         'is_active' => true,
     ]);
+    $forex->forceFill(['created_at' => now()->subMonths(2)])->saveQuietly();
 
     // Transaction that occurred this month (inflow of 5,000 into bank)
     FinancialTransaction::create([

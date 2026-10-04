@@ -4,8 +4,12 @@ namespace App\Actions;
 
 use App\Models\Contact;
 use App\Models\Debt;
+use App\Models\Expense;
+use App\Models\FinancialAccount;
 use App\Models\InventoryUnit;
 use App\Models\SalesOrder;
+use App\Models\SalesOrderItem;
+use App\Models\Tenant;
 use Carbon\Carbon;
 
 class GeneratePartnerStatementAction
@@ -34,9 +38,6 @@ class GeneratePartnerStatementAction
     /**
      * Generate an aggregated statement and ledger for a vendor/partner.
      *
-     * @param  Contact  $contact
-     * @param  string|null  $startDateStr
-     * @param  string|null  $endDateStr
      * @return array<string, mixed>
      */
     public function execute(Contact $contact, ?string $startDateStr = null, ?string $endDateStr = null): array
@@ -87,6 +88,7 @@ class GeneratePartnerStatementAction
                             $pName = $it->variant?->product?->name ?? 'Device';
                             $sn = $it->inventoryUnit?->imei_or_serial ? " (SN: {$it->inventoryUnit->imei_or_serial})" : '';
                             $qty = $it->quantity > 1 ? " x{$it->quantity}" : '';
+
                             return "{$pName}{$sn}{$qty}";
                         })->join(', ');
                     } elseif ($debt->notes) {
@@ -103,7 +105,7 @@ class GeneratePartnerStatementAction
                         'context' => $cleanContext,
                         'payable' => (float) $debt->original_amount,
                         'receivable' => 0.0,
-                        'balance_effect' => - (float) $debt->original_amount,
+                        'balance_effect' => -(float) $debt->original_amount,
                         'reference_number' => null,
                     ];
                 } elseif ($debt->reference_type === 'salesperson_bonus') {
@@ -113,6 +115,7 @@ class GeneratePartnerStatementAction
                             $pName = $it->variant?->product?->name ?? 'Device';
                             $sn = $it->inventoryUnit?->imei_or_serial ? " (SN: {$it->inventoryUnit->imei_or_serial})" : '';
                             $qty = $it->quantity > 1 ? " x{$it->quantity}" : '';
+
                             return "{$pName}{$sn}{$qty}";
                         })->join(', ');
                     } elseif ($debt->notes) {
@@ -129,7 +132,7 @@ class GeneratePartnerStatementAction
                         'context' => $cleanContext,
                         'payable' => (float) $debt->original_amount,
                         'receivable' => 0.0,
-                        'balance_effect' => - (float) $debt->original_amount,
+                        'balance_effect' => -(float) $debt->original_amount,
                         'reference_number' => null,
                     ];
                 } elseif ($debt->reference_type === 'brokered_sourcing') {
@@ -139,6 +142,7 @@ class GeneratePartnerStatementAction
                             $pName = $it->variant?->product?->name ?? 'Device';
                             $sn = $it->inventoryUnit?->imei_or_serial ? " (SN: {$it->inventoryUnit->imei_or_serial})" : ' x1';
                             $qty = $it->quantity > 1 ? " x{$it->quantity}" : '';
+
                             return "{$pName}{$sn}{$qty}";
                         })->join(', ');
                     } elseif ($debt->notes) {
@@ -153,7 +157,7 @@ class GeneratePartnerStatementAction
                         'context' => $itemDesc,
                         'payable' => (float) $debt->original_amount,
                         'receivable' => 0.0,
-                        'balance_effect' => - (float) $debt->original_amount,
+                        'balance_effect' => -(float) $debt->original_amount,
                         'reference_number' => null,
                     ];
                 } elseif ($debt->reference_type === 'stock_intake') {
@@ -170,7 +174,7 @@ class GeneratePartnerStatementAction
                         'context' => $context,
                         'payable' => (float) $debt->original_amount,
                         'receivable' => 0.0,
-                        'balance_effect' => - (float) $debt->original_amount,
+                        'balance_effect' => -(float) $debt->original_amount,
                         'reference_number' => null,
                     ];
                 } else {
@@ -182,7 +186,7 @@ class GeneratePartnerStatementAction
                         'context' => $debt->notes ? $this->sanitizeContext($debt->notes) : 'Agreed payable balance',
                         'payable' => (float) $debt->original_amount,
                         'receivable' => 0.0,
-                        'balance_effect' => - (float) $debt->original_amount,
+                        'balance_effect' => -(float) $debt->original_amount,
                         'reference_number' => null,
                     ];
                 }
@@ -195,6 +199,7 @@ class GeneratePartnerStatementAction
                             $pName = $it->variant?->product?->name ?? 'Device';
                             $sn = $it->inventoryUnit?->imei_or_serial ? " (SN: {$it->inventoryUnit->imei_or_serial})" : '';
                             $qty = $it->quantity > 1 ? " x{$it->quantity}" : ' x1';
+
                             return "{$pName}{$sn}{$qty}";
                         })->join(', ');
                     } elseif ($debt->notes) {
@@ -242,10 +247,10 @@ class GeneratePartnerStatementAction
                             'date' => $debt->updated_at ? Carbon::parse($debt->updated_at) : $debtCreatedDate,
                             'type' => 'handover_return',
                             'type_label' => 'Device Returned',
-                            'context' => 'Returned unsold to shop' . ($debt->notes ? " · {$debt->notes}" : ''),
+                            'context' => 'Returned unsold to shop'.($debt->notes ? " · {$debt->notes}" : ''),
                             'payable' => 0.0,
-                            'receivable' => - (float) $debt->original_amount,
-                            'balance_effect' => - (float) $debt->original_amount,
+                            'receivable' => -(float) $debt->original_amount,
+                            'balance_effect' => -(float) $debt->original_amount,
                             'reference_number' => 'RETURN-TO-SHOP',
                         ];
                     }
@@ -307,8 +312,8 @@ class GeneratePartnerStatementAction
                         'date' => $payDate,
                         'type' => 'vendor_return',
                         'type_label' => 'Return',
-                        'context' => 'Returned to vendor' . ($debt->notes ? " · {$debt->notes}" : ''),
-                        'payable' => - (float) $payment->amount,
+                        'context' => 'Returned to vendor'.($debt->notes ? " · {$debt->notes}" : ''),
+                        'payable' => -(float) $payment->amount,
                         'receivable' => 0.0,
                         'balance_effect' => (float) $payment->amount,
                         'reference_number' => 'RETURN-TO-VENDOR',
@@ -320,7 +325,7 @@ class GeneratePartnerStatementAction
                         'type' => 'repair_offset',
                         'type_label' => 'Repair Deduction',
                         'context' => 'Repair cost deduction',
-                        'payable' => - (float) $payment->amount,
+                        'payable' => -(float) $payment->amount,
                         'receivable' => 0.0,
                         'balance_effect' => (float) $payment->amount,
                         'reference_number' => 'REPAIR-OFFSET',
@@ -331,10 +336,10 @@ class GeneratePartnerStatementAction
                         'date' => $payDate,
                         'type' => 'handover_return',
                         'type_label' => 'Device Returned',
-                        'context' => 'Returned unsold to shop' . ($debt->notes ? " · {$debt->notes}" : ''),
+                        'context' => 'Returned unsold to shop'.($debt->notes ? " · {$debt->notes}" : ''),
                         'payable' => 0.0,
-                        'receivable' => - (float) $payment->amount,
-                        'balance_effect' => - (float) $payment->amount,
+                        'receivable' => -(float) $payment->amount,
+                        'balance_effect' => -(float) $payment->amount,
                         'reference_number' => 'RETURN-TO-SHOP',
                     ];
                 } elseif ($payment->reference_number === 'BILATERAL-OFFSET') {
@@ -344,9 +349,9 @@ class GeneratePartnerStatementAction
                         'type' => 'bilateral_offset',
                         'type_label' => 'Bilateral Offset',
                         'context' => $payment->notes ?: 'Settled via bilateral offset / trade',
-                        'payable' => $debt->type === 'payable' ? - (float) $payment->amount : 0.0,
-                        'receivable' => $debt->type === 'receivable' ? - (float) $payment->amount : 0.0,
-                        'balance_effect' => $debt->type === 'payable' ? (float) $payment->amount : - (float) $payment->amount,
+                        'payable' => $debt->type === 'payable' ? -(float) $payment->amount : 0.0,
+                        'receivable' => $debt->type === 'receivable' ? -(float) $payment->amount : 0.0,
+                        'balance_effect' => $debt->type === 'payable' ? (float) $payment->amount : -(float) $payment->amount,
                         'reference_number' => 'BILATERAL-OFFSET',
                     ];
                 } elseif ($payment->reference_number === 'OFFSET-INTAKE' || $payment->reference_number === 'DEVICE-OFFSET' || str_contains($payment->notes ?? '', 'device') || str_contains($payment->notes ?? '', 'Offset') || str_contains($payment->notes ?? '', 'Paid by device')) {
@@ -356,21 +361,21 @@ class GeneratePartnerStatementAction
                         'type' => 'device_offset',
                         'type_label' => 'Paid by Device',
                         'context' => $payment->notes ?: 'Paid by device intake offset',
-                        'payable' => $debt->type === 'payable' ? - (float) $payment->amount : 0.0,
-                        'receivable' => $debt->type === 'receivable' ? - (float) $payment->amount : 0.0,
-                        'balance_effect' => $debt->type === 'payable' ? (float) $payment->amount : - (float) $payment->amount,
+                        'payable' => $debt->type === 'payable' ? -(float) $payment->amount : 0.0,
+                        'receivable' => $debt->type === 'receivable' ? -(float) $payment->amount : 0.0,
+                        'balance_effect' => $debt->type === 'payable' ? (float) $payment->amount : -(float) $payment->amount,
                         'reference_number' => 'DEVICE-OFFSET',
                     ];
                 } elseif ($debt->type === 'payable') {
                     $accText = ($accountName && $accountName !== 'Wire') ? " ({$accountName})" : '';
-                    $cleanPayRef = ($payment->reference_number && !str_starts_with($payment->reference_number, 'ORD-')) ? $payment->reference_number : null;
+                    $cleanPayRef = ($payment->reference_number && ! str_starts_with($payment->reference_number, 'ORD-')) ? $payment->reference_number : null;
                     $rawEntries[] = [
                         'id' => "pay-{$payment->id}",
                         'date' => $payDate,
                         'type' => 'payment_sent',
                         'type_label' => 'Payment Sent',
                         'context' => "Transferred{$accText}",
-                        'payable' => - (float) $payment->amount,
+                        'payable' => -(float) $payment->amount,
                         'receivable' => 0.0,
                         'balance_effect' => (float) $payment->amount,
                         'reference_number' => $cleanPayRef,
@@ -384,8 +389,8 @@ class GeneratePartnerStatementAction
                         'type_label' => $isRepair ? 'Repair Payment' : 'Payment Received',
                         'context' => $isRepair ? "Repair payment ({$accountName})" : "Payment received ({$accountName})",
                         'payable' => 0.0,
-                        'receivable' => - (float) $payment->amount,
-                        'balance_effect' => - (float) $payment->amount,
+                        'receivable' => -(float) $payment->amount,
+                        'balance_effect' => -(float) $payment->amount,
                         'reference_number' => $payment->reference_number,
                     ];
                 }
@@ -410,6 +415,7 @@ class GeneratePartnerStatementAction
                     $pName = $it->variant?->product?->name ?? 'Item';
                     $sn = $it->inventoryUnit?->imei_or_serial ? " (SN: {$it->inventoryUnit->imei_or_serial})" : '';
                     $qty = $it->quantity > 1 ? " x{$it->quantity}" : '';
+
                     return "{$pName}{$sn}{$qty}";
                 })->join(', ')
                 : 'Purchase';
@@ -463,13 +469,13 @@ class GeneratePartnerStatementAction
         // Units supplied by this vendor that do not have an existing debt record (e.g. stocked directly)
         $existingStockIntakeUnitIds = $debts->where('reference_type', 'stock_intake')->pluck('reference_id')->filter()->all();
         $consignmentOrderIds = $debts->where('reference_type', 'consignment_sale')->pluck('reference_id')->filter()->all();
-        $soldUnitIdsWithDebt = \App\Models\SalesOrderItem::whereIn('sales_order_id', $consignmentOrderIds)
+        $soldUnitIdsWithDebt = SalesOrderItem::whereIn('sales_order_id', $consignmentOrderIds)
             ->whereNotNull('inventory_unit_id')
             ->pluck('inventory_unit_id')
             ->all();
 
         $brokeredOrderIds = $debts->where('reference_type', 'brokered_sourcing')->pluck('reference_id')->filter()->all();
-        $brokeredUnitIds = \App\Models\SalesOrderItem::whereIn('sales_order_id', $brokeredOrderIds)
+        $brokeredUnitIds = SalesOrderItem::whereIn('sales_order_id', $brokeredOrderIds)
             ->whereNotNull('inventory_unit_id')
             ->pluck('inventory_unit_id')
             ->all();
@@ -485,7 +491,7 @@ class GeneratePartnerStatementAction
 
         $vendorUnitsWithoutDebt = InventoryUnit::where('supplier_contact_id', $contact->id)
             ->where('cost_basis', '>', 0)
-            ->whereNotIn('source_type', ['exchange', 'vendor_direct'])
+            ->whereNotIn('source_type', ['exchange', 'vendor_direct', 'consignment'])
             ->whereNull('exchange_sales_order_id')
             ->whereNotIn('id', $allDebtedUnitIds)
             ->where(function ($q) {
@@ -505,6 +511,7 @@ class GeneratePartnerStatementAction
                         }
                     }
                 }
+
                 return true;
             });
 
@@ -519,7 +526,7 @@ class GeneratePartnerStatementAction
                 'context' => "{$pName}{$sn}",
                 'payable' => (float) $unit->cost_basis,
                 'receivable' => 0.0,
-                'balance_effect' => - (float) $unit->cost_basis,
+                'balance_effect' => -(float) $unit->cost_basis,
                 'reference_number' => null,
             ];
 
@@ -530,7 +537,7 @@ class GeneratePartnerStatementAction
                     'type' => 'vendor_return',
                     'type_label' => 'Return',
                     'context' => "Returned to vendor · {$pName}{$sn}",
-                    'payable' => - (float) $unit->cost_basis,
+                    'payable' => -(float) $unit->cost_basis,
                     'receivable' => 0.0,
                     'balance_effect' => (float) $unit->cost_basis,
                     'reference_number' => 'RETURN-TO-VENDOR',
@@ -539,7 +546,7 @@ class GeneratePartnerStatementAction
         }
 
         // Direct expenses paid to this vendor (if not already recorded as debt payment)
-        $directExpenses = \App\Models\Expense::where('tenant_id', $contact->tenant_id)
+        $directExpenses = Expense::where('tenant_id', $contact->tenant_id)
             ->where('vendor_contact_id', $contact->id)
             ->whereNull('inventory_unit_id')
             ->with('financialAccount')
@@ -562,7 +569,7 @@ class GeneratePartnerStatementAction
                     'type' => 'payment_sent',
                     'type_label' => 'Payment Sent',
                     'context' => $expDesc,
-                    'payable' => - (float) $exp->amount,
+                    'payable' => -(float) $exp->amount,
                     'receivable' => 0.0,
                     'balance_effect' => (float) $exp->amount,
                     'reference_number' => null,
@@ -656,7 +663,7 @@ class GeneratePartnerStatementAction
 
         $unDebtStockPayable = (float) InventoryUnit::where('supplier_contact_id', $contact->id)
             ->where('status', 'in_stock')
-            ->whereNotIn('source_type', ['exchange', 'vendor_direct'])
+            ->whereNotIn('source_type', ['exchange', 'vendor_direct', 'consignment'])
             ->whereNull('exchange_sales_order_id')
             ->whereNotIn('id', $allDebtedUnitIds)
             ->where(function ($q) {
@@ -772,7 +779,7 @@ class GeneratePartnerStatementAction
             'business' => (function () use ($contact) {
                 $tenant = $contact->tenant;
                 if (! $tenant && ! empty($contact->tenant_id)) {
-                    $tenant = \App\Models\Tenant::find($contact->tenant_id);
+                    $tenant = Tenant::find($contact->tenant_id);
                 }
                 $tenantSettings = $tenant?->settings ?? [];
                 $ownerUser = $tenant?->users()->where('role', 'owner')->first();
@@ -796,7 +803,7 @@ class GeneratePartnerStatementAction
                     'logo_url' => $businessLogo,
                     'tin_number' => $tenantSettings['tin_number'] ?? null,
                     'footer_note' => $tenantSettings['footer_note'] ?? null,
-                    'bank_accounts' => \App\Models\FinancialAccount::where('tenant_id', $contact->tenant_id)
+                    'bank_accounts' => FinancialAccount::where('tenant_id', $contact->tenant_id)
                         ->where('is_active', true)
                         ->whereIn('type', ['bank', 'mobile_money'])
                         ->get(['id', 'name', 'account_number', 'type', 'logo'])

@@ -34,6 +34,7 @@ class DashboardController extends Controller
         // 1. Inventory Valuation (up to end of selected period)
         $serializedStockValue = (float) InventoryUnit::where('created_at', '<=', $endOfMonth)
             ->where('status', 'in_stock')
+            ->whereNotIn('source_type', ['consignment', 'exchange', 'vendor_direct'])
             ->sum('cost_basis');
         $quantityStockValue = (float) InventoryStock::whereHas('variant.product', fn ($q) => $q->where('has_serials', false))
             ->whereDoesntHave('variant.inventoryUnits', fn ($q) => $q->where('status', 'in_stock'))
@@ -74,7 +75,7 @@ class DashboardController extends Controller
         }
 
         // 3. Treasury & Asset Balances (calculated as of end of selected month)
-        $accounts = FinancialAccount::all();
+        $accounts = FinancialAccount::where('created_at', '<=', $endOfMonth)->get();
         (new AccountBalanceService)->calculateBalancesAsOf($accounts, $endOfMonth);
 
         $cashAndBankBalance = 0.0;
@@ -109,10 +110,14 @@ class DashboardController extends Controller
 
         $monthlyRevenue = (float) SalesOrder::whereBetween('order_date', [$startOfMonth, $endOfMonth])->sum('total_amount');
         $monthlyDiscounts = (float) SalesOrder::whereBetween('order_date', [$startOfMonth, $endOfMonth])->sum('discount_amount');
-        $itemProfits = (float) SalesOrderItem::whereHas('salesOrder', function ($q) use ($startOfMonth, $endOfMonth) {
+        $monthlyWriteOffs = (float) SalesOrder::whereBetween('order_date', [$startOfMonth, $endOfMonth])->sum('write_off_amount');
+        $monthlyItems = SalesOrderItem::whereHas('salesOrder', function ($q) use ($startOfMonth, $endOfMonth) {
             $q->whereBetween('order_date', [$startOfMonth, $endOfMonth]);
-        })->sum('profit');
-        $monthlyGrossProfit = max(0.0, $itemProfits - $monthlyDiscounts);
+        })->get(['unit_price', 'unit_cost', 'quantity', 'bonus_amount']);
+        // Preserve below-cost sales as losses. Historical rows may have been
+        // stored with profit=0, so recalculate from immutable sale facts.
+        $itemProfits = $monthlyItems->sum(fn (SalesOrderItem $item): float => $this->realizedItemProfit($item));
+        $monthlyGrossProfit = $itemProfits - $monthlyDiscounts - $monthlyWriteOffs;
 
         $monthlyManualExpenses = (float) Expense::whereBetween('date', [$startOfMonth, $endOfMonth])
             ->where('is_owner_draw', false)
@@ -123,8 +128,11 @@ class DashboardController extends Controller
 
         $monthlyExpenses = $monthlyManualExpenses + $monthlyTransactionFees;
 
-        $monthlyOwnerDraws = (float) Expense::whereBetween('date', [$startOfMonth, $endOfMonth])
-            ->where('is_owner_draw', true)
+        // Owner withdrawals are cash/equity movements, not operating
+        // expenses. The financial transaction ledger is authoritative here
+        // and also covers owner draws recorded outside the expense form.
+        $monthlyOwnerDraws = (float) FinancialTransaction::whereBetween('date', [$startOfMonth, $endOfMonth])
+            ->where('type', 'owner_draw')
             ->sum('amount');
 
         $monthlyNetProfit = $monthlyGrossProfit - $monthlyExpenses;
@@ -167,14 +175,16 @@ class DashboardController extends Controller
         foreach ($groupedOrders as $date => $dayOrders) {
             $dayRev = (float) $dayOrders->sum('total_amount');
             $dayDisc = (float) $dayOrders->sum('discount_amount');
-            $dayItemProfit = (float) $dayOrders->flatMap->items->sum('profit');
-            $dayProfit = max(0.0, $dayItemProfit - $dayDisc);
+            $dayItemProfit = (float) $dayOrders->flatMap->items->sum(fn (SalesOrderItem $item): float => $this->realizedItemProfit($item));
+            $dayWriteOff = (float) $dayOrders->sum('write_off_amount');
+            $dayProfit = $dayItemProfit - $dayDisc - $dayWriteOff;
 
             $salesChart[] = [
                 'date' => $date,
                 'day' => Carbon::parse($date)->format('M d'),
                 'revenue' => round($dayRev, 2),
                 'profit' => round($dayProfit, 2),
+                'write_offs' => round($dayWriteOff, 2),
                 'orders' => count($dayOrders),
             ];
         }
@@ -219,7 +229,7 @@ class DashboardController extends Controller
             $unDebtStockPayable = (float) InventoryUnit::where('supplier_contact_id', $p->id)
                 ->where('created_at', '<=', $endOfMonth)
                 ->where('status', 'in_stock')
-                ->where('source_type', '!=', 'exchange')
+                ->whereNotIn('source_type', ['exchange', 'consignment', 'vendor_direct'])
                 ->whereNull('exchange_sales_order_id')
                 ->whereNotIn('id', $allDebtedUnitIds)
                 ->sum('cost_basis');
@@ -283,6 +293,9 @@ class DashboardController extends Controller
                 'monthly_performance' => [
                     'selected_month' => $startOfMonth->format('Y-m'),
                     'revenue' => $monthlyRevenue,
+                    'net_revenue' => $monthlyRevenue - $monthlyDiscounts - $monthlyWriteOffs,
+                    'discounts' => $monthlyDiscounts,
+                    'write_offs' => $monthlyWriteOffs,
                     'gross_profit' => $monthlyGrossProfit,
                     'operating_expenses' => $monthlyExpenses,
                     'manual_expenses' => $monthlyManualExpenses,
@@ -312,5 +325,11 @@ class DashboardController extends Controller
                 'sales_chart' => $salesChart,
             ],
         ]);
+    }
+
+    private function realizedItemProfit(SalesOrderItem $item): float
+    {
+        return ((float) $item->unit_price - (float) $item->unit_cost) * (int) $item->quantity
+            - (float) $item->bonus_amount;
     }
 }

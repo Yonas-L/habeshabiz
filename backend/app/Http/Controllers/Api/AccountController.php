@@ -24,11 +24,16 @@ class AccountController extends Controller
         $user = $request->user();
         $isOwner = $user ? $user->isOwner() : false;
 
-        $accounts = FinancialAccount::orderBy('name')->get();
-
         $monthParam = $request->query('month');
+        $query = FinancialAccount::orderBy('name');
         if ($monthParam && preg_match('/^\d{4}-\d{2}$/', $monthParam)) {
             $endOfMonth = Carbon::createFromFormat('Y-m', $monthParam)->endOfMonth();
+            $query->where('created_at', '<=', $endOfMonth);
+        }
+
+        $accounts = $query->get();
+
+        if (isset($endOfMonth)) {
             (new AccountBalanceService)->calculateBalancesAsOf($accounts, $endOfMonth);
         }
 

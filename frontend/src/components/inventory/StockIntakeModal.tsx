@@ -662,6 +662,19 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
     );
   }, [activeCategory, selectedProduct]);
 
+  // Batch table: category-aware column labels and variant option text
+  const showBattery = isPhone || activeArchetype === 'phone_tablet' || activeArchetype === 'laptop_computer' || activeArchetype === 'smartwatch';
+  const serialLabel = isPhone || activeArchetype === 'phone_tablet' ? 'IMEI' : 'Serial';
+  const variantOptionLabel = (v: ProductVariant) => {
+    const specVals = v.specs ? Object.values(v.specs).filter(Boolean).map(String) : [];
+    const ramLabel = v.ram ? (v.ram.toLowerCase().includes('ram') ? v.ram : `${v.ram} RAM`) : null;
+    const parts =
+      activeArchetype === 'phone_tablet' || activeArchetype === 'laptop_computer'
+        ? [v.storage, ramLabel, ...specVals, v.color]
+        : [...specVals, v.storage, v.color];
+    return parts.filter(Boolean).join(' · ') || 'Standard';
+  };
+
   // Load receivable debts
   useEffect(() => {
     if (isOpen) {
@@ -826,7 +839,7 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
             cost_basis: parseFormattedNumber(it.cost_basis) ?? 0,
             selling_price: parseFormattedNumber(it.selling_price) ?? undefined,
             condition: it.condition,
-            battery_health: it.battery_health ? parseInt(it.battery_health, 10) : undefined,
+            battery_health: showBattery && it.battery_health ? parseInt(it.battery_health, 10) : undefined,
             cycle_count: it.cycle_count ? parseInt(it.cycle_count, 10) : undefined,
             sim_type: it.sim_type,
             notes: it.notes?.trim() || undefined,
@@ -1773,102 +1786,117 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                 <div className="space-y-3">
                   {/* Desktop Table */}
                   <div className="hidden sm:block overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-50 dark:bg-slate-900/60 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-200/80 dark:border-slate-800">
+                    <table className="w-full table-fixed text-left text-xs">
+                      <colgroup>
+                        <col className="w-9" />
+                        <col className="w-[26%]" />
+                        <col />
+                        {showBattery && <col className="w-[72px]" />}
+                        <col className="w-[110px]" />
+                        <col className="w-[110px]" />
+                        <col className="w-[68px]" />
+                      </colgroup>
+                      <thead className="bg-slate-50 dark:bg-slate-900/60 text-[11px] font-semibold text-slate-500 dark:text-slate-400 border-b border-slate-200/80 dark:border-slate-800">
                         <tr>
-                          <th className="py-2 px-2.5 w-7 text-center">#</th>
-                          <th className="py-2 px-2.5">
-                            <div className="flex items-center justify-between">
-                              <span>Variant (RAM / Storage)</span>
+                          <th className="py-2.5 px-2 text-center font-medium text-slate-400">#</th>
+                          <th className="py-2.5 px-2">
+                            <div className="flex items-center gap-2">
+                              <span>Variant</span>
                               <button
                                 type="button"
                                 onClick={() => {
                                   setIsCreatingVariant(true);
                                   resetVariantInputs();
                                 }}
-                                className="text-[9px] text-emerald-600 dark:text-emerald-400 font-bold hover:underline cursor-pointer lowercase"
-                                title="Add new RAM/storage variant to model"
+                                className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
+                                title="Add a new variant to this product"
                               >
-                                + new spec
+                                <Plus className="w-3 h-3" />
+                                New
                               </button>
                             </div>
                           </th>
-                          <th className="py-2 px-2.5">Serial / IMEI *</th>
-                          {isPhone && <th className="py-2 px-2 w-20">Battery %</th>}
-                          <th className="py-2 px-2.5 w-28">Cost (ETB) *</th>
-                          <th className="py-2 px-2.5 w-28">Price (ETB)</th>
-                          <th className="py-2 px-2 text-right w-16">Actions</th>
+                          <th className="py-2.5 px-2">
+                            {serialLabel} <span className="text-rose-500">*</span>
+                          </th>
+                          {showBattery && <th className="py-2.5 px-2 text-center">Battery</th>}
+                          <th className="py-2.5 px-2">
+                            Cost <span className="text-rose-500">*</span>
+                          </th>
+                          <th className="py-2.5 px-2">Price</th>
+                          <th className="py-2.5 px-2" />
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 bg-white dark:bg-slate-900/40">
                         {batchItems.map((item, idx) => (
                           <tr key={item.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
                             <td className="py-2 px-2 text-center text-slate-400 font-mono text-[11px]">{idx + 1}</td>
-                            <td className="py-2 px-2.5">
+                            <td className="py-2 px-2">
                               <select
                                 value={item.variant_id}
                                 onChange={(e) => handleUpdateBatchItem(idx, { variant_id: e.target.value })}
-                                className="w-full h-8 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold focus:outline-none"
+                                className="w-full h-9 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white truncate focus:outline-none cursor-pointer"
                               >
-                                {(selectedProduct?.variants || []).map((v) => {
-                                  const ramLabel = v.ram ? (v.ram.toLowerCase().includes('ram') ? v.ram : `${v.ram} RAM`) : null;
-                                  const label = [v.storage, ramLabel, v.color].filter(Boolean).join(' · ') || 'Standard';
-                                  return (
-                                    <option key={v.id} value={v.id}>
-                                      {label}
-                                    </option>
-                                  );
-                                })}
+                                {(selectedProduct?.variants || []).map((v) => (
+                                  <option key={v.id} value={v.id}>
+                                    {variantOptionLabel(v)}
+                                  </option>
+                                ))}
                               </select>
                             </td>
-                            <td className="py-2 px-2.5">
+                            <td className="py-2 px-2">
                               <input
                                 type="text"
                                 required
-                                placeholder="359871..."
+                                placeholder={serialLabel === 'IMEI' ? '15-digit IMEI' : 'Serial number'}
                                 value={item.imei_or_serial}
                                 onChange={(e) => handleUpdateBatchItem(idx, { imei_or_serial: e.target.value })}
-                                className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-slate-900/20"
+                                className="w-full h-9 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono text-xs tracking-wide text-slate-900 dark:text-white placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-slate-900/20"
                               />
                             </td>
-                            {isPhone && (
+                            {showBattery && (
                               <td className="py-2 px-2">
-                                <input
-                                  type="number"
-                                  min="1"
-                                  max="100"
-                                  value={item.battery_health || ''}
-                                  onChange={(e) => handleUpdateBatchItem(idx, { battery_health: e.target.value })}
-                                  className="w-full h-8 px-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-center font-mono text-xs focus:outline-none"
-                                />
+                                <div className="relative">
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    max="100"
+                                    value={item.battery_health || ''}
+                                    onChange={(e) => handleUpdateBatchItem(idx, { battery_health: e.target.value })}
+                                    className="w-full h-9 pl-2 pr-5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-center font-mono text-xs focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+                                  />
+                                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none">%</span>
+                                </div>
                               </td>
                             )}
-                            <td className="py-2 px-2.5">
+                            <td className="py-2 px-2">
                               <input
                                 type="text"
                                 required
-                                placeholder="Cost"
+                                inputMode="numeric"
+                                placeholder="0"
                                 value={item.cost_basis}
                                 onChange={(e) => handleUpdateBatchItem(idx, { cost_basis: formatCurrencyInput(e.target.value) })}
-                                className="w-full h-8 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono font-bold text-xs focus:outline-none"
+                                className="w-full h-9 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono font-semibold text-xs text-right placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:outline-none"
                               />
                             </td>
-                            <td className="py-2 px-2.5">
+                            <td className="py-2 px-2">
                               <input
                                 type="text"
-                                placeholder="Opt."
+                                inputMode="numeric"
+                                placeholder="—"
                                 value={item.selling_price || ''}
                                 onChange={(e) => handleUpdateBatchItem(idx, { selling_price: formatCurrencyInput(e.target.value) })}
-                                className="w-full h-8 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono text-xs focus:outline-none"
+                                className="w-full h-9 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono text-xs text-right placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:outline-none"
                               />
                             </td>
-                            <td className="py-2 px-2 text-right">
-                              <div className="flex items-center justify-end gap-1">
+                            <td className="py-2 px-2">
+                              <div className="flex items-center justify-end gap-0.5">
                                 <button
                                   type="button"
                                   onClick={() => handleDuplicateBatchItem(idx)}
-                                  title="Duplicate device row"
-                                  className="p-1 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                  title="Duplicate row"
+                                  className="p-1.5 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                                 >
                                   <Copy className="w-3.5 h-3.5" />
                                 </button>
@@ -1876,8 +1904,8 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                                   type="button"
                                   onClick={() => handleRemoveBatchItem(idx)}
                                   disabled={batchItems.length <= 1}
-                                  title="Remove device row"
-                                  className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 disabled:opacity-30 transition-colors cursor-pointer"
+                                  title="Remove row"
+                                  className="p-1.5 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
@@ -1918,77 +1946,81 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <div className="flex items-center justify-between mb-0.5">
-                              <label className="text-[10px] text-slate-400">Variant</label>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setIsCreatingVariant(true);
-                                  resetVariantInputs();
-                                }}
-                                className="text-[9px] text-emerald-600 dark:text-emerald-400 font-bold hover:underline"
-                              >
-                                + new spec
-                              </button>
-                            </div>
-                            <select
-                              value={item.variant_id}
-                              onChange={(e) => handleUpdateBatchItem(idx, { variant_id: e.target.value })}
-                              className="w-full h-8 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium focus:outline-none"
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="text-[10px] font-medium text-slate-500">Variant</label>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsCreatingVariant(true);
+                                resetVariantInputs();
+                              }}
+                              className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline"
                             >
-                              {(selectedProduct?.variants || []).map((v) => {
-                                const ramLabel = v.ram ? (v.ram.toLowerCase().includes('ram') ? v.ram : `${v.ram} RAM`) : null;
-                                const label = [v.storage, ramLabel, v.color].filter(Boolean).join(' · ') || 'Standard';
-                                return (
-                                  <option key={v.id} value={v.id}>
-                                    {label}
-                                  </option>
-                                );
-                              })}
-                            </select>
+                              <Plus className="w-3 h-3" />
+                              New
+                            </button>
                           </div>
-                          <div>
-                            <label className="block text-[10px] text-slate-400 mb-0.5">Serial / IMEI *</label>
-                            <input
-                              type="text"
-                              placeholder="Serial #"
-                              value={item.imei_or_serial}
-                              onChange={(e) => handleUpdateBatchItem(idx, { imei_or_serial: e.target.value })}
-                              className="w-full h-8 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono text-xs focus:outline-none"
-                            />
-                          </div>
+                          <select
+                            value={item.variant_id}
+                            onChange={(e) => handleUpdateBatchItem(idx, { variant_id: e.target.value })}
+                            className="w-full h-9 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium focus:outline-none"
+                          >
+                            {(selectedProduct?.variants || []).map((v) => (
+                              <option key={v.id} value={v.id}>
+                                {variantOptionLabel(v)}
+                              </option>
+                            ))}
+                          </select>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-2">
-                          {isPhone && (
+                        <div>
+                          <label className="block text-[10px] font-medium text-slate-500 mb-1">
+                            {serialLabel} <span className="text-rose-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            placeholder={serialLabel === 'IMEI' ? '15-digit IMEI' : 'Serial number'}
+                            value={item.imei_or_serial}
+                            onChange={(e) => handleUpdateBatchItem(idx, { imei_or_serial: e.target.value })}
+                            className="w-full h-9 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono text-xs tracking-wide placeholder:text-slate-300 focus:outline-none"
+                          />
+                        </div>
+
+                        <div className={`grid gap-2 ${showBattery ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                          {showBattery && (
                             <div>
-                              <label className="block text-[10px] text-slate-400 mb-0.5">Battery %</label>
+                              <label className="block text-[10px] font-medium text-slate-500 mb-1">Battery</label>
                               <input
                                 type="number"
                                 value={item.battery_health || ''}
                                 onChange={(e) => handleUpdateBatchItem(idx, { battery_health: e.target.value })}
-                                className="w-full h-8 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-center font-mono text-xs focus:outline-none"
+                                className="w-full h-9 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-center font-mono text-xs focus:outline-none"
                               />
                             </div>
                           )}
-                          <div className={isPhone ? '' : 'col-span-2'}>
-                            <label className="block text-[10px] text-slate-400 mb-0.5">Cost (ETB) *</label>
+                          <div>
+                            <label className="block text-[10px] font-medium text-slate-500 mb-1">
+                              Cost <span className="text-rose-500">*</span>
+                            </label>
                             <input
                               type="text"
+                              inputMode="numeric"
+                              placeholder="0"
                               value={item.cost_basis}
                               onChange={(e) => handleUpdateBatchItem(idx, { cost_basis: formatCurrencyInput(e.target.value) })}
-                              className="w-full h-8 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono font-bold text-xs focus:outline-none"
+                              className="w-full h-9 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono font-semibold text-xs text-right placeholder:text-slate-300 focus:outline-none"
                             />
                           </div>
                           <div>
-                            <label className="block text-[10px] text-slate-400 mb-0.5">Price (ETB)</label>
+                            <label className="block text-[10px] font-medium text-slate-500 mb-1">Price</label>
                             <input
                               type="text"
+                              inputMode="numeric"
+                              placeholder="—"
                               value={item.selling_price || ''}
                               onChange={(e) => handleUpdateBatchItem(idx, { selling_price: formatCurrencyInput(e.target.value) })}
-                              className="w-full h-8 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono text-xs focus:outline-none"
+                              className="w-full h-9 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono text-xs text-right placeholder:text-slate-300 focus:outline-none"
                             />
                           </div>
                         </div>
@@ -2179,20 +2211,31 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                 <div>
                   <div className="text-xs font-bold">Vendor Consignment</div>
                   <div className="text-[10px] opacity-75 font-normal mt-0.5">
-                    Broker stock · Auto-debt on sale
+                    Vendor owns stock · Payout on sale
                   </div>
                 </div>
               </button>
             </div>
 
-            {/* Consignment Return Deadline */}
+            {/* Consignment Policy Banner & Return Deadline */}
             {sourceType === 'consignment' && (
-              <div className="p-3 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/60 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900 dark:text-amber-300">
-                    <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                    <span>Return Window to Broker (Optional)</span>
+              <div className="p-3 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/60 space-y-2.5">
+                <div className="flex items-start gap-2 text-xs text-amber-900 dark:text-amber-300">
+                  <Handshake className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold block">Vendor owns this stock</span>
+                    <span className="text-[11px] text-amber-800/90 dark:text-amber-400/90 font-normal leading-relaxed block mt-0.5">
+                      No payment or debt is recorded now. A vendor payout is generated automatically only when the device is sold.
+                    </span>
                   </div>
+                </div>
+
+                <div className="pt-2 border-t border-amber-200/60 dark:border-amber-800/40">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900 dark:text-amber-300">
+                      <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                      <span>Return Window to Broker (Optional)</span>
+                    </div>
                   <span className="text-[10px] text-amber-700/80 dark:text-amber-400/80">
                     Optional return deadline
                   </span>
@@ -2229,6 +2272,7 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                     className="w-full h-9 px-2.5 rounded-lg border border-amber-300 dark:border-amber-800 bg-white dark:bg-slate-900 text-xs font-mono font-medium focus:outline-none"
                   />
                 )}
+                </div>
               </div>
             )}
 

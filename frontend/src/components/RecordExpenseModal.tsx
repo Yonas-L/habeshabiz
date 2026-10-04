@@ -252,7 +252,7 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
               <option value="rent">Shop Rent & Utilities</option>
               <option value="maintenance">Device Maintenance & Tooling</option>
               <option value="salary">Staff Daily Pay / Commission</option>
-              <option value="personal_owner_draw">Personal Owner Draw (Yoni)</option>
+              <option value="personal_owner_draw">Personal Owner Draw</option>
               <option value="other">Other Operational Expense</option>
             </select>
           </div>

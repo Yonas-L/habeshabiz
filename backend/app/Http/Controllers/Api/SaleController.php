@@ -9,12 +9,16 @@ use App\Models\Debt;
 use App\Models\DebtPayment;
 use App\Models\FinancialAccount;
 use App\Models\FinancialTransaction;
+use App\Models\InventoryUnit;
+use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\SalesOrder;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class SaleController extends Controller
 {
@@ -139,6 +143,8 @@ class SaleController extends Controller
             'salesperson_id' => ['nullable', 'exists:users,id'],
             'discount_amount' => ['nullable', 'numeric', 'min:0'],
             'paid_amount' => ['required', 'numeric', 'min:0'],
+            'credit_sale' => ['nullable', 'boolean'],
+            'intentional_shortfall' => ['nullable', 'boolean'],
             'payment_method' => ['required', 'string', 'in:cash,telebirr,cbe,bank_transfer,credit'],
             'financial_account_id' => ['nullable', 'exists:financial_accounts,id'],
             'notes' => ['nullable', 'string'],
@@ -325,6 +331,8 @@ class SaleController extends Controller
             // Sale & Customer details
             'selling_price' => ['required', 'numeric', 'min:0'],
             'paid_amount' => ['required', 'numeric', 'min:0'],
+            'credit_sale' => ['nullable', 'boolean'],
+            'intentional_shortfall' => ['nullable', 'boolean'],
             'payment_method' => ['required', 'string', 'in:cash,telebirr,cbe,bank_transfer,credit'],
             'financial_account_id' => ['nullable', 'exists:financial_accounts,id'],
             'customer_id' => ['nullable', 'exists:contacts,id'],
@@ -344,7 +352,7 @@ class SaleController extends Controller
             if ((float) $vendorAcc->current_balance < $vendorCost) {
                 return response()->json([
                     'success' => false,
-                    'message' => "Insufficient balance in {$vendorAcc->name}. Balance is " . number_format($vendorAcc->current_balance, 2) . " ETB, but {$vendorCost} ETB is required. Overdrafts are not permitted.",
+                    'message' => "Insufficient balance in {$vendorAcc->name}. Balance is ".number_format($vendorAcc->current_balance, 2)." ETB, but {$vendorCost} ETB is required. Overdrafts are not permitted.",
                 ], 422);
             }
         }
@@ -355,7 +363,7 @@ class SaleController extends Controller
             if (! $variantId) {
                 $productId = $validated['product_id'] ?? null;
                 if (! $productId) {
-                    $product = \App\Models\Product::create([
+                    $product = Product::create([
                         'tenant_id' => $tenantId,
                         'name' => $validated['product_name'],
                         'category' => 'phone_tablet',
@@ -364,7 +372,7 @@ class SaleController extends Controller
                     ]);
                     $productId = $product->id;
                 }
-                $variant = \App\Models\ProductVariant::create([
+                $variant = ProductVariant::create([
                     'product_id' => $productId,
                     'storage' => $validated['storage'] ?? null,
                     'ram' => $validated['ram'] ?? null,
@@ -376,28 +384,28 @@ class SaleController extends Controller
 
             $imei = ! empty($validated['imei_or_serial']) ? trim($validated['imei_or_serial']) : null;
             if ($imei) {
-                $existingActive = \App\Models\InventoryUnit::where('tenant_id', $tenantId)
+                $existingActive = InventoryUnit::where('tenant_id', $tenantId)
                     ->whereIn('status', ['in_stock', 'reserved', 'out'])
                     ->where('imei_or_serial', $imei)
                     ->exists();
                 if ($existingActive) {
-                    throw \Illuminate\Validation\ValidationException::withMessages([
+                    throw ValidationException::withMessages([
                         'imei_or_serial' => ["IMEI/Serial '{$imei}' is already in active shop inventory."],
                     ]);
                 }
 
-                $existingSold = \App\Models\InventoryUnit::where('tenant_id', $tenantId)
+                $existingSold = InventoryUnit::where('tenant_id', $tenantId)
                     ->where('status', 'sold')
                     ->where('imei_or_serial', $imei)
                     ->exists();
                 if ($existingSold) {
-                    throw \Illuminate\Validation\ValidationException::withMessages([
+                    throw ValidationException::withMessages([
                         'imei_or_serial' => ["IMEI/Serial '{$imei}' has already been recorded as sold."],
                     ]);
                 }
             }
 
-            $unit = \App\Models\InventoryUnit::create([
+            $unit = InventoryUnit::create([
                 'tenant_id' => $tenantId,
                 'variant_id' => $variantId,
                 'imei_or_serial' => $imei,
@@ -420,21 +428,21 @@ class SaleController extends Controller
                 $totalVendorDeduction = $vendorCost + $vendorFee;
 
                 if ((float) $vendorAcc->current_balance < $totalVendorDeduction) {
-                    throw \Illuminate\Validation\ValidationException::withMessages([
-                        'vendor_payment_account_id' => ["Insufficient balance in account '{$vendorAcc->name}'. Available: ".number_format((float) $vendorAcc->current_balance, 2)." ETB, Required: ".number_format($totalVendorDeduction, 2)." ETB (including fee)."],
+                    throw ValidationException::withMessages([
+                        'vendor_payment_account_id' => ["Insufficient balance in account '{$vendorAcc->name}'. Available: ".number_format((float) $vendorAcc->current_balance, 2).' ETB, Required: '.number_format($totalVendorDeduction, 2).' ETB (including fee).'],
                     ]);
                 }
                 $vendorAcc->decrement('current_balance', $totalVendorDeduction);
 
                 FinancialTransaction::create([
                     'tenant_id' => $tenantId,
-                    'transaction_number' => 'TXN-'.strtoupper(\Illuminate\Support\Str::random(8)),
+                    'transaction_number' => 'TXN-'.strtoupper(Str::random(8)),
                     'source_account_id' => $vendorAcc->id,
                     'type' => 'supplier_payment',
                     'amount' => $vendorCost,
                     'fee' => $vendorFee,
                     'contact_id' => $validated['vendor_contact_id'],
-                    'description' => "Vendor direct payout for IMEI: " . ($imei ?: 'N/A'),
+                    'description' => 'Vendor direct payout for IMEI: '.($imei ?: 'N/A'),
                     'date' => now(),
                     'created_by' => $user->id,
                 ]);
@@ -447,6 +455,8 @@ class SaleController extends Controller
                 'customer_phone' => $validated['customer_phone'] ?? null,
                 'salesperson_id' => $user->id,
                 'paid_amount' => (float) $validated['paid_amount'],
+                'credit_sale' => (bool) ($validated['credit_sale'] ?? ($validated['payment_method'] === 'credit')),
+                'intentional_shortfall' => (bool) ($validated['intentional_shortfall'] ?? false),
                 'payment_method' => $validated['payment_method'],
                 'financial_account_id' => $validated['financial_account_id'] ?? null,
                 'notes' => $validated['notes'] ?? 'Vendor Direct Sale',

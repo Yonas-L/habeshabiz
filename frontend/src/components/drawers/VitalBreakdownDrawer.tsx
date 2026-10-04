@@ -93,7 +93,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
     },
     inventory: {
       title: 'Shop Inventory',
-      subtitle: 'Phones, Consoles and Electronics on Shelf',
+      subtitle: 'Shop-owned devices on shelf (excludes consignment)',
       amount: capital_overview.stock_value,
       icon: Smartphone,
       targetTab: 'inventory',
