@@ -53,8 +53,6 @@ export const BusinessReportPrintModal: React.FC<BusinessReportPrintModalProps> =
   if (!isOpen || !report) return null;
 
   const { summary, stock_position, cash_position, staff_performance, vendor_activity, repairs, reconciliation } = report;
-  const isProfit = summary.net_profit > 0;
-  const isLoss = summary.net_profit < 0;
   const cogs = Math.max(0, summary.revenue - summary.gross_profit);
 
   const today = new Date();
@@ -97,8 +95,6 @@ export const BusinessReportPrintModal: React.FC<BusinessReportPrintModalProps> =
     }),
     { received: 0, sold: 0, revenue: 0, returned: 0 }
   );
-
-  const netCapitalPosition = stock_position.owned_value + (cash_position.total_liquidity_and_assets ?? cash_position.cash_and_bank);
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-10 sm:pt-14 pb-8 px-3 sm:px-6 bg-black/75 backdrop-blur-xs overflow-y-auto printable-modal-backdrop">
@@ -212,45 +208,6 @@ export const BusinessReportPrintModal: React.FC<BusinessReportPrintModalProps> =
               </div>
             </div>
 
-            {/* Executive Voucher & Financial Position Strip */}
-            <div className="p-4 sm:p-5 rounded-md border border-slate-200 bg-slate-50/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="space-y-1">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block">
-                  Executive Performance Summary
-                </span>
-                <div className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-tight">
-                  {tenant?.name || 'Store'} · Verified Financial Position
-                </div>
-                <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-slate-600">
-                  <span>{summary.orders} Orders Closed</span>
-                  <span>·</span>
-                  <span>{summary.units_sold} Units Sold</span>
-                  <span>·</span>
-                  <span>Sales Revenue: {formatNum(summary.revenue)} ETB</span>
-                </div>
-              </div>
-
-              <div className="sm:text-right font-mono shrink-0 space-y-0.5">
-                <div className="flex items-center sm:justify-end gap-1.5">
-                  <span className={`w-2 h-2 rounded-full ${isProfit ? 'bg-emerald-500' : isLoss ? 'bg-rose-500' : 'bg-slate-400'}`} />
-                  <span className={`text-xs font-black uppercase tracking-wider ${
-                    isProfit ? 'text-emerald-700' : isLoss ? 'text-rose-700' : 'text-slate-600'
-                  }`}>
-                    {isProfit ? 'Operating in Profit' : isLoss ? 'Operating in Loss' : 'Break-Even'}
-                  </span>
-                </div>
-                <div
-                  className={`text-2xl sm:text-3xl font-black tabular-nums tracking-tight ${
-                    isProfit ? 'text-emerald-700' : isLoss ? 'text-rose-700' : 'text-slate-900'
-                  }`}
-                >
-                  {isProfit ? '+' : isLoss ? '−' : ''}
-                  {formatNum(Math.abs(summary.net_profit))}
-                  <span className="text-xs font-bold text-slate-400 font-sans ml-1.5">ETB Net Profit</span>
-                </div>
-              </div>
-            </div>
-
             {/* ROW 1: Sales & Revenue (Left) | Capital & Stock (Right) */}
             <div className="grid grid-cols-2 gap-6 items-start">
               {/* 1. Sales & Revenue Table */}
@@ -309,53 +266,47 @@ export const BusinessReportPrintModal: React.FC<BusinessReportPrintModalProps> =
                 </div>
               </div>
 
-              {/* 2. Capital & Stock Position Table */}
+              {/* 2. Inventory & Stock Valuation Table */}
               <div className="space-y-2">
                 <div className="text-xs font-black uppercase tracking-widest text-slate-900 flex items-center justify-between pb-1">
-                  <span>Capital & Inventory Report</span>
+                  <span>Inventory & Stock Valuation</span>
                   <span className="font-mono text-xs font-normal text-slate-400">As of period end</span>
                 </div>
                 <div className="border border-slate-200 rounded-md overflow-hidden bg-white">
                   <table className="w-full text-xs text-left">
                     <thead>
                       <tr className="border-b-2 border-slate-900 text-slate-900 text-[10px] font-black uppercase tracking-wider bg-slate-50/50">
-                        <th className="py-2.5 px-3">Asset / Capital Category</th>
-                        <th className="py-2.5 px-3 text-right">Holdings</th>
+                        <th className="py-2.5 px-3">Inventory Category / Valuation Area</th>
+                        <th className="py-2.5 px-3 text-right">Holdings / Metric</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 font-mono text-xs">
                       <tr>
                         <td className="py-2 px-3 font-sans text-slate-700">Shop-owned stock on shelf</td>
-                        <td className="py-2 px-3 text-right font-bold text-slate-900">{formatNum(stock_position.owned_value)} ETB</td>
-                      </tr>
-                      <tr>
-                        <td className="py-2 px-3 font-sans text-slate-700">Shop-owned device count</td>
                         <td className="py-2 px-3 text-right font-bold text-slate-900">{stock_position.owned_units} devices</td>
                       </tr>
                       <tr>
-                        <td className="py-2 px-3 font-sans text-slate-700">Vendor consignment in custody</td>
-                        <td className="py-2 px-3 text-right font-bold text-amber-700">{formatNum(stock_position.vendor_value)} ETB</td>
+                        <td className="py-2 px-3 font-sans text-slate-700">Shop-owned stock valuation (at cost)</td>
+                        <td className="py-2 px-3 text-right font-bold text-slate-900">{formatNum(stock_position.owned_value)} ETB</td>
                       </tr>
                       <tr>
-                        <td className="py-2 px-3 font-sans text-slate-700">Vendor consignment count</td>
+                        <td className="py-2 px-3 font-sans text-slate-700">Vendor consignment in custody</td>
                         <td className="py-2 px-3 text-right font-bold text-slate-900">{stock_position.vendor_units} devices</td>
                       </tr>
                       <tr>
-                        <td className="py-2 px-3 font-sans text-slate-700">Cash + Bank liquidity</td>
-                        <td className="py-2 px-3 text-right font-bold text-emerald-700">{formatNum(cash_position.cash_and_bank)} ETB</td>
+                        <td className="py-2 px-3 font-sans text-slate-700">Vendor consignment valuation</td>
+                        <td className="py-2 px-3 text-right font-bold text-blue-700">{formatNum(stock_position.vendor_value)} ETB</td>
                       </tr>
-                      {(cash_position.custom_assets || 0) > 0 && (
-                        <tr>
-                          <td className="py-2 px-3 font-sans text-amber-800">Custom Assets (Gold / Forex)</td>
-                          <td className="py-2 px-3 text-right font-bold text-amber-700">{formatNum(cash_position.custom_assets)} ETB</td>
-                        </tr>
-                      )}
+                      <tr>
+                        <td className="py-2 px-3 font-sans text-slate-700">Total physical shelf inventory count</td>
+                        <td className="py-2 px-3 text-right font-bold text-slate-900">{stock_position.owned_units + stock_position.vendor_units} devices</td>
+                      </tr>
                     </tbody>
                     <tfoot>
                       <tr className="border-t-2 border-slate-900 bg-slate-50/80 font-mono text-xs font-bold text-slate-900">
-                        <td className="py-2.5 px-3 font-sans uppercase tracking-wider text-[11px]">Net Capital Position</td>
-                        <td className="py-2.5 px-3 text-right font-black text-slate-900">
-                          {formatNum(netCapitalPosition)} ETB
+                        <td className="py-2.5 px-3 font-sans uppercase tracking-wider text-[11px]">Total Owned Inventory at Cost</td>
+                        <td className="py-2.5 px-3 text-right font-black text-blue-700">
+                          {formatNum(stock_position.owned_value)} ETB
                         </td>
                       </tr>
                     </tfoot>

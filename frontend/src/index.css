@@ -32,6 +32,96 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Auth surfaces: a deep emerald workspace with restrained ambient light. */
+.auth-shell {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 18% 18%, rgba(52, 211, 153, 0.22), transparent 32%),
+    radial-gradient(circle at 84% 82%, rgba(16, 185, 129, 0.16), transparent 30%),
+    linear-gradient(135deg, #022c22 0%, #064e3b 48%, #022c22 100%);
+}
+
+.auth-shell::before,
+.auth-shell::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  width: 22rem;
+  height: 22rem;
+  border-radius: 9999px;
+  filter: blur(70px);
+  opacity: 0.28;
+  pointer-events: none;
+  animation: authGlow 12s ease-in-out infinite alternate;
+}
+
+.auth-shell::before {
+  top: -10rem;
+  left: -8rem;
+  background: #34d399;
+}
+
+.auth-shell::after {
+  right: -10rem;
+  bottom: -11rem;
+  background: #10b981;
+  animation-delay: -6s;
+}
+
+.auth-panel {
+  position: relative;
+  z-index: 1;
+  backdrop-filter: blur(16px);
+}
+
+.onboarding-step-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 1.25rem;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 24px 70px rgba(2, 44, 34, 0.2);
+}
+
+.dark .onboarding-step-card {
+  border-color: rgba(167, 243, 208, 0.12);
+  background: rgba(19, 25, 38, 0.96);
+}
+
+@keyframes authGlow {
+  from { transform: translate3d(-10px, 6px, 0) scale(0.96); }
+  to { transform: translate3d(12px, -10px, 0) scale(1.04); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-shell::before,
+  .auth-shell::after {
+    animation: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .auth-shell {
+    align-items: stretch;
+    justify-content: flex-start;
+    min-height: 100svh;
+    overflow-y: auto;
+    padding: 1rem;
+  }
+
+  .auth-panel {
+    width: 100%;
+    margin-block: auto;
+  }
+
+  .onboarding-step-card {
+    border-radius: 1rem;
+    box-shadow: 0 16px 40px rgba(2, 44, 34, 0.2);
+  }
+}
+
 html.dark body {
   background-color: #0b0f17;
   color: #f8fafc;
@@ -697,4 +787,3 @@ html.dark ::-webkit-scrollbar-thumb:hover {
     break-inside: avoid !important;
   }
 }
-

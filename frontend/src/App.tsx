@@ -428,9 +428,9 @@ export default function App() {
     }
 
     return (
-      <div className="min-h-screen bg-[#f6f8fa] dark:bg-[#0b0f17] flex flex-col items-center justify-center p-4 selection:bg-slate-900 selection:text-white transition-colors duration-200">
+      <div className="auth-shell min-h-screen flex flex-col items-center justify-center p-4 selection:bg-emerald-300 selection:text-emerald-950 transition-colors duration-200">
         <Toaster position="bottom-right" richColors closeButton theme={theme} />
-        <div className="w-full max-w-sm bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800 p-7 shadow-xl">
+        <div className="auth-panel w-full max-w-sm bg-white dark:bg-[#131926] rounded-2xl border border-white/70 dark:border-emerald-100/10 p-7 shadow-xl">
           <div className="text-center mb-6">
             <div className="w-10 h-10 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 mx-auto flex items-center justify-center font-bold text-xs mb-3 shadow-xs tracking-tight">
               HB
@@ -475,14 +475,14 @@ export default function App() {
             <button
               type="submit"
               disabled={isSubmittingAuth}
-              className="w-full h-10 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-xs disabled:opacity-50 active:scale-[0.98] cursor-pointer"
+              className="w-full h-10 px-4 rounded-xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:hover:bg-emerald-950/80 border border-emerald-200 dark:border-emerald-800/70 text-emerald-700 dark:text-emerald-300 text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-xs disabled:opacity-50 active:scale-[0.98] cursor-pointer"
             >
               {isSubmittingAuth ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 <>
                   <span>Sign In</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
+                  <ArrowRight className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                 </>
               )}
             </button>

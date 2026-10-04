@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Loader2 } from 'lucide-react';
+import { ShieldCheck, Loader2, ArrowRight } from 'lucide-react';
 import { adminApi, setAdminToken } from '../../api/adminClient';
 
 interface AdminLoginViewProps {
@@ -40,8 +40,8 @@ export const AdminLoginView: React.FC<AdminLoginViewProps> = ({ onSuccess, onBac
   };
 
   return (
-    <div className="min-h-screen bg-[#0b0f17] flex flex-col items-center justify-center p-4 selection:bg-emerald-500 selection:text-white">
-      <div className="w-full max-w-sm bg-[#131926] rounded-2xl border border-slate-800 p-7 shadow-2xl space-y-6 animate-page-enter">
+    <div className="auth-shell min-h-screen flex flex-col items-center justify-center p-4 selection:bg-emerald-300 selection:text-emerald-950">
+      <div className="auth-panel w-full max-w-sm bg-[#131926] rounded-2xl border border-emerald-100/10 p-7 shadow-2xl space-y-6 animate-page-enter">
         <div className="text-center space-y-2">
           <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto shadow-inner">
             <ShieldCheck className="w-6 h-6" />
@@ -94,7 +94,7 @@ export const AdminLoginView: React.FC<AdminLoginViewProps> = ({ onSuccess, onBac
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full h-10 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition-all shadow-sm active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full h-10 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/70 border border-emerald-500/30 text-emerald-300 font-semibold text-xs transition-all shadow-sm active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
           >
             {isLoading ? (
               <>
@@ -102,7 +102,10 @@ export const AdminLoginView: React.FC<AdminLoginViewProps> = ({ onSuccess, onBac
                 <span>Verifying...</span>
               </>
             ) : (
-              <span>Sign In to Superadmin</span>
+              <>
+                <span>Sign In to Superadmin</span>
+                <ArrowRight className="w-3.5 h-3.5 text-emerald-400" />
+              </>
             )}
           </button>
 

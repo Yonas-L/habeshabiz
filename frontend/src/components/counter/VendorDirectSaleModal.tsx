@@ -123,6 +123,14 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
     return products.find((p) => p.id === selectedProductId) || null;
   }, [products, selectedProductId]);
 
+  const vendorContacts = useMemo(
+    () => liveContacts.filter((contact) =>
+      contact.is_active !== false &&
+      ['vendor', 'peer_vendor', 'supplier', 'partner'].some((role) => contact.roles?.includes(role))
+    ),
+    [liveContacts]
+  );
+
   const isPhone = useMemo(() => {
     const name = (selectedProduct?.name || customProductName).toLowerCase();
     const cat = (selectedProduct?.category || '').toLowerCase();
@@ -519,7 +527,7 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
                   className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none cursor-pointer"
                 >
                   <option value="">— Select Vendor Partner —</option>
-                  {liveContacts.map((c) => (
+                  {vendorContacts.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name} {c.phone ? `(${c.phone})` : ''}
                     </option>

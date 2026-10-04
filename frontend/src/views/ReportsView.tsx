@@ -123,7 +123,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ tenant, selectedMonth 
       `${tenant?.name || 'Business'}_${label}_${from}_to_${to}`.replace(/\s+/g, '_'),
       undefined,
       () => setDownloadingTable(null),
-      { revealTableBranding: true, expandScrollAreas: true },
+      { revealTableBranding: true, expandScrollAreas: true, singleTable: true },
       () => setError('The table PDF could not be generated. Please try again.'),
     );
   };
@@ -191,13 +191,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ tenant, selectedMonth 
     };
   }, [report?.vendor_activity.vendors]);
 
-  const totalLiquidAndCustomAssets = report?.cash_position.total_liquidity_and_assets ?? (
-    (report?.cash_position.cash_and_bank || 0) + (report?.cash_position.custom_assets || 0)
-  );
-  const netCapitalPosition = (report?.stock_position.owned_value || 0) + totalLiquidAndCustomAssets;
-
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-6 pb-16 animate-page-enter">
+    <div className="mx-auto w-full max-w-7xl space-y-4 sm:space-y-6 pb-16 animate-page-enter">
       {/* ─── Header & Actions ─── */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 dark:border-slate-800 pb-3.5">
         <div>
@@ -238,7 +233,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ tenant, selectedMonth 
         </div>
 
         {/* Action Controls */}
-        <div className="flex items-center gap-2 print:hidden shrink-0">
+        <div className="flex w-full items-center justify-end gap-2 print:hidden shrink-0 sm:w-auto">
           <button
             type="button"
             onClick={() => void loadReport(from, to)}
@@ -262,7 +257,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ tenant, selectedMonth 
               )
             }
             disabled={!report || isDownloading || loading}
-            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-slate-900 dark:bg-white px-3.5 text-xs font-bold text-white dark:text-slate-900 shadow-2xs hover:bg-slate-800 dark:hover:bg-slate-100 transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+            className="inline-flex h-9 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg bg-slate-900 dark:bg-white px-3.5 text-xs font-bold text-white dark:text-slate-900 shadow-2xs hover:bg-slate-800 dark:hover:bg-slate-100 transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer sm:flex-none"
           >
             {isDownloading ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -275,7 +270,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ tenant, selectedMonth 
       </div>
 
       {/* ─── Compact Range Selector Strip ─── */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between py-2 border-b border-slate-200/80 dark:border-slate-800/80 print:hidden text-xs">
+      <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between py-2 border-b border-slate-200/80 dark:border-slate-800/80 print:hidden text-xs">
         {/* Presets */}
         <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
           <span className="font-semibold text-slate-400 dark:text-slate-500 mr-1.5 shrink-0">
@@ -309,19 +304,19 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ tenant, selectedMonth 
         </div>
 
         {/* Custom Pickers */}
-        <div className="flex items-center gap-2 self-start sm:self-auto">
-          <div className="flex items-center gap-1.5">
+        <div className="flex w-full flex-wrap items-center gap-2 self-start sm:w-auto sm:flex-nowrap sm:self-auto">
+          <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:flex-none">
             <span className="text-[11px] text-slate-400 uppercase font-semibold">From:</span>
             <input
               type="date"
               value={from}
               max={to}
               onChange={(e) => handleCustomDateChange(e.target.value, to)}
-              className="h-8 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#131926] px-2 text-xs font-medium text-slate-900 dark:text-white outline-none focus:border-emerald-500"
+              className="h-8 min-w-0 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#131926] px-2 text-xs font-medium text-slate-900 dark:text-white outline-none focus:border-emerald-500 sm:w-auto"
             />
           </div>
           <span className="text-slate-400">→</span>
-          <div className="flex items-center gap-1.5">
+          <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:flex-none">
             <span className="text-[11px] text-slate-400 uppercase font-semibold">To:</span>
             <input
               type="date"
@@ -329,14 +324,14 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ tenant, selectedMonth 
               min={from}
               max={asDateInput(new Date())}
               onChange={(e) => handleCustomDateChange(from, e.target.value)}
-              className="h-8 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#131926] px-2 text-xs font-medium text-slate-900 dark:text-white outline-none focus:border-emerald-500"
+              className="h-8 min-w-0 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#131926] px-2 text-xs font-medium text-slate-900 dark:text-white outline-none focus:border-emerald-500 sm:w-auto"
             />
           </div>
           <button
             type="button"
             onClick={() => void loadReport(from, to)}
             disabled={loading}
-            className="h-8 px-2.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors disabled:opacity-50"
+            className="h-8 flex-1 px-2.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors disabled:opacity-50 sm:flex-none"
           >
             Run
           </button>
@@ -557,21 +552,21 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ tenant, selectedMonth 
               </div>
             </div>
 
-            {/* 2. Capital & Inventory Position Report */}
+            {/* 2. Inventory & Stock Valuation Report */}
             <div id="report-capital-table" data-pdf-section className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-[#131926]">
-              <PdfBrandHeader tenant={tenant} title="Capital & Inventory Report" />
+              <PdfBrandHeader tenant={tenant} title="Inventory & Stock Valuation" />
               {/* Section Header */}
               <div className="flex items-center justify-between px-4 py-3 bg-slate-50 dark:bg-slate-900/70 border-b border-slate-200 dark:border-slate-800">
                 <div className="flex items-center gap-2">
                   <Package className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                   <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
-                    Capital & Inventory Report
+                    Inventory & Stock Valuation
                   </h2>
                 </div>
                 <span className="text-[11px] font-mono text-slate-400">
                   As of {report.period.to}
                 </span>
-                <TableDownloadButton label="Capital and Inventory" loading={downloadingTable === 'report-capital-table'} onClick={() => void downloadTable('report-capital-table', 'Capital_and_Inventory')} />
+                <TableDownloadButton label="Inventory and Stock Valuation" loading={downloadingTable === 'report-capital-table'} onClick={() => void downloadTable('report-capital-table', 'Inventory_and_Stock_Valuation')} />
               </div>
 
               {/* Table */}
@@ -579,8 +574,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ tenant, selectedMonth 
               <table className="w-full text-xs text-left">
                 <thead>
                   <tr className="border-b border-slate-200 dark:border-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 bg-slate-50/50 dark:bg-slate-900/40">
-                    <th className="py-2 px-4">Position / Asset Area</th>
-                    <th className="py-2 px-4 text-right">Current Value</th>
+                    <th className="py-2 px-4">Inventory Category / Valuation Area</th>
+                    <th className="py-2 px-4 text-right">Holdings / Metric</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
@@ -591,7 +586,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ tenant, selectedMonth 
                     </td>
                   </tr>
                   <tr className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
-                    <td className="py-2 px-4 text-slate-600 dark:text-slate-300 font-medium">Shop-owned stock at cost</td>
+                    <td className="py-2 px-4 text-slate-600 dark:text-slate-300 font-medium">Shop-owned stock valuation (at cost)</td>
                     <td className="py-2 px-4 text-right font-mono font-bold text-slate-900 dark:text-white tabular-nums">
                       {formatMoney(report.stock_position.owned_value)}
                     </td>
@@ -603,49 +598,26 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ tenant, selectedMonth 
                     </td>
                   </tr>
                   <tr className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
-                    <td className="py-2 px-4 text-slate-600 dark:text-slate-300">Vendor consignment value</td>
+                    <td className="py-2 px-4 text-slate-600 dark:text-slate-300">Vendor consignment valuation</td>
                     <td className="py-2 px-4 text-right font-mono font-semibold text-blue-600 dark:text-blue-400 tabular-nums">
                       {formatMoney(report.stock_position.vendor_value)}
                     </td>
                   </tr>
                   <tr className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
-                    <td className="py-2 px-4 text-slate-600 dark:text-slate-300 font-medium">Cash + bank liquid holdings</td>
+                    <td className="py-2 px-4 text-slate-600 dark:text-slate-300 font-medium">Total physical shelf inventory count</td>
                     <td className="py-2 px-4 text-right font-mono font-bold text-slate-900 dark:text-white tabular-nums">
-                      {formatMoney(report.cash_position.cash_and_bank)}
+                      {report.stock_position.owned_units + report.stock_position.vendor_units} devices
                     </td>
                   </tr>
-                  {(report.cash_position.custom_assets || 0) > 0 && (
-                    <tr className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
-                      <td className="py-2 px-4 text-slate-600 dark:text-slate-300 font-medium">Custom assets (Gold / Forex)</td>
-                      <td className="py-2 px-4 text-right font-mono font-bold text-amber-600 dark:text-amber-400 tabular-nums">
-                        {formatMoney(report.cash_position.custom_assets || 0)}
-                      </td>
-                    </tr>
-                  )}
-                  {/* Account specifics */}
-                  {report.cash_position.accounts && report.cash_position.accounts.length > 0 ? (
-                    report.cash_position.accounts.map((acc) => (
-                      <tr key={acc.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30 text-[11px] text-slate-500">
-                        <td className="py-1.5 px-4 pl-8">↳ {acc.name} ({acc.type.replace('_', ' ')})</td>
-                        <td className="py-1.5 px-4 text-right font-mono tabular-nums">
-                          {formatMoney(acc.balance)}
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr className="text-[11px] text-slate-400 italic">
-                      <td colSpan={2} className="py-2 px-4 pl-8">No bank or cash assets deposited in this period (0 ETB)</td>
-                    </tr>
-                  )}
                 </tbody>
                 {/* Total Row */}
                 <tfoot>
                   <tr className="border-t-2 border-slate-900 dark:border-slate-500 bg-slate-50 dark:bg-slate-900/80 font-bold">
                     <td className="py-3 px-4 text-slate-900 dark:text-white uppercase tracking-wider text-[11px]">
-                      Net Working Capital (Owned)
+                      Total Owned Inventory at Cost
                     </td>
-                    <td className="py-3 px-4 text-right font-mono text-sm text-emerald-600 dark:text-emerald-400 tabular-nums">
-                      {formatMoney(netCapitalPosition)}
+                    <td className="py-3 px-4 text-right font-mono text-sm text-blue-600 dark:text-blue-400 tabular-nums">
+                      {formatMoney(report.stock_position.owned_value)}
                     </td>
                   </tr>
                 </tfoot>
@@ -977,52 +949,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ tenant, selectedMonth 
               </div>
             </div>
           </section>
-
-          {/* ─── Assets, Liabilities & Net Position ─── */}
-          {report.financial_position && (
-            <section data-pdf-section className="max-w-4xl mx-auto w-full pt-6 print:pt-8">
-              <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-[#131926] shadow-2xs">
-                <PdfBrandHeader tenant={tenant} title="Financial Position" />
-                <div className="flex items-center justify-between px-4 py-3 bg-slate-50 dark:bg-slate-900/70 border-b border-slate-200 dark:border-slate-800">
-                  <div>
-                    <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">Financial Position</h2>
-                    <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">Assets minus currently unpaid obligations as of {report.period.to}.</p>
-                  </div>
-                  <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Balance sheet view</span>
-                </div>
-                <div className="grid gap-5 p-4 sm:grid-cols-3">
-                  <div className="sm:col-span-2">
-                    <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">Assets</p>
-                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                      <div className="flex justify-between gap-4 py-2 text-xs"><span className="text-slate-600 dark:text-slate-300">Cash and bank</span><span className="font-mono font-semibold tabular-nums text-slate-900 dark:text-white">{formatMoney(report.financial_position.assets.cash_and_bank)}</span></div>
-                      <div className="flex justify-between gap-4 py-2 text-xs"><span className="text-slate-600 dark:text-slate-300">Owned inventory</span><span className="font-mono font-semibold tabular-nums text-slate-900 dark:text-white">{formatMoney(report.financial_position.assets.owned_stock)}</span></div>
-                      <div className="flex justify-between gap-4 py-2 text-xs"><span className="text-slate-600 dark:text-slate-300">Customer receivables</span><span className="font-mono font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">{formatMoney(report.financial_position.assets.customer_receivables)}</span></div>
-                      <div className="flex justify-between gap-4 border-t border-slate-200 py-2.5 text-xs font-bold dark:border-slate-700"><span className="text-slate-900 dark:text-white">Total assets</span><span className="font-mono tabular-nums text-slate-900 dark:text-white">{formatMoney(report.financial_position.assets.total)}</span></div>
-                    </div>
-                  </div>
-                  <div>
-                    <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">Liabilities</p>
-                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                      <div className="flex justify-between gap-4 py-2 text-xs"><span className="text-slate-600 dark:text-slate-300">Open payables</span><span className="font-mono font-semibold tabular-nums text-rose-700 dark:text-rose-400">{formatMoney(report.financial_position.liabilities.open_payables)}</span></div>
-                      <div className="flex justify-between gap-4 py-2 text-xs"><span className="text-slate-600 dark:text-slate-300">Payable records</span><span className="font-mono font-semibold tabular-nums text-slate-900 dark:text-white">{report.financial_position.liabilities.open_payable_count}</span></div>
-                      <div className="flex justify-between gap-4 border-t border-slate-200 py-2.5 text-xs font-bold dark:border-slate-700"><span className="text-slate-900 dark:text-white">Net position</span><span className="font-mono tabular-nums text-emerald-700 dark:text-emerald-400">{formatMoney(report.financial_position.net_position)}</span></div>
-                    </div>
-                  </div>
-                </div>
-                {report.financial_position.liabilities.payables.length > 0 && (
-                  <div className="border-t border-slate-200 px-4 py-3 dark:border-slate-800">
-                    <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">Outstanding obligations</p>
-                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {report.financial_position.liabilities.payables.map((payable) => (
-                        <div key={payable.id} className="flex items-center justify-between gap-4 py-2 text-xs"><span className="min-w-0 truncate text-slate-600 dark:text-slate-300">{payable.contact} · {payable.reference_type.replaceAll('_', ' ')}</span><span className="shrink-0 font-mono font-semibold tabular-nums text-rose-700 dark:text-rose-400">{formatMoney(payable.remaining_amount)}</span></div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                <p className="border-t border-slate-200 px-4 py-3 text-[11px] text-slate-500 dark:border-slate-800 dark:text-slate-400">{report.financial_position.consignment_note}</p>
-              </div>
-            </section>
-          )}
 
           {/* ─── Bottom Cash & Financial Balance Reconciliation Table ─── */}
           {report.reconciliation && (

@@ -43,7 +43,7 @@ const BUSINESS_TYPES: BusinessTypeOption[] = [
     id: 'electronics',
     title: 'Electronics and Mobile Phones',
     badge: 'Active',
-    description: 'Specialized for smartphone shops, computers, accessories, and IMEI serial tracking.',
+    description: 'Phones, computers, accessories, and IMEI tracking.',
     available: true,
     icon: Smartphone,
   },
@@ -51,7 +51,7 @@ const BUSINESS_TYPES: BusinessTypeOption[] = [
     id: 'general_retail',
     title: 'General Retail',
     badge: 'Coming Soon',
-    description: 'Supermarkets, packaged merchandise, FMCG goods, and quick cashier checkout.',
+    description: 'Supermarkets, FMCG, and fast checkout.',
     available: false,
     icon: Store,
   },
@@ -59,7 +59,7 @@ const BUSINESS_TYPES: BusinessTypeOption[] = [
     id: 'clothing',
     title: 'Clothing and Fashion',
     badge: 'Coming Soon',
-    description: 'Apparel boutiques, footwear shops, and size or color variant tracking.',
+    description: 'Apparel, footwear, and size or color variants.',
     available: false,
     icon: Shirt,
   },
@@ -67,7 +67,7 @@ const BUSINESS_TYPES: BusinessTypeOption[] = [
     id: 'food_beverage',
     title: 'Food and Beverage',
     badge: 'Coming Soon',
-    description: 'Cafes, bakeries, juice bars, dining menus, and ingredient tracking.',
+    description: 'Cafes, bakeries, menus, and ingredients.',
     available: false,
     icon: Coffee,
   },
@@ -439,8 +439,8 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSuccess, onCan
   }
 
   return (
-    <div className="min-h-screen bg-[#f6f8fa] dark:bg-[#0b0f17] flex flex-col justify-center items-center p-4 sm:p-6 font-sans transition-colors duration-200">
-      <div className="w-full max-w-xl bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xl overflow-hidden">
+    <div className="auth-shell min-h-screen flex flex-col justify-center items-center p-4 sm:p-6 font-sans transition-colors duration-200">
+      <div className="auth-panel w-full max-w-lg">
         {/* Stepper Progress Bar */}
         <div className="w-full bg-slate-100 dark:bg-slate-800/80 h-1">
           <div
@@ -450,20 +450,17 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSuccess, onCan
         </div>
 
         {/* Stepper Header */}
-        <div className="px-6 sm:px-8 pt-6 pb-4 border-b border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
+        <div className="px-2 sm:px-3 pt-2 pb-4 border-b border-emerald-100/20 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-xs flex items-center justify-center tracking-tight shadow-xs">
+            <div className="w-8 h-8 rounded-xl bg-white text-emerald-800 font-bold text-xs flex items-center justify-center tracking-tight shadow-xs">
               HB
             </div>
             <div>
-              <h1 className="text-sm font-bold text-slate-900 dark:text-white">
-                Set Up New Business
+              <h1 className="text-sm font-bold text-white">
+                Create workspace
               </h1>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Step {step} of 3 —{' '}
-                {step === 1 && 'Choose Business Vertical'}
-                {step === 2 && 'Business and Login Details'}
-                {step === 3 && 'Confirm and Launch'}
+              <p className="text-[11px] text-emerald-100/75">
+                Step {step} of 3 · {step === 1 ? 'Business type' : step === 2 ? 'Your details' : 'Review'}
               </p>
             </div>
           </div>
@@ -478,7 +475,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSuccess, onCan
                     ? 'w-6 bg-emerald-600 dark:bg-emerald-500'
                     : s < step
                     ? 'w-2.5 bg-emerald-600/50 dark:bg-emerald-500/50'
-                    : 'w-2.5 bg-slate-200 dark:bg-slate-700'
+                    : 'w-2.5 bg-emerald-100/25'
                 }`}
               />
             ))}
@@ -486,7 +483,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSuccess, onCan
         </div>
 
         {/* Step Contents */}
-        <div className="p-6 sm:p-8">
+        <div className="onboarding-step-card p-5 sm:p-6">
           {errorMessage && (
             <div className="mb-5 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-rose-700 dark:text-rose-400 text-xs font-medium flex items-center justify-between">
               <span>{errorMessage}</span>
@@ -510,10 +507,10 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSuccess, onCan
             >
               <div>
                 <h2 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
-                  Choose Business Vertical
+                  Choose your business type
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  Select your industry to configure catalog structure, inventory tracking, and accounts.
+                  We’ll tailor your workspace for this industry.
                 </p>
               </div>
 
@@ -593,18 +590,19 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSuccess, onCan
                 <button
                   type="button"
                   onClick={onCancelToLogin}
-                  className="px-4 py-2 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-emerald-700 dark:text-emerald-300 hover:text-emerald-900 dark:hover:text-emerald-200 transition-colors cursor-pointer"
                 >
+                  <ArrowLeft className="w-3.5 h-3.5" />
                   Back to Sign In
                 </button>
 
                 <button
                   type="button"
                   onClick={handleNextFromStep1}
-                  className="h-10 px-5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white font-semibold text-xs flex items-center gap-2 transition-all shadow-xs cursor-pointer active:scale-95"
+                  className="h-10 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs flex items-center gap-2 transition-all shadow-xs cursor-pointer active:scale-95"
                 >
                   <span>Continue</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
+                  <ArrowRight className="w-3.5 h-3.5 text-emerald-100" />
                 </button>
               </div>
             </div>
@@ -621,10 +619,10 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSuccess, onCan
             >
               <div>
                 <h2 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
-                  Business and Login Details
+                  Your business details
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  Enter your business information and your credentials as the owner.
+                  Set up the owner account and workspace details.
                 </p>
               </div>
 
@@ -674,7 +672,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSuccess, onCan
                           </span>
                         </div>
                         <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                          Featured on sales receipts, statements, and shop navigation.
+                          Shown on receipts and navigation.
                         </p>
                       </div>
                     </div>
@@ -827,7 +825,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSuccess, onCan
                 <button
                   type="button"
                   onClick={() => goToStep(1)}
-                  className="px-4 py-2 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer flex items-center gap-1.5"
+                  className="px-3 py-2 text-xs font-semibold text-emerald-700 dark:text-emerald-300 hover:text-emerald-900 dark:hover:text-emerald-200 transition-colors cursor-pointer flex items-center gap-1.5"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
                   <span>Previous</span>
@@ -835,10 +833,10 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSuccess, onCan
 
                 <button
                   type="submit"
-                  className="h-10 px-5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white font-semibold text-xs flex items-center gap-2 transition-all shadow-xs cursor-pointer active:scale-95"
+                  className="h-10 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs flex items-center gap-2 transition-all shadow-xs cursor-pointer active:scale-95"
                 >
                   <span>Continue</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
+                  <ArrowRight className="w-3.5 h-3.5 text-emerald-100" />
                 </button>
               </div>
             </form>
@@ -854,10 +852,10 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSuccess, onCan
             >
               <div>
                 <h2 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
-                  Confirm and Launch Workspace
+                  Review and launch
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  Review your information before initializing your workspace.
+                  Check your details before creating the workspace.
                 </p>
               </div>
 
@@ -912,7 +910,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSuccess, onCan
               <div className="p-3.5 rounded-xl border border-emerald-200/70 dark:border-emerald-900/40 bg-emerald-50/30 dark:bg-emerald-950/20 flex items-start gap-2.5">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
                 <div className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                  Includes the 2026 Electronics Starter Catalog with curated categories and smartphone models (Galaxy S25, iPhone 16 series, Tecno, MacBooks) for immediate stock intake.
+                  Electronics starter catalog included.
                 </div>
               </div>
 

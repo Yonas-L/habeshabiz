@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Actions\RecordSaleAction;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Models\Contact;
 use App\Models\Debt;
 use App\Models\DebtPayment;
 use App\Models\FinancialAccount;
@@ -344,6 +345,23 @@ class SaleController extends Controller
         /** @var User $user */
         $user = $request->user();
         $tenantId = $user->tenant_id;
+
+        $isVendorContact = Contact::where('tenant_id', $tenantId)
+            ->whereKey($validated['vendor_contact_id'])
+            ->where('is_active', true)
+            ->where(function ($query): void {
+                $query->whereJsonContains('roles', 'peer_vendor')
+                    ->orWhereJsonContains('roles', 'vendor')
+                    ->orWhereJsonContains('roles', 'supplier')
+                    ->orWhereJsonContains('roles', 'partner');
+            })
+            ->exists();
+
+        if (! $isVendorContact) {
+            throw ValidationException::withMessages([
+                'vendor_contact_id' => 'Vendor sourcing requires an active vendor, supplier, or partner contact.',
+            ]);
+        }
 
         // Check overdraft if vendor is paid now from bank
         $vendorCost = (float) $validated['vendor_cost'];

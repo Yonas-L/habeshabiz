@@ -14,7 +14,7 @@ export async function downloadPdf(
   filename: string,
   onStart?: () => void,
   onDone?: () => void,
-  options: { revealBranding?: boolean; revealTableBranding?: boolean; expandScrollAreas?: boolean; paginateSections?: boolean } = {},
+  options: { revealBranding?: boolean; revealTableBranding?: boolean; expandScrollAreas?: boolean; paginateSections?: boolean; singleTable?: boolean } = {},
   onError?: (error: unknown) => void,
 ): Promise<void> {
   const element = document.getElementById(elementId);
@@ -148,6 +148,33 @@ export async function downloadPdf(
               node.style.display = 'block';
               node.classList.remove('hidden');
             }
+          });
+
+          // ── Make a single-table export a full-width A4 report, not a narrow
+          // grid child from the two-column screen layout. ──
+          if (options.singleTable) {
+            const reportSection = clonedDocument.getElementById(elementId);
+            if (reportSection) {
+              reportSection.style.width = '760px';
+              reportSection.style.maxWidth = '760px';
+              reportSection.style.margin = '0 auto';
+              reportSection.style.overflow = 'visible';
+            }
+          }
+
+          // ── Keep report tables inside their columns and wrap long labels
+          // instead of allowing them to spill outside the PDF page. ──
+          clonedDocument.querySelectorAll<HTMLTableElement>('table').forEach((table) => {
+            table.style.width = '100%';
+            table.style.maxWidth = '100%';
+            table.style.tableLayout = 'fixed';
+            table.style.borderCollapse = 'collapse';
+            table.querySelectorAll<HTMLElement>('th, td').forEach((cell) => {
+              cell.style.whiteSpace = 'normal';
+              cell.style.overflowWrap = 'anywhere';
+              cell.style.wordBreak = 'break-word';
+              cell.style.verticalAlign = 'top';
+            });
           });
 
           // ── Ensure 2-column report layout remains 2 columns in PDF print ──
