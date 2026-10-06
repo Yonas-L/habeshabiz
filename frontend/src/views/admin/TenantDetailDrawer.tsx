@@ -26,6 +26,9 @@ import {
   Laptop,
   Monitor,
   Globe,
+  RotateCcw,
+  Trash2,
+  AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -79,6 +82,8 @@ interface TenantDetailDrawerProps {
   onClose: () => void;
   onLockRequest: (tenant: AdminTenantItem) => void;
   onUnlockRequest: (tenant: AdminTenantItem) => void;
+  onResetRequest?: (tenant: AdminTenantItem) => void;
+  onDeleteRequest?: (tenant: AdminTenantItem) => void;
 }
 
 export const TenantDetailDrawer: React.FC<TenantDetailDrawerProps> = ({
@@ -87,6 +92,8 @@ export const TenantDetailDrawer: React.FC<TenantDetailDrawerProps> = ({
   onClose,
   onLockRequest,
   onUnlockRequest,
+  onResetRequest,
+  onDeleteRequest,
 }) => {
   const [detail, setDetail] = useState<AdminTenantDetailResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -471,6 +478,45 @@ export const TenantDetailDrawer: React.FC<TenantDetailDrawerProps> = ({
                         ))}
                       </div>
                     )}
+                  </div>
+
+                  {/* Store Maintenance & Danger Zone */}
+                  <div className="p-4 rounded-xl border border-rose-200/70 dark:border-rose-950/60 bg-rose-500/5 dark:bg-rose-950/10 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400">
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        <span className="text-[10px] font-bold uppercase tracking-wider">
+                          Store Lifecycle & Danger Zone
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                      Wipe testing data for a fresh start or permanently destroy this store workspace.
+                    </p>
+
+                    <div className="flex items-center gap-2 pt-1 flex-wrap">
+                      {onResetRequest && (
+                        <button
+                          type="button"
+                          onClick={() => onResetRequest(tenant)}
+                          className="h-8 px-3 rounded-lg border border-amber-300 dark:border-amber-800/80 bg-white dark:bg-slate-900 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          <span>Reset Data (Fresh Start)</span>
+                        </button>
+                      )}
+
+                      {onDeleteRequest && (
+                        <button
+                          type="button"
+                          onClick={() => onDeleteRequest(tenant)}
+                          className="h-8 px-3 rounded-lg border border-rose-300 dark:border-rose-900/80 bg-white dark:bg-slate-900 text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Delete Store Permanently</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}

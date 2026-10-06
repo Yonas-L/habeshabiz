@@ -10,6 +10,7 @@ use App\Models\Product;
 use App\Models\SalesOrder;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\TenantOnboardingService;
 use App\Support\DeviceDetector;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,6 +18,10 @@ use Illuminate\Support\Facades\Cache;
 
 class AdminTenantController extends Controller
 {
+    public function __construct(
+        protected TenantOnboardingService $onboardingService
+    ) {}
+
     public function index(Request $request): JsonResponse
     {
         $search = trim((string) $request->query('search', ''));
@@ -288,6 +293,33 @@ class AdminTenantController extends Controller
                 'lock_reason' => null,
                 'locked_at' => null,
             ],
+        ]);
+    }
+
+    public function resetData(string $id): JsonResponse
+    {
+        $tenant = Tenant::with('users')->findOrFail($id);
+
+        $this->onboardingService->resetTenantData($tenant);
+
+        return response()->json([
+            'message' => "All transactional and inventory data for store '{$tenant->name}' has been reset successfully. Login accounts preserved.",
+            'tenant' => [
+                'id' => $tenant->id,
+                'name' => $tenant->name,
+            ],
+        ]);
+    }
+
+    public function destroy(string $id): JsonResponse
+    {
+        $tenant = Tenant::findOrFail($id);
+        $name = $tenant->name;
+
+        $this->onboardingService->deleteTenantCompletely($tenant);
+
+        return response()->json([
+            'message' => "Store '{$name}' and all associated users, inventory, and records have been permanently deleted.",
         ]);
     }
 }

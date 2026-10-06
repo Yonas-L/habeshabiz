@@ -459,3 +459,106 @@ test('admin can inspect a single tenant health and activity logs', function () {
         ]);
 });
 
+test('admin can reset a tenant data completely while preserving login users and profile', function () {
+    $admin = PlatformAdmin::create([
+        'name' => 'Admin Reset Test',
+        'email' => 'admin_reset@platform.com',
+        'password' => Hash::make('secret'),
+    ]);
+    $adminToken = $admin->createToken('admin_token')->plainTextToken;
+
+    $onboardingService = app(\App\Services\TenantOnboardingService::class);
+    $res = $onboardingService->onboard([
+        'business_type' => 'electronics',
+        'business_name' => 'Test Reset Store',
+        'owner_name' => 'Store Owner',
+        'owner_phone' => '+251911999888',
+        'owner_email' => 'owner_reset@test.com',
+        'password' => 'secret123',
+        'city' => 'Addis Ababa',
+        'team_size' => '2-5',
+    ]);
+
+    $tenant = $res['tenant'];
+    $user = $res['user'];
+
+    // Create some sales or inventory for this tenant
+    $category = \App\Models\Category::where('tenant_id', $tenant->id)->first();
+    $product = \App\Models\Product::create([
+        'tenant_id' => $tenant->id,
+        'category_id' => $category?->id,
+        'name' => 'Dummy Phone',
+        'brand' => 'Apple',
+        'model' => 'iPhone 15',
+        'has_serials' => true,
+        'is_active' => true,
+    ]);
+    $variant = \App\Models\ProductVariant::create([
+        'tenant_id' => $tenant->id,
+        'product_id' => $product->id,
+    ]);
+    \App\Models\InventoryUnit::create([
+        'tenant_id' => $tenant->id,
+        'variant_id' => $variant->id,
+        'imei' => '354892019283741',
+        'cost_basis' => 50000,
+        'status' => 'in_stock',
+    ]);
+
+    expect(\App\Models\InventoryUnit::where('tenant_id', $tenant->id)->count())->toBe(1);
+
+    // Call reset endpoint
+    $response = $this->withHeader('Authorization', 'Bearer '.$adminToken)
+        ->postJson("/api/v1/admin/tenants/{$tenant->id}/reset-data");
+
+    $response->assertStatus(200)
+        ->assertJson([
+            'tenant' => [
+                'id' => $tenant->id,
+                'name' => $tenant->name,
+            ],
+        ]);
+
+    // Transactional records cleared
+    expect(\App\Models\InventoryUnit::where('tenant_id', $tenant->id)->count())->toBe(0);
+    expect(\App\Models\SalesOrder::where('tenant_id', $tenant->id)->count())->toBe(0);
+
+    // User and tenant preserved
+    expect(\App\Models\User::where('tenant_id', $tenant->id)->count())->toBe(1);
+    expect(\App\Models\Tenant::where('id', $tenant->id)->exists())->toBeTrue();
+    expect(\App\Models\FinancialAccount::where('tenant_id', $tenant->id)->count())->toBeGreaterThan(0);
+});
+
+test('admin can permanently delete a tenant and all its data', function () {
+    $admin = PlatformAdmin::create([
+        'name' => 'Admin Delete Test',
+        'email' => 'admin_delete@platform.com',
+        'password' => Hash::make('secret'),
+    ]);
+    $adminToken = $admin->createToken('admin_token')->plainTextToken;
+
+    $onboardingService = app(\App\Services\TenantOnboardingService::class);
+    $res = $onboardingService->onboard([
+        'business_type' => 'electronics',
+        'business_name' => 'Delete Me Store',
+        'owner_name' => 'Owner Delete',
+        'owner_phone' => '+251911777666',
+        'owner_email' => 'owner_delete@test.com',
+        'password' => 'secret123',
+        'city' => 'Addis Ababa',
+        'team_size' => '1',
+    ]);
+
+    $tenant = $res['tenant'];
+
+    // Call delete endpoint
+    $response = $this->withHeader('Authorization', 'Bearer '.$adminToken)
+        ->deleteJson("/api/v1/admin/tenants/{$tenant->id}");
+
+    $response->assertStatus(200);
+
+    expect(\App\Models\Tenant::where('id', $tenant->id)->exists())->toBeFalse();
+    expect(\App\Models\User::where('tenant_id', $tenant->id)->exists())->toBeFalse();
+    expect(\App\Models\FinancialAccount::where('tenant_id', $tenant->id)->exists())->toBeFalse();
+});
+

@@ -273,6 +273,16 @@ export const adminApi = {
       method: 'POST',
     }),
 
+  resetTenantData: (id: string) =>
+    adminRequest<{ message: string; tenant: { id: string; name: string } }>(`/tenants/${id}/reset-data`, {
+      method: 'POST',
+    }),
+
+  deleteTenant: (id: string) =>
+    adminRequest<{ message: string }>(`/tenants/${id}`, {
+      method: 'DELETE',
+    }),
+
   // Whitelist
   getWhitelist: (page = 1, status?: string) => {
     const params = new URLSearchParams({ page: String(page) });

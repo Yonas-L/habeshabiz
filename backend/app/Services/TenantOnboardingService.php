@@ -2,13 +2,26 @@
 
 namespace App\Services;
 
+use App\Models\AuditLog;
 use App\Models\Category;
+use App\Models\Contact;
+use App\Models\Debt;
+use App\Models\DebtPayment;
+use App\Models\Expense;
 use App\Models\FinancialAccount;
+use App\Models\FinancialTransaction;
+use App\Models\InventoryStock;
+use App\Models\InventoryUnit;
+use App\Models\MaintenanceRecord;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\SalesOrder;
+use App\Models\SalesOrderItem;
+use App\Models\StaffTask;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Scopes\TenantScope;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -826,5 +839,123 @@ class TenantOnboardingService
                 }
             }
         }
+    }
+
+    /**
+     * Completely reset a tenant's transactional and inventory data while preserving
+     * business profile, settings, and login credentials.
+     */
+    public function resetTenantData(Tenant $tenant): void
+    {
+        DB::transaction(function () use ($tenant) {
+            $tenantId = $tenant->id;
+
+            TenantScope::setForcedTenantId($tenantId);
+
+            // 1. Delete all operational activity and task records
+            AuditLog::where('tenant_id', $tenantId)->delete();
+            StaffTask::where('tenant_id', $tenantId)->delete();
+            MaintenanceRecord::where('tenant_id', $tenantId)->delete();
+
+            // 2. Delete debts and debt payments
+            DebtPayment::where('tenant_id', $tenantId)->delete();
+            Debt::where('tenant_id', $tenantId)->delete();
+
+            // 3. Delete expenses and financial transactions
+            Expense::where('tenant_id', $tenantId)->delete();
+            FinancialTransaction::where('tenant_id', $tenantId)->delete();
+
+            // 4. Delete sales orders and items
+            SalesOrderItem::where('tenant_id', $tenantId)->delete();
+            SalesOrder::where('tenant_id', $tenantId)->delete();
+
+            // 5. Delete serialized units and quantity stock
+            InventoryUnit::where('tenant_id', $tenantId)->delete();
+            InventoryStock::where('tenant_id', $tenantId)->delete();
+
+            // 6. Delete products, variants, categories, contacts, and financial accounts
+            ProductVariant::withTrashed()->whereHas('product', fn($q) => $q->where('tenant_id', $tenantId))->forceDelete();
+            Product::withTrashed()->where('tenant_id', $tenantId)->forceDelete();
+            Category::where('tenant_id', $tenantId)->delete();
+            Contact::withTrashed()->where('tenant_id', $tenantId)->forceDelete();
+            FinancialAccount::withTrashed()->where('tenant_id', $tenantId)->forceDelete();
+
+            // 7. Seed fresh starter accounts (zero balance)
+            $this->seedStarterAccounts($tenant);
+
+            // 8. Seed fresh taxonomy and catalog templates
+            $this->seedCatalog($tenant, $tenant->business_type ?: 'electronics');
+
+            // 9. Record a fresh audit log entry
+            $owner = $tenant->users->firstWhere('role', 'owner') ?? $tenant->users->first();
+            AuditLog::create([
+                'tenant_id' => $tenantId,
+                'user_id' => $owner?->id,
+                'action' => 'tenant.reset_data',
+                'entity_type' => 'tenant',
+                'entity_id' => $tenantId,
+                'old_values' => null,
+                'new_values' => ['message' => 'Full store data reset executed by platform superadmin.'],
+                'ip_address' => request()->ip() ?? '127.0.0.1',
+                'user_agent' => request()->userAgent(),
+            ]);
+
+            TenantScope::setForcedTenantId(null);
+        });
+    }
+
+    /**
+     * Completely and permanently delete a tenant account and all related data.
+     */
+    public function deleteTenantCompletely(Tenant $tenant): void
+    {
+        DB::transaction(function () use ($tenant) {
+            $tenantId = $tenant->id;
+
+            TenantScope::setForcedTenantId($tenantId);
+
+            // 1. Delete all operational activity and task records
+            AuditLog::where('tenant_id', $tenantId)->delete();
+            StaffTask::where('tenant_id', $tenantId)->delete();
+            MaintenanceRecord::where('tenant_id', $tenantId)->delete();
+
+            // 2. Delete debts and debt payments
+            DebtPayment::where('tenant_id', $tenantId)->delete();
+            Debt::where('tenant_id', $tenantId)->delete();
+
+            // 3. Delete expenses and financial transactions
+            Expense::where('tenant_id', $tenantId)->delete();
+            FinancialTransaction::where('tenant_id', $tenantId)->delete();
+
+            // 4. Delete sales orders and items
+            SalesOrderItem::where('tenant_id', $tenantId)->delete();
+            SalesOrder::where('tenant_id', $tenantId)->delete();
+
+            // 5. Delete serialized units and quantity stock
+            InventoryUnit::where('tenant_id', $tenantId)->delete();
+            InventoryStock::where('tenant_id', $tenantId)->delete();
+
+            // 6. Delete products, variants, categories, contacts, and financial accounts
+            ProductVariant::withTrashed()->whereHas('product', fn($q) => $q->where('tenant_id', $tenantId))->forceDelete();
+            Product::withTrashed()->where('tenant_id', $tenantId)->forceDelete();
+            Category::where('tenant_id', $tenantId)->delete();
+            Contact::withTrashed()->where('tenant_id', $tenantId)->forceDelete();
+            FinancialAccount::withTrashed()->where('tenant_id', $tenantId)->forceDelete();
+
+            // 7. Delete users and tokens
+            $users = User::where('tenant_id', $tenantId)->get();
+            foreach ($users as $user) {
+                $user->tokens()->delete();
+                $user->delete();
+            }
+
+            TenantScope::setForcedTenantId(null);
+
+            // 8. Clear cached lockout state
+            Cache::forget("tenant_locked:{$tenant->id}");
+
+            // 9. Delete tenant record
+            $tenant->delete();
+        });
     }
 }

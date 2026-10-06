@@ -26,6 +26,8 @@ import {
   ShieldCheck,
   TrendingUp,
   X,
+  RotateCcw,
+  Trash2,
 } from 'lucide-react';
 
 export const AdminTenantsView: React.FC = () => {
@@ -52,6 +54,10 @@ export const AdminTenantsView: React.FC = () => {
   const [selectedTenantForDetail, setSelectedTenantForDetail] = useState<AdminTenantItem | null>(null);
   const [tenantToLock, setTenantToLock] = useState<AdminTenantItem | null>(null);
   const [lockReason, setLockReason] = useState('');
+  const [tenantToReset, setTenantToReset] = useState<AdminTenantItem | null>(null);
+  const [resetConfirmText, setResetConfirmText] = useState('');
+  const [tenantToDelete, setTenantToDelete] = useState<AdminTenantItem | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
@@ -146,6 +152,48 @@ export const AdminTenantsView: React.FC = () => {
       }
     } catch (err: any) {
       toast.error('Failed to unlock store', { description: err.message });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleConfirmReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!tenantToReset || resetConfirmText.trim().toUpperCase() !== 'RESET') return;
+
+    try {
+      setActionLoading(true);
+      const res = await adminApi.resetTenantData(tenantToReset.id);
+      toast.success(res.message || `Store "${tenantToReset.name}" data reset successfully`);
+      setTenantToReset(null);
+      setResetConfirmText('');
+      loadData(pagination.current_page, searchQuery, statusFilter);
+      if (selectedTenantForDetail?.id === tenantToReset.id) {
+        setSelectedTenantForDetail(null);
+      }
+    } catch (err: any) {
+      toast.error('Failed to reset store data', { description: err.message });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleConfirmDelete = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!tenantToDelete || deleteConfirmText.trim() !== tenantToDelete.name.trim()) return;
+
+    try {
+      setActionLoading(true);
+      const res = await adminApi.deleteTenant(tenantToDelete.id);
+      toast.success(res.message || `Store "${tenantToDelete.name}" deleted permanently`);
+      setTenantToDelete(null);
+      setDeleteConfirmText('');
+      loadData(pagination.current_page, searchQuery, statusFilter);
+      if (selectedTenantForDetail?.id === tenantToDelete.id) {
+        setSelectedTenantForDetail(null);
+      }
+    } catch (err: any) {
+      toast.error('Failed to delete store', { description: err.message });
     } finally {
       setActionLoading(false);
     }
@@ -518,6 +566,32 @@ export const AdminTenantsView: React.FC = () => {
                               <span>Suspend</span>
                             </button>
                           )}
+
+                          <button
+                            type="button"
+                            disabled={actionLoading}
+                            onClick={() => {
+                              setTenantToReset(t);
+                              setResetConfirmText('');
+                            }}
+                            title="Reset store data (Fresh start)"
+                            className="h-7 w-7 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-amber-50 dark:hover:bg-amber-950/40 text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 flex items-center justify-center transition-colors cursor-pointer disabled:opacity-50"
+                          >
+                            <RotateCcw className="w-3 h-3" />
+                          </button>
+
+                          <button
+                            type="button"
+                            disabled={actionLoading}
+                            onClick={() => {
+                              setTenantToDelete(t);
+                              setDeleteConfirmText('');
+                            }}
+                            title="Delete store permanently"
+                            className="h-7 w-7 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 flex items-center justify-center transition-colors cursor-pointer disabled:opacity-50"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -566,6 +640,14 @@ export const AdminTenantsView: React.FC = () => {
           setLockReason('');
         }}
         onUnlockRequest={(t) => handleUnlock(t)}
+        onResetRequest={(t) => {
+          setTenantToReset(t);
+          setResetConfirmText('');
+        }}
+        onDeleteRequest={(t) => {
+          setTenantToDelete(t);
+          setDeleteConfirmText('');
+        }}
       />
 
       {/* Confirmation Modal: Open Public Registration */}
@@ -650,6 +732,139 @@ export const AdminTenantsView: React.FC = () => {
                 >
                   {actionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Lock className="w-3.5 h-3.5" />}
                   <span>Confirm Suspension</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Reset Store Data Modal (Fresh Start) */}
+      {tenantToReset && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-xs" onClick={() => setTenantToReset(null)} />
+          <div className="relative w-full max-w-md bg-white dark:bg-[#131926] rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-2xl space-y-4 animate-page-enter">
+            <div className="flex items-center gap-3 text-amber-600 dark:text-amber-400">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
+                <RotateCcw className="w-5 h-5 text-amber-500" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                  Reset Store Data — {tenantToReset.name}
+                </h3>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Fresh start for test stores & early pilot users
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40 text-xs text-amber-800 dark:text-amber-300 space-y-1.5">
+              <p className="font-semibold">What will be cleared:</p>
+              <ul className="list-disc list-inside space-y-0.5 text-[11px] text-amber-700 dark:text-amber-400">
+                <li>All products, inventory units, and stock quantities</li>
+                <li>All sales orders, customer debts, and payment records</li>
+                <li>All expense transactions and audit activity logs</li>
+              </ul>
+              <p className="text-[11px] pt-1 text-slate-600 dark:text-slate-400">
+                ✓ <strong>Preserved:</strong> Store owner login credentials, email, password, and workspace settings remain intact.
+              </p>
+            </div>
+
+            <form onSubmit={handleConfirmReset} className="space-y-4 pt-1">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Type <strong className="font-mono text-amber-600 dark:text-amber-400">RESET</strong> to confirm:
+                </label>
+                <input
+                  type="text"
+                  value={resetConfirmText}
+                  onChange={(e) => setResetConfirmText(e.target.value)}
+                  required
+                  placeholder="RESET"
+                  className="w-full h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all placeholder:text-slate-400 uppercase"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setTenantToReset(null)}
+                  className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={actionLoading || resetConfirmText.trim().toUpperCase() !== 'RESET'}
+                  className="h-9 px-5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  {actionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
+                  <span>Wipe Data & Reset</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Permanently Delete Store Modal */}
+      {tenantToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-xs" onClick={() => setTenantToDelete(null)} />
+          <div className="relative w-full max-w-md bg-white dark:bg-[#131926] rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-2xl space-y-4 animate-page-enter">
+            <div className="flex items-center gap-3 text-rose-600 dark:text-rose-400">
+              <div className="w-10 h-10 rounded-xl bg-rose-500/10 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5 text-rose-500" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                  Permanently Delete Store
+                </h3>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Irreversible destruction of store and all accounts
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-rose-50/70 dark:bg-rose-950/20 border border-rose-200/60 dark:border-rose-800/40 text-xs text-rose-800 dark:text-rose-300 space-y-1">
+              <p className="font-semibold text-rose-700 dark:text-rose-300">
+                Warning: This action cannot be undone.
+              </p>
+              <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                This will delete the entire tenant record, all owner and staff login accounts, all inventory data, and financial transactions permanently.
+              </p>
+            </div>
+
+            <form onSubmit={handleConfirmDelete} className="space-y-4 pt-1">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Type the exact store name <strong className="font-mono text-rose-600 dark:text-rose-400">"{tenantToDelete.name}"</strong> to confirm:
+                </label>
+                <input
+                  type="text"
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  required
+                  placeholder={tenantToDelete.name}
+                  className="w-full h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all placeholder:text-slate-400"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setTenantToDelete(null)}
+                  className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={actionLoading || deleteConfirmText.trim() !== tenantToDelete.name.trim()}
+                  className="h-9 px-5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  {actionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                  <span>Delete Store Permanently</span>
                 </button>
               </div>
             </form>

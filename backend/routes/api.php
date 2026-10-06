@@ -45,6 +45,8 @@ Route::prefix('v1')->group(function () {
             Route::get('/tenants/{id}', [AdminTenantController::class, 'show']);
             Route::post('/tenants/{id}/lock', [AdminTenantController::class, 'lock']);
             Route::post('/tenants/{id}/unlock', [AdminTenantController::class, 'unlock']);
+            Route::post('/tenants/{id}/reset-data', [AdminTenantController::class, 'resetData']);
+            Route::delete('/tenants/{id}', [AdminTenantController::class, 'destroy']);
 
             // Whitelist
             Route::get('/whitelist', [AdminWhitelistController::class, 'index']);
