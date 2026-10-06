@@ -34,6 +34,11 @@ class User extends Authenticatable
         'role',
         'permissions',
         'is_active',
+        'last_device',
+        'last_device_type',
+        'last_browser',
+        'last_login_ip',
+        'last_login_at',
     ];
 
     protected $hidden = [
@@ -48,6 +53,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'permissions' => 'array',
             'is_active' => 'boolean',
+            'last_login_at' => 'datetime',
         ];
     }
 

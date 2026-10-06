@@ -82,7 +82,7 @@ export const AdminSignupAttemptsView: React.FC = () => {
             Signup Attempts Audit Log
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Real-time audit log of all registration attempts across the platform.
+            {pagination.total} registration {pagination.total === 1 ? 'attempt' : 'attempts'} recorded
           </p>
         </div>
 

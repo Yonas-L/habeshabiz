@@ -65,6 +65,11 @@ class TenantOnboardingService
                     'can_view_costs' => true,
                     'can_discount' => true,
                 ],
+                'last_device' => $data['last_device'] ?? null,
+                'last_device_type' => $data['last_device_type'] ?? null,
+                'last_browser' => $data['last_browser'] ?? null,
+                'last_login_ip' => $data['last_login_ip'] ?? null,
+                'last_login_at' => $data['last_login_at'] ?? now(),
                 'is_active' => true,
             ]);
 

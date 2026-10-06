@@ -23,6 +23,7 @@ class AuditLog extends Model
         'old_values',
         'new_values',
         'ip_address',
+        'user_agent',
         'created_at',
     ];
 
@@ -62,6 +63,7 @@ class AuditLog extends Model
             'old_values' => $oldValues,
             'new_values' => $newValues,
             'ip_address' => request()->ip(),
+            'user_agent' => substr((string) request()->userAgent(), 0, 255),
             'created_at' => now(),
         ]);
     }

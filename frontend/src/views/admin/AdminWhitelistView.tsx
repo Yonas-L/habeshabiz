@@ -105,7 +105,7 @@ export const AdminWhitelistView: React.FC = () => {
             Whitelist Management
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Pre-authorize emails to allow shop creation when public registration is closed.
+            {pagination.total} pre-authorized {pagination.total === 1 ? 'account' : 'accounts'} on access list
           </p>
         </div>
 

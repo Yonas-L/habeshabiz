@@ -3,7 +3,9 @@ import {
   adminApi,
   type AdminTenantItem,
   type AdminPagination,
+  type AdminPlatformSummary,
 } from '../../api/adminClient';
+import { TenantDetailDrawer, DeviceBadge } from './TenantDetailDrawer';
 import { CustomPageLoader } from '../../components/loading/CustomPageLoader';
 import { toast } from 'sonner';
 import {
@@ -16,10 +18,19 @@ import {
   ChevronRight,
   ToggleLeft,
   ToggleRight,
+  Package,
+  Users,
+  Search,
+  RefreshCw,
+  Eye,
+  ShieldCheck,
+  TrendingUp,
+  X,
 } from 'lucide-react';
 
 export const AdminTenantsView: React.FC = () => {
   const [tenants, setTenants] = useState<AdminTenantItem[]>([]);
+  const [summary, setSummary] = useState<AdminPlatformSummary | null>(null);
   const [pagination, setPagination] = useState<AdminPagination>({
     current_page: 1,
     last_page: 1,
@@ -28,32 +39,52 @@ export const AdminTenantsView: React.FC = () => {
   });
   const [loading, setLoading] = useState(true);
 
+  // Search & Status Filter
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'locked'>('all');
+
   // Registration Setting
   const [registrationOpen, setRegistrationOpen] = useState<boolean>(false);
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [showToggleModal, setShowToggleModal] = useState(false);
 
-  // Lock Modal State
+  // Drawer & Action Modal State
+  const [selectedTenantForDetail, setSelectedTenantForDetail] = useState<AdminTenantItem | null>(null);
   const [tenantToLock, setTenantToLock] = useState<AdminTenantItem | null>(null);
   const [lockReason, setLockReason] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
-    loadData(1);
+    loadData(1, searchQuery, statusFilter);
     loadSettings();
-  }, []);
+  }, [statusFilter]);
 
-  const loadData = async (page = 1) => {
+  const loadData = async (page = 1, search = searchQuery, status = statusFilter) => {
     try {
       setLoading(true);
-      const res = await adminApi.getTenants(page);
+      const res = await adminApi.getTenants({
+        page,
+        search: search.trim() ? search.trim() : undefined,
+        status,
+      });
       setTenants(res.data);
+      if (res.summary) setSummary(res.summary);
       setPagination(res.pagination);
     } catch (err: any) {
-      toast.error('Failed to load tenants', { description: err.message });
+      toast.error('Failed to load stores', { description: err.message });
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    loadData(1, searchQuery, statusFilter);
+  };
+
+  const handleClearSearch = () => {
+    setSearchQuery('');
+    loadData(1, '', statusFilter);
   };
 
   const loadSettings = async () => {
@@ -75,7 +106,7 @@ export const AdminTenantsView: React.FC = () => {
       await adminApi.updateSetting('registration_open', String(nextVal));
       setRegistrationOpen(nextVal);
       setShowToggleModal(false);
-      toast.success(nextVal ? 'Registration is now OPEN to the public' : 'Registration is now CLOSED (Whitelist required)');
+      toast.success(nextVal ? 'Public registration is now OPEN' : 'Registration is now GATED (Whitelist required)');
     } catch (err: any) {
       toast.error('Failed to update setting', { description: err.message });
     } finally {
@@ -90,12 +121,15 @@ export const AdminTenantsView: React.FC = () => {
     try {
       setActionLoading(true);
       await adminApi.lockTenant(tenantToLock.id, lockReason.trim());
-      toast.success(`Tenant ${tenantToLock.name} suspended`);
+      toast.success(`Store "${tenantToLock.name}" suspended`);
       setTenantToLock(null);
       setLockReason('');
-      loadData(pagination.current_page);
+      loadData(pagination.current_page, searchQuery, statusFilter);
+      if (selectedTenantForDetail?.id === tenantToLock.id) {
+        setSelectedTenantForDetail(null);
+      }
     } catch (err: any) {
-      toast.error('Failed to lock tenant', { description: err.message });
+      toast.error('Failed to lock store', { description: err.message });
     } finally {
       setActionLoading(false);
     }
@@ -105,185 +139,386 @@ export const AdminTenantsView: React.FC = () => {
     try {
       setActionLoading(true);
       await adminApi.unlockTenant(tenant.id);
-      toast.success(`Tenant ${tenant.name} restored to active`);
-      loadData(pagination.current_page);
+      toast.success(`Store "${tenant.name}" restored to active`);
+      loadData(pagination.current_page, searchQuery, statusFilter);
+      if (selectedTenantForDetail?.id === tenant.id) {
+        setSelectedTenantForDetail(null);
+      }
     } catch (err: any) {
-      toast.error('Failed to unlock tenant', { description: err.message });
+      toast.error('Failed to unlock store', { description: err.message });
     } finally {
       setActionLoading(false);
     }
   };
 
-  return (
-    <div className="space-y-6">
-      {/* Header & Registration Setting Strip */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-[#131926] p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs">
-        <div>
-          <h1 className="text-base font-bold text-slate-900 dark:text-white">
-            Tenant Management
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            {pagination.total} registered business {pagination.total === 1 ? 'store' : 'stores'} on HabeshaBiz
-          </p>
-        </div>
+  // Human readable time difference
+  const formatTimeAgo = (dateStr: string) => {
+    if (!dateStr) return 'Never';
+    const d = new Date(dateStr);
+    const now = new Date();
+    const diffSec = Math.floor((now.getTime() - d.getTime()) / 1000);
 
-        {/* Registration Toggle */}
-        <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-900/80 px-4 py-2.5 rounded-xl border border-slate-200/60 dark:border-slate-800/80">
-          <div className="text-left">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-              Public Onboarding
-            </span>
-            <span className={`text-xs font-bold ${registrationOpen ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
-              {registrationOpen ? 'Open to Public' : 'Gated (Whitelist Only)'}
+    if (diffSec < 60) return 'Just now';
+    if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+    if (diffSec < 86400 * 7) return `${Math.floor(diffSec / 86400)}d ago`;
+
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  };
+
+  const isRecentlyActive = (dateStr: string) => {
+    if (!dateStr) return false;
+    const diffSec = (new Date().getTime() - new Date(dateStr).getTime()) / 1000;
+    return diffSec < 1800; // active in last 30 minutes
+  };
+
+  return (
+    <div className="space-y-5">
+      {/* 1. TOP PLATFORM VITAL METRICS (5 Sleek Flat Cards) */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        {/* Active Stores */}
+        <div className="p-4 rounded-2xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800 shadow-2xs">
+          <div className="flex items-center justify-between text-slate-400 mb-1.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider">Active Stores</span>
+            <Building2 className="w-4 h-4 text-emerald-500" />
+          </div>
+          <div className="text-xl font-black font-mono text-slate-900 dark:text-white">
+            {summary?.active_tenants ?? pagination.total}{' '}
+            <span className="text-xs font-normal text-slate-400 font-sans">
+              / {summary?.total_tenants ?? pagination.total}
             </span>
           </div>
+          <span className="text-[10px] text-slate-400 block mt-0.5">
+            {summary?.locked_tenants ? `${summary.locked_tenants} suspended` : 'All operating normally'}
+          </span>
+        </div>
+
+        {/* Live Stock */}
+        <div className="p-4 rounded-2xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800 shadow-2xs">
+          <div className="flex items-center justify-between text-slate-400 mb-1.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider">Live Stock Count</span>
+            <Package className="w-4 h-4 text-sky-500" />
+          </div>
+          <div className="text-xl font-black font-mono text-slate-900 dark:text-white">
+            {(summary?.total_stock_count ?? 0).toLocaleString()}{' '}
+            <span className="text-xs font-normal text-slate-400 font-sans">units</span>
+          </div>
+          <span className="text-[10px] text-slate-400 block mt-0.5">
+            Across all stores
+          </span>
+        </div>
+
+        {/* Total Platform Volume */}
+        <div className="p-4 rounded-2xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800 shadow-2xs">
+          <div className="flex items-center justify-between text-slate-400 mb-1.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider">Platform Volume</span>
+            <TrendingUp className="w-4 h-4 text-indigo-500" />
+          </div>
+          <div className="text-xl font-black font-mono text-slate-900 dark:text-white truncate">
+            {Number(summary?.total_sales_volume ?? 0).toLocaleString()}{' '}
+            <span className="text-xs font-normal text-slate-400 font-sans">ETB</span>
+          </div>
+          <span className="text-[10px] text-slate-400 block mt-0.5">
+            {(summary?.total_sales_count ?? 0).toLocaleString()} total sales
+          </span>
+        </div>
+
+        {/* Total Users */}
+        <div className="p-4 rounded-2xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800 shadow-2xs">
+          <div className="flex items-center justify-between text-slate-400 mb-1.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider">Store Users</span>
+            <Users className="w-4 h-4 text-amber-500" />
+          </div>
+          <div className="text-xl font-black font-mono text-slate-900 dark:text-white">
+            {summary?.total_users ?? 0}{' '}
+            <span className="text-xs font-normal text-slate-400 font-sans">staff & owners</span>
+          </div>
+          <span className="text-[10px] text-slate-400 block mt-0.5">
+            Registered accounts
+          </span>
+        </div>
+
+        {/* Access Gate Switch Card */}
+        <div className="p-4 rounded-2xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800 shadow-2xs flex flex-col justify-between col-span-2 sm:col-span-1">
+          <div className="flex items-center justify-between text-slate-400 mb-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider">Access Gate</span>
+            <ShieldCheck className="w-4 h-4 text-emerald-500" />
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <span className={`text-xs font-bold block ${registrationOpen ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                {registrationOpen ? 'Open to Public' : 'Gated Whitelist'}
+              </span>
+              <span className="text-[10px] text-slate-400">
+                {registrationOpen ? 'Anyone can signup' : 'Invite code required'}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              disabled={settingsLoading || actionLoading}
+              onClick={() => {
+                if (!registrationOpen) {
+                  setShowToggleModal(true);
+                } else {
+                  handleToggleRegistration();
+                }
+              }}
+              className="cursor-pointer text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-transform active:scale-95 disabled:opacity-50 shrink-0"
+              title="Toggle Access Gate"
+            >
+              {registrationOpen ? (
+                <ToggleRight className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
+              ) : (
+                <ToggleLeft className="w-8 h-8 text-slate-400" />
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. SEARCH & FILTER TOOLBAR */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white dark:bg-[#131926] p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs">
+        {/* Search Input */}
+        <form onSubmit={handleSearchSubmit} className="relative flex-1">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search stores by name, slug, phone, owner email..."
+            className="w-full h-9 pl-9 pr-8 rounded-xl bg-slate-50 dark:bg-slate-900 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 border border-slate-200/80 dark:border-slate-800 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition-all"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={handleClearSearch}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </form>
+
+        {/* Filter Pills */}
+        <div className="flex items-center gap-1.5 shrink-0 overflow-x-auto">
+          {[
+            { key: 'all', label: 'All Stores' },
+            { key: 'active', label: 'Active' },
+            { key: 'locked', label: 'Suspended' },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setStatusFilter(tab.key as any)}
+              className={`h-9 px-3.5 rounded-xl text-xs font-semibold capitalize cursor-pointer transition-all ${
+                statusFilter === tab.key
+                  ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
 
           <button
             type="button"
-            disabled={settingsLoading || actionLoading}
-            onClick={() => {
-              if (!registrationOpen) {
-                setShowToggleModal(true);
-              } else {
-                handleToggleRegistration();
-              }
-            }}
-            className="cursor-pointer text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-transform active:scale-95 disabled:opacity-50"
-            title="Toggle Registration Mode"
+            onClick={() => loadData(pagination.current_page, searchQuery, statusFilter)}
+            disabled={loading}
+            title="Refresh stores"
+            className="h-9 w-9 rounded-xl border border-slate-200/80 dark:border-slate-800 flex items-center justify-center text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer disabled:opacity-50"
           >
-            {registrationOpen ? (
-              <ToggleRight className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
-            ) : (
-              <ToggleLeft className="w-8 h-8 text-slate-400" />
-            )}
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           </button>
         </div>
       </div>
 
-      {/* Tenants Table */}
+      {/* 3. STORES TABLE */}
       <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs overflow-hidden">
-        <div className="w-full overflow-hidden">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-slate-50/70 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800 text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+        <div className="w-full overflow-x-auto">
+          <table className="w-full text-left text-xs border-collapse min-w-[700px]">
+            <thead className="bg-slate-50/80 dark:bg-slate-900/60 border-b border-slate-200/70 dark:border-slate-800 text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider text-[10px]">
               <tr>
-                <th className="py-3 px-4">Business Name</th>
-                <th className="py-3 px-4">Owner Email</th>
-                <th className="py-3 px-3.5 hidden sm:table-cell">Type</th>
-                <th className="py-3 px-3.5 whitespace-nowrap">Signed Up</th>
-                <th className="py-3 px-3.5 text-center">Status</th>
-                <th className="py-3 px-4 text-right">Actions</th>
+                <th className="py-3.5 px-4">Store Profile</th>
+                <th className="py-3.5 px-4">Owner & Contact</th>
+                <th className="py-3.5 px-3.5 text-center">Live Stock</th>
+                <th className="py-3.5 px-3.5 text-right">Sales Volume</th>
+                <th className="py-3.5 px-3.5 text-center">Team</th>
+                <th className="py-3.5 px-3.5 text-center">Last Active</th>
+                <th className="py-3.5 px-3.5 text-center">Status</th>
+                <th className="py-3.5 px-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-slate-700 dark:text-slate-300">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-400">
+                  <td colSpan={8} className="py-14 text-center text-slate-400">
                     <CustomPageLoader mode="admin" fullScreen={false} />
                   </td>
                 </tr>
               ) : tenants.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-16 text-center text-slate-400 italic">
-                    No registered tenants found.
+                  <td colSpan={8} className="py-16 text-center text-slate-400 italic">
+                    No matching stores found.
                   </td>
                 </tr>
               ) : (
                 tenants.map((t) => {
                   const isLocked = t.is_locked;
+                  const logo = t.settings?.logo_url;
+                  const recent = isRecentlyActive(t.last_activity_at);
+
                   return (
                     <tr
                       key={t.id}
-                      className={`transition-colors ${
+                      onClick={() => setSelectedTenantForDetail(t)}
+                      className={`cursor-pointer transition-colors ${
                         isLocked
-                          ? 'bg-rose-500/5 dark:bg-rose-950/20 hover:bg-rose-500/10 dark:hover:bg-rose-950/30'
-                          : 'hover:bg-slate-50/70 dark:hover:bg-slate-800/30'
+                          ? 'bg-rose-500/5 dark:bg-rose-950/15 hover:bg-rose-500/10 dark:hover:bg-rose-950/25'
+                          : 'hover:bg-slate-50/80 dark:hover:bg-slate-800/40'
                       }`}
                     >
-                      {/* Name & Slug */}
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2.5">
-                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 ${
-                            isLocked
-                              ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
-                              : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
-                          }`}>
-                            <Building2 className="w-4 h-4" />
-                          </div>
+                      {/* Store Profile */}
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-3">
+                          {logo ? (
+                            <img
+                              src={logo}
+                              alt={t.name}
+                              className="w-9 h-9 rounded-xl object-contain border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-0.5 shrink-0 shadow-2xs"
+                            />
+                          ) : (
+                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 ${
+                              isLocked
+                                ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                            }`}>
+                              {t.name.substring(0, 2).toUpperCase()}
+                            </div>
+                          )}
+
                           <div className="min-w-0">
-                            <span className="font-bold text-slate-900 dark:text-white block truncate">
+                            <span className="font-bold text-slate-900 dark:text-white block truncate text-xs hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
                               {t.name}
                             </span>
-                            <span className="text-[10px] text-slate-400 font-mono block truncate">
-                              /{t.slug}
-                            </span>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className="text-[10px] text-slate-400 font-mono">/{t.slug}</span>
+                              <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 capitalize">
+                                {t.business_type?.replace(/_/g, ' ') || 'Electronics'}
+                              </span>
+                            </div>
                           </div>
                         </div>
                       </td>
 
-                      {/* Owner Email */}
-                      <td className="py-3 px-4 font-mono text-slate-600 dark:text-slate-300 truncate max-w-[200px]">
-                        {t.owner_email || <span className="text-slate-400 italic">None</span>}
+                      {/* Owner & Contact */}
+                      <td className="py-3.5 px-4">
+                        <div className="min-w-0 space-y-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-semibold text-slate-800 dark:text-slate-200 truncate">
+                              {t.owner?.name || t.owner_email || 'Owner'}
+                            </span>
+                            {t.primary_device && (
+                              <DeviceBadge
+                                device={t.primary_device}
+                                deviceType={t.primary_device_type}
+                              />
+                            )}
+                          </div>
+                          <span className="text-[10px] text-slate-400 font-mono block truncate">
+                            {t.owner?.email || t.owner_email || '—'}
+                          </span>
+                        </div>
                       </td>
 
-                      {/* Business Type */}
-                      <td className="py-3 px-3.5 hidden sm:table-cell capitalize text-slate-500 dark:text-slate-400">
-                        {t.business_type?.replace(/_/g, ' ') || 'Electronics'}
+                      {/* Stock Count */}
+                      <td className="py-3.5 px-3.5 text-center whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50/70 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 font-mono font-bold text-xs border border-emerald-200/50 dark:border-emerald-800/30">
+                          <Package className="w-3.5 h-3.5" />
+                          <span>{t.stock_count.toLocaleString()}</span>
+                        </span>
                       </td>
 
-                      {/* Signed up */}
-                      <td className="py-3 px-3.5 whitespace-nowrap text-slate-500 dark:text-slate-400 text-[11px]">
-                        {new Date(t.created_at).toLocaleDateString(undefined, {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric',
-                        })}
+                      {/* Sales & Revenue */}
+                      <td className="py-3.5 px-3.5 text-right whitespace-nowrap">
+                        <span className="font-mono font-bold text-slate-900 dark:text-white block text-xs">
+                          {Number(t.sales_volume).toLocaleString()} {t.currency_code}
+                        </span>
+                        <span className="text-[10px] text-slate-400 block mt-0.5">
+                          {t.sales_count} {t.sales_count === 1 ? 'sale' : 'sales'}
+                        </span>
+                      </td>
+
+                      {/* Team Size */}
+                      <td className="py-3.5 px-3.5 text-center whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1 text-slate-600 dark:text-slate-400 font-medium">
+                          <Users className="w-3 h-3 text-slate-400" />
+                          <span>{t.users_count}</span>
+                        </span>
+                      </td>
+
+                      {/* Last Active */}
+                      <td className="py-3.5 px-3.5 text-center whitespace-nowrap">
+                        <div className="inline-flex items-center gap-1.5 text-slate-600 dark:text-slate-400 font-mono text-[11px]">
+                          {recent && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
+                          <span>{formatTimeAgo(t.last_activity_at)}</span>
+                        </div>
                       </td>
 
                       {/* Status */}
-                      <td className="py-3 px-3.5 text-center whitespace-nowrap">
+                      <td className="py-3.5 px-3.5 text-center whitespace-nowrap">
                         <span
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
                             isLocked
                               ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
-                              : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+                              : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
                           }`}
                         >
                           <span className={`w-1.5 h-1.5 rounded-full ${isLocked ? 'bg-rose-500' : 'bg-emerald-500'}`} />
-                          {isLocked ? 'Locked' : 'Active'}
+                          {isLocked ? 'Suspended' : 'Active'}
                         </span>
-                        {isLocked && t.lock_reason && (
-                          <span className="block text-[9px] text-rose-500/80 max-w-[140px] truncate mx-auto mt-0.5" title={t.lock_reason}>
-                            {t.lock_reason}
-                          </span>
-                        )}
                       </td>
 
                       {/* Actions */}
-                      <td className="py-3 px-4 text-right whitespace-nowrap">
-                        {isLocked ? (
+                      <td className="py-3.5 px-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1.5">
                           <button
                             type="button"
-                            disabled={actionLoading}
-                            onClick={() => handleUnlock(t)}
-                            className="h-7 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[11px] transition-all shadow-2xs active:scale-95 cursor-pointer inline-flex items-center gap-1 disabled:opacity-50"
+                            onClick={() => setSelectedTenantForDetail(t)}
+                            title="Inspect Store Health & Activity"
+                            className="h-7 px-2.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-[11px] transition-colors flex items-center gap-1 cursor-pointer"
                           >
-                            <Unlock className="w-3 h-3" />
-                            <span>Unlock</span>
+                            <Eye className="w-3.5 h-3.5 text-slate-400" />
+                            <span>Inspect</span>
                           </button>
-                        ) : (
-                          <button
-                            type="button"
-                            disabled={actionLoading}
-                            onClick={() => {
-                              setTenantToLock(t);
-                              setLockReason('');
-                            }}
-                            className="h-7 px-3 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold text-[11px] transition-all shadow-2xs active:scale-95 cursor-pointer inline-flex items-center gap-1 disabled:opacity-50"
-                          >
-                            <Lock className="w-3 h-3" />
-                            <span>Lock</span>
-                          </button>
-                        )}
+
+                          {isLocked ? (
+                            <button
+                              type="button"
+                              disabled={actionLoading}
+                              onClick={() => handleUnlock(t)}
+                              title="Restore Store"
+                              className="h-7 px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[11px] transition-all shadow-2xs active:scale-95 cursor-pointer inline-flex items-center gap-1 disabled:opacity-50"
+                            >
+                              <Unlock className="w-3 h-3" />
+                              <span>Restore</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled={actionLoading}
+                              onClick={() => {
+                                setTenantToLock(t);
+                                setLockReason('');
+                              }}
+                              title="Suspend Store"
+                              className="h-7 px-2.5 rounded-lg bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/30 dark:hover:bg-rose-950/50 text-rose-700 dark:text-rose-400 border border-rose-200/60 dark:border-rose-900/40 font-semibold text-[11px] transition-all active:scale-95 cursor-pointer inline-flex items-center gap-1 disabled:opacity-50"
+                            >
+                              <Lock className="w-3 h-3" />
+                              <span>Suspend</span>
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -293,26 +528,26 @@ export const AdminTenantsView: React.FC = () => {
           </table>
         </div>
 
-        {/* Pagination */}
+        {/* Pagination Footer */}
         {pagination.last_page > 1 && (
           <div className="p-4 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs text-slate-500">
             <div>
-              Page {pagination.current_page} of {pagination.last_page} ({pagination.total} items)
+              Page {pagination.current_page} of {pagination.last_page} ({pagination.total} stores)
             </div>
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
                 disabled={pagination.current_page <= 1 || loading}
-                onClick={() => loadData(pagination.current_page - 1)}
-                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-800"
+                onClick={() => loadData(pagination.current_page - 1, searchQuery, statusFilter)}
+                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
               <button
                 type="button"
                 disabled={pagination.current_page >= pagination.last_page || loading}
-                onClick={() => loadData(pagination.current_page + 1)}
-                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-800"
+                onClick={() => loadData(pagination.current_page + 1, searchQuery, statusFilter)}
+                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -321,7 +556,19 @@ export const AdminTenantsView: React.FC = () => {
         )}
       </div>
 
-      {/* Confirmation Modal to Open Registration */}
+      {/* Slide-out Store Health & Activity Drawer */}
+      <TenantDetailDrawer
+        tenant={selectedTenantForDetail}
+        isOpen={Boolean(selectedTenantForDetail)}
+        onClose={() => setSelectedTenantForDetail(null)}
+        onLockRequest={(t) => {
+          setTenantToLock(t);
+          setLockReason('');
+        }}
+        onUnlockRequest={(t) => handleUnlock(t)}
+      />
+
+      {/* Confirmation Modal: Open Public Registration */}
       {showToggleModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-xs" onClick={() => setShowToggleModal(false)} />
@@ -333,13 +580,13 @@ export const AdminTenantsView: React.FC = () => {
               </h3>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-              Opening registration allows anyone to create a tenant on HabeshaBiz without needing to be on the access whitelist.
+              Opening registration allows any merchant to signup without an invite or whitelist approval.
             </p>
             <div className="flex items-center justify-end gap-2 pt-2">
               <button
                 type="button"
                 onClick={() => setShowToggleModal(false)}
-                className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 Cancel
               </button>
@@ -347,7 +594,7 @@ export const AdminTenantsView: React.FC = () => {
                 type="button"
                 disabled={actionLoading}
                 onClick={handleToggleRegistration}
-                className="h-9 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all disabled:opacity-50"
+                className="h-9 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all disabled:opacity-50 cursor-pointer"
               >
                 {actionLoading ? 'Updating...' : 'Yes, Open Registration'}
               </button>
@@ -356,7 +603,7 @@ export const AdminTenantsView: React.FC = () => {
         </div>
       )}
 
-      {/* Lock Tenant Modal */}
+      {/* Suspend Store Modal */}
       {tenantToLock && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-xs" onClick={() => setTenantToLock(null)} />
@@ -365,10 +612,10 @@ export const AdminTenantsView: React.FC = () => {
               <Lock className="w-5 h-5 shrink-0" />
               <div>
                 <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                  Suspend Tenant — {tenantToLock.name}
+                  Suspend Store — {tenantToLock.name}
                 </h3>
                 <p className="text-[11px] text-slate-400 mt-0.5">
-                  Users will receive 403 suspension error on all API requests
+                  Users of this store will be locked out and receive suspension notice
                 </p>
               </div>
             </div>
@@ -383,7 +630,7 @@ export const AdminTenantsView: React.FC = () => {
                   onChange={(e) => setLockReason(e.target.value)}
                   required
                   rows={3}
-                  placeholder="e.g. Subscription expired, Terms of service review, or Non-payment..."
+                  placeholder="e.g. Subscription expired, Terms of service violation, or Non-payment..."
                   className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all placeholder:text-slate-400 resize-none"
                 />
               </div>
@@ -392,14 +639,14 @@ export const AdminTenantsView: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setTenantToLock(null)}
-                  className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                  className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={actionLoading || !lockReason.trim()}
-                  className="h-9 px-5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-1.5"
+                  className="h-9 px-5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
                 >
                   {actionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Lock className="w-3.5 h-3.5" />}
                   <span>Confirm Suspension</span>

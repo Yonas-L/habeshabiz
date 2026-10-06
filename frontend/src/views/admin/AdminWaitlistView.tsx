@@ -117,7 +117,7 @@ export const AdminWaitlistView: React.FC = () => {
             Waitlist Submissions
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Leads and prospective merchants who submitted access requests.
+            {pagination.total} merchant {pagination.total === 1 ? 'lead' : 'leads'} awaiting platform access
           </p>
         </div>
       </div>

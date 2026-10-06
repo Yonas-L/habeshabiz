@@ -8,6 +8,7 @@ use App\Models\PlatformSignupAttempt;
 use App\Models\PlatformWhitelist;
 use App\Models\Tenant;
 use App\Services\TenantOnboardingService;
+use App\Support\DeviceDetector;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -67,6 +68,13 @@ class OnboardingController extends Controller
         if ($request->hasFile('logo')) {
             $validated['logo_url'] = Tenant::convertUploadedFileToDataUri($request->file('logo'));
         }
+
+        $device = DeviceDetector::parse($request->userAgent());
+        $validated['last_device'] = $device['platform'];
+        $validated['last_device_type'] = $device['type'];
+        $validated['last_browser'] = $device['browser'];
+        $validated['last_login_ip'] = $request->ip();
+        $validated['last_login_at'] = now();
 
         $result = DB::transaction(function () use ($validated, $whitelistEntry, $email, $businessName) {
             $onboardingResult = $this->onboardingService->onboard($validated);

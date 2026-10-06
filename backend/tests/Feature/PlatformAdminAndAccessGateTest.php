@@ -373,3 +373,89 @@ test('platform_signup_attempts older than 90 days are deleted by the scheduler c
     expect(PlatformSignupAttempt::where('id', $oldAttempt->id)->exists())->toBeFalse();
     expect(PlatformSignupAttempt::where('id', $recentAttempt->id)->exists())->toBeTrue();
 });
+
+test('admin can retrieve tenants with rich stock metrics and summary aggregates', function () {
+    $admin = PlatformAdmin::create([
+        'name' => 'Admin Metrics Tester',
+        'email' => 'admin_metrics@platform.com',
+        'password' => Hash::make('secret'),
+    ]);
+    $adminToken = $admin->createToken('admin_token')->plainTextToken;
+
+    $tenant = Tenant::create([
+        'name' => 'Metrics Shop',
+        'slug' => 'metrics-shop',
+        'phone' => '+251911999111',
+        'currency_code' => 'ETB',
+        'business_type' => 'electronics',
+        'is_locked' => false,
+    ]);
+
+    User::create([
+        'tenant_id' => $tenant->id,
+        'name' => 'Metrics Owner',
+        'email' => 'owner@metricsshop.com',
+        'password' => Hash::make('secret'),
+        'role' => 'owner',
+    ]);
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$adminToken)
+        ->getJson('/api/v1/admin/tenants');
+
+    $response->assertStatus(200)
+        ->assertJsonStructure([
+            'data' => [
+                '*' => [
+                    'id',
+                    'name',
+                    'slug',
+                    'owner_email',
+                    'stock_count',
+                    'sales_count',
+                    'sales_volume',
+                    'last_activity_at',
+                    'is_locked',
+                ],
+            ],
+            'summary' => [
+                'total_tenants',
+                'active_tenants',
+                'total_stock_count',
+                'total_sales_volume',
+                'total_users',
+            ],
+            'pagination',
+        ]);
+});
+
+test('admin can inspect a single tenant health and activity logs', function () {
+    $admin = PlatformAdmin::create([
+        'name' => 'Admin Inspector',
+        'email' => 'admin_inspector@platform.com',
+        'password' => Hash::make('secret'),
+    ]);
+    $adminToken = $admin->createToken('admin_token')->plainTextToken;
+
+    $tenant = Tenant::create([
+        'name' => 'Inspect Shop',
+        'slug' => 'inspect-shop',
+        'phone' => '+251911333444',
+        'currency_code' => 'ETB',
+        'business_type' => 'electronics',
+        'is_locked' => false,
+    ]);
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$adminToken)
+        ->getJson("/api/v1/admin/tenants/{$tenant->id}");
+
+    $response->assertStatus(200)
+        ->assertJsonStructure([
+            'tenant' => ['id', 'name', 'slug', 'business_type', 'is_locked'],
+            'users',
+            'financial_accounts',
+            'inventory' => ['total_products', 'in_stock_units', 'total_stock_count', 'inventory_valuation_etb'],
+            'sales' => ['total_sales_count', 'total_sales_volume', 'recent_orders'],
+            'recent_activity',
+        ]);
+});
+

@@ -42,6 +42,7 @@ Route::prefix('v1')->group(function () {
 
             // Tenants
             Route::get('/tenants', [AdminTenantController::class, 'index']);
+            Route::get('/tenants/{id}', [AdminTenantController::class, 'show']);
             Route::post('/tenants/{id}/lock', [AdminTenantController::class, 'lock']);
             Route::post('/tenants/{id}/unlock', [AdminTenantController::class, 'unlock']);
 

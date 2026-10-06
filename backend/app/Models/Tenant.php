@@ -179,4 +179,19 @@ class Tenant extends Model
     {
         return $this->hasMany(Expense::class);
     }
+
+    public function inventoryUnits(): HasMany
+    {
+        return $this->hasMany(InventoryUnit::class);
+    }
+
+    public function inventoryStocks(): HasMany
+    {
+        return $this->hasMany(InventoryStock::class);
+    }
+
+    public function auditLogs(): HasMany
+    {
+        return $this->hasMany(AuditLog::class);
+    }
 }

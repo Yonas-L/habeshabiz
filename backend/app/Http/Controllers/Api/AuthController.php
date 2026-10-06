@@ -34,6 +34,16 @@ class AuthController extends Controller
             ], 403);
         }
 
+        // Track device info
+        $deviceInfo = \App\Support\DeviceDetector::parse($request->userAgent());
+        $user->update([
+            'last_device' => $deviceInfo['platform'],
+            'last_device_type' => $deviceInfo['type'],
+            'last_browser' => $deviceInfo['browser'],
+            'last_login_ip' => $request->ip(),
+            'last_login_at' => now(),
+        ]);
+
         $token = $user->createToken('habeshabiz_api_token')->plainTextToken;
 
         return response()->json([
