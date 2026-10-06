@@ -562,3 +562,63 @@ test('admin can permanently delete a tenant and all its data', function () {
     expect(\App\Models\FinancialAccount::where('tenant_id', $tenant->id)->exists())->toBeFalse();
 });
 
+test('admin can toggle business type active status and disabled business type is rejected on registration', function () {
+    $admin = PlatformAdmin::create([
+        'name' => 'Admin Vertical Test',
+        'email' => 'admin_vert@platform.com',
+        'password' => Hash::make('secret'),
+    ]);
+    $adminToken = $admin->createToken('admin_token')->plainTextToken;
+
+    // 1. Admin disables electronics
+    $resToggle = $this->withHeader('Authorization', 'Bearer '.$adminToken)
+        ->patchJson('/api/v1/admin/settings', [
+            'key' => 'business_type_electronics_enabled',
+            'value' => 'false',
+        ]);
+    $resToggle->assertStatus(200);
+
+    // 2. Public config shows electronics as unavailable
+    $resConfig = $this->getJson('/api/v1/onboard/business-types');
+    $resConfig->assertStatus(200);
+    $types = collect($resConfig->json('business_types'));
+    $electronicsType = $types->firstWhere('id', 'electronics');
+    expect($electronicsType['available'])->toBeFalse();
+
+    // 3. Trying to register with electronics fails with 422
+    PlatformSetting::set('registration_open', 'true');
+    $resOnboard = $this->postJson('/api/v1/onboard', [
+        'business_type' => 'electronics',
+        'business_name' => 'Disabled Electronics',
+        'owner_name' => 'John Doe',
+        'owner_phone' => '+251911999888',
+        'owner_email' => 'john_disabled@test.com',
+        'password' => 'secret123',
+        'city' => 'Addis Ababa',
+        'team_size' => '1',
+    ]);
+    $resOnboard->assertStatus(422)
+        ->assertJsonPath('error', 'business_type_disabled');
+
+    // 4. Admin re-enables electronics
+    $this->withHeader('Authorization', 'Bearer '.$adminToken)
+        ->patchJson('/api/v1/admin/settings', [
+            'key' => 'business_type_electronics_enabled',
+            'value' => 'true',
+        ])
+        ->assertStatus(200);
+
+    // 5. Registration now succeeds
+    $resOnboardSuccess = $this->postJson('/api/v1/onboard', [
+        'business_type' => 'electronics',
+        'business_name' => 'Enabled Electronics',
+        'owner_name' => 'John Doe',
+        'owner_phone' => '+251911999888',
+        'owner_email' => 'john_enabled@test.com',
+        'password' => 'secret123',
+        'city' => 'Addis Ababa',
+        'team_size' => '1',
+    ]);
+    $resOnboardSuccess->assertStatus(201);
+});
+

@@ -24,6 +24,7 @@ export interface AdminTenantItem {
   primary_device?: string | null;
   primary_device_type?: string | null;
   business_type?: string | null;
+  status?: 'active' | 'inactive' | 'coming_soon';
   currency_code: string;
   created_at: string;
   is_locked: boolean;
@@ -38,16 +39,62 @@ export interface AdminTenantItem {
   sales_count: number;
   sales_volume: number;
   last_activity_at: string;
+  businesses?: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    business_type: string;
+    type_label: string;
+    status: 'active' | 'inactive' | 'coming_soon';
+    products_count: number;
+    stock_count: number;
+    serialized_stock_count?: number;
+    accessory_stock_count?: number;
+    sales_count: number;
+    sales_volume: number;
+    categories?: Array<{
+      id: string;
+      name: string;
+      slug: string;
+      icon?: string | null;
+      has_serials: boolean;
+      products_count: number;
+    }>;
+  }>;
+  categories?: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    icon?: string | null;
+    has_serials: boolean;
+    products_count: number;
+  }>;
+}
+
+export interface AdminBusinessTypeVertical {
+  id: string;
+  title: string;
+  subtitle: string;
+  icon: string;
+  is_enabled: boolean;
+  setting_key: string;
+  stores_count: number;
+  active_stores_count: number;
+  stock_count: number;
+  sales_volume: number;
 }
 
 export interface AdminPlatformSummary {
   total_tenants: number;
   active_tenants: number;
+  inactive_tenants: number;
+  coming_soon_tenants: number;
   locked_tenants: number;
   total_stock_count: number;
   total_sales_volume: number;
   total_sales_count: number;
   total_users: number;
+  business_types?: AdminBusinessTypeVertical[];
 }
 
 export interface AdminTenantDetailResponse {
@@ -250,11 +297,12 @@ export const adminApi = {
     adminRequest<{ admin: AdminUser }>('/auth/me'),
 
   // Tenants
-  getTenants: (params?: { page?: number; search?: string; status?: string }) => {
+  getTenants: (params?: { page?: number; search?: string; status?: string; business_type?: string }) => {
     const q = new URLSearchParams();
     if (params?.page) q.set('page', String(params.page));
     if (params?.search) q.set('search', params.search);
     if (params?.status && params.status !== 'all') q.set('status', params.status);
+    if (params?.business_type && params.business_type !== 'all') q.set('business_type', params.business_type);
     const qs = q.toString();
     return adminRequest<PaginatedResponse<AdminTenantItem>>(`/tenants${qs ? `?${qs}` : ''}`);
   },

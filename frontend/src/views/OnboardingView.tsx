@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Smartphone,
   Store,
@@ -38,7 +38,7 @@ interface BusinessTypeOption {
   icon: React.FC<{ className?: string }>;
 }
 
-const BUSINESS_TYPES: BusinessTypeOption[] = [
+const DEFAULT_BUSINESS_TYPES: BusinessTypeOption[] = [
   {
     id: 'electronics',
     title: 'Electronics and Mobile Phones',
@@ -79,8 +79,49 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSuccess, onCan
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [direction, setDirection] = useState<'forward' | 'backward'>('forward');
 
+  // Business Types State (Loaded from backend)
+  const [businessTypesList, setBusinessTypesList] = useState<BusinessTypeOption[]>(DEFAULT_BUSINESS_TYPES);
+
   // Step 1: Selected Business Type
   const [businessType, setBusinessType] = useState<BusinessType>('electronics');
+
+  useEffect(() => {
+    let mounted = true;
+    api.getBusinessTypes()
+      .then((res) => {
+        if (!mounted || !res?.business_types) return;
+        const iconMap: Record<BusinessType, any> = {
+          electronics: Smartphone,
+          general_retail: Store,
+          clothing: Shirt,
+          food_beverage: Coffee,
+        };
+        const updated = res.business_types.map((bt) => ({
+          id: bt.id,
+          title: bt.title,
+          badge: bt.badge || (bt.available ? 'Active' : 'Coming Soon'),
+          description: bt.description,
+          available: bt.available,
+          icon: iconMap[bt.id] || Store,
+        }));
+        setBusinessTypesList(updated);
+
+        const current = updated.find((t) => t.id === businessType);
+        if (current && !current.available) {
+          const firstAvailable = updated.find((t) => t.available);
+          if (firstAvailable) {
+            setBusinessType(firstAvailable.id);
+          }
+        }
+      })
+      .catch((err) => {
+        console.warn('Could not load business types:', err);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // Step 2: Form fields
   const [businessName, setBusinessName] = useState('');
@@ -515,7 +556,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSuccess, onCan
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                {BUSINESS_TYPES.map((type) => {
+                {businessTypesList.map((type) => {
                   const Icon = type.icon;
                   const isSelected = businessType === type.id;
                   const isAvailable = type.available;

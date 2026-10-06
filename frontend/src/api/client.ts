@@ -867,6 +867,16 @@ export const api = {
       body: JSON.stringify(data),
     });
   },
+  getBusinessTypes: () =>
+    request<{
+      business_types: Array<{
+        id: 'electronics' | 'general_retail' | 'clothing' | 'food_beverage';
+        title: string;
+        badge?: string;
+        description: string;
+        available: boolean;
+      }>;
+    }>('/onboard/business-types'),
   joinWaitlist: (payload: WaitlistPayload) =>
     request<{ message: string }>('/waitlist', {
       method: 'POST',

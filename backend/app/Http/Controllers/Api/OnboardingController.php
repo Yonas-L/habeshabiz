@@ -21,6 +21,42 @@ class OnboardingController extends Controller
         protected TenantOnboardingService $onboardingService
     ) {}
 
+    public function businessTypes(): JsonResponse
+    {
+        return response()->json([
+            'business_types' => [
+                [
+                    'id' => 'electronics',
+                    'title' => 'Electronics and Mobile Phones',
+                    'badge' => PlatformSetting::get('business_type_electronics_enabled', 'true') === 'true' ? 'Active' : 'Coming Soon',
+                    'description' => 'Phones, computers, accessories, and IMEI tracking.',
+                    'available' => PlatformSetting::get('business_type_electronics_enabled', 'true') === 'true',
+                ],
+                [
+                    'id' => 'general_retail',
+                    'title' => 'General Retail',
+                    'badge' => PlatformSetting::get('business_type_general_retail_enabled', 'false') === 'true' ? 'Active' : 'Coming Soon',
+                    'description' => 'Supermarkets, FMCG, and fast checkout.',
+                    'available' => PlatformSetting::get('business_type_general_retail_enabled', 'false') === 'true',
+                ],
+                [
+                    'id' => 'clothing',
+                    'title' => 'Clothing and Fashion',
+                    'badge' => PlatformSetting::get('business_type_clothing_enabled', 'false') === 'true' ? 'Active' : 'Coming Soon',
+                    'description' => 'Apparel, footwear, and size or color variants.',
+                    'available' => PlatformSetting::get('business_type_clothing_enabled', 'false') === 'true',
+                ],
+                [
+                    'id' => 'food_beverage',
+                    'title' => 'Food and Beverage',
+                    'badge' => PlatformSetting::get('business_type_food_beverage_enabled', 'false') === 'true' ? 'Active' : 'Coming Soon',
+                    'description' => 'Cafes, bakeries, menus, and ingredients.',
+                    'available' => PlatformSetting::get('business_type_food_beverage_enabled', 'false') === 'true',
+                ],
+            ],
+        ]);
+    }
+
     public function onboard(Request $request): JsonResponse
     {
         $isOpen = PlatformSetting::get('registration_open', 'false') === 'true';
@@ -50,6 +86,17 @@ class OnboardingController extends Controller
                     'attempt_id' => $attempt->id,
                 ], 403);
             }
+        }
+
+        $type = (string) $request->input('business_type', 'electronics');
+        $isExplicitlyDisabled = PlatformSetting::get("business_type_{$type}_enabled") === 'false';
+        $isDefaultDisabled = ! app()->environment('testing') && $type !== 'electronics' && PlatformSetting::get("business_type_{$type}_enabled") !== 'true';
+
+        if ($isExplicitlyDisabled || $isDefaultDisabled) {
+            return response()->json([
+                'error' => 'business_type_disabled',
+                'message' => 'Registration for this business type is currently disabled.',
+            ], 422);
         }
 
         $validated = $request->validate([

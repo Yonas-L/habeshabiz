@@ -29,6 +29,7 @@ Route::prefix('v1')->group(function () {
     // Public Endpoints
     Route::post('/auth/login', [AuthController::class, 'login']);
     Route::post('/onboard', [OnboardingController::class, 'onboard']);
+    Route::get('/onboard/business-types', [OnboardingController::class, 'businessTypes']);
     Route::post('/waitlist', [WaitlistController::class, 'store']);
     Route::get('/public/statement/{token}', [ContactController::class, 'publicStatement']);
 

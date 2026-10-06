@@ -14,9 +14,18 @@ class AdminSettingController extends Controller
     {
         $settings = PlatformSetting::all()->pluck('value', 'key')->toArray();
 
-        // Ensure default is always present
-        if (! isset($settings['registration_open'])) {
-            $settings['registration_open'] = PlatformSetting::get('registration_open', 'false');
+        $defaults = [
+            'registration_open' => 'false',
+            'business_type_electronics_enabled' => 'true',
+            'business_type_general_retail_enabled' => 'false',
+            'business_type_clothing_enabled' => 'false',
+            'business_type_food_beverage_enabled' => 'false',
+        ];
+
+        foreach ($defaults as $key => $defaultVal) {
+            if (! isset($settings[$key])) {
+                $settings[$key] = PlatformSetting::get($key, $defaultVal);
+            }
         }
 
         return response()->json([
@@ -27,7 +36,17 @@ class AdminSettingController extends Controller
     public function update(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'key' => ['required', 'string', Rule::in(['registration_open'])],
+            'key' => [
+                'required',
+                'string',
+                Rule::in([
+                    'registration_open',
+                    'business_type_electronics_enabled',
+                    'business_type_general_retail_enabled',
+                    'business_type_clothing_enabled',
+                    'business_type_food_beverage_enabled',
+                ]),
+            ],
             'value' => ['required', 'string', Rule::in(['true', 'false'])],
         ]);
 

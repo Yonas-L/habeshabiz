@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Models\Category;
 use App\Models\InventoryStock;
 use App\Models\InventoryUnit;
+use App\Models\PlatformSetting;
 use App\Models\Product;
 use App\Models\SalesOrder;
 use App\Models\Tenant;
@@ -26,6 +28,7 @@ class AdminTenantController extends Controller
     {
         $search = trim((string) $request->query('search', ''));
         $status = (string) $request->query('status', 'all');
+        $businessType = (string) $request->query('business_type', 'all');
 
         $query = Tenant::query()
             ->with([
@@ -45,8 +48,22 @@ class AdminTenantController extends Controller
 
         if ($status === 'active') {
             $query->where('is_locked', false);
-        } elseif ($status === 'locked') {
+        } elseif ($status === 'inactive' || $status === 'locked') {
             $query->where('is_locked', true);
+        } elseif ($status === 'coming_soon') {
+            $query->where('is_locked', false)
+                ->whereDoesntHave('inventoryUnits')
+                ->whereDoesntHave('salesOrders');
+        }
+
+        if (!empty($businessType) && $businessType !== 'all') {
+            if ($businessType === 'electronics') {
+                $query->where(function ($q) {
+                    $q->where('business_type', 'electronics')->orWhereNull('business_type');
+                });
+            } else {
+                $query->where('business_type', $businessType);
+            }
         }
 
         if (!empty($search)) {
@@ -82,7 +99,13 @@ class AdminTenantController extends Controller
             ->selectRaw('tenant_id, SUM(quantity_on_hand) as sum_qty')
             ->pluck('sum_qty', 'tenant_id');
 
-        $items = $tenants->getCollection()->map(function (Tenant $tenant) use ($auditMax, $salesMax, $inventoryStockSum): array {
+        $categoriesByTenant = Category::whereIn('tenant_id', $tenantIds)
+            ->withCount('products')
+            ->orderBy('sort_order')
+            ->get()
+            ->groupBy('tenant_id');
+
+        $items = $tenants->getCollection()->map(function (Tenant $tenant) use ($auditMax, $salesMax, $inventoryStockSum, $categoriesByTenant): array {
             $owner = $tenant->users->firstWhere('role', 'owner') ?? $tenant->users->first();
             $lastAudit = $auditMax[$tenant->id] ?? null;
             $lastSale = $salesMax[$tenant->id] ?? null;
@@ -97,8 +120,41 @@ class AdminTenantController extends Controller
             $serializedStock = (int) ($tenant->in_stock_units_count ?? 0);
             $accessoryStock = (int) ($inventoryStockSum[$tenant->id] ?? 0);
             $totalStock = $serializedStock + $accessoryStock;
+            $salesCount = (int) ($tenant->sales_count ?? 0);
 
             $mostRecentUser = $tenant->users->sortByDesc('last_login_at')->first() ?? $owner;
+
+            $isLocked = (bool) $tenant->is_locked;
+            $lifecycleStatus = $isLocked ? 'inactive' : (($totalStock > 0 || $salesCount > 0) ? 'active' : 'coming_soon');
+
+            $tenantCategories = $categoriesByTenant->get($tenant->id, collect())->map(function ($cat) {
+                return [
+                    'id' => $cat->id,
+                    'name' => $cat->name,
+                    'slug' => $cat->slug,
+                    'icon' => $cat->icon,
+                    'has_serials' => (bool) $cat->has_serials,
+                    'products_count' => (int) ($cat->products_count ?? 0),
+                ];
+            })->values();
+
+            $businesses = [
+                [
+                    'id' => $tenant->id,
+                    'name' => $tenant->name,
+                    'slug' => $tenant->slug,
+                    'business_type' => $tenant->business_type ?: 'electronics',
+                    'type_label' => ucwords(str_replace('_', ' ', $tenant->business_type ?: 'electronics')),
+                    'status' => $lifecycleStatus,
+                    'products_count' => (int) ($tenant->products_count ?? 0),
+                    'stock_count' => $totalStock,
+                    'serialized_stock_count' => $serializedStock,
+                    'accessory_stock_count' => $accessoryStock,
+                    'sales_count' => $salesCount,
+                    'sales_volume' => (float) ($tenant->sales_volume ?? 0),
+                    'categories' => $tenantCategories,
+                ]
+            ];
 
             return [
                 'id' => $tenant->id,
@@ -106,6 +162,7 @@ class AdminTenantController extends Controller
                 'slug' => $tenant->slug,
                 'phone' => $tenant->phone,
                 'business_type' => $tenant->business_type,
+                'status' => $lifecycleStatus,
                 'currency_code' => $tenant->currency_code ?: 'ETB',
                 'created_at' => $tenant->created_at,
                 'is_locked' => (bool) $tenant->is_locked,
@@ -130,21 +187,103 @@ class AdminTenantController extends Controller
                 'stock_count' => $totalStock,
                 'serialized_stock_count' => $serializedStock,
                 'accessory_stock_count' => $accessoryStock,
-                'sales_count' => (int) ($tenant->sales_count ?? 0),
+                'sales_count' => $salesCount,
                 'sales_volume' => (float) ($tenant->sales_volume ?? 0),
                 'last_activity_at' => $lastActivityAt,
+                'businesses' => $businesses,
+                'categories' => $tenantCategories,
             ];
         });
 
         // Top-level platform vital stats
+        $totalTenants = Tenant::count();
+        $lockedCount = Tenant::where('is_locked', true)->count();
+        $activeCount = Tenant::where('is_locked', false)
+            ->where(function ($q) {
+                $q->has('inventoryUnits')
+                  ->orWhereHas('salesOrders')
+                  ->orWhereHas('inventoryStocks', fn($sq) => $sq->where('quantity_on_hand', '>', 0));
+            })->count();
+        $comingSoonCount = Tenant::where('is_locked', false)
+            ->whereDoesntHave('inventoryUnits')
+            ->whereDoesntHave('salesOrders')
+            ->whereDoesntHave('inventoryStocks', fn($sq) => $sq->where('quantity_on_hand', '>', 0))
+            ->count();
+
+        $verticals = [
+            [
+                'id' => 'electronics',
+                'title' => 'Electronics & Mobile',
+                'subtitle' => 'Phones, laptops, accessories & IMEIs',
+                'icon' => 'smartphone',
+                'is_enabled' => PlatformSetting::get('business_type_electronics_enabled', 'true') === 'true',
+                'setting_key' => 'business_type_electronics_enabled',
+                'stores_count' => Tenant::where(fn($q) => $q->where('business_type', 'electronics')->orWhereNull('business_type'))->count(),
+                'active_stores_count' => Tenant::where(fn($q) => $q->where('business_type', 'electronics')->orWhereNull('business_type'))->where('is_locked', false)->count(),
+                'stock_count' => (int) (
+                    InventoryUnit::whereHas('tenant', fn($q) => $q->where('business_type', 'electronics')->orWhereNull('business_type'))->where('status', 'in_stock')->count()
+                    + (int) InventoryStock::whereHas('tenant', fn($q) => $q->where('business_type', 'electronics')->orWhereNull('business_type'))->sum('quantity_on_hand')
+                ),
+                'sales_volume' => (float) SalesOrder::whereHas('tenant', fn($q) => $q->where('business_type', 'electronics')->orWhereNull('business_type'))->sum('total_amount'),
+            ],
+            [
+                'id' => 'general_retail',
+                'title' => 'General Retail',
+                'subtitle' => 'Supermarkets, FMCG & goods',
+                'icon' => 'store',
+                'is_enabled' => PlatformSetting::get('business_type_general_retail_enabled', 'false') === 'true',
+                'setting_key' => 'business_type_general_retail_enabled',
+                'stores_count' => Tenant::where('business_type', 'general_retail')->count(),
+                'active_stores_count' => Tenant::where('business_type', 'general_retail')->where('is_locked', false)->count(),
+                'stock_count' => (int) (
+                    InventoryUnit::whereHas('tenant', fn($q) => $q->where('business_type', 'general_retail'))->where('status', 'in_stock')->count()
+                    + (int) InventoryStock::whereHas('tenant', fn($q) => $q->where('business_type', 'general_retail'))->sum('quantity_on_hand')
+                ),
+                'sales_volume' => (float) SalesOrder::whereHas('tenant', fn($q) => $q->where('business_type', 'general_retail'))->sum('total_amount'),
+            ],
+            [
+                'id' => 'clothing',
+                'title' => 'Clothing & Fashion',
+                'subtitle' => 'Apparel, footwear & variants',
+                'icon' => 'shirt',
+                'is_enabled' => PlatformSetting::get('business_type_clothing_enabled', 'false') === 'true',
+                'setting_key' => 'business_type_clothing_enabled',
+                'stores_count' => Tenant::where('business_type', 'clothing')->count(),
+                'active_stores_count' => Tenant::where('business_type', 'clothing')->where('is_locked', false)->count(),
+                'stock_count' => (int) (
+                    InventoryUnit::whereHas('tenant', fn($q) => $q->where('business_type', 'clothing'))->where('status', 'in_stock')->count()
+                    + (int) InventoryStock::whereHas('tenant', fn($q) => $q->where('business_type', 'clothing'))->sum('quantity_on_hand')
+                ),
+                'sales_volume' => (float) SalesOrder::whereHas('tenant', fn($q) => $q->where('business_type', 'clothing'))->sum('total_amount'),
+            ],
+            [
+                'id' => 'food_beverage',
+                'title' => 'Food & Beverage',
+                'subtitle' => 'Cafes, bakeries & menus',
+                'icon' => 'coffee',
+                'is_enabled' => PlatformSetting::get('business_type_food_beverage_enabled', 'false') === 'true',
+                'setting_key' => 'business_type_food_beverage_enabled',
+                'stores_count' => Tenant::where('business_type', 'food_beverage')->count(),
+                'active_stores_count' => Tenant::where('business_type', 'food_beverage')->where('is_locked', false)->count(),
+                'stock_count' => (int) (
+                    InventoryUnit::whereHas('tenant', fn($q) => $q->where('business_type', 'food_beverage'))->where('status', 'in_stock')->count()
+                    + (int) InventoryStock::whereHas('tenant', fn($q) => $q->where('business_type', 'food_beverage'))->sum('quantity_on_hand')
+                ),
+                'sales_volume' => (float) SalesOrder::whereHas('tenant', fn($q) => $q->where('business_type', 'food_beverage'))->sum('total_amount'),
+            ],
+        ];
+
         $summary = [
-            'total_tenants' => Tenant::count(),
-            'active_tenants' => Tenant::where('is_locked', false)->count(),
-            'locked_tenants' => Tenant::where('is_locked', true)->count(),
+            'total_tenants' => $totalTenants,
+            'active_tenants' => $activeCount,
+            'inactive_tenants' => $lockedCount,
+            'coming_soon_tenants' => $comingSoonCount,
+            'locked_tenants' => $lockedCount,
             'total_stock_count' => (int) (InventoryUnit::where('status', 'in_stock')->count() + (int) InventoryStock::sum('quantity_on_hand')),
             'total_sales_volume' => (float) SalesOrder::sum('total_amount'),
             'total_sales_count' => (int) SalesOrder::count(),
             'total_users' => User::count(),
+            'business_types' => $verticals,
         ];
 
         return response()->json([
