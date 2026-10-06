@@ -146,45 +146,92 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
         </div>
       }
       footerActions={
-        <>
-          <button
-            type="button"
-            onClick={onClose}
-            className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
-          >
-            Close
-          </button>
-
-          {/* Delete — only for manual debts with no payments */}
-          {debt.reference_type === 'direct_credit' && paid === 0 && (
+        <div className="w-full">
+          {/* Desktop Action Row (≥ sm) */}
+          <div className="hidden sm:flex sm:items-center sm:justify-between sm:w-full gap-3">
             <button
               type="button"
-              onClick={handleDrawerDelete}
-              disabled={deletingDrawer}
-              className="h-9 px-3 rounded-xl border border-rose-200 dark:border-rose-800/60 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors flex items-center gap-1.5 disabled:opacity-50"
+              onClick={onClose}
+              className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0 whitespace-nowrap"
             >
-              {deletingDrawer ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-              <span>Delete</span>
+              Close
             </button>
-          )}
 
-          {remaining > 0 && !showPayForm && (
-            <button
-              type="button"
-              onClick={() => setShowPayForm(true)}
-              className="h-9 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs active:scale-95 flex items-center gap-1.5"
-            >
-              <DollarSign className="w-3.5 h-3.5" />
-              <span>
-                {debt.reference_type === 'salesperson_bonus'
-                  ? 'Pay Sales Bonus Now'
-                  : isReceivable
-                  ? 'Collect Payment Now'
-                  : 'Pay Sourcing Partner'}
-              </span>
-            </button>
-          )}
-        </>
+            <div className="flex items-center gap-2">
+              {/* Delete — only for manual debts with no payments */}
+              {debt.reference_type === 'direct_credit' && paid === 0 && (
+                <button
+                  type="button"
+                  onClick={handleDrawerDelete}
+                  disabled={deletingDrawer}
+                  className="h-9 px-3 rounded-xl border border-rose-200 dark:border-rose-800/60 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors flex items-center gap-1.5 disabled:opacity-50 shrink-0 whitespace-nowrap"
+                >
+                  {deletingDrawer ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                  <span>Delete</span>
+                </button>
+              )}
+
+              {remaining > 0 && !showPayForm && (
+                <button
+                  type="button"
+                  onClick={() => setShowPayForm(true)}
+                  className="h-9 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs active:scale-95 flex items-center gap-1.5 shrink-0 whitespace-nowrap"
+                >
+                  <DollarSign className="w-3.5 h-3.5" />
+                  <span>
+                    {debt.reference_type === 'salesperson_bonus'
+                      ? 'Pay Sales Bonus Now'
+                      : isReceivable
+                      ? 'Collect Payment Now'
+                      : 'Pay Sourcing Partner'}
+                  </span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Mobile Action Row (< sm) */}
+          <div className="flex sm:hidden flex-col gap-2 w-full">
+            {remaining > 0 && !showPayForm && (
+              <button
+                type="button"
+                onClick={() => setShowPayForm(true)}
+                className="w-full h-10 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs active:scale-95 flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer"
+              >
+                <DollarSign className="w-3.5 h-3.5 shrink-0" />
+                <span>
+                  {debt.reference_type === 'salesperson_bonus'
+                    ? 'Pay Sales Bonus'
+                    : isReceivable
+                    ? 'Collect Payment'
+                    : 'Pay Sourcing Partner'}
+                </span>
+              </button>
+            )}
+
+            <div className="flex items-center gap-2 w-full">
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer flex items-center justify-center whitespace-nowrap"
+              >
+                Close
+              </button>
+
+              {debt.reference_type === 'direct_credit' && paid === 0 && (
+                <button
+                  type="button"
+                  onClick={handleDrawerDelete}
+                  disabled={deletingDrawer}
+                  className="flex-1 h-9 px-3 rounded-xl border border-rose-200 dark:border-rose-800/60 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50 whitespace-nowrap cursor-pointer"
+                >
+                  {deletingDrawer ? <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" /> : <Trash2 className="w-3.5 h-3.5 shrink-0" />}
+                  <span>Delete</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       }
     >
       {/* Hero Remaining Obligation Card */}

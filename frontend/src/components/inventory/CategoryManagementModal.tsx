@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import type { ProductCategory } from '../../api/client';
 import { api } from '../../api/client';
@@ -77,6 +77,23 @@ export const CategoryManagementModal: React.FC<CategoryManagementModalProps> = (
   const [hasSerials, setHasSerials] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Refs for auto-scroll and auto-focus
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  // Auto-scroll to form and focus name input when creating or editing
+  useEffect(() => {
+    if (isCreating || editingCategory) {
+      scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+      const timer = setTimeout(() => {
+        nameInputRef.current?.focus();
+        nameInputRef.current?.select();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isCreating, editingCategory]);
 
   if (!isOpen) return null;
 
@@ -178,29 +195,30 @@ export const CategoryManagementModal: React.FC<CategoryManagementModalProps> = (
         <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mt-2.5 mb-1 sm:hidden shrink-0" />
 
         {/* Header */}
-        <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
-          <div>
-            <h2 className="text-base font-bold text-slate-900 dark:text-white">
+        <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-3 shrink-0">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-base font-bold text-slate-900 dark:text-white truncate">
               Manage Categories
             </h2>
-            <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5 truncate">
               Organize inventory catalog and tracking modes
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             {!isCreating && !editingCategory && (
               <button
                 onClick={handleStartCreate}
-                className="h-8 px-3 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all flex items-center gap-1.5 shadow-2xs active:scale-95"
+                className="h-8 px-3 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all flex items-center gap-1.5 shadow-2xs active:scale-95 shrink-0 whitespace-nowrap cursor-pointer"
               >
-                <Plus className="w-3.5 h-3.5" />
+                <Plus className="w-3.5 h-3.5 text-emerald-400 dark:text-emerald-500 shrink-0" />
                 <span>New Category</span>
               </button>
             )}
             <button
               onClick={onClose}
-              className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center transition-colors"
+              className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center transition-colors cursor-pointer shrink-0"
+              aria-label="Close"
             >
               <X className="w-4 h-4" />
             </button>
@@ -208,10 +226,11 @@ export const CategoryManagementModal: React.FC<CategoryManagementModalProps> = (
         </div>
 
         {/* Modal Body */}
-        <div className="p-5 overflow-y-auto space-y-4 flex-1">
+        <div ref={scrollContainerRef} className="p-5 overflow-y-auto space-y-4 flex-1">
           {/* Create or Edit Inline Card */}
           {(isCreating || editingCategory) && (
             <form
+              ref={formRef}
               onSubmit={handleSaveCategory}
               className="p-4 rounded-xl bg-slate-50/80 dark:bg-slate-900/50 border border-slate-200/60 dark:border-slate-800 space-y-3 animate-fadeIn"
             >
@@ -222,7 +241,7 @@ export const CategoryManagementModal: React.FC<CategoryManagementModalProps> = (
                 <button
                   type="button"
                   onClick={handleCancelForm}
-                  className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                  className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -234,6 +253,7 @@ export const CategoryManagementModal: React.FC<CategoryManagementModalProps> = (
                     Category Name *
                   </label>
                   <input
+                    ref={nameInputRef}
                     type="text"
                     required
                     placeholder="e.g. Smart Watches, Audio, Accessories"

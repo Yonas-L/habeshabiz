@@ -755,12 +755,128 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
   return (
     <div className="space-y-5 animate-page-enter">
-      {/* Top Controls Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      {/* ═══ MOBILE TOP CONTROLS (< sm) ═══ */}
+      <div className="sm:hidden space-y-2.5">
+        {/* Row 1: Search + Category Menu Button + Add Stock Button */}
+        <div className="flex items-center gap-2">
+          {/* Search Input */}
+          <div className="relative flex-1 min-w-0">
+            {isSearching ? (
+              <Loader2 className="w-4 h-4 text-primary-500 animate-spin absolute left-3 top-3 pointer-events-none" />
+            ) : (
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
+            )}
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  setDebouncedSearch(search);
+                }
+              }}
+              placeholder="Search Model, Serial, IMEI..."
+              className="w-full h-10 pl-9 pr-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700 shadow-2xs transition-all"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch('');
+                  setDebouncedSearch('');
+                }}
+                className="absolute right-2.5 top-2.5 p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                title="Clear search"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Manage Categories Modal Button */}
+          {isOwner && (
+            <button
+              onClick={() => setIsCategoryModalOpen(true)}
+              className="h-10 w-10 shrink-0 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-center active:scale-95 transition-all shadow-2xs cursor-pointer"
+              title="Manage product categories"
+              aria-label="Manage product categories"
+            >
+              <FolderCog className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+            </button>
+          )}
+
+          {/* Add Stock Button */}
+          {(isOwner || canIntake) && (
+            <button
+              onClick={() => {
+                setIntakeInitialProductId(undefined);
+                setIntakeInitialVariantId(undefined);
+                setShowIntakeModal(true);
+              }}
+              className="h-10 px-3 shrink-0 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 flex items-center gap-1.5 active:scale-95 transition-all shadow-xs cursor-pointer"
+            >
+              <Plus className="w-4 h-4 text-emerald-400 dark:text-emerald-500 shrink-0" />
+              <span>Add</span>
+            </button>
+          )}
+        </div>
+
+        {/* Row 2: Status Filter + Category Filter (Equal 2 columns) */}
+        <div className="grid grid-cols-2 gap-2">
+          {/* Status Select */}
+          <div className="relative w-full min-w-0">
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value as TabType);
+                setCurrentPage(1);
+              }}
+              className="w-full h-10 pl-3 pr-7 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700 shadow-2xs appearance-none cursor-pointer truncate"
+            >
+              <option value="in_stock">In Stock ({counts.in_stock})</option>
+              <option value="vendor_stock">Vendor ({counts.vendor_stock ?? 0})</option>
+              <option value="exchange_stock">Exchange ({counts.exchange_stock ?? 0})</option>
+              <option value="out">Out ({counts.out})</option>
+              <option value="sold">Sold ({counts.sold})</option>
+              <option value="returned">Returns ({counts.returned})</option>
+              <option value="returned_to_vendor">With Vendor ({counts.returned_to_vendor ?? 0})</option>
+              <option value="all">All ({counts.all})</option>
+              {isOwner && (
+                <option value="archived">Archived ({archivedProducts.length})</option>
+              )}
+            </select>
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-3.5 pointer-events-none" />
+          </div>
+
+          {/* Category Select */}
+          <div className="relative w-full min-w-0">
+            <select
+              value={selectedCategoryId}
+              onChange={(e) => {
+                setSelectedCategoryId(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full h-10 pl-3 pr-7 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700 shadow-2xs appearance-none cursor-pointer truncate"
+            >
+              <option value="all">All Categories</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} {c.in_stock_units_count ? `(${c.in_stock_units_count})` : ''}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-3.5 pointer-events-none" />
+          </div>
+        </div>
+      </div>
+
+      {/* ═══ DESKTOP TOP CONTROLS (sm and up) ═══ */}
+      <div className="hidden sm:flex items-center justify-between gap-3">
         {/* Left: Status Dropdown + Category Dropdown + Search */}
-        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap flex-1 max-w-3xl">
+        <div className="flex items-center gap-2 flex-1 max-w-3xl">
           {/* Status Select Dropdown */}
-          <div className="relative min-w-[140px] sm:w-44 shrink-0">
+          <div className="relative w-44 shrink-0">
             <select
               value={statusFilter}
               onChange={(e) => {
@@ -785,7 +901,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           </div>
 
           {/* Category Select Dropdown */}
-          <div className="relative min-w-[130px] sm:w-44 shrink-0">
+          <div className="relative w-44 shrink-0">
             <select
               value={selectedCategoryId}
               onChange={(e) => {
@@ -840,9 +956,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           </div>
         </div>
 
-        {/* Right: Action Buttons (Hidden on mobile as accessible via FAB & in-card action) */}
+        {/* Right: Action Buttons */}
         {(isOwner || canIntake) && (
-          <div className="hidden sm:flex items-center gap-2 shrink-0 justify-end">
+          <div className="flex items-center gap-2 shrink-0 justify-end">
             {isOwner && (
               <button
                 onClick={() => setIsCategoryModalOpen(true)}

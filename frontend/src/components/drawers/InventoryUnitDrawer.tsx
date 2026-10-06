@@ -360,7 +360,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
       }
       footerActions={
         isEditing ? (
-          <>
+          <div className="flex items-center justify-between gap-3 w-full">
             <button
               type="button"
               onClick={() => {
@@ -368,7 +368,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
                 setIsEditing(false);
               }}
               disabled={saving}
-              className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
+              className="flex-1 sm:flex-none h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0 whitespace-nowrap"
             >
               Cancel
             </button>
@@ -376,112 +376,227 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
               type="button"
               onClick={handleSave}
               disabled={saving}
-              className="h-9 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs active:scale-95 flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0"
+              className="flex-1 sm:flex-none h-9 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0 whitespace-nowrap"
             >
               {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
               <span>Save Changes</span>
             </button>
-          </>
+          </div>
         ) : (
-          <>
-            <button
-              type="button"
-              onClick={onClose}
-              className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
-            >
-              Close
-            </button>
+          <div className="w-full">
+            {/* Desktop Action Row (≥ sm): Preserves single-row layout */}
+            <div className="hidden sm:flex sm:items-center sm:justify-between sm:w-full gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0 whitespace-nowrap"
+              >
+                Close
+              </button>
 
-            <div className="flex items-center gap-2">
-              {/* Edit Details Button in footer for fast access */}
-              {isOwner && (
+              <div className="flex items-center gap-2">
+                {/* Edit Details Button in footer for fast access */}
+                {isOwner && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      initForm(currentUnit);
+                      setIsEditing(true);
+                    }}
+                    className="h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer shrink-0 whitespace-nowrap"
+                    title="Edit device serial, condition, cost basis, or diagnostics"
+                  >
+                    <Edit3 className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                    <span>Edit</span>
+                  </button>
+                )}
+
+                {/* IN STOCK: Handover (Owner Only) or Sell (Everyone) */}
+                {isInStock && (
+                  <>
+                    {(isOwner || canHandover) && onOpenHandover && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onOpenHandover(currentUnit);
+                          onClose();
+                        }}
+                        className="h-9 px-3.5 rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50/60 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 shrink-0 whitespace-nowrap"
+                      >
+                        <UserCheck className="w-3.5 h-3.5" />
+                        <span>Handover</span>
+                      </button>
+                    )}
+
+                    {onSelectForSale && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onSelectForSale(currentUnit);
+                          onClose();
+                        }}
+                        className="h-9 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs active:scale-95 flex items-center gap-1.5 shrink-0 whitespace-nowrap"
+                      >
+                        <DollarSign className="w-3.5 h-3.5" />
+                        <span>Sell at Counter</span>
+                      </button>
+                    )}
+                  </>
+                )}
+
+                {/* OUT FOR SALE: Mark Sold or Restock to Shelf */}
+                {isOut && (isOwner || canHandover) && (
+                  <div className="flex items-center gap-2">
+                    {onOpenMarkSold && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onOpenMarkSold(currentUnit);
+                          onClose();
+                        }}
+                        className="h-9 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs active:scale-95 flex items-center gap-1.5 cursor-pointer shrink-0 whitespace-nowrap"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Mark Sold</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      disabled={restocking}
+                      onClick={handleRestockOut}
+                      className="h-9 px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-bold transition-all shadow-2xs active:scale-95 flex items-center gap-1.5 cursor-pointer shrink-0 whitespace-nowrap"
+                    >
+                      {restocking ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
+                      <span>Restock Unsold</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* SOLD: Warranty Swap & Customer Return */}
+                {isSold && onOpenSwap && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onOpenSwap(currentUnit);
+                      onClose();
+                    }}
+                    className="h-9 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition-all shadow-xs active:scale-95 flex items-center gap-1.5 shrink-0 whitespace-nowrap"
+                  >
+                    <ArrowLeftRight className="w-3.5 h-3.5" />
+                    <span>Warranty Swap</span>
+                  </button>
+                )}
+
+                {isSold && (isOwner || canManageInv) && onOpenCustomerReturn && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onOpenCustomerReturn(currentUnit);
+                      onClose();
+                    }}
+                    className="h-9 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all shadow-xs active:scale-95 flex items-center gap-1.5 shrink-0 whitespace-nowrap"
+                  >
+                    <Undo2 className="w-3.5 h-3.5" />
+                    <span>Process Customer Return</span>
+                  </button>
+                )}
+
+                {/* RETURNED / FIXED: Record Repair Cost & Repaired Restock */}
+                {(isReturned || currentUnit.status === 'fixed') && (isOwner || canManageInv) && (
+                  <>
+                    {onOpenRepairExpense && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onOpenRepairExpense(currentUnit);
+                          onClose();
+                        }}
+                        className="h-9 px-3.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition-all shadow-xs active:scale-95 flex items-center gap-1.5 cursor-pointer shrink-0 whitespace-nowrap"
+                      >
+                        <Wrench className="w-3.5 h-3.5" />
+                        <span>Log Repair Cost</span>
+                      </button>
+                    )}
+                    {onOpenRepairedRestock && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onOpenRepairedRestock(currentUnit);
+                          onClose();
+                        }}
+                        className={`h-9 px-4 rounded-xl text-white text-xs font-bold transition-all shadow-xs active:scale-95 flex items-center gap-1.5 cursor-pointer shrink-0 whitespace-nowrap ${
+                          currentUnit.status === 'fixed' ? 'bg-teal-600 hover:bg-teal-700' : 'bg-emerald-600 hover:bg-emerald-700'
+                        }`}
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>Restock Repaired Device</span>
+                      </button>
+                    )}
+                  </>
+                )}
+
+                {/* WITH VENDOR: Receive Fixed & Vendor Swap */}
+                {currentUnit.status === 'returned_to_vendor' && (isOwner || canManageInv) && (
+                  <>
+                    {onOpenReceiveFixed && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onOpenReceiveFixed(currentUnit);
+                          onClose();
+                        }}
+                        className="h-9 px-3.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition-all shadow-xs active:scale-95 flex items-center gap-1.5 shrink-0 whitespace-nowrap"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Receive Fixed</span>
+                      </button>
+                    )}
+                    {onOpenVendorSwap && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onOpenVendorSwap(currentUnit);
+                          onClose();
+                        }}
+                        className="h-9 px-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-xs active:scale-95 flex items-center gap-1.5 shrink-0 whitespace-nowrap"
+                      >
+                        <ArrowLeftRight className="w-3.5 h-3.5" />
+                        <span>Vendor Swap</span>
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Mobile Action Rows (< sm): Clean full-width primary + secondary action rows */}
+            <div className="flex sm:hidden flex-col gap-2 w-full">
+              {/* Row 1: Primary Status-driven Action */}
+              {isInStock && onSelectForSale && (
                 <button
                   type="button"
                   onClick={() => {
-                    initForm(currentUnit);
-                    setIsEditing(true);
+                    onSelectForSale(currentUnit);
+                    onClose();
                   }}
-                  className="h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer"
-                  title="Edit device serial, condition, cost basis, or diagnostics"
+                  className="w-full h-10 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs active:scale-95 flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer"
                 >
-                  <Edit3 className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
-                  <span>Edit</span>
+                  <DollarSign className="w-3.5 h-3.5 shrink-0" />
+                  <span>Sell at Counter</span>
                 </button>
               )}
 
-              {/* IN STOCK: Handover (Owner Only) or Sell (Everyone) */}
-              {isInStock && (
-                <>
-                  {(isOwner || canHandover) && onOpenHandover && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onOpenHandover(currentUnit);
-                        onClose();
-                      }}
-                      className="h-9 px-3.5 rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50/60 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
-                    >
-                      <UserCheck className="w-3.5 h-3.5" />
-                      <span>Handover</span>
-                    </button>
-                  )}
-
-                  {onSelectForSale && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onSelectForSale(currentUnit);
-                        onClose();
-                      }}
-                      className="h-9 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs active:scale-95 flex items-center gap-1.5"
-                    >
-                      <DollarSign className="w-3.5 h-3.5" />
-                      <span>Sell at Counter</span>
-                    </button>
-                  )}
-                </>
-              )}
-
-              {/* OUT FOR SALE: Mark Sold or Restock to Shelf */}
-              {isOut && (isOwner || canHandover) && (
-                <div className="flex items-center gap-2">
-                  {onOpenMarkSold && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onOpenMarkSold(currentUnit);
-                        onClose();
-                      }}
-                      className="h-9 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs active:scale-95 flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>Mark Sold</span>
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    disabled={restocking}
-                    onClick={handleRestockOut}
-                    className="h-9 px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-bold transition-all shadow-2xs active:scale-95 flex items-center gap-1.5 cursor-pointer"
-                  >
-                    {restocking ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
-                    <span>Restock Unsold</span>
-                  </button>
-                </div>
-              )}
-
-              {/* SOLD: Warranty Swap & Customer Return */}
-              {isSold && onOpenSwap && (
+              {isOut && (isOwner || canHandover) && onOpenMarkSold && (
                 <button
                   type="button"
                   onClick={() => {
-                    onOpenSwap(currentUnit);
+                    onOpenMarkSold(currentUnit);
                     onClose();
                   }}
-                  className="h-9 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition-all shadow-xs active:scale-95 flex items-center gap-1.5"
+                  className="w-full h-10 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs active:scale-95 flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer"
                 >
-                  <ArrowLeftRight className="w-3.5 h-3.5" />
-                  <span>Warranty Swap</span>
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                  <span>Mark Sold</span>
                 </button>
               )}
 
@@ -492,80 +607,138 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
                     onOpenCustomerReturn(currentUnit);
                     onClose();
                   }}
-                  className="h-9 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all shadow-xs active:scale-95 flex items-center gap-1.5"
+                  className="w-full h-10 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all shadow-xs active:scale-95 flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer"
                 >
-                  <Undo2 className="w-3.5 h-3.5" />
+                  <Undo2 className="w-3.5 h-3.5 shrink-0" />
                   <span>Process Customer Return</span>
                 </button>
               )}
 
-              {/* RETURNED / FIXED: Record Repair Cost & Repaired Restock */}
-              {(isReturned || currentUnit.status === 'fixed') && (isOwner || canManageInv) && (
-                <>
-                  {onOpenRepairExpense && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onOpenRepairExpense(currentUnit);
-                        onClose();
-                      }}
-                      className="h-9 px-3.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition-all shadow-xs active:scale-95 flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <Wrench className="w-3.5 h-3.5" />
-                      <span>Log Repair Cost</span>
-                    </button>
-                  )}
-                  {onOpenRepairedRestock && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onOpenRepairedRestock(currentUnit);
-                        onClose();
-                      }}
-                      className={`h-9 px-4 rounded-xl text-white text-xs font-bold transition-all shadow-xs active:scale-95 flex items-center gap-1.5 cursor-pointer ${
-                        currentUnit.status === 'fixed' ? 'bg-teal-600 hover:bg-teal-700' : 'bg-emerald-600 hover:bg-emerald-700'
-                      }`}
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      <span>Restock Repaired Device</span>
-                    </button>
-                  )}
-                </>
+              {(isReturned || currentUnit.status === 'fixed') && (isOwner || canManageInv) && onOpenRepairedRestock && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onOpenRepairedRestock(currentUnit);
+                    onClose();
+                  }}
+                  className={`w-full h-10 px-4 rounded-xl text-white text-xs font-bold transition-all shadow-xs active:scale-95 flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                    currentUnit.status === 'fixed' ? 'bg-teal-600 hover:bg-teal-700' : 'bg-emerald-600 hover:bg-emerald-700'
+                  }`}
+                >
+                  <RotateCcw className="w-3.5 h-3.5 shrink-0" />
+                  <span>Restock Repaired Device</span>
+                </button>
               )}
 
-              {/* WITH VENDOR: Receive Fixed & Vendor Swap */}
-              {currentUnit.status === 'returned_to_vendor' && (isOwner || canManageInv) && (
-                <>
-                  {onOpenReceiveFixed && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onOpenReceiveFixed(currentUnit);
-                        onClose();
-                      }}
-                      className="h-9 px-3.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition-all shadow-xs active:scale-95 flex items-center gap-1.5"
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>Receive Fixed</span>
-                    </button>
-                  )}
-                  {onOpenVendorSwap && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onOpenVendorSwap(currentUnit);
-                        onClose();
-                      }}
-                      className="h-9 px-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-xs active:scale-95 flex items-center gap-1.5"
-                    >
-                      <ArrowLeftRight className="w-3.5 h-3.5" />
-                      <span>Vendor Swap</span>
-                    </button>
-                  )}
-                </>
+              {currentUnit.status === 'returned_to_vendor' && (isOwner || canManageInv) && onOpenReceiveFixed && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onOpenReceiveFixed(currentUnit);
+                    onClose();
+                  }}
+                  className="w-full h-10 px-4 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition-all shadow-xs active:scale-95 flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                  <span>Receive Fixed</span>
+                </button>
               )}
+
+              {/* Row 2: Secondary / Close Actions */}
+              <div className="flex items-center gap-2 w-full">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="flex-1 h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer flex items-center justify-center whitespace-nowrap"
+                >
+                  Close
+                </button>
+
+                {isOwner && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      initForm(currentUnit);
+                      setIsEditing(true);
+                    }}
+                    className="flex-1 h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 text-xs font-bold transition-all shadow-2xs flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap"
+                  >
+                    <Edit3 className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
+                    <span>Edit</span>
+                  </button>
+                )}
+
+                {/* Additional contextual secondary buttons for mobile */}
+                {isInStock && (isOwner || canHandover) && onOpenHandover && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onOpenHandover(currentUnit);
+                      onClose();
+                    }}
+                    className="flex-1 h-9 px-3 rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50/60 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1 whitespace-nowrap cursor-pointer"
+                  >
+                    <UserCheck className="w-3.5 h-3.5 shrink-0" />
+                    <span>Handover</span>
+                  </button>
+                )}
+
+                {isOut && (isOwner || canHandover) && (
+                  <button
+                    type="button"
+                    disabled={restocking}
+                    onClick={handleRestockOut}
+                    className="flex-1 h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-bold transition-all shadow-2xs active:scale-95 flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap"
+                  >
+                    {restocking ? <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" /> : <RotateCcw className="w-3.5 h-3.5 shrink-0" />}
+                    <span>Restock</span>
+                  </button>
+                )}
+
+                {isSold && onOpenSwap && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onOpenSwap(currentUnit);
+                      onClose();
+                    }}
+                    className="flex-1 h-9 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition-all shadow-xs active:scale-95 flex items-center justify-center gap-1 whitespace-nowrap cursor-pointer"
+                  >
+                    <ArrowLeftRight className="w-3.5 h-3.5 shrink-0" />
+                    <span>Swap</span>
+                  </button>
+                )}
+
+                {(isReturned || currentUnit.status === 'fixed') && (isOwner || canManageInv) && onOpenRepairExpense && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onOpenRepairExpense(currentUnit);
+                      onClose();
+                    }}
+                    className="flex-1 h-9 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition-all shadow-xs active:scale-95 flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap"
+                  >
+                    <Wrench className="w-3.5 h-3.5 shrink-0" />
+                    <span>Repair</span>
+                  </button>
+                )}
+
+                {currentUnit.status === 'returned_to_vendor' && (isOwner || canManageInv) && onOpenVendorSwap && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onOpenVendorSwap(currentUnit);
+                      onClose();
+                    }}
+                    className="flex-1 h-9 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-xs active:scale-95 flex items-center justify-center gap-1 whitespace-nowrap cursor-pointer"
+                  >
+                    <ArrowLeftRight className="w-3.5 h-3.5 shrink-0" />
+                    <span>Swap</span>
+                  </button>
+                )}
+              </div>
             </div>
-          </>
+          </div>
         )
       }
     >

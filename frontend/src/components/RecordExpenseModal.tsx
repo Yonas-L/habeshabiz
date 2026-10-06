@@ -507,7 +507,7 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="h-10 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            className="h-10 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0 whitespace-nowrap"
           >
             Cancel
           </button>
@@ -515,7 +515,7 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
             type="submit"
             form="record-expense-form"
             disabled={submitting}
-            className="h-10 px-5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 disabled:opacity-50 transition-colors shadow-xs active:scale-[0.98] cursor-pointer"
+            className="h-10 px-5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 disabled:opacity-50 transition-colors shadow-xs active:scale-[0.98] cursor-pointer shrink-0 whitespace-nowrap"
           >
             {submitting ? 'Recording...' : 'Record Outflow'}
           </button>
