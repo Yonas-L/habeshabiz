@@ -10,7 +10,6 @@ import {
   Package,
   Barcode,
   BatteryCharging,
-  Loader2,
   ChevronDown,
   Handshake,
   Building2,
@@ -20,6 +19,7 @@ import {
   Trash2,
   ShieldAlert,
 } from 'lucide-react';
+import { LdrsSpinner } from '../loading/LdrsSpinner';
 import { PartnerFormModal } from '../partners/PartnerFormModal';
 
 interface StockIntakeModalProps {
@@ -1093,7 +1093,7 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                       onClick={() => setVariantStorage(opt)}
                       className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
                         isSelected
-                          ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 border-slate-900 dark:border-white shadow-2xs font-bold'
+                          ? 'bg-slate-900 dark:bg-slate-900 text-emerald-400 dark:text-emerald-400 border-slate-800 dark:border-slate-800 shadow-2xs font-bold ring-1 ring-emerald-500/20'
                           : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
                       }`}
                     >
@@ -1129,7 +1129,7 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                       onClick={() => setVariantRam(opt)}
                       className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
                         isSelected
-                          ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 border-slate-900 dark:border-white shadow-2xs font-bold'
+                          ? 'bg-slate-900 dark:bg-slate-900 text-emerald-400 dark:text-emerald-400 border-slate-800 dark:border-slate-800 shadow-2xs font-bold ring-1 ring-emerald-500/20'
                           : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
                       }`}
                     >
@@ -1165,7 +1165,7 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                       onClick={() => setVariantProcessor(opt)}
                       className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
                         isSelected
-                          ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 border-slate-900 dark:border-white shadow-2xs font-bold'
+                          ? 'bg-slate-900 dark:bg-slate-900 text-emerald-400 dark:text-emerald-400 border-slate-800 dark:border-slate-800 shadow-2xs font-bold ring-1 ring-emerald-500/20'
                           : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
                       }`}
                     >
@@ -1201,7 +1201,7 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                       onClick={() => setVariantColor(opt)}
                       className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
                         isSelected
-                          ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 border-slate-900 dark:border-white shadow-2xs font-bold'
+                          ? 'bg-slate-900 dark:bg-slate-900 text-emerald-400 dark:text-emerald-400 border-slate-800 dark:border-slate-800 shadow-2xs font-bold ring-1 ring-emerald-500/20'
                           : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
                       }`}
                     >
@@ -1243,7 +1243,7 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                       onClick={() => setVariantStorage(opt)}
                       className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
                         isSelected
-                          ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 border-slate-900 dark:border-white shadow-2xs font-bold'
+                          ? 'bg-slate-900 dark:bg-slate-900 text-emerald-400 dark:text-emerald-400 border-slate-800 dark:border-slate-800 shadow-2xs font-bold ring-1 ring-emerald-500/20'
                           : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
                       }`}
                     >
@@ -1275,7 +1275,7 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                   onClick={() => setVariantRam('')}
                   className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
                     !variantRam
-                      ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 border-slate-900 dark:border-white shadow-2xs font-bold'
+                      ? 'bg-slate-900 dark:bg-slate-900 text-emerald-400 dark:text-emerald-400 border-slate-800 dark:border-slate-800 shadow-2xs font-bold ring-1 ring-emerald-500/20'
                       : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:border-slate-300'
                   }`}
                 >
@@ -1290,7 +1290,7 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                       onClick={() => setVariantRam(opt)}
                       className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
                         isSelected
-                          ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 border-slate-900 dark:border-white shadow-2xs font-bold'
+                          ? 'bg-slate-900 dark:bg-slate-900 text-emerald-400 dark:text-emerald-400 border-slate-800 dark:border-slate-800 shadow-2xs font-bold ring-1 ring-emerald-500/20'
                           : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
                       }`}
                     >
@@ -1326,7 +1326,7 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                       onClick={() => setVariantColor(opt)}
                       className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
                         isSelected
-                          ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 border-slate-900 dark:border-white shadow-2xs font-bold'
+                          ? 'bg-slate-900 dark:bg-slate-900 text-emerald-400 dark:text-emerald-400 border-slate-800 dark:border-slate-800 shadow-2xs font-bold ring-1 ring-emerald-500/20'
                           : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
                       }`}
                     >
@@ -1359,15 +1359,15 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
       />
 
       {/* Modal / Bottom Sheet Surface */}
-      <div className="relative z-10 w-full max-w-2xl bg-white dark:bg-[#131926] rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-slate-200/80 dark:border-slate-800 overflow-hidden animate-bottom-sheet sm:animate-modal-enter flex flex-col max-h-[88vh] sm:max-h-[calc(100vh-7rem)] my-0 sm:my-auto">
+      <div className="relative z-10 w-full max-w-2xl bg-white dark:bg-[#131926] rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-slate-200/80 dark:border-slate-800 overflow-hidden max-sm:animate-bottom-sheet sm:animate-modal-enter flex flex-col max-h-[88vh] sm:max-h-[calc(100vh-7rem)] my-0 sm:my-auto">
         {/* Mobile Drag Indicator */}
         <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mt-2.5 mb-1 sm:hidden shrink-0" />
 
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center shrink-0">
-              <Package className="w-4 h-4" />
+            <div className="w-9 h-9 rounded-xl bg-slate-900 dark:bg-slate-900 border border-slate-800 text-emerald-400 flex items-center justify-center shrink-0 shadow-xs">
+              <Package className="w-4.5 h-4.5" />
             </div>
             <div>
               <h2 className="text-sm font-bold text-slate-900 dark:text-white leading-none">
@@ -1471,9 +1471,9 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                     type="button"
                     onClick={handleCreateProduct}
                     disabled={isSubmittingProduct || !newProductName.trim()}
-                    className="h-9 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold disabled:opacity-50 transition-all cursor-pointer flex items-center gap-1.5"
+                    className="h-9 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-800 text-emerald-400 dark:text-emerald-400 text-xs font-bold disabled:opacity-50 transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
                   >
-                    {isSubmittingProduct ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                    {isSubmittingProduct ? <LdrsSpinner size={14} color="#34d399" stroke={2.5} /> : null}
                     <span>Save Model</span>
                   </button>
                 </div>
@@ -1720,9 +1720,9 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                             type="button"
                             onClick={() => handleCreateVariant()}
                             disabled={isSubmittingVariant}
-                            className="h-8 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold disabled:opacity-50 transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
+                            className="h-8 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-800 text-emerald-400 dark:text-emerald-400 text-xs font-bold disabled:opacity-50 transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
                           >
-                            {isSubmittingVariant ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                            {isSubmittingVariant ? <LdrsSpinner size={14} color="#34d399" stroke={2.5} /> : <Check className="w-3.5 h-3.5" />}
                             <span>Save & Select Variant</span>
                           </button>
                         </div>
@@ -1743,14 +1743,14 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
 
               {/* Single / Batch / Bulk Toggle */}
               {hasSerials && (
-                <div className="p-0.5 bg-slate-100 dark:bg-slate-800 rounded-lg flex text-[10px] font-semibold">
+                <div className="p-0.5 bg-slate-100 dark:bg-slate-850 rounded-lg flex text-[10px] font-semibold">
                   <button
                     type="button"
                     onClick={() => setIntakeMode('single')}
                     className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
                       intakeMode === 'single'
-                        ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs font-bold'
-                        : 'text-slate-500 dark:text-slate-400'
+                        ? 'bg-slate-900 dark:bg-slate-900 text-emerald-400 dark:text-emerald-400 border border-slate-800 shadow-2xs font-bold ring-1 ring-emerald-500/20'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
                     }`}
                   >
                     Single Unit
@@ -1760,8 +1760,8 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                     onClick={switchToBatchMode}
                     className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
                       intakeMode === 'batch'
-                        ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs font-bold'
-                        : 'text-slate-500 dark:text-slate-400'
+                        ? 'bg-slate-900 dark:bg-slate-900 text-emerald-400 dark:text-emerald-400 border border-slate-800 shadow-2xs font-bold ring-1 ring-emerald-500/20'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
                     }`}
                   >
                     Batch Devices
@@ -1771,8 +1771,8 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                     onClick={() => setIntakeMode('bulk')}
                     className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
                       intakeMode === 'bulk'
-                        ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs font-bold'
-                        : 'text-slate-500 dark:text-slate-400'
+                        ? 'bg-slate-900 dark:bg-slate-900 text-emerald-400 dark:text-emerald-400 border border-slate-800 shadow-2xs font-bold ring-1 ring-emerald-500/20'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
                     }`}
                   >
                     Bulk Paste
@@ -2185,7 +2185,7 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                 onClick={() => setSourceType('purchase')}
                 className={`p-3 rounded-xl border text-left flex items-start gap-2.5 transition-all cursor-pointer ${
                   sourceType === 'purchase'
-                    ? 'border-slate-900 dark:border-slate-200 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-xs font-bold'
+                    ? 'border-slate-800 dark:border-slate-800 bg-slate-900 dark:bg-slate-900 text-emerald-400 dark:text-emerald-400 shadow-xs font-bold ring-1 ring-emerald-500/20'
                     : 'border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 text-slate-700 dark:text-slate-300 hover:border-slate-300'
                 }`}
               >
@@ -2203,7 +2203,7 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                 onClick={() => setSourceType('consignment')}
                 className={`p-3 rounded-xl border text-left flex items-start gap-2.5 transition-all cursor-pointer ${
                   sourceType === 'consignment'
-                    ? 'border-amber-500 bg-amber-500 text-white shadow-xs font-bold'
+                    ? 'border-amber-500/80 bg-amber-500/10 text-amber-500 dark:text-amber-400 shadow-xs font-bold ring-1 ring-amber-500/30'
                     : 'border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 text-slate-700 dark:text-slate-300 hover:border-amber-300'
                 }`}
               >
@@ -2402,7 +2402,7 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                     onClick={() => setFundingSource('unpaid')}
                     className={`py-1.5 px-2 rounded-lg text-center transition-all cursor-pointer ${
                       fundingSource === 'unpaid'
-                        ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-bold'
+                        ? 'bg-slate-900 dark:bg-slate-900 text-emerald-400 dark:text-emerald-400 border border-slate-800 shadow-xs font-bold ring-1 ring-emerald-500/20'
                         : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                     }`}
                   >
@@ -2413,7 +2413,7 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                     onClick={() => setFundingSource('shop_account')}
                     className={`py-1.5 px-2 rounded-lg text-center transition-all cursor-pointer ${
                       fundingSource === 'shop_account'
-                        ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-bold'
+                        ? 'bg-slate-900 dark:bg-slate-900 text-emerald-400 dark:text-emerald-400 border border-slate-800 shadow-xs font-bold ring-1 ring-emerald-500/20'
                         : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                     }`}
                   >
@@ -2429,7 +2429,7 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                     }}
                     className={`py-1.5 px-2 rounded-lg text-center transition-all cursor-pointer ${
                       fundingSource === 'debtor_offset'
-                        ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-bold'
+                        ? 'bg-slate-900 dark:bg-slate-900 text-emerald-400 dark:text-emerald-400 border border-slate-800 shadow-xs font-bold ring-1 ring-emerald-500/20'
                         : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                     }`}
                   >
@@ -2449,7 +2449,7 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                     }}
                     className={`py-1.5 px-2 rounded-lg text-center transition-all cursor-pointer ${
                       fundingSource === 'split'
-                        ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-bold'
+                        ? 'bg-slate-900 dark:bg-slate-900 text-emerald-400 dark:text-emerald-400 border border-slate-800 shadow-xs font-bold ring-1 ring-emerald-500/20'
                         : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                     }`}
                   >
@@ -2596,7 +2596,7 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setIsAddSupplierOpen(true)}
-                    className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5 cursor-pointer"
+                    className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-0.5 cursor-pointer"
                   >
                     <Plus className="w-3 h-3" />
                     <span>New Partner</span>
@@ -2677,11 +2677,11 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                   (fundingSource === 'shop_account' || fundingSource === 'split') &&
                   isAccountOverdrawn)
               }
-              className="h-10 px-5 rounded-xl bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 text-white dark:text-slate-900 text-xs font-bold transition-all shadow-xs flex items-center gap-2 disabled:opacity-50 active:scale-[0.98] cursor-pointer shrink-0 whitespace-nowrap"
+              className="h-10 px-5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-800 text-emerald-400 dark:text-emerald-400 text-xs font-bold transition-all shadow-xs flex items-center gap-2 disabled:opacity-50 active:scale-[0.98] cursor-pointer shrink-0 whitespace-nowrap"
             >
               {isSubmittingIntake ? (
                 <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <LdrsSpinner size={15} color="#34d399" stroke={2.5} />
                   <span>Recording...</span>
                 </>
               ) : (

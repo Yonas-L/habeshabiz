@@ -688,12 +688,12 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                 <button
                   type="button"
                   onClick={() => setIsVendorDirectModalOpen(true)}
-                  className="h-9 sm:h-10 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all shrink-0 cursor-pointer"
+                  className="h-9 sm:h-10 px-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-800/80 dark:border-slate-800 text-emerald-400 dark:text-emerald-400 active:scale-95 text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all shrink-0 cursor-pointer group"
                   title="Source device directly from vendor (1-Step POS Sale)"
                 >
-                  <Handshake className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Source from Vendor</span>
-                  <span className="sm:hidden">Vendor</span>
+                  <Handshake className="w-4 h-4 text-emerald-400 transition-transform group-hover:scale-105" />
+                  <span className="hidden sm:inline text-emerald-400">Source from Vendor</span>
+                  <span className="sm:hidden text-emerald-400">Vendor</span>
                 </button>
               </div>
             )}
@@ -1251,15 +1251,15 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                             setPaidAmount('0');
                           }
                         }}
-                        className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border-2 text-[11px] font-semibold transition-all ${
+                        className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[11px] font-semibold transition-all cursor-pointer ${
                           isSelected
                             ? m.value === 'credit'
-                              ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400'
-                              : 'border-slate-900 dark:border-white bg-slate-900 dark:bg-white text-white dark:text-slate-900'
-                            : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-400 dark:hover:border-slate-500'
+                              ? 'border-slate-800 bg-slate-900 dark:bg-slate-900 text-amber-400 dark:text-amber-400 shadow-xs font-bold ring-1 ring-amber-500/20'
+                              : 'border-slate-800 bg-slate-900 dark:bg-slate-900 text-emerald-400 dark:text-emerald-400 shadow-xs font-bold ring-1 ring-emerald-500/20'
+                            : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700 bg-white dark:bg-slate-900'
                         }`}
                       >
-                        <Icon className="w-3.5 h-3.5" />
+                        <Icon className={`w-3.5 h-3.5 ${isSelected ? (m.value === 'credit' ? 'text-amber-400' : 'text-emerald-400') : 'text-slate-400 dark:text-slate-500'}`} />
                         {m.label}
                       </button>
                     );

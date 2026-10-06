@@ -10,13 +10,13 @@ import {
   Share2,
   Phone,
   Pencil,
-  Loader2,
   Package,
   Wrench,
   ArrowRightLeft,
   Receipt,
   Search,
 } from 'lucide-react';
+import { LdrsSpinner } from '../components/loading/LdrsSpinner';
 import { AnimatedNumber } from '../components/AnimatedNumber';
 import { VendorStatementPrintModal } from '../components/partners/VendorStatementPrintModal';
 import { PartnerFormModal } from '../components/partners/PartnerFormModal';
@@ -241,7 +241,7 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
             title="Edit Partner Details"
           >
             {isFetchingContact ? (
-              <Loader2 className="w-3.5 h-3.5 text-slate-500 animate-spin" />
+              <LdrsSpinner size={14} color="#64748b" stroke={2.5} />
             ) : (
               <Pencil className="w-3.5 h-3.5 text-slate-500" />
             )}
@@ -254,16 +254,16 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
             className="h-9 px-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/80 text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95"
             title="Copy shareable public read-only link"
           >
-            {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Share2 className="w-3.5 h-3.5 text-slate-500" />}
+            {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> : <Share2 className="w-3.5 h-3.5 text-slate-500" />}
             <span>{copiedLink ? 'Link Copied!' : 'Share Public Statement'}</span>
           </button>
 
           <button
             type="button"
             onClick={() => setIsPrintModalOpen(true)}
-            className="h-9 px-3.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
+            className="h-9 px-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-800 text-emerald-400 dark:text-emerald-400 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
           >
-            <Printer className="w-3.5 h-3.5" />
+            <Printer className="w-3.5 h-3.5 text-emerald-400" />
             <span>Print Statement</span>
           </button>
         </div>
@@ -276,7 +276,7 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
             onClick={() => setDateFilter('all')}
             className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
               dateFilter === 'all'
-                ? 'bg-white dark:bg-[#131926] text-slate-900 dark:text-white shadow-xs font-bold'
+                ? 'bg-slate-900 dark:bg-slate-900 text-emerald-400 dark:text-emerald-400 border border-slate-800 shadow-xs font-bold ring-1 ring-emerald-500/20'
                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
@@ -286,7 +286,7 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
             onClick={() => setDateFilter('this_month')}
             className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
               dateFilter === 'this_month'
-                ? 'bg-white dark:bg-[#131926] text-slate-900 dark:text-white shadow-xs font-bold'
+                ? 'bg-slate-900 dark:bg-slate-900 text-emerald-400 dark:text-emerald-400 border border-slate-800 shadow-xs font-bold ring-1 ring-emerald-500/20'
                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
@@ -296,7 +296,7 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
             onClick={() => setDateFilter('last_month')}
             className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
               dateFilter === 'last_month'
-                ? 'bg-white dark:bg-[#131926] text-slate-900 dark:text-white shadow-xs font-bold'
+                ? 'bg-slate-900 dark:bg-slate-900 text-emerald-400 dark:text-emerald-400 border border-slate-800 shadow-xs font-bold ring-1 ring-emerald-500/20'
                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
@@ -306,7 +306,7 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
             onClick={() => setDateFilter('last_30_days')}
             className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
               dateFilter === 'last_30_days'
-                ? 'bg-white dark:bg-[#131926] text-slate-900 dark:text-white shadow-xs font-bold'
+                ? 'bg-slate-900 dark:bg-slate-900 text-emerald-400 dark:text-emerald-400 border border-slate-800 shadow-xs font-bold ring-1 ring-emerald-500/20'
                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
@@ -316,7 +316,7 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
             onClick={() => setDateFilter('custom')}
             className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
               dateFilter === 'custom'
-                ? 'bg-white dark:bg-[#131926] text-slate-900 dark:text-white shadow-xs font-bold'
+                ? 'bg-slate-900 dark:bg-slate-900 text-emerald-400 dark:text-emerald-400 border border-slate-800 shadow-xs font-bold ring-1 ring-emerald-500/20'
                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >

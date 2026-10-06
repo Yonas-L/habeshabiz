@@ -1,7 +1,8 @@
 import React from 'react';
 import type { PartnerStatementData } from '../../api/client';
 import { resolveImageUrl } from '../../api/client';
-import { Printer, X, Link, Check, ShieldCheck, Loader2 } from 'lucide-react';
+import { Printer, X, Link, Check, ShieldCheck } from 'lucide-react';
+import { LdrsSpinner } from '../loading/LdrsSpinner';
 import { toast } from 'sonner';
 import { downloadPdf } from '../../utils/downloadPdf';
 
@@ -123,12 +124,12 @@ export const VendorStatementPrintModal: React.FC<VendorStatementPrintModalProps>
               type="button"
               onClick={handlePrint}
               disabled={isDownloading}
-              className="h-8 px-3.5 rounded-md bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
+              className="h-8 px-3.5 rounded-md bg-slate-900 hover:bg-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-800 text-emerald-400 dark:text-emerald-400 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
               title="Download statement as PDF"
             >
               {isDownloading ? (
                 <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <LdrsSpinner size={13} color="#34d399" stroke={2.5} />
                   <span>Generating…</span>
                 </>
               ) : (

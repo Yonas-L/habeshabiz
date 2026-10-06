@@ -146,8 +146,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       label: 'Bank Accounts',
       value: capital_overview.cash_and_banks,
       prefix: '',
-      icon: <Landmark className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />,
-      colorBg: 'bg-blue-50 dark:bg-blue-950/60',
+      icon: <Landmark className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />,
+      colorBg: 'bg-teal-50 dark:bg-teal-950/60',
       onClick: () => setSelectedVital('cash'),
     },
     {

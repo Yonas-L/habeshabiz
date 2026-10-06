@@ -317,9 +317,9 @@ export const ExchangeDeviceModal: React.FC<ExchangeDeviceModalProps> = ({
   if (!isOpen) return null;
 
   const modalContent = (
-    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/60 backdrop-blur-xs overflow-y-auto">
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/60 backdrop-blur-xs overflow-y-auto animate-backdrop-enter">
       <div
-        className="bg-white dark:bg-[#131926] border-t sm:border border-slate-200 dark:border-slate-800 rounded-t-3xl sm:rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[88vh] sm:max-h-[85vh] animate-bottom-sheet sm:animate-in my-0 sm:my-auto"
+        className="bg-white dark:bg-[#131926] border-t sm:border border-slate-200 dark:border-slate-800 rounded-t-3xl sm:rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[88vh] sm:max-h-[85vh] max-sm:animate-bottom-sheet sm:animate-modal-enter my-0 sm:my-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Mobile Drag Indicator */}
@@ -328,8 +328,8 @@ export const ExchangeDeviceModal: React.FC<ExchangeDeviceModalProps> = ({
         {/* Header */}
         <div className="px-5 py-3.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 flex items-center justify-center">
-              <Repeat className="w-4 h-4" />
+            <div className="w-8 h-8 rounded-xl bg-slate-900 dark:bg-slate-900 border border-slate-800 text-emerald-400 flex items-center justify-center shadow-xs">
+              <Repeat className="w-4 h-4 text-emerald-400" />
             </div>
             <h3 className="font-bold text-slate-900 dark:text-white text-sm">
               Device Exchange / Trade-In
@@ -644,7 +644,7 @@ export const ExchangeDeviceModal: React.FC<ExchangeDeviceModalProps> = ({
                 placeholder="Optional inspection notes..."
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+                className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
               />
             </div>
           </div>
@@ -676,7 +676,7 @@ export const ExchangeDeviceModal: React.FC<ExchangeDeviceModalProps> = ({
             type="button"
             onClick={handleSubmit}
             disabled={!selectedVariantId || tradeInValNum <= 0 || !imei.trim() || isImeiAlreadyInStock}
-            className="h-8 px-4 rounded-xl bg-purple-600 text-white text-xs font-bold hover:bg-purple-700 transition-all shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+            className="h-8 px-4 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition-all shadow-xs disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
           >
             <Repeat className="w-3.5 h-3.5" />
             Attach Exchange Device

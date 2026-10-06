@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom';
 import type { Contact } from '../../api/client';
 import { api } from '../../api/client';
 import { toast } from 'sonner';
-import { X, Handshake, Check, Loader2 } from 'lucide-react';
+import { X, Handshake, Check } from 'lucide-react';
+import { LdrsSpinner } from '../loading/LdrsSpinner';
 
 interface PartnerFormModalProps {
   isOpen: boolean;
@@ -135,15 +136,15 @@ export const PartnerFormModal: React.FC<PartnerFormModalProps> = ({
       />
 
       {/* Modal / Bottom Sheet Surface */}
-      <div className="relative z-10 w-full max-w-lg bg-white dark:bg-[#131926] rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-slate-100 dark:border-slate-800 overflow-hidden animate-bottom-sheet sm:animate-modal-enter flex flex-col max-h-[88vh] sm:max-h-[90vh] my-0 sm:my-auto">
+      <div className="relative z-10 w-full max-w-lg bg-white dark:bg-[#131926] rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-slate-100 dark:border-slate-800 overflow-hidden max-sm:animate-bottom-sheet sm:animate-modal-enter flex flex-col max-h-[88vh] sm:max-h-[90vh] my-0 sm:my-auto">
         {/* Mobile Drag Indicator */}
         <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mt-2.5 mb-1 sm:hidden shrink-0" />
 
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center shrink-0">
-              <Handshake className="w-4 h-4" />
+            <div className="w-9 h-9 rounded-xl bg-slate-900 dark:bg-slate-900 border border-slate-800 text-emerald-400 flex items-center justify-center shrink-0 shadow-xs">
+              <Handshake className="w-4.5 h-4.5" />
             </div>
             <div>
               <h2 className="text-sm font-bold text-slate-900 dark:text-white leading-none">
@@ -245,7 +246,7 @@ export const PartnerFormModal: React.FC<PartnerFormModalProps> = ({
                     onClick={() => toggleRole(r.id)}
                     className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
                       isSelected
-                        ? 'border-slate-900 dark:border-slate-200 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-xs'
+                        ? 'border-slate-800 dark:border-slate-800 bg-slate-900 dark:bg-slate-900 text-emerald-400 dark:text-emerald-400 shadow-xs ring-1 ring-emerald-500/20 font-bold'
                         : 'border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700'
                     }`}
                   >
@@ -253,7 +254,7 @@ export const PartnerFormModal: React.FC<PartnerFormModalProps> = ({
                     <div
                       className={`w-4 h-4 rounded-md flex items-center justify-center transition-all ${
                         isSelected
-                          ? 'bg-white/20 dark:bg-slate-900/20 text-white dark:text-slate-900'
+                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                           : 'border border-slate-300 dark:border-slate-600 text-transparent'
                       }`}
                     >
@@ -294,12 +295,12 @@ export const PartnerFormModal: React.FC<PartnerFormModalProps> = ({
                 type="button"
                 onClick={() => setIsActive(!isActive)}
                 className={`w-10 h-6 flex items-center rounded-full p-0.5 transition-colors cursor-pointer ${
-                  isActive ? 'bg-slate-900 dark:bg-white' : 'bg-slate-300 dark:bg-slate-700'
+                  isActive ? 'bg-slate-900 dark:bg-slate-900 border border-slate-800 ring-1 ring-emerald-500/20' : 'bg-slate-300 dark:bg-slate-700'
                 }`}
               >
                 <div
                   className={`w-5 h-5 rounded-full transition-transform ${
-                    isActive ? 'bg-white dark:bg-slate-900 translate-x-4' : 'bg-white dark:bg-slate-300 translate-x-0'
+                    isActive ? 'bg-emerald-400 translate-x-4 shadow-xs' : 'bg-white dark:bg-slate-300 translate-x-0'
                   }`}
                 />
               </button>
@@ -320,11 +321,11 @@ export const PartnerFormModal: React.FC<PartnerFormModalProps> = ({
             type="submit"
             form="partner-form"
             disabled={submitting}
-            className="h-10 px-5 rounded-xl bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 text-white dark:text-slate-900 text-xs font-bold transition-all shadow-xs flex items-center gap-2 disabled:opacity-50 active:scale-[0.98] cursor-pointer"
+            className="h-10 px-5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-800 text-emerald-400 dark:text-emerald-400 text-xs font-bold transition-all shadow-xs flex items-center gap-2 disabled:opacity-50 active:scale-[0.98] cursor-pointer"
           >
             {submitting ? (
               <>
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <LdrsSpinner size={15} color="#34d399" stroke={2.5} />
                 <span>Saving...</span>
               </>
             ) : (

@@ -312,20 +312,106 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
             </div>
           </div>
 
-          {/* Asset details if custom asset */}
-          {account.asset_details && Object.keys(account.asset_details).length > 0 && (
-            <div className="mt-4 pt-3.5 border-t border-slate-200/60 dark:border-slate-800/70 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-              {Object.entries(account.asset_details).map(([key, val]) => (
-                <div key={key} className="bg-white/60 dark:bg-slate-800/40 rounded-lg p-2 border border-slate-200/50 dark:border-slate-800/50">
-                  <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-bold capitalize">
-                    {key.replace(/_/g, ' ')}
-                  </span>
-                  <span className="font-mono font-bold text-slate-800 dark:text-slate-200 truncate block mt-0.5">
-                    {String(val)}
-                  </span>
+          {/* Asset details / holdings if reserve asset */}
+          {account.asset_details && (
+            (() => {
+              const details = account.asset_details as Record<string, any>;
+              const rawHoldings = Array.isArray(details.holdings) ? details.holdings : null;
+              const curr = account.currency === 'GOLD' ? 'g' : (account.currency || details.currency || 'USD');
+              const totalForeign = details.total_foreign_amount != null
+                ? Number(details.total_foreign_amount)
+                : rawHoldings
+                  ? rawHoldings.reduce((s: number, h: any) => s + (Number(h.amount) || 0), 0)
+                  : null;
+
+              const extraEntries = Object.entries(details).filter(
+                ([k, v]) =>
+                  !['holdings', 'currency', 'total_foreign_amount', 'total_etb_value', 'logo'].includes(k) &&
+                  typeof v !== 'object' &&
+                  v !== null &&
+                  v !== ''
+              );
+
+              if (!rawHoldings && totalForeign == null && extraEntries.length === 0) return null;
+
+              return (
+                <div className="mt-4 pt-3.5 border-t border-slate-200/60 dark:border-slate-800/70 space-y-2.5">
+                  {/* Holdings Header */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Holdings Breakdown
+                      </span>
+                      {rawHoldings && rawHoldings.length > 0 && (
+                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-200/50 dark:border-emerald-800/40 shrink-0 whitespace-nowrap">
+                          {rawHoldings.length} {rawHoldings.length === 1 ? 'Lot' : 'Lots'}
+                        </span>
+                      )}
+                    </div>
+                    {totalForeign != null && (
+                      <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                        {totalForeign.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{' '}
+                        <span className="text-[10px] font-sans text-slate-400 font-bold uppercase">{curr}</span>
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Individual Lots List */}
+                  {rawHoldings && rawHoldings.length > 0 && (
+                    <div className="space-y-1.5">
+                      {rawHoldings.map((h: any, idx: number) => {
+                        const amount = Number(h.amount) || 0;
+                        const rate = Number(h.rate) || 0;
+                        const val = Number(h.etb_value) || (amount * rate);
+                        return (
+                          <div
+                            key={h.id || idx}
+                            className="flex items-center justify-between p-2 rounded-xl bg-slate-50/70 dark:bg-slate-900/40 border border-slate-200/50 dark:border-slate-800/50 text-xs"
+                          >
+                            <div className="flex items-center gap-2 font-mono flex-wrap">
+                              <span className="text-[10px] font-sans font-bold text-slate-400 uppercase">
+                                Lot {idx + 1}
+                              </span>
+                              <span className="font-bold text-slate-800 dark:text-slate-200">
+                                {amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {curr}
+                              </span>
+                              {rate > 0 && (
+                                <span className="text-slate-400 text-[11px]">
+                                  @ {rate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ETB
+                                </span>
+                              )}
+                            </div>
+                            <div className="font-mono font-bold text-slate-900 dark:text-white text-right shrink-0 whitespace-nowrap ml-2">
+                              {val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{' '}
+                              <span className="text-[10px] font-sans text-slate-400 font-normal">ETB</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Extra Primitive Metadata */}
+                  {extraEntries.length > 0 && (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-xs">
+                      {extraEntries.map(([key, val]) => (
+                        <div
+                          key={key}
+                          className="bg-slate-50/50 dark:bg-slate-900/30 rounded-lg p-2 border border-slate-200/40 dark:border-slate-800/40"
+                        >
+                          <span className="text-[9px] text-slate-400 uppercase tracking-wider block font-bold capitalize">
+                            {key.replace(/_/g, ' ')}
+                          </span>
+                          <span className="font-mono font-bold text-slate-800 dark:text-slate-200 truncate block mt-0.5">
+                            {String(val)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              ))}
-            </div>
+              );
+            })()
           )}
         </div>
 

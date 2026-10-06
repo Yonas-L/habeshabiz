@@ -190,9 +190,159 @@ const FOREX_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" w
   <text x="40" y="66" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="9" fill="#ffffff" letter-spacing="1">FX · USDT</text>
 </svg>`;
 
+// 10. USD Dollar Reserve
+const USD_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80">
+  <defs>
+    <linearGradient id="usdBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#064e3b"/>
+      <stop offset="100%" stop-color="#022c22"/>
+    </linearGradient>
+    <linearGradient id="usdEmerald" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34d399"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+  </defs>
+  <rect width="80" height="80" rx="18" fill="url(#usdBg)"/>
+  <circle cx="40" cy="34" r="18" fill="#042f2e" stroke="url(#usdEmerald)" stroke-width="2.2"/>
+  <text x="40" y="41" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="20" fill="#34d399">$</text>
+  <text x="40" y="66" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="10.5" fill="#a7f3d0" letter-spacing="1">USD</text>
+</svg>`;
+
+// 11. USDT Crypto Reserve
+const USDT_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80">
+  <defs>
+    <linearGradient id="usdtBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#115e59"/>
+      <stop offset="100%" stop-color="#042f2e"/>
+    </linearGradient>
+  </defs>
+  <rect width="80" height="80" rx="18" fill="url(#usdtBg)"/>
+  <circle cx="40" cy="34" r="18" fill="#0f766e" stroke="#2dd4bf" stroke-width="2"/>
+  <text x="40" y="41" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="20" fill="#2dd4bf">₮</text>
+  <text x="40" y="66" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="10" fill="#ccfbf1" letter-spacing="1">USDT</text>
+</svg>`;
+
+// 12. Euro Reserve
+const EUR_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80">
+  <defs>
+    <linearGradient id="eurBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e3a8a"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+  </defs>
+  <rect width="80" height="80" rx="18" fill="url(#eurBg)"/>
+  <circle cx="40" cy="34" r="18" fill="#1e40af" stroke="#60a5fa" stroke-width="2"/>
+  <text x="40" y="41" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="20" fill="#93c5fd">€</text>
+  <text x="40" y="66" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="10.5" fill="#bfdbfe" letter-spacing="1">EURO</text>
+</svg>`;
+
+// 13. British Pound Reserve
+const GBP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80">
+  <defs>
+    <linearGradient id="gbpBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#312e81"/>
+      <stop offset="100%" stop-color="#1e1b4b"/>
+    </linearGradient>
+  </defs>
+  <rect width="80" height="80" rx="18" fill="url(#gbpBg)"/>
+  <circle cx="40" cy="34" r="18" fill="#3730a3" stroke="#a5b4fc" stroke-width="2"/>
+  <text x="40" y="41" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="20" fill="#c7d2fe">£</text>
+  <text x="40" y="66" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="10.5" fill="#e0e7ff" letter-spacing="1">GBP</text>
+</svg>`;
+
+// 14. UAE Dirham Reserve
+const AED_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80">
+  <defs>
+    <linearGradient id="aedBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#064e3b"/>
+      <stop offset="100%" stop-color="#881337"/>
+    </linearGradient>
+  </defs>
+  <rect width="80" height="80" rx="18" fill="url(#aedBg)"/>
+  <circle cx="40" cy="34" r="18" fill="#042f2e" stroke="#34d399" stroke-width="2"/>
+  <text x="40" y="40" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="13" fill="#ffffff">د.إ</text>
+  <text x="40" y="66" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="10" fill="#fecdd3" letter-spacing="1">AED</text>
+</svg>`;
+
+// 15. Safe / Vault Reserve
+const VAULT_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80">
+  <defs>
+    <linearGradient id="vaultBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="100%" stop-color="#020617"/>
+    </linearGradient>
+  </defs>
+  <rect width="80" height="80" rx="18" fill="url(#vaultBg)"/>
+  <circle cx="40" cy="33" r="17" fill="#0f172a" stroke="#10b981" stroke-width="2.5"/>
+  <circle cx="40" cy="33" r="7" fill="#10b981"/>
+  <circle cx="40" cy="33" r="3" fill="#0f172a"/>
+  <path d="M40 18 L40 22 M40 44 L40 48 M25 33 L29 33 M51 33 L55 33" stroke="#10b981" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="40" y="66" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="9.5" fill="#34d399" letter-spacing="1.5">VAULT</text>
+</svg>`;
+
 function svgToDataUri(svg: string): string {
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
+
+export interface ReservePreset {
+  id: string;
+  name: string;
+  shortCode: string;
+  currency: string;
+  dataUri: string;
+}
+
+export const PRESET_RESERVE_LOGOS: ReservePreset[] = [
+  {
+    id: 'usd',
+    name: 'US Dollar Reserve',
+    shortCode: 'USD',
+    currency: 'USD',
+    dataUri: svgToDataUri(USD_SVG),
+  },
+  {
+    id: 'usdt',
+    name: 'USDT Crypto Reserve',
+    shortCode: 'USDT',
+    currency: 'USDT',
+    dataUri: svgToDataUri(USDT_SVG),
+  },
+  {
+    id: 'gold',
+    name: 'Physical Gold Reserve',
+    shortCode: 'Gold',
+    currency: 'GOLD',
+    dataUri: svgToDataUri(GOLD_SVG),
+  },
+  {
+    id: 'eur',
+    name: 'Euro Reserve',
+    shortCode: 'EUR',
+    currency: 'EUR',
+    dataUri: svgToDataUri(EUR_SVG),
+  },
+  {
+    id: 'gbp',
+    name: 'British Pound Reserve',
+    shortCode: 'GBP',
+    currency: 'GBP',
+    dataUri: svgToDataUri(GBP_SVG),
+  },
+  {
+    id: 'aed',
+    name: 'UAE Dirham Reserve',
+    shortCode: 'AED',
+    currency: 'AED',
+    dataUri: svgToDataUri(AED_SVG),
+  },
+  {
+    id: 'vault',
+    name: 'Store Vault Reserve',
+    shortCode: 'Vault',
+    currency: 'USD',
+    dataUri: svgToDataUri(VAULT_SVG),
+  },
+];
 
 export const PRESET_BANK_LOGOS: BankPreset[] = [
   {

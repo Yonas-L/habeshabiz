@@ -473,15 +473,15 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
           <div className="space-y-2.5">
             <div className="flex items-center justify-between pb-1">
               <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                Store Hedge Reserves
+                Hedge Reserves
               </span>
               <button
                 type="button"
-                onClick={() => handleOpenCreate('asset_gold')}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-[11px] font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs active:scale-95 cursor-pointer"
+                onClick={() => handleOpenCreate('asset_fx')}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900 dark:bg-slate-900 text-emerald-400 border border-slate-800 text-[11px] font-bold hover:bg-slate-800 transition-all shadow-xs active:scale-95 cursor-pointer"
               >
-                <Plus className="w-3 h-3 text-amber-400 dark:text-amber-600" />
-                <span>Add Asset Reserve</span>
+                <Plus className="w-3 h-3 text-emerald-400" />
+                <span>Add Reserve</span>
               </button>
             </div>
 
@@ -554,8 +554,21 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                           <AccountLogo account={acc} size="sm" />
                           <div className="min-w-0">
                             <div className="font-bold text-slate-900 dark:text-white truncate">{acc.name}</div>
-                            <div className="text-[11px] text-slate-400 mt-0.5">
-                              {acc.type.replace(/_/g, ' ')} &bull; {acc.currency}
+                            <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                              <span>{acc.type.replace(/_/g, ' ')}</span>
+                              {acc.asset_details?.total_foreign_amount != null ? (
+                                <>
+                                  <span>&bull;</span>
+                                  <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">
+                                    {Number(acc.asset_details.total_foreign_amount).toLocaleString()} {acc.currency === 'GOLD' ? 'g' : (acc.currency || 'USD')}
+                                  </span>
+                                </>
+                              ) : (
+                                <>
+                                  <span>&bull;</span>
+                                  <span>{acc.currency}</span>
+                                </>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -570,7 +583,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                                 Physical Gold
                               </span>
                             ) : cat === 'forex' ? (
-                              <span className="text-[10px] text-sky-600 dark:text-sky-400 font-semibold block">
+                              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold block">
                                 Forex & USD
                               </span>
                             ) : (

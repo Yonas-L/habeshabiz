@@ -11,7 +11,6 @@ import {
   Trash2,
   Copy,
   Check,
-  Loader2,
   ShoppingBag,
   ShieldAlert,
   LayoutGrid,
@@ -20,6 +19,7 @@ import {
   ChevronRight,
   ExternalLink,
 } from 'lucide-react';
+import { LdrsSpinner } from '../components/loading/LdrsSpinner';
 import { PartnerFormModal } from '../components/partners/PartnerFormModal';
 import { PartnerDetailView } from './PartnerDetailView';
 import { Pagination } from '../components/Pagination';
@@ -241,9 +241,9 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
           <button
             type="button"
             onClick={() => handleOpenAddModal('peer_vendor')}
-            className="h-9 px-4 rounded-xl bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 text-white dark:text-slate-900 text-xs font-bold transition-all shadow-sm flex items-center gap-2 active:scale-[0.98]"
+            className="h-9 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-800 text-emerald-400 dark:text-emerald-400 text-xs font-bold transition-all shadow-xs flex items-center gap-2 active:scale-[0.98] cursor-pointer"
           >
-            <Plus className="w-3.5 h-3.5 text-emerald-400 dark:text-emerald-600" />
+            <Plus className="w-3.5 h-3.5 text-emerald-400" />
             Add Partner
           </button>
         </div>
@@ -267,9 +267,9 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                 setSelectedRole(tab.id as RoleFilter);
                 setCurrentPage(1);
               }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg whitespace-nowrap transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg whitespace-nowrap transition-all cursor-pointer ${
                 selectedRole === tab.id
-                  ? 'bg-white dark:bg-[#131926] text-slate-900 dark:text-white shadow-xs font-bold'
+                  ? 'bg-slate-900 dark:bg-slate-900 text-emerald-400 dark:text-emerald-400 border border-slate-800 shadow-xs font-bold ring-1 ring-emerald-500/20'
                   : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
@@ -277,8 +277,8 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
               {tab.count !== null && (
                 <span className={`text-[10px] font-mono leading-none px-1.5 py-0.5 rounded-md ${
                   selectedRole === tab.id
-                    ? 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
-                    : 'text-slate-400 dark:text-slate-600'
+                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                    : 'bg-slate-200/60 dark:bg-slate-700/60 text-slate-500 dark:text-slate-400'
                 }`}>
                   {tab.count}
                 </span>
@@ -913,10 +913,10 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                 type="button"
                 onClick={handleConfirmDelete}
                 disabled={isDeleting}
-                className="h-9 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white text-xs font-bold transition-colors shadow-xs flex items-center gap-1.5 disabled:opacity-50 active:scale-[0.98]"
+                className="h-9 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white text-xs font-bold transition-colors shadow-xs flex items-center gap-1.5 disabled:opacity-50 active:scale-[0.98] cursor-pointer"
               >
                 {isDeleting
-                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ? <LdrsSpinner size={14} color="#ffffff" stroke={2.5} />
                   : <Trash2 className="w-3.5 h-3.5" />
                 }
                 <span>{isDeleting ? 'Removing…' : 'Remove Partner'}</span>

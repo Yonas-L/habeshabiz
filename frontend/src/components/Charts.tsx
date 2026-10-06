@@ -213,7 +213,7 @@ export const InteractiveSalesWaveChart: React.FC<{
         onTouchEnd={handleTouchEnd}
         onMouseMove={(e) => handlePointerInteraction(e.clientX)}
         onMouseLeave={() => setHoverIndex(null)}
-        className="relative w-full h-[170px] sm:h-[180px] bg-gradient-to-b from-slate-50/50 to-transparent dark:from-slate-800/20 dark:to-transparent rounded-xl border border-slate-100/90 dark:border-slate-800/80 overflow-hidden touch-none select-none cursor-crosshair"
+        className="relative w-full h-[170px] sm:h-[180px] bg-gradient-to-b from-slate-50/50 to-transparent dark:from-slate-800/20 dark:to-transparent rounded-xl border border-slate-100/90 dark:border-slate-800/80 touch-none select-none cursor-crosshair"
       >
         {points.length === 0 && (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-xs text-slate-400 font-medium z-10">
@@ -224,17 +224,17 @@ export const InteractiveSalesWaveChart: React.FC<{
 
         <svg
           viewBox={`0 0 ${width} ${height}`}
-          className="w-full h-full overflow-visible"
+          className="w-full h-full overflow-hidden rounded-xl"
           preserveAspectRatio="none"
         >
           <defs>
             <linearGradient id="emeraldWave" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#10b981" stopOpacity="0.25" />
+              <stop offset="0%" stopColor="#10b981" stopOpacity="0.28" />
               <stop offset="100%" stopColor="#10b981" stopOpacity="0.00" />
             </linearGradient>
-            <linearGradient id="indigoWave" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#6366f1" stopOpacity="0.22" />
-              <stop offset="100%" stopColor="#6366f1" stopOpacity="0.00" />
+            <linearGradient id="tealWave" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#0d9488" stopOpacity="0.25" />
+              <stop offset="100%" stopColor="#0d9488" stopOpacity="0.00" />
             </linearGradient>
             <clipPath id="salesWaveReveal">
               <rect
@@ -286,7 +286,7 @@ export const InteractiveSalesWaveChart: React.FC<{
               {areaPath && (
                 <path
                   d={areaPath}
-                  fill={metric === 'revenue' ? 'url(#indigoWave)' : 'url(#emeraldWave)'}
+                  fill={metric === 'revenue' ? 'url(#emeraldWave)' : 'url(#tealWave)'}
                   className="transition-opacity duration-300"
                 />
               )}
@@ -294,7 +294,7 @@ export const InteractiveSalesWaveChart: React.FC<{
                 <path
                   d={curvePath}
                   fill="none"
-                  stroke={metric === 'revenue' ? '#6366f1' : '#10b981'}
+                  stroke={metric === 'revenue' ? '#10b981' : '#0d9488'}
                   strokeWidth="2.75"
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -313,17 +313,18 @@ export const InteractiveSalesWaveChart: React.FC<{
                   y1={padY}
                   x2={pt.x}
                   y2={height - padY}
-                  stroke="#94a3b8"
+                  stroke="#10b981"
                   strokeWidth="1.2"
                   strokeDasharray="3 3"
+                  className="opacity-70"
                 />
               )}
               <circle
                 cx={pt.x}
                 cy={pt.y}
                 r={hoverIndex === i ? 6 : 3.5}
-                fill={hoverIndex === i ? (metric === 'revenue' ? '#6366f1' : '#10b981') : '#ffffff'}
-                stroke={metric === 'revenue' ? '#6366f1' : '#10b981'}
+                fill={hoverIndex === i ? (metric === 'revenue' ? '#10b981' : '#0d9488') : '#ffffff'}
+                stroke={metric === 'revenue' ? '#10b981' : '#0d9488'}
                 strokeWidth="2"
                 style={{
                   transformOrigin: `${pt.x}px ${pt.y}px`,
@@ -354,7 +355,7 @@ export const InteractiveSalesWaveChart: React.FC<{
                     y1={padY}
                     x2={pt.x}
                     y2={height - padY}
-                    stroke="#94a3b8"
+                    stroke="#10b981"
                     strokeWidth="1"
                     strokeDasharray="3 3"
                     className="opacity-70"
@@ -366,7 +367,7 @@ export const InteractiveSalesWaveChart: React.FC<{
                   width={barW}
                   height={isLoaded ? barH : 0}
                   rx={Math.min(barW / 2.5, 4)}
-                  fill={isHovered ? (isRev ? '#6366f1' : '#10b981') : (isRev ? '#818cf8' : '#34d399')}
+                  fill={isHovered ? (isRev ? '#10b981' : '#0d9488') : (isRev ? '#34d399' : '#2dd4bf')}
                   opacity={hoverIndex === null ? 0.85 : isHovered ? 1 : 0.35}
                   style={{
                     transition: 'all 280ms cubic-bezier(0.16, 1, 0.3, 1)',
@@ -380,23 +381,34 @@ export const InteractiveSalesWaveChart: React.FC<{
           })}
         </svg>
 
-        {/* Floating Tooltip Pill */}
-        {hoverIndex !== null && points[hoverIndex] && (
-          <div
-            className="absolute z-10 pointer-events-none -translate-x-1/2 -translate-y-full bg-slate-900 dark:bg-slate-800 text-white px-3 py-1.5 rounded-xl shadow-xl text-xs font-mono whitespace-nowrap animate-modal-enter border border-slate-700/50"
-            style={{
-              left: `${Math.max(12, Math.min(88, (points[hoverIndex].x / width) * 100))}%`,
-              top: `${Math.max(points[hoverIndex].y - 12, 10)}px`,
-            }}
-          >
-            <div className="font-bold">{points[hoverIndex].val.toLocaleString()} ETB</div>
-            <div className="text-[10px] text-slate-300 font-sans flex items-center gap-1.5 mt-0.5">
-              <span>{points[hoverIndex].day}</span>
-              <span>&bull;</span>
-              <span>{points[hoverIndex].orders} {points[hoverIndex].orders === 1 ? 'order' : 'orders'}</span>
+        {/* Floating Tooltip Pill with Smart Flip Positioning */}
+        {hoverIndex !== null && points[hoverIndex] && (() => {
+          const pt = points[hoverIndex];
+          const isTopHalf = pt.y < 58;
+          return (
+            <div
+              className={`absolute z-30 pointer-events-none -translate-x-1/2 bg-slate-900/95 dark:bg-slate-800/95 backdrop-blur-xs text-white px-3 py-1.5 rounded-xl shadow-2xl text-xs font-mono whitespace-nowrap border border-slate-700/70 transition-transform duration-75 ease-out ${
+                isTopHalf ? 'translate-y-3' : '-translate-y-full -translate-y-2.5'
+              }`}
+              style={{
+                left: `${Math.max(14, Math.min(86, (pt.x / width) * 100))}%`,
+                top: `${pt.y}px`,
+              }}
+            >
+              <div className="font-bold text-emerald-400 font-mono">
+                {pt.val.toLocaleString()}{' '}
+                <span className="text-[10px] font-sans text-slate-300 font-normal">{currency}</span>
+              </div>
+              <div className="text-[10px] text-slate-300 font-sans flex items-center gap-1.5 mt-0.5">
+                <span>{pt.day}</span>
+                <span>&bull;</span>
+                <span>
+                  {pt.orders} {pt.orders === 1 ? 'order' : 'orders'}
+                </span>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
 
       {/* Axis Labels */}
@@ -632,7 +644,7 @@ export const DonutCapitalChart: React.FC<{
             cy="80"
             r={radius}
             fill="none"
-            stroke="#3b82f6"
+            stroke="#0d9488"
             strokeWidth={stroke}
             strokeDasharray={isLoaded ? `${circum * treasPct} ${circum}` : `0 ${circum}`}
             strokeDashoffset={isLoaded ? -treasOffset : 0}
@@ -645,7 +657,7 @@ export const DonutCapitalChart: React.FC<{
               cy="80"
               r={radius}
               fill="none"
-              stroke="#6366f1"
+              stroke="#047857"
               strokeWidth={stroke}
               strokeDasharray={isLoaded ? `${circum * forexPct} ${circum}` : `0 ${circum}`}
               strokeDashoffset={isLoaded ? -forexOffset : 0}
@@ -742,7 +754,7 @@ export const DonutCapitalChart: React.FC<{
           </div>
 
           <div className="flex items-start gap-2 p-2 sm:p-0 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 sm:bg-transparent border border-slate-100 dark:border-slate-800/50 sm:border-0">
-            <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0 mt-1 sm:mt-0.5" />
+            <span className="w-2.5 h-2.5 rounded-full bg-teal-600 shrink-0 mt-1 sm:mt-0.5" />
             <div className="min-w-0 flex-1">
               <span className="text-slate-400 dark:text-slate-500 block text-[10px] font-medium truncate">
                 {hasGranularAssets ? 'Liquid Finance' : 'Cash'} ({(treasPct * 100).toFixed(0)}%)
@@ -755,12 +767,12 @@ export const DonutCapitalChart: React.FC<{
 
           {hasGranularAssets && forexVal > 0 && (
             <div className="flex items-start gap-2 p-2 sm:p-0 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 sm:bg-transparent border border-slate-100 dark:border-slate-800/50 sm:border-0">
-              <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 shrink-0 mt-1 sm:mt-0.5" />
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-700 shrink-0 mt-1 sm:mt-0.5" />
               <div className="min-w-0 flex-1">
                 <span className="text-slate-400 dark:text-slate-500 block text-[10px] font-medium truncate">
                   Forex Reserves ({(forexPct * 100).toFixed(0)}%)
                 </span>
-                <span className="font-bold text-indigo-600 dark:text-indigo-400 font-mono text-xs truncate block mt-0.5">
+                <span className="font-bold text-emerald-700 dark:text-emerald-400 font-mono text-xs truncate block mt-0.5">
                   +<AnimatedNumber value={forexVal} /> <span className="text-[10px] font-normal text-slate-400">ETB</span>
                 </span>
               </div>
