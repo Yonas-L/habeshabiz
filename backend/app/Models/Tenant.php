@@ -70,6 +70,71 @@ class Tenant extends Model
         return $url;
     }
 
+    /**
+     * Convert an uploaded logo file to a base64 data URI for permanent DB persistence on ephemeral hosting.
+     */
+    public static function convertUploadedFileToDataUri(\Illuminate\Http\UploadedFile $file): string
+    {
+        $mime = $file->getMimeType() ?: 'image/png';
+        $realPath = $file->getRealPath();
+
+        // If SVG or GD not loaded, return base64 data URI directly
+        if (str_contains($mime, 'svg') || !extension_loaded('gd') || !function_exists('imagecreatefromstring')) {
+            $contents = file_get_contents($realPath);
+            return 'data:' . $mime . ';base64,' . base64_encode($contents);
+        }
+
+        try {
+            $rawContent = file_get_contents($realPath);
+            $srcImg = @imagecreatefromstring($rawContent);
+            if ($srcImg) {
+                $width = imagesx($srcImg);
+                $height = imagesy($srcImg);
+                $maxDimension = 512;
+
+                if ($width > $maxDimension || $height > $maxDimension) {
+                    if ($width >= $height) {
+                        $newWidth = $maxDimension;
+                        $newHeight = (int) round(($height / $width) * $maxDimension);
+                    } else {
+                        $newHeight = $maxDimension;
+                        $newWidth = (int) round(($width / $height) * $maxDimension);
+                    }
+
+                    $dstImg = imagecreatetruecolor($newWidth, $newHeight);
+                    imagealphablending($dstImg, false);
+                    imagesavealpha($dstImg, true);
+                    $transparent = imagecolorallocatealpha($dstImg, 255, 255, 255, 127);
+                    imagefilledrectangle($dstImg, 0, 0, $newWidth, $newHeight, $transparent);
+
+                    imagecopyresampled($dstImg, $srcImg, 0, 0, 0, 0, $newWidth, $newHeight, $width, $height);
+                    imagedestroy($srcImg);
+                    $srcImg = $dstImg;
+                }
+
+                ob_start();
+                if (str_contains($mime, 'png') || str_contains($mime, 'webp') || str_contains($mime, 'gif')) {
+                    imagepng($srcImg, null, 6);
+                    $outMime = 'image/png';
+                } else {
+                    imagejpeg($srcImg, null, 85);
+                    $outMime = 'image/jpeg';
+                }
+                $imgData = ob_get_clean();
+                imagedestroy($srcImg);
+
+                if (!empty($imgData)) {
+                    return 'data:' . $outMime . ';base64,' . base64_encode($imgData);
+                }
+            }
+        } catch (\Throwable $e) {
+            // Fallback to direct file encoding
+        }
+
+        $contents = file_get_contents($realPath);
+        return 'data:' . $mime . ';base64,' . base64_encode($contents);
+    }
+
     public function scopeLocked(Builder $query): Builder
     {
         return $query->where('is_locked', true);

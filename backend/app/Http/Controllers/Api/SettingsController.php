@@ -177,7 +177,7 @@ class SettingsController extends Controller
     }
 
     /**
-     * Upload business logo image and store in filesystem.
+     * Upload business logo image and store in persistent database settings.
      */
     public function uploadLogo(Request $request): JsonResponse
     {
@@ -198,8 +198,7 @@ class SettingsController extends Controller
         /** @var Tenant $tenant */
         $tenant = $user->tenant;
 
-        $path = $request->file('logo')->store('logos', 'public');
-        $url = Tenant::normalizeStorageUrl('/storage/' . $path);
+        $url = Tenant::convertUploadedFileToDataUri($request->file('logo'));
 
         $settings = $tenant->settings ?? [];
         $settings['logo_url'] = $url;
