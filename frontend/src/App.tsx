@@ -40,9 +40,10 @@ import { QuickSearchModal, type NavigationPayload } from './components/QuickSear
 import { MobileBottomNav } from './components/navigation/MobileBottomNav';
 import { SpeedDialFAB } from './components/navigation/SpeedDialFAB';
 import { CustomPageLoader } from './components/loading/CustomPageLoader';
+import { LdrsSpinner } from './components/loading/LdrsSpinner';
 import { TopProgressBar } from './components/loading/TopProgressBar';
 import { Toaster, toast } from 'sonner';
-import { ArrowRight, Loader2 } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
 export const getCurrentMonth = (): string => {
   const now = new Date();
@@ -478,7 +479,7 @@ export default function App() {
               className="w-full h-10 px-4 rounded-xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:hover:bg-emerald-950/80 border border-emerald-200 dark:border-emerald-800/70 text-emerald-700 dark:text-emerald-300 text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-xs disabled:opacity-50 active:scale-[0.98] cursor-pointer"
             >
               {isSubmittingAuth ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <LdrsSpinner size={16} color="#059669" stroke={2.5} />
               ) : (
                 <>
                   <span>Sign In</span>
