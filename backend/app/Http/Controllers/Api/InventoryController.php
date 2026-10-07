@@ -1324,15 +1324,36 @@ class InventoryController extends Controller
             foreach ($offsetPayments as $pmt) {
                 $debt = $pmt->debt;
                 if ($debt) {
-                    $restoredPaid = max(0, (float) $debt->paid_amount - (float) $pmt->amount);
-                    $restoredRemaining = (float) $debt->remaining_amount + (float) $pmt->amount;
-                    $debt->update([
-                        'paid_amount' => $restoredPaid,
-                        'remaining_amount' => $restoredRemaining,
-                        'status' => $restoredRemaining >= (float) $debt->original_amount ? 'open' : 'partially_paid',
-                    ]);
+                    $sn = $unit->imei_or_serial ? " (SN: {$unit->imei_or_serial})" : '';
+                    $devName = $unit->variant?->product?->name ?? 'Device';
+                    $reversalAmount = (float) $pmt->amount;
+
+                    $existingReturnOffset = DebtPayment::where('debt_id', $debt->id)
+                        ->where('reference_number', 'RETURN-OFFSET')
+                        ->where('notes', 'like', "%[unit_id:{$unit->id}]%")
+                        ->first();
+
+                    if (! $existingReturnOffset) {
+                        DebtPayment::create([
+                            'tenant_id' => $user->tenant_id,
+                            'debt_id' => $debt->id,
+                            'financial_account_id' => null,
+                            'amount' => -$reversalAmount,
+                            'payment_date' => now(),
+                            'reference_number' => 'RETURN-OFFSET',
+                            'notes' => "Returned handover device: {$devName}{$sn} [unit_id:{$unit->id}]",
+                            'created_by' => $user->id,
+                        ]);
+
+                        $restoredPaid = max(0, (float) $debt->paid_amount - $reversalAmount);
+                        $restoredRemaining = (float) $debt->remaining_amount + $reversalAmount;
+                        $debt->update([
+                            'paid_amount' => $restoredPaid,
+                            'remaining_amount' => $restoredRemaining,
+                            'status' => $restoredRemaining >= (float) $debt->original_amount ? 'open' : 'partially_paid',
+                        ]);
+                    }
                 }
-                $pmt->delete();
             }
 
             // Reverse SalesOrder / realized profit for this unit if one was created

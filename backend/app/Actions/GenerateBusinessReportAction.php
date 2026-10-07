@@ -28,12 +28,13 @@ class GenerateBusinessReportAction
         $orders = SalesOrder::query()
             ->with(['items', 'salesperson'])
             ->whereBetween('order_date', [$start, $end])
+            ->whereNotIn('payment_status', ['refunded', 'cancelled'])
             ->orderBy('order_date')
             ->get();
 
         $items = SalesOrderItem::query()
             ->with(['salesOrder', 'vendorContact', 'variant.product', 'inventoryUnit'])
-            ->whereHas('salesOrder', fn ($query) => $query->whereBetween('order_date', [$start, $end]))
+            ->whereHas('salesOrder', fn ($query) => $query->whereBetween('order_date', [$start, $end])->whereNotIn('payment_status', ['refunded', 'cancelled']))
             ->get();
 
         $revenue = (float) $orders->sum('total_amount');
@@ -441,6 +442,10 @@ class GenerateBusinessReportAction
      */
     private function realizedItemProfit(SalesOrderItem $item): float
     {
+        if ($item->salesOrder && in_array($item->salesOrder->payment_status, ['refunded', 'cancelled'], true)) {
+            return 0.0;
+        }
+
         return ((float) $item->unit_price - (float) $item->unit_cost) * (int) $item->quantity
             - (float) $item->bonus_amount;
     }

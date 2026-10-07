@@ -24,6 +24,7 @@ class GeneratePartnerStatementAction
     {
         $text = preg_replace('/\[unit_id:[a-zA-Z0-9_-]+\]/i', '', $text);
         $text = preg_replace('/^Deducted by handover device:\s*/i', 'Handover device: ', $text);
+        $text = preg_replace('/^Returned handover device:\s*/i', 'Returned: ', $text);
         $text = preg_replace('/wire\s+payout/i', 'Transferred', $text);
         $text = preg_replace('/(?:in|for|from)?\s*Order\s*#[A-Za-z0-9_-]+/i', '', $text);
         $text = preg_replace('/#ORD-[A-Za-z0-9_-]+/i', '', $text);
@@ -392,6 +393,19 @@ class GeneratePartnerStatementAction
                         'balance_effect' => (float) $payment->amount,
                         'reference_number' => 'BILATERAL-OFFSET',
                     ];
+                } elseif ($payment->reference_number === 'RETURN-OFFSET' || str_starts_with($payment->reference_number ?? '', 'RETURN-OFFSET')) {
+                    $revPayable = abs((float) $payment->amount);
+                    $rawEntries[] = [
+                        'id' => "pay-{$payment->id}",
+                        'date' => $payDate,
+                        'type' => 'handover_return',
+                        'type_label' => 'Item Returned',
+                        'context' => $this->sanitizeContext($payment->notes ?: 'Returned handover device'),
+                        'payable' => $revPayable,
+                        'receivable' => 0.0,
+                        'balance_effect' => -$revPayable,
+                        'reference_number' => 'RETURN-OFFSET',
+                    ];
                 } elseif ($payment->reference_number === 'OFFSET-INTAKE' || $payment->reference_number === 'DEVICE-OFFSET' || str_contains(strtolower($payment->notes ?? ''), 'device') || str_contains(strtolower($payment->notes ?? ''), 'handover') || str_contains($payment->notes ?? '', 'Paid by device')) {
                     $rawEntries[] = [
                         'id' => "pay-{$payment->id}",
@@ -697,7 +711,7 @@ class GeneratePartnerStatementAction
         foreach ($inRangeEntries as $entry) {
             $runningBalance += $entry['balance_effect'];
 
-            if ($entry['type'] === 'consignment_sale' || $entry['type'] === 'brokered_sourcing' || $entry['type'] === 'stock_intake' || $entry['type'] === 'manual_payable') {
+            if ($entry['type'] === 'consignment_sale' || $entry['type'] === 'brokered_sourcing' || $entry['type'] === 'stock_intake' || $entry['type'] === 'manual_payable' || $entry['type'] === 'handover_return') {
                 $rangePayableSum += $entry['payable'];
             } elseif ($entry['type'] === 'payment_sent' || $entry['type'] === 'repair_offset' || $entry['type'] === 'vendor_return') {
                 $rangePaidSentSum += abs($entry['payable']);
@@ -775,36 +789,76 @@ class GeneratePartnerStatementAction
                 ];
             });
 
-        // Units out on handover with this partner
-        $handedOutUnits = InventoryUnit::where('handover_to', $contact->name)
-            ->where('status', 'out')
+        // Discover any inventory units involved in handover settlements or returns with this partner via debt payments
+        $handoverUnitIds = [];
+        foreach ($debts as $d) {
+            foreach ($d->payments as $p) {
+                if (preg_match('/\[unit_id:([a-zA-Z0-9_-]+)\]/', $p->notes ?? '', $matches)) {
+                    $handoverUnitIds[] = $matches[1];
+                }
+            }
+        }
+        $handoverUnitIds = array_values(array_unique($handoverUnitIds));
+
+        // Units out on handover with this partner (including recently returned units for full audit visibility)
+        $handedOutUnits = InventoryUnit::where(function ($q) use ($contact, $handoverUnitIds) {
+                $q->where('handover_to', $contact->name);
+                if (! empty($handoverUnitIds)) {
+                    $q->orWhereIn('id', $handoverUnitIds);
+                }
+            })
             ->with(['variant.product'])
             ->get()
             ->map(function ($u) {
+                $isReturned = in_array($u->status, ['returned', 'returned_to_vendor', 'restocked'], true) || ! empty($u->returned_at);
+
                 return [
                     'id' => $u->id,
                     'model' => $u->variant?->product?->name ?? 'Device',
                     'specs' => array_filter([$u->variant?->storage, $u->variant?->color]),
                     'imei_or_serial' => $u->imei_or_serial,
                     'status' => $u->status,
+                    'is_returned' => $isReturned,
                     'location' => $u->location,
-                    'handed_out_at' => $u->handed_out_at?->toIso8601String(),
-                    'handover_payout' => (float) $u->handover_payout,
+                    'handed_out_at' => $u->handed_out_at?->toIso8601String() ?? $u->sold_at?->toIso8601String(),
+                    'returned_at' => $u->returned_at?->toIso8601String(),
+                    'return_reason' => $u->return_reason,
+                    'handover_payout' => (float) ($u->handover_payout ?: $u->selling_price),
                 ];
             });
 
-        // Units with vendor for repair/warranty
-        $vendorReturnUnits = InventoryUnit::where('supplier_contact_id', $contact->id)
-            ->whereIn('status', ['returned_to_vendor', 'fixed'])
+        // Units with vendor for repair/warranty or returned by partner
+        $vendorReturnUnits = InventoryUnit::where(function ($q) use ($contact, $handoverUnitIds) {
+                $q->where(function ($sub) use ($contact) {
+                    $sub->where('supplier_contact_id', $contact->id)
+                        ->whereIn('status', ['returned_to_vendor', 'fixed']);
+                });
+                if (! empty($handoverUnitIds)) {
+                    $q->orWhere(function ($sub) use ($handoverUnitIds) {
+                        $sub->whereIn('id', $handoverUnitIds)
+                            ->where(function ($s2) {
+                                $s2->whereIn('status', ['returned', 'returned_to_vendor'])
+                                    ->orWhereNotNull('returned_at');
+                            });
+                    });
+                }
+                $q->orWhere(function ($sub) use ($contact) {
+                    $sub->where('handover_to', $contact->name)
+                        ->whereIn('status', ['returned', 'returned_to_vendor']);
+                });
+            })
             ->with(['variant.product', 'maintenanceRecords'])
             ->get()
             ->map(function ($u) {
+                $isReturned = in_array($u->status, ['returned', 'returned_to_vendor'], true) || ! empty($u->returned_at);
+
                 return [
                     'id' => $u->id,
                     'model' => $u->variant?->product?->name ?? 'Device',
                     'specs' => array_filter([$u->variant?->storage, $u->variant?->color]),
                     'imei_or_serial' => $u->imei_or_serial,
                     'status' => $u->status,
+                    'is_returned' => $isReturned,
                     'return_reason' => $u->return_reason,
                     'returned_at' => $u->returned_at?->toIso8601String(),
                     'maintenance_cost' => (float) $u->maintenanceRecords->sum('cost'),

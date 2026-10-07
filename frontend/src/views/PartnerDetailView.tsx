@@ -582,8 +582,8 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
                                   ? 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/50'
                                   : row.type === 'payout_advance'
                                   ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border border-indigo-200/50'
-                                  : row.type === 'vendor_return' || row.type === 'vendor_return_refund'
-                                  ? 'bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-400 border border-teal-200/50'
+                                  : row.type === 'handover_return' || row.type === 'vendor_return' || row.type === 'vendor_return_refund'
+                                  ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50'
                                   : row.type === 'payment_received'
                                   ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50'
                                   : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
@@ -669,8 +669,8 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
                           ? 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/50'
                           : row.type === 'payout_advance'
                           ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border border-indigo-200/50'
-                          : row.type === 'vendor_return' || row.type === 'vendor_return_refund'
-                          ? 'bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-400 border border-teal-200/50'
+                          : row.type === 'handover_return' || row.type === 'vendor_return' || row.type === 'vendor_return_refund'
+                          ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50'
                           : row.type === 'payment_received'
                           ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50'
                           : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
@@ -903,12 +903,26 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
                           {unit.handover_payout > 0 ? `${unit.handover_payout.toLocaleString()} ETB` : '—'}
                         </td>
                         <td className="py-2.5 px-3.5 font-sans text-slate-500 text-[11px]">
-                          {unit.handed_out_at ? new Date(unit.handed_out_at).toLocaleDateString() : '—'}
+                          <div>{unit.handed_out_at ? new Date(unit.handed_out_at).toLocaleDateString() : '—'}</div>
+                          {unit.returned_at && (
+                            <div className="text-[10px] text-slate-400 dark:text-slate-500">
+                              Ret: {new Date(unit.returned_at).toLocaleDateString()}
+                            </div>
+                          )}
                         </td>
                         <td className="py-2.5 px-3.5 text-center font-sans">
-                          <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50">
-                            Out with Partner
-                          </span>
+                          {unit.status === 'returned' || unit.is_returned ? (
+                            <span
+                              className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700"
+                              title={unit.return_reason || undefined}
+                            >
+                              Returned to Shop
+                            </span>
+                          ) : (
+                            <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50">
+                              Out with Partner
+                            </span>
+                          )}
                         </td>
                       </tr>
                     ))
@@ -941,9 +955,15 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
                         </p>
                       )}
                     </div>
-                    <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50 shrink-0">
-                      Out with Partner
-                    </span>
+                    {unit.status === 'returned' || unit.is_returned ? (
+                      <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700 shrink-0">
+                        Returned to Shop
+                      </span>
+                    ) : (
+                      <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50 shrink-0">
+                        Out with Partner
+                      </span>
+                    )}
                   </div>
 
                   <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs">
@@ -1014,10 +1034,16 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
                             className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${
                               unit.status === 'fixed'
                                 ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 border border-blue-200/50'
+                                : unit.status === 'returned' || unit.is_returned
+                                ? 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700'
                                 : 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50'
                             }`}
                           >
-                            {unit.status === 'fixed' ? 'Fixed' : 'With Vendor'}
+                            {unit.status === 'fixed'
+                              ? 'Fixed'
+                              : unit.status === 'returned' || unit.is_returned
+                              ? 'Returned to Shop'
+                              : 'With Vendor'}
                           </span>
                         </td>
                       </tr>
@@ -1058,10 +1084,16 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
                       className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold shrink-0 ${
                         unit.status === 'fixed'
                           ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 border border-blue-200/50'
+                          : unit.status === 'returned' || unit.is_returned
+                          ? 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700'
                           : 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50'
                       }`}
                     >
-                      {unit.status === 'fixed' ? 'Fixed' : 'With Vendor'}
+                      {unit.status === 'fixed'
+                        ? 'Fixed'
+                        : unit.status === 'returned' || unit.is_returned
+                        ? 'Returned to Shop'
+                        : 'With Vendor'}
                     </span>
                   </div>
 

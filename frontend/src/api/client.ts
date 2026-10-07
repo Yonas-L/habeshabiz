@@ -195,8 +195,11 @@ export interface StatementHandedOutUnit {
   specs: string[];
   imei_or_serial: string | null;
   status: string;
+  is_returned?: boolean;
   location: string | null;
   handed_out_at: string | null;
+  returned_at?: string | null;
+  return_reason?: string | null;
   handover_payout: number;
 }
 
@@ -206,6 +209,7 @@ export interface StatementVendorReturnUnit {
   specs: string[];
   imei_or_serial: string | null;
   status: string;
+  is_returned?: boolean;
   return_reason: string | null;
   returned_at: string | null;
   maintenance_cost: number;
