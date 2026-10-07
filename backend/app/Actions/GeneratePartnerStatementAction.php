@@ -25,6 +25,7 @@ class GeneratePartnerStatementAction
         $text = preg_replace('/\[unit_id:[a-zA-Z0-9_-]+\]/i', '', $text);
         $text = preg_replace('/^Deducted by handover device:\s*/i', 'Handover device: ', $text);
         $text = preg_replace('/^Returned handover device:\s*/i', 'Returned: ', $text);
+        $text = preg_replace('/^Received fixed from vendor:\s*/i', 'Received fixed: ', $text);
         $text = preg_replace('/wire\s+payout/i', 'Transferred', $text);
         $text = preg_replace('/(?:in|for|from)?\s*Order\s*#[A-Za-z0-9_-]+/i', '', $text);
         $text = preg_replace('/#ORD-[A-Za-z0-9_-]+/i', '', $text);
@@ -405,6 +406,19 @@ class GeneratePartnerStatementAction
                         'receivable' => 0.0,
                         'balance_effect' => -$revPayable,
                         'reference_number' => 'RETURN-OFFSET',
+                    ];
+                } elseif ($payment->reference_number === 'RECEIVE-FROM-VENDOR' || str_starts_with($payment->reference_number ?? '', 'RECEIVE-FROM-VENDOR') || $payment->reference_number === 'RETURN-FROM-VENDOR' || str_starts_with($payment->reference_number ?? '', 'RETURN-FROM-VENDOR')) {
+                    $revPayable = abs((float) $payment->amount);
+                    $rawEntries[] = [
+                        'id' => "pay-{$payment->id}",
+                        'date' => $payDate,
+                        'type' => 'stock_intake',
+                        'type_label' => 'Item Received',
+                        'context' => $this->sanitizeContext($payment->notes ?: 'Received fixed from vendor'),
+                        'payable' => $revPayable,
+                        'receivable' => 0.0,
+                        'balance_effect' => -$revPayable,
+                        'reference_number' => 'RECEIVE-FROM-VENDOR',
                     ];
                 } elseif ($payment->reference_number === 'OFFSET-INTAKE' || $payment->reference_number === 'DEVICE-OFFSET' || str_contains(strtolower($payment->notes ?? ''), 'device') || str_contains(strtolower($payment->notes ?? ''), 'handover') || str_contains($payment->notes ?? '', 'Paid by device')) {
                     $rawEntries[] = [
@@ -831,7 +845,11 @@ class GeneratePartnerStatementAction
         $vendorReturnUnits = InventoryUnit::where(function ($q) use ($contact, $handoverUnitIds) {
                 $q->where(function ($sub) use ($contact) {
                     $sub->where('supplier_contact_id', $contact->id)
-                        ->whereIn('status', ['returned_to_vendor', 'fixed']);
+                        ->where(function ($s) {
+                            $s->whereIn('status', ['returned_to_vendor', 'fixed'])
+                                ->orWhere('is_repaired', true)
+                                ->orWhereNotNull('returned_at');
+                        });
                 });
                 if (! empty($handoverUnitIds)) {
                     $q->orWhere(function ($sub) use ($handoverUnitIds) {
@@ -857,7 +875,7 @@ class GeneratePartnerStatementAction
                     'model' => $u->variant?->product?->name ?? 'Device',
                     'specs' => array_filter([$u->variant?->storage, $u->variant?->color]),
                     'imei_or_serial' => $u->imei_or_serial,
-                    'status' => $u->status,
+                    'status' => $u->is_repaired ? 'fixed' : $u->status,
                     'is_returned' => $isReturned,
                     'return_reason' => $u->return_reason,
                     'returned_at' => $u->returned_at?->toIso8601String(),
