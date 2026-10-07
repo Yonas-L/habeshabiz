@@ -742,6 +742,7 @@ class InventoryController extends Controller
                         ->where('contact_id', $partnerContact->id)
                         ->where('type', 'payable')
                         ->whereIn('status', ['open', 'partially_paid'])
+                        ->with('payments')
                         ->orderBy('due_date', 'asc')
                         ->orderBy('created_at', 'asc')
                         ->get();
@@ -755,7 +756,7 @@ class InventoryController extends Controller
 
                         $sn = $unit->imei_or_serial ? " (SN: {$unit->imei_or_serial})" : '';
                         $devName = $unit->variant?->product?->name ?? 'Device';
-                        DebtPayment::create([
+                        $pmt = DebtPayment::create([
                             'tenant_id' => $user->tenant_id,
                             'debt_id' => $op->id,
                             'amount' => $deduct,
@@ -765,15 +766,8 @@ class InventoryController extends Controller
                             'created_by' => $user->id,
                         ]);
 
-                        $newPaid = (float) $op->paid_amount + $deduct;
-                        $newRemaining = max(0.0, $rem - $deduct);
-                        $newStatus = $newRemaining <= 0.009 ? 'settled' : 'partially_paid';
-
-                        $op->update([
-                            'paid_amount' => $newPaid,
-                            'remaining_amount' => $newRemaining,
-                            'status' => $newStatus,
-                        ]);
+                        $op->payments->push($pmt);
+                        $op->recalculateSettlement();
 
                         $remOffset -= $deduct;
                     }
@@ -1112,6 +1106,7 @@ class InventoryController extends Controller
                         ->where('contact_id', $partnerContact->id)
                         ->where('type', 'payable')
                         ->whereIn('status', ['open', 'partially_paid'])
+                        ->with('payments')
                         ->orderBy('created_at')
                         ->get();
 
@@ -1123,7 +1118,7 @@ class InventoryController extends Controller
                         }
                         $applied = min($remOffset, (float) $payable->remaining_amount);
 
-                        DebtPayment::create([
+                        $pmt = DebtPayment::create([
                             'tenant_id' => $user->tenant_id,
                             'debt_id' => $payable->id,
                             'financial_account_id' => null,
@@ -1134,13 +1129,8 @@ class InventoryController extends Controller
                             'created_by' => $user->id,
                         ]);
 
-                        $newPaid = (float) $payable->paid_amount + $applied;
-                        $newRemaining = max(0, (float) $payable->original_amount - $newPaid);
-                        $payable->update([
-                            'paid_amount' => $newPaid,
-                            'remaining_amount' => $newRemaining,
-                            'status' => $newRemaining <= 0 ? 'settled' : 'partially_paid',
-                        ]);
+                        $payable->payments->push($pmt);
+                        $payable->recalculateSettlement();
 
                         $remOffset -= $applied;
                     }
@@ -1311,7 +1301,7 @@ class InventoryController extends Controller
             }
 
             // Reverse bilateral debt offset payments if this unit was sold via offset
-            $offsetPayments = DebtPayment::where('tenant_id', $user->tenant_id)
+            $unitDebtIds = DebtPayment::where('tenant_id', $user->tenant_id)
                 ->where('reference_number', 'BILATERAL-OFFSET')
                 ->where(function ($q) use ($unit) {
                     $q->where('notes', 'like', "%[unit_id:{$unit->id}]%");
@@ -1319,40 +1309,68 @@ class InventoryController extends Controller
                         $q->orWhere('notes', 'like', "%{$unit->imei_or_serial}%");
                     }
                 })
-                ->get();
+                ->pluck('debt_id')
+                ->unique()
+                ->filter();
 
-            foreach ($offsetPayments as $pmt) {
-                $debt = $pmt->debt;
-                if ($debt) {
+            $debtsToUpdate = Debt::whereIn('id', $unitDebtIds)->with('payments')->get();
+            $linkedUnitIds = $debtsToUpdate->pluck('reference_id')->filter()->unique();
+            $linkedUnits = InventoryUnit::whereIn('id', $linkedUnitIds)->get()->keyBy('id');
+
+            foreach ($debtsToUpdate as $debt) {
+                $totalOffset = (float) $debt->payments
+                    ->where('reference_number', 'BILATERAL-OFFSET')
+                    ->filter(function ($p) use ($unit) {
+                        return str_contains($p->notes ?? '', "[unit_id:{$unit->id}]")
+                            || (! empty($unit->imei_or_serial) && str_contains($p->notes ?? '', $unit->imei_or_serial));
+                    })
+                    ->sum('amount');
+
+                $totalReversed = abs((float) $debt->payments
+                    ->where('reference_number', 'RETURN-OFFSET')
+                    ->filter(function ($p) use ($unit) {
+                        return str_contains($p->notes ?? '', "[unit_id:{$unit->id}]")
+                            || (! empty($unit->imei_or_serial) && str_contains($p->notes ?? '', $unit->imei_or_serial));
+                    })
+                    ->sum('amount'));
+
+                $unreversedAmount = $totalOffset - $totalReversed;
+
+                if ($unreversedAmount > 0) {
                     $sn = $unit->imei_or_serial ? " (SN: {$unit->imei_or_serial})" : '';
                     $devName = $unit->variant?->product?->name ?? 'Device';
-                    $reversalAmount = (float) $pmt->amount;
 
-                    $existingReturnOffset = DebtPayment::where('debt_id', $debt->id)
-                        ->where('reference_number', 'RETURN-OFFSET')
-                        ->where('notes', 'like', "%[unit_id:{$unit->id}]%")
-                        ->first();
+                    $retPmt = DebtPayment::create([
+                        'tenant_id' => $user->tenant_id,
+                        'debt_id' => $debt->id,
+                        'financial_account_id' => null,
+                        'amount' => -$unreversedAmount,
+                        'payment_date' => now(),
+                        'reference_number' => 'RETURN-OFFSET',
+                        'notes' => "Returned handover device: {$devName}{$sn} [unit_id:{$unit->id}]",
+                        'created_by' => $user->id,
+                    ]);
+                    $debt->payments->push($retPmt);
 
-                    if (! $existingReturnOffset) {
-                        DebtPayment::create([
+                    // If the unit tied to this debt has ALREADY been returned to vendor,
+                    // reversing the offset restores liability on a device that is no longer in shop stock.
+                    // We must compensate the RETURN-TO-VENDOR cancellation so the shop does not end up
+                    // owing a vendor for an intake device that was already handed back to that vendor.
+                    $linkedUnit = ! empty($debt->reference_id) ? ($linkedUnits->get($debt->reference_id) ?? null) : null;
+                    if ($linkedUnit && $linkedUnit->status === 'returned_to_vendor') {
+                        $compPmt = DebtPayment::create([
                             'tenant_id' => $user->tenant_id,
                             'debt_id' => $debt->id,
-                            'financial_account_id' => null,
-                            'amount' => -$reversalAmount,
+                            'amount' => $unreversedAmount,
                             'payment_date' => now(),
-                            'reference_number' => 'RETURN-OFFSET',
-                            'notes' => "Returned handover device: {$devName}{$sn} [unit_id:{$unit->id}]",
+                            'reference_number' => 'RETURN-TO-VENDOR',
+                            'notes' => 'Device returned to vendor, adjusting cancellation after handover reversal',
                             'created_by' => $user->id,
                         ]);
-
-                        $restoredPaid = max(0, (float) $debt->paid_amount - $reversalAmount);
-                        $restoredRemaining = (float) $debt->remaining_amount + $reversalAmount;
-                        $debt->update([
-                            'paid_amount' => $restoredPaid,
-                            'remaining_amount' => $restoredRemaining,
-                            'status' => $restoredRemaining >= (float) $debt->original_amount ? 'open' : 'partially_paid',
-                        ]);
+                        $debt->payments->push($compPmt);
                     }
+
+                    $debt->recalculateSettlement();
                 }
             }
 
@@ -1619,15 +1637,28 @@ class InventoryController extends Controller
             //    the vendor now owes us a REFUND (open receivable) for that paid amount!
             $unitPayables = Debt::where('reference_id', $unit->id)
                 ->where('type', 'payable')
+                ->with('payments')
                 ->get();
 
             $totalRefundOwed = 0.0;
 
             foreach ($unitPayables as $debt) {
-                $realPaidAmount = (float) $debt->payments()
-                    ->where(function ($q) {
-                        $q->whereNull('reference_number')
-                            ->orWhere('reference_number', '!=', 'RETURN-TO-VENDOR');
+                // Only actual cash/wire payments (backed by a financial account) constitute
+                // real money paid that the vendor must refund in cash.
+                // Device handovers (BILATERAL-OFFSET) and internal credit offsets are NOT cash payments.
+                $realPaidAmount = (float) $debt->payments
+                    ->filter(function ($p) {
+                        return ! empty($p->financial_account_id)
+                            && ! in_array($p->reference_number, [
+                                'RETURN-TO-VENDOR',
+                                'RECEIVE-FROM-VENDOR',
+                                'BILATERAL-OFFSET',
+                                'DEVICE-OFFSET',
+                                'OFFSET-INTAKE',
+                                'RETURN-OFFSET',
+                                'MUTUAL-OFFSET',
+                                'REPAIR-OFFSET',
+                            ], true);
                     })
                     ->sum('amount');
 
@@ -1636,21 +1667,19 @@ class InventoryController extends Controller
                 }
 
                 if ($debt->remaining_amount > 0) {
-                    DebtPayment::create([
+                    $retPmt = DebtPayment::create([
                         'tenant_id' => $unit->tenant_id,
                         'debt_id' => $debt->id,
                         'amount' => (float) $debt->remaining_amount,
                         'payment_date' => now(),
                         'reference_number' => 'RETURN-TO-VENDOR',
                         'notes' => 'Device returned to vendor, canceling payable obligation',
+                        'created_by' => auth()->id(),
                     ]);
-
-                    $debt->update([
-                        'paid_amount' => $debt->original_amount,
-                        'remaining_amount' => 0.0,
-                        'status' => 'settled',
-                    ]);
+                    $debt->payments->push($retPmt);
                 }
+
+                $debt->recalculateSettlement();
             }
 
             if ($totalRefundOwed > 0 && $unit->supplier_contact_id) {
@@ -1764,12 +1793,13 @@ class InventoryController extends Controller
             // 1. Re-instate / restore the payable debt obligation to the vendor (Yenus)
             $vendorPayables = Debt::where('reference_id', $unit->id)
                 ->where('type', 'payable')
+                ->with('payments')
                 ->get();
 
             foreach ($vendorPayables as $debt) {
-                $returnToVendorPayment = $debt->payments()
+                $returnToVendorPayment = $debt->payments
                     ->where('reference_number', 'RETURN-TO-VENDOR')
-                    ->latest()
+                    ->sortByDesc('created_at')
                     ->first();
 
                 if ($returnToVendorPayment) {
@@ -1777,12 +1807,12 @@ class InventoryController extends Controller
                     $sn = $unit->imei_or_serial ? " (SN: {$unit->imei_or_serial})" : '';
                     $devName = $unit->variant?->product?->name ?? 'Device';
 
-                    $existingReceivePayment = $debt->payments()
+                    $existingReceivePayment = $debt->payments
                         ->where('reference_number', 'RECEIVE-FROM-VENDOR')
                         ->first();
 
                     if (! $existingReceivePayment) {
-                        DebtPayment::create([
+                        $recPmt = DebtPayment::create([
                             'tenant_id' => $user->tenant_id,
                             'debt_id' => $debt->id,
                             'financial_account_id' => null,
@@ -1792,14 +1822,9 @@ class InventoryController extends Controller
                             'notes' => "Received fixed from vendor: {$devName}{$sn} [unit_id:{$unit->id}]",
                             'created_by' => $user->id,
                         ]);
+                        $debt->payments->push($recPmt);
 
-                        $restoredPaid = max(0, (float) $debt->paid_amount - $reversalAmount);
-                        $restoredRemaining = (float) $debt->remaining_amount + $reversalAmount;
-                        $debt->update([
-                            'paid_amount' => $restoredPaid,
-                            'remaining_amount' => $restoredRemaining,
-                            'status' => $restoredRemaining >= (float) $debt->original_amount ? 'open' : 'partially_paid',
-                        ]);
+                        $debt->recalculateSettlement();
                     }
                 }
             }
@@ -1845,6 +1870,7 @@ class InventoryController extends Controller
                             $q->orWhere('notes', 'like', "%{$unit->imei_or_serial}%");
                         }
                     })
+                    ->with('debt.payments')
                     ->get();
 
                 foreach ($returnOffsetPayments as $retPmt) {
@@ -1854,13 +1880,13 @@ class InventoryController extends Controller
                         $sn = $unit->imei_or_serial ? " (SN: {$unit->imei_or_serial})" : '';
                         $devName = $unit->variant?->product?->name ?? 'Device';
 
-                        $existingReOffset = DebtPayment::where('debt_id', $pDebt->id)
+                        $existingReOffset = $pDebt->payments
                             ->where('reference_number', 'BILATERAL-OFFSET')
-                            ->where('notes', 'like', "%(Repaired)%[unit_id:{$unit->id}]%")
+                            ->filter(fn ($p) => str_contains($p->notes ?? '', "(Repaired)") && str_contains($p->notes ?? '', "[unit_id:{$unit->id}]"))
                             ->first();
 
                         if (! $existingReOffset) {
-                            DebtPayment::create([
+                            $rePmt = DebtPayment::create([
                                 'tenant_id' => $user->tenant_id,
                                 'debt_id' => $pDebt->id,
                                 'financial_account_id' => null,
@@ -1870,14 +1896,9 @@ class InventoryController extends Controller
                                 'notes' => "Handover device (Repaired): {$devName}{$sn} [unit_id:{$unit->id}]",
                                 'created_by' => $user->id,
                             ]);
+                            $pDebt->payments->push($rePmt);
 
-                            $newPaid = (float) $pDebt->paid_amount + $offsetAmount;
-                            $newRemaining = max(0, (float) $pDebt->remaining_amount - $offsetAmount);
-                            $pDebt->update([
-                                'paid_amount' => $newPaid,
-                                'remaining_amount' => $newRemaining,
-                                'status' => $newRemaining <= 0 ? 'settled' : 'partially_paid',
-                            ]);
+                            $pDebt->recalculateSettlement();
                         }
                     }
                 }

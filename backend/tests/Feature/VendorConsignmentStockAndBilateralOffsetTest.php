@@ -444,3 +444,83 @@ test('instant 1-click handover debt offset marks sold, settles debt, generates c
     expect((float) $dashboardRes->json('data.monthly_performance.gross_profit'))->toBe(5000.00);
 });
 
+test('bilateral multi-cycle device handover and vendor returns maintain mathematical ledger integrity with zero phantom refund claims', function () {
+    // 1. Stock Intake Unit A (iPhone 15) from Partner A on credit (100,000 ETB)
+    $resA = $this->actingAs($this->user, 'sanctum')->postJson('/api/v1/inventory/units', [
+        'product_id' => $this->product->id,
+        'variant_id' => $this->variantA->id,
+        'imei_or_serial' => 'SN-IP15-MULTI',
+        'cost_basis' => 100000.00,
+        'selling_price' => 120000.00,
+        'supplier_contact_id' => $this->partnerA->id,
+        'funding_source' => 'none',
+        'condition' => 'brand_new',
+    ]);
+    $resA->assertCreated();
+    $unitAId = $resA->json('data.id');
+
+    // 2. Stock Intake Unit B (iPhone 13 / Samsung) from Partner B on credit (45,000 ETB)
+    $resB = $this->actingAs($this->user, 'sanctum')->postJson('/api/v1/inventory/units', [
+        'product_id' => $this->productB->id,
+        'variant_id' => $this->variantB->id,
+        'imei_or_serial' => 'SN-IP13-MULTI',
+        'cost_basis' => 45000.00,
+        'selling_price' => 50000.00,
+        'supplier_contact_id' => $this->partnerB->id,
+        'funding_source' => 'none',
+        'condition' => 'brand_new',
+    ]);
+    $resB->assertCreated();
+    $unitBId = $resB->json('data.id');
+
+    // 3. Handover Unit B to Partner A with instant_offset: true at 50,000 ETB
+    $handoverRes = $this->actingAs($this->user, 'sanctum')->postJson("/api/v1/inventory/units/{$unitBId}/handover", [
+        'handover_to' => $this->partnerA->name,
+        'handover_payout' => 50000.00,
+        'instant_offset' => true,
+    ]);
+    $handoverRes->assertOk();
+
+    // 4. Partner A returns Unit B (defective)
+    $custRetRes = $this->actingAs($this->user, 'sanctum')->postJson("/api/v1/inventory/units/{$unitBId}/customer-return", [
+        'destination' => 'vendor',
+        'return_reason' => 'Screen defective, returning to Yenus',
+    ]);
+    $custRetRes->assertOk();
+
+    // 5. Return Unit A to Partner A (return to vendor)
+    $retARes = $this->actingAs($this->user, 'sanctum')->postJson("/api/v1/inventory/units/{$unitAId}/return-to-vendor", [
+        'return_reason' => 'Returning to Nati',
+    ]);
+    $retARes->assertOk();
+
+    // Assert NO phantom vendor_return_refund was created
+    $refunds = Debt::where('contact_id', $this->partnerA->id)->where('reference_type', 'vendor_return_refund')->get();
+    expect($refunds)->toBeEmpty();
+
+    // 6. Receive Unit A back fixed from Partner A (restock)
+    $recARes = $this->actingAs($this->user, 'sanctum')->postJson("/api/v1/inventory/units/{$unitAId}/receive-from-vendor", [
+        'action' => 'restock',
+    ]);
+    $recARes->assertOk();
+
+    // 7. Return Unit A to Partner A again
+    $retA2Res = $this->actingAs($this->user, 'sanctum')->postJson("/api/v1/inventory/units/{$unitAId}/return-to-vendor", [
+        'return_reason' => 'Returning to Nati second time',
+    ]);
+    $retA2Res->assertOk();
+
+    // Check Partner A's intake debt: paid_amount must strictly equal sum of payments
+    $debtA = Debt::where('contact_id', $this->partnerA->id)->where('reference_type', 'stock_intake')->first();
+    expect((float) $debtA->paid_amount)->toBe((float) $debtA->payments()->sum('amount'))
+        ->and((float) $debtA->remaining_amount)->toBe(0.00)
+        ->and($debtA->status)->toBe('settled');
+
+    // Check statement: net balance must be settled (0.00 ETB)
+    $statementA = $this->actingAs($this->user, 'sanctum')->getJson("/api/v1/contacts/{$this->partnerA->id}/statement");
+    $statementA->assertOk();
+    expect((float) $statementA->json('data.kpis.current_net_balance'))->toBe(0.00)
+        ->and($statementA->json('data.kpis.balance_verdict'))->toBe('Settled (0.00 ETB)');
+});
+
+

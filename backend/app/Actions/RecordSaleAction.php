@@ -563,6 +563,7 @@ class RecordSaleAction
                     ->where('contact_id', $customerId)
                     ->where('type', 'payable')
                     ->whereIn('status', ['open', 'partially_paid'])
+                    ->with('payments')
                     ->orderBy('created_at')
                     ->get();
 
@@ -572,7 +573,7 @@ class RecordSaleAction
                     }
                     $applied = min($remOffset, (float) $payable->remaining_amount);
 
-                    DebtPayment::create([
+                    $pmt = DebtPayment::create([
                         'tenant_id' => $tenantId,
                         'debt_id' => $payable->id,
                         'financial_account_id' => null,
@@ -583,13 +584,8 @@ class RecordSaleAction
                         'created_by' => $data['salesperson_id'] ?? auth()->id(),
                     ]);
 
-                    $newPaid = (float) $payable->paid_amount + $applied;
-                    $newRemaining = max(0, (float) $payable->original_amount - $newPaid);
-                    $payable->update([
-                        'paid_amount' => $newPaid,
-                        'remaining_amount' => $newRemaining,
-                        'status' => $newRemaining <= 0 ? 'settled' : 'partially_paid',
-                    ]);
+                    $payable->payments->push($pmt);
+                    $payable->recalculateSettlement();
 
                     $remOffset -= $applied;
                 }

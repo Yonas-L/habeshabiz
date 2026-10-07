@@ -181,7 +181,7 @@ class GeneratePartnerStatementAction
                         'balance_effect' => -(float) $debt->original_amount,
                         'reference_number' => null,
                     ];
-                } else {
+                } elseif ((float) $debt->original_amount > 0) {
                     $rawEntries[] = [
                         'id' => "debt-{$debt->id}",
                         'date' => $debtCreatedDate,

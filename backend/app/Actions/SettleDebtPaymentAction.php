@@ -54,18 +54,10 @@ class SettleDebtPaymentAction
             ]);
 
             // Update debt amounts
-            $newPaid = (float) $debt->paid_amount + $amount;
-            $newRemaining = (float) $debt->original_amount - $newPaid;
-            $status = $newRemaining <= 0 ? 'settled' : 'partially_paid';
-
-            $debt->update([
-                'paid_amount' => $newPaid,
-                'remaining_amount' => max(0, $newRemaining),
-                'status' => $status,
-            ]);
+            $debt->recalculateSettlement();
 
             // If this was a handover holding debt and now fully settled, auto-mark unit as sold
-            if ($debt->reference_type === 'handover_holding' && $status === 'settled' && ! empty($debt->reference_id)) {
+            if ($debt->reference_type === 'handover_holding' && $debt->status === 'settled' && ! empty($debt->reference_id)) {
                 $unit = InventoryUnit::find($debt->reference_id);
                 if ($unit && $unit->status === 'out') {
                     $vendorName = $unit->handover_to ?? 'Vendor/Broker';
@@ -89,7 +81,7 @@ class SettleDebtPaymentAction
                         newValues: [
                             'imei_or_serial' => $unit->imei_or_serial,
                             'handover_to' => $unit->handover_to,
-                            'settled_amount' => $newPaid,
+                            'settled_amount' => $debt->paid_amount,
                         ]
                     );
                 }

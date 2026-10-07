@@ -68,6 +68,24 @@ class Debt extends Model
         return $this->status === 'settled';
     }
 
+    /**
+     * Recalculate and synchronize paid_amount, remaining_amount, and status
+     * directly from associated debt payments, ensuring zero discrepancy.
+     */
+    public function recalculateSettlement(?float $explicitPaid = null): void
+    {
+        $paidAmount = $explicitPaid ?? (float) $this->payments()->sum('amount');
+        $paidAmount = max(0.0, $paidAmount);
+        $remainingAmount = max(0.0, (float) $this->original_amount - $paidAmount);
+        $status = $remainingAmount <= 0.009 ? 'settled' : ($paidAmount > 0.009 ? 'partially_paid' : 'open');
+
+        $this->update([
+            'paid_amount' => $paidAmount,
+            'remaining_amount' => $remainingAmount,
+            'status' => $status,
+        ]);
+    }
+
     public static function applyOpenAdvancesToPayable(self $payableDebt): void
     {
         if ($payableDebt->type !== 'payable' || (float) $payableDebt->remaining_amount <= 0) {
@@ -103,21 +121,20 @@ class Debt extends Model
                 'created_by' => auth()->id(),
             ]);
 
-            $newPayablePaid = (float) $payableDebt->paid_amount + $offsetAmount;
-            $newPayableRemaining = max(0, (float) $payableDebt->original_amount - $newPayablePaid);
-            $payableDebt->update([
-                'paid_amount' => $newPayablePaid,
-                'remaining_amount' => $newPayableRemaining,
-                'status' => $newPayableRemaining <= 0 ? 'settled' : 'partially_paid',
+            // Clearing leg on the advance receivable
+            DebtPayment::create([
+                'tenant_id' => $advance->tenant_id,
+                'debt_id' => $advance->id,
+                'financial_account_id' => $accountId,
+                'amount' => $offsetAmount,
+                'payment_date' => $advance->created_at ?? now(),
+                'reference_number' => 'ADVANCE-OFFSET',
+                'notes' => "Applied against open payable debt (#{$payableDebt->id})",
+                'created_by' => auth()->id(),
             ]);
 
-            $newAdvancePaid = (float) $advance->paid_amount + $offsetAmount;
-            $newAdvanceRemaining = max(0, (float) $advance->original_amount - $newAdvancePaid);
-            $advance->update([
-                'paid_amount' => $newAdvancePaid,
-                'remaining_amount' => $newAdvanceRemaining,
-                'status' => $newAdvanceRemaining <= 0 ? 'settled' : 'partially_paid',
-            ]);
+            $payableDebt->recalculateSettlement();
+            $advance->recalculateSettlement();
         }
     }
 
