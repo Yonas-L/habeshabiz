@@ -71,6 +71,7 @@ class ExpenseController extends Controller
             'vendor_contact_id' => ['nullable', 'exists:contacts,id'],
             'description' => ['required', 'string', 'max:255'],
             'date' => ['nullable', 'date'],
+            'fee' => ['nullable', 'numeric', 'min:0'],
         ]);
 
         $expense = DB::transaction(function () use ($validated) {
@@ -289,6 +290,7 @@ class ExpenseController extends Controller
                 'type' => ($validated['is_owner_draw'] ?? false) ? 'owner_draw' : 'expense',
                 'amount' => $amount,
                 'fee' => $fee,
+                'reference_number' => "EXP-{$expense->id}",
                 'description' => $validated['description'],
                 'date' => $expense->date,
                 'created_by' => auth()->id(),
@@ -302,5 +304,140 @@ class ExpenseController extends Controller
             'message' => 'Expense recorded and account deducted.',
             'data' => $expense,
         ], 201);
+    }
+
+    public function destroy(Request $request, string $id): JsonResponse
+    {
+        /** @var \App\Models\User $user */
+        $user = $request->user();
+        if (! $user || ! $user->isOwner()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. Deleting expense records is restricted to store owners.',
+            ], 403);
+        }
+
+        $tenantId = TenantScope::getActiveTenantId() ?? $user->tenant_id;
+
+        $expense = Expense::where('tenant_id', $tenantId)->findOrFail($id);
+
+        DB::transaction(function () use ($expense, $tenantId) {
+            // 1. Revert financial transaction & calculate refund (principal + any bank fee)
+            $tx = FinancialTransaction::where('tenant_id', $tenantId)
+                ->where(function ($q) use ($expense) {
+                    $q->where('reference_number', "EXP-{$expense->id}")
+                        ->orWhere(function ($sub) use ($expense) {
+                            $sub->where('source_account_id', $expense->financial_account_id)
+                                ->where('amount', $expense->amount)
+                                ->whereIn('type', ['expense', 'owner_draw'])
+                                ->where('description', $expense->description);
+                        });
+                })
+                ->latest()
+                ->first();
+
+            $fee = $tx ? (float) $tx->fee : 0.0;
+            $refundAmount = (float) $expense->amount + $fee;
+
+            if ($expense->financial_account_id) {
+                $account = FinancialAccount::where('tenant_id', $tenantId)
+                    ->withTrashed()
+                    ->find($expense->financial_account_id);
+                if ($account) {
+                    $account->increment('current_balance', $refundAmount);
+                }
+            }
+
+            if ($tx) {
+                $tx->delete();
+            }
+
+            // 2. Revert vendor debt payments settled via this expense payout
+            $debtPayments = DebtPayment::where('tenant_id', $tenantId)
+                ->where('reference_number', "EXP-{$expense->id}")
+                ->get();
+
+            foreach ($debtPayments as $dp) {
+                $debt = Debt::where('tenant_id', $tenantId)->find($dp->debt_id);
+                if ($debt) {
+                    $newPaid = max(0, (float) $debt->paid_amount - (float) $dp->amount);
+                    $newRemaining = max(0, (float) $debt->original_amount - $newPaid);
+                    $newStatus = $newPaid <= 0 ? 'open' : 'partially_paid';
+
+                    $debt->update([
+                        'paid_amount' => $newPaid,
+                        'remaining_amount' => $newRemaining,
+                        'status' => $newStatus,
+                    ]);
+                }
+                $dp->delete();
+            }
+
+            // 3. Delete any advance payout receivable spawned by excess wire
+            Debt::where('tenant_id', $tenantId)
+                ->where('reference_type', 'vendor_advance_payout')
+                ->where('reference_id', (string) $expense->id)
+                ->delete();
+
+            // 4. Revert any linked maintenance records and repair debt offsets
+            if ($expense->inventory_unit_id) {
+                $maintenances = MaintenanceRecord::where('tenant_id', $tenantId)
+                    ->where('inventory_unit_id', $expense->inventory_unit_id)
+                    ->where('cost', $expense->amount)
+                    ->get();
+
+                foreach ($maintenances as $mr) {
+                    if ($mr->vendor_debt_id) {
+                        $vDebt = Debt::where('tenant_id', $tenantId)->find($mr->vendor_debt_id);
+                        if ($vDebt) {
+                            if ($vDebt->reference_type === 'vendor_repair_reimbursement') {
+                                $vDebt->delete();
+                            } elseif ($vDebt->type === 'payable') {
+                                $repairPayment = DebtPayment::where('tenant_id', $tenantId)
+                                    ->where('debt_id', $vDebt->id)
+                                    ->where('reference_number', 'REPAIR-OFFSET')
+                                    ->where('amount', $expense->amount)
+                                    ->latest()
+                                    ->first();
+                                if ($repairPayment) {
+                                    $newPaid = max(0, (float) $vDebt->paid_amount - (float) $repairPayment->amount);
+                                    $newRemaining = max(0, (float) $vDebt->original_amount - $newPaid);
+                                    $newStatus = $newPaid <= 0 ? 'open' : 'partially_paid';
+                                    $vDebt->update([
+                                        'paid_amount' => $newPaid,
+                                        'remaining_amount' => $newRemaining,
+                                        'status' => $newStatus,
+                                    ]);
+                                    $repairPayment->delete();
+                                }
+                            }
+                        }
+                    }
+                    $mr->delete();
+                }
+            }
+
+            // 5. Audit Log
+            AuditLog::record(
+                action: 'expense_deleted',
+                entityType: 'Expense',
+                entityId: (string) $expense->id,
+                oldValues: [
+                    'amount' => $expense->amount,
+                    'category' => $expense->category,
+                    'description' => $expense->description,
+                    'financial_account_id' => $expense->financial_account_id,
+                    'refunded_amount' => $refundAmount,
+                ]
+            );
+
+            // 6. Delete Expense
+            $expense->delete();
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Expense deleted successfully and account balance restored.',
+        ]);
     }
 }

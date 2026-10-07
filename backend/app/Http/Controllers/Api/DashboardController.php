@@ -32,15 +32,26 @@ class DashboardController extends Controller
         }
 
         // 1. Inventory Valuation (up to end of selected period)
-        $serializedStockValue = (float) InventoryUnit::where('created_at', '<=', $endOfMonth)
+        // Shop-owned serialized stock (purchased with shop capital or customer trade-ins)
+        $shopOwnedSerializedStockValue = (float) InventoryUnit::where('created_at', '<=', $endOfMonth)
             ->where('status', 'in_stock')
-            ->whereNotIn('source_type', ['consignment', 'exchange', 'vendor_direct'])
+            ->whereIn('source_type', ['purchase', 'exchange'])
             ->sum('cost_basis');
+
+        // Vendor consignment stock physically on shelf
+        $vendorConsignmentStockValue = (float) InventoryUnit::where('created_at', '<=', $endOfMonth)
+            ->where('status', 'in_stock')
+            ->where('source_type', 'consignment')
+            ->sum('cost_basis');
+
         $quantityStockValue = (float) InventoryStock::whereHas('variant.product', fn ($q) => $q->where('has_serials', false))
             ->whereDoesntHave('variant.inventoryUnits', fn ($q) => $q->where('status', 'in_stock'))
             ->get()
             ->sum(fn ($s) => $s->quantity_on_hand * (float) $s->average_cost);
-        $totalStockValue = $serializedStockValue + $quantityStockValue;
+
+        // Dashboard Stock Valuation strictly reflects Shop-Owned stock
+        $totalStockValue = $shopOwnedSerializedStockValue + $quantityStockValue;
+        $totalShelfStockValue = $totalStockValue + $vendorConsignmentStockValue;
 
         // 2. Debts: Receivables vs Payables — bilaterally netted per contact
         // If a contact owes us 100k AND we owe them 100k, the net is 0
@@ -103,16 +114,23 @@ class DashboardController extends Controller
         }
 
         // 4. Net Capital (The Ethiopian Merchant Formula from Excel)
-        // Net Capital = Stock + Receivables + Cash/Banks + Assets - Payables
-        $netCapital = $totalStockValue + $totalReceivables + $cashAndBankBalance + $customAssetsBalance - $totalPayables;
+        // Net Capital = Owned Stock + Consignment Stock (covering consignment debt) + Receivables + Cash/Banks + Assets - Payables
+        $netCapital = $totalStockValue + $vendorConsignmentStockValue + $totalReceivables + $cashAndBankBalance + $customAssetsBalance - $totalPayables;
 
         // 5. Monthly Performance (selected month or current calendar month)
 
-        $monthlyRevenue = (float) SalesOrder::whereBetween('order_date', [$startOfMonth, $endOfMonth])->sum('total_amount');
-        $monthlyDiscounts = (float) SalesOrder::whereBetween('order_date', [$startOfMonth, $endOfMonth])->sum('discount_amount');
-        $monthlyWriteOffs = (float) SalesOrder::whereBetween('order_date', [$startOfMonth, $endOfMonth])->sum('write_off_amount');
+        $monthlyRevenue = (float) SalesOrder::whereBetween('order_date', [$startOfMonth, $endOfMonth])
+            ->whereNotIn('payment_status', ['refunded', 'cancelled'])
+            ->sum('total_amount');
+        $monthlyDiscounts = (float) SalesOrder::whereBetween('order_date', [$startOfMonth, $endOfMonth])
+            ->whereNotIn('payment_status', ['refunded', 'cancelled'])
+            ->sum('discount_amount');
+        $monthlyWriteOffs = (float) SalesOrder::whereBetween('order_date', [$startOfMonth, $endOfMonth])
+            ->whereNotIn('payment_status', ['refunded', 'cancelled'])
+            ->sum('write_off_amount');
         $monthlyItems = SalesOrderItem::whereHas('salesOrder', function ($q) use ($startOfMonth, $endOfMonth) {
-            $q->whereBetween('order_date', [$startOfMonth, $endOfMonth]);
+            $q->whereBetween('order_date', [$startOfMonth, $endOfMonth])
+                ->whereNotIn('payment_status', ['refunded', 'cancelled']);
         })->get(['unit_price', 'unit_cost', 'quantity', 'bonus_amount']);
         // Preserve below-cost sales as losses. Historical rows may have been
         // stored with profit=0, so recalculate from immutable sale facts.
@@ -167,6 +185,7 @@ class DashboardController extends Controller
         // 9. Daily sales chart points for the selected month
         $monthOrders = SalesOrder::with('items')
             ->whereBetween('order_date', [$startOfMonth, $endOfMonth])
+            ->whereNotIn('payment_status', ['refunded', 'cancelled'])
             ->orderBy('order_date')
             ->get();
 
@@ -229,7 +248,7 @@ class DashboardController extends Controller
             $unDebtStockPayable = (float) InventoryUnit::where('supplier_contact_id', $p->id)
                 ->where('created_at', '<=', $endOfMonth)
                 ->where('status', 'in_stock')
-                ->whereNotIn('source_type', ['exchange', 'consignment', 'vendor_direct'])
+                ->whereNotIn('source_type', ['exchange', 'vendor_direct'])
                 ->whereNull('exchange_sales_order_id')
                 ->whereNotIn('id', $allDebtedUnitIds)
                 ->sum('cost_basis');
@@ -281,6 +300,8 @@ class DashboardController extends Controller
                 'capital_overview' => [
                     'net_capital' => $netCapital,
                     'stock_value' => $totalStockValue,
+                    'vendor_stock_value' => $vendorConsignmentStockValue,
+                    'total_shelf_stock_value' => $totalShelfStockValue,
                     'receivables' => $totalReceivables,
                     'cash_and_banks' => $cashAndBankBalance,
                     'custom_assets' => $customAssetsBalance,
@@ -304,7 +325,18 @@ class DashboardController extends Controller
                     'net_profit' => $monthlyNetProfit,
                 ],
                 'counts' => [
-                    'in_stock_phones' => InventoryUnit::where('created_at', '<=', $endOfMonth)->where('status', 'in_stock')->count(),
+                    'in_stock_phones' => InventoryUnit::where('created_at', '<=', $endOfMonth)
+                        ->where('status', 'in_stock')
+                        ->whereIn('source_type', ['purchase', 'exchange'])
+                        ->count(),
+                    'vendor_consignment_phones' => InventoryUnit::where('created_at', '<=', $endOfMonth)
+                        ->where('status', 'in_stock')
+                        ->where('source_type', 'consignment')
+                        ->count(),
+                    'total_shelf_phones' => InventoryUnit::where('created_at', '<=', $endOfMonth)
+                        ->where('status', 'in_stock')
+                        ->whereNotIn('source_type', ['vendor_direct'])
+                        ->count(),
                     'open_receivables' => Debt::where('created_at', '<=', $endOfMonth)->where('type', 'receivable')->whereIn('status', ['open', 'partially_paid'])->count(),
                     'open_receivable_parties' => $netReceivableParties,
                     'open_payables' => Debt::where('created_at', '<=', $endOfMonth)->where('type', 'payable')->whereIn('status', ['open', 'partially_paid'])->count(),

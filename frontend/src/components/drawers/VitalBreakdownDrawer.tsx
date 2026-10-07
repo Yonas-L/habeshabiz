@@ -448,18 +448,37 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
         >
           <div className="p-4 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/70 dark:border-slate-800/90 text-xs space-y-3">
             <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800">
-              <span className="text-slate-400">Total Units in Stock</span>
+              <span className="text-slate-400">Shop-Owned Stock</span>
               <span className="font-bold text-slate-900 dark:text-white font-mono text-sm">
                 {counts.in_stock_phones} units
               </span>
             </div>
 
             <div className="flex justify-between items-center">
-              <span className="text-slate-400">Total Valuation</span>
+              <span className="text-slate-400">Shop-Owned Valuation</span>
               <span className="font-bold text-slate-900 dark:text-white font-mono text-sm">
                 {capital_overview.stock_value.toLocaleString()} ETB
               </span>
             </div>
+
+            {(counts.vendor_consignment_phones ?? 0) > 0 && (
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
+                <div className="flex justify-between items-center text-slate-500 dark:text-slate-400">
+                  <span>Vendor Stock (Consignment)</span>
+                  <span className="font-semibold font-mono text-xs text-amber-600 dark:text-amber-400">
+                    {counts.vendor_consignment_phones} units
+                  </span>
+                </div>
+                {capital_overview.vendor_stock_value !== undefined && capital_overview.vendor_stock_value > 0 && (
+                  <div className="flex justify-between items-center text-[11px] text-slate-400">
+                    <span>Vendor Custody Value</span>
+                    <span className="font-mono">
+                      {capital_overview.vendor_stock_value.toLocaleString()} ETB
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </ProgressiveSection>
       )}

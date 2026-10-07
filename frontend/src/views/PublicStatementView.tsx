@@ -315,6 +315,8 @@ export const PublicStatementView: React.FC<PublicStatementViewProps> = ({ token 
                         <td className="py-3 px-3 print:py-1.5 print:px-1.5 font-sans text-xs font-semibold text-slate-900 leading-snug">
                           <div>
                             {(row.context || '')
+                              .replace(/\[unit_id:[a-zA-Z0-9_-]+\]/gi, '')
+                              .replace(/^Deducted by handover device:\s*/gi, 'Handover device: ')
                               .replace(/wire\s+payout/gi, 'Transferred')
                               .replace(/(?:in|for|from)?\s*Order\s*#[A-Za-z0-9_-]+/gi, '')
                               .replace(/#ORD-[A-Za-z0-9_-]+/gi, '')

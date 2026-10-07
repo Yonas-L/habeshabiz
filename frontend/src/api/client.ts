@@ -437,6 +437,8 @@ export interface DashboardData {
   capital_overview: {
     net_capital: number;
     stock_value: number;
+    vendor_stock_value?: number;
+    total_shelf_stock_value?: number;
     receivables: number;
     cash_and_banks: number;
     custom_assets: number;
@@ -458,6 +460,8 @@ export interface DashboardData {
   };
   counts: {
     in_stock_phones: number;
+    vendor_consignment_phones?: number;
+    total_shelf_phones?: number;
     open_receivables: number;
     open_receivable_parties?: number;
     open_payables: number;
@@ -1117,7 +1121,7 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
-  handoverInventoryUnit: (id: string, data: { handover_to: string; location?: string; notes?: string; return_deadline?: string; handover_payout?: number }) =>
+  handoverInventoryUnit: (id: string, data: { handover_to: string; location?: string; notes?: string; return_deadline?: string; handover_payout?: number; instant_offset?: boolean }) =>
     request<InventoryUnit>(`/inventory/units/${id}/handover`, {
       method: 'POST',
       body: JSON.stringify(data),
@@ -1144,7 +1148,7 @@ export const api = {
       method: 'POST',
     }),
 
-  customerReturnInventoryUnit: (id: string, data: { return_reason: string; condition?: string; notes?: string; destination?: 'repair' | 'vendor'; customer_waiting?: boolean }) =>
+  customerReturnInventoryUnit: (id: string, data: { return_reason: string; condition?: string; notes?: string; destination?: 'repair' | 'vendor' | 'restock'; customer_waiting?: boolean }) =>
     request<InventoryUnit>(`/inventory/units/${id}/customer-return`, {
       method: 'POST',
       body: JSON.stringify(data),
@@ -1318,6 +1322,7 @@ export const api = {
     notes?: string;
     disburse_account_id?: string;
     cash_flow_direction?: 'in' | 'out' | 'none';
+    fee?: number;
   }) =>
     request<Debt>('/debts', {
       method: 'POST',
@@ -1470,10 +1475,15 @@ export const api = {
     return request<ExpensesData>(`/expenses?${query.toString()}`);
   },
 
-  recordExpense: (data: { financial_account_id: string; inventory_unit_id?: string; category: string; amount: number; is_owner_draw?: boolean; vendor_billing?: 'shop' | 'vendor_deduct' | 'vendor_reimburse'; vendor_contact_id?: string; description: string; date?: string }) =>
+  recordExpense: (data: { financial_account_id: string; inventory_unit_id?: string; category: string; amount: number; is_owner_draw?: boolean; vendor_billing?: 'shop' | 'vendor_deduct' | 'vendor_reimburse'; vendor_contact_id?: string; description: string; date?: string; fee?: number }) =>
     request<Expense>('/expenses', {
       method: 'POST',
       body: JSON.stringify(data),
+    }),
+
+  deleteExpense: (id: string) =>
+    request<{ success: boolean; message: string }>(`/expenses/${id}`, {
+      method: 'DELETE',
     }),
 
   // Staff Management (Owner)

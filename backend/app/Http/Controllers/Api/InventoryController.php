@@ -15,6 +15,7 @@ use App\Models\InventoryStock;
 use App\Models\InventoryUnit;
 use App\Models\ProductVariant;
 use App\Models\SalesOrder;
+use App\Models\SalesOrderItem;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -518,22 +519,30 @@ class InventoryController extends Controller
                 ]);
             }
 
-            // 3. Supplier Debt Tracking (only for shop purchase on credit / pay later, NEVER for consignment)
-            if (($validated['source_type'] ?? 'purchase') !== 'consignment' && ! empty($validated['supplier_contact_id']) && $totalCost > 0 && $fundingSource === 'none') {
-                $intakeDebt = Debt::create([
-                    'tenant_id' => $tenantId,
-                    'contact_id' => $validated['supplier_contact_id'],
-                    'type' => 'payable',
-                    'reference_type' => 'stock_intake',
-                    'reference_id' => $createdUnits[0]->id ?? null,
-                    'original_amount' => $totalCost,
-                    'paid_amount' => 0.0,
-                    'remaining_amount' => $totalCost,
-                    'due_date' => $validated['return_deadline'] ?? now()->addDays(30),
-                    'status' => 'open',
-                    'notes' => 'Stock intake: '.count($createdUnits).' unit(s)',
-                ]);
-                Debt::applyOpenAdvancesToPayable($intakeDebt);
+            // 3. Supplier Debt Tracking (for all vendor stock on credit / consignment where cash was not paid upfront)
+            if (! empty($validated['supplier_contact_id']) && $fundingSource === 'none' && $totalCost > 0) {
+                foreach ($createdUnits as $unit) {
+                    $unitCost = (float) $unit->cost_basis;
+                    if ($unitCost > 0) {
+                        $pName = $unit->variant?->product?->name ?? 'Device';
+                        $sn = $unit->imei_or_serial ? " (SN: {$unit->imei_or_serial})" : '';
+                        $intakeDebt = Debt::create([
+                            'tenant_id' => $tenantId,
+                            'contact_id' => $validated['supplier_contact_id'],
+                            'type' => 'payable',
+                            'reference_type' => 'stock_intake',
+                            'reference_id' => $unit->id,
+                            'original_amount' => $unitCost,
+                            'paid_amount' => 0.0,
+                            'remaining_amount' => $unitCost,
+                            'due_date' => $unit->return_deadline ?? $validated['return_deadline'] ?? now()->addDays(30),
+                            'status' => 'open',
+                            'notes' => "Stock intake: {$pName}{$sn}",
+                        ]);
+                        Debt::applyOpenAdvancesToPayable($intakeDebt);
+                    }
+                }
+                Debt::reconcileContactMutualDebts($tenantId, (string) $validated['supplier_contact_id']);
             }
 
             AuditLog::record(
@@ -689,7 +698,138 @@ class InventoryController extends Controller
             'notes' => ['nullable', 'string'],
             'return_deadline' => ['nullable', 'date', 'after_or_equal:today'],
             'handover_payout' => ['nullable', 'numeric', 'min:0'],
+            'instant_offset' => ['nullable', 'boolean'],
         ]);
+
+        if ($validated['instant_offset'] ?? false) {
+            $finalPrice = ! empty($validated['handover_payout'])
+                ? (float) $validated['handover_payout']
+                : (float) ($unit->selling_price ?? $unit->cost_basis ?? 0);
+
+            $partnerContact = Contact::where('tenant_id', $user->tenant_id)
+                ->where('name', 'ilike', $validated['handover_to'])
+                ->first();
+
+            if (! $partnerContact) {
+                $partnerContact = Contact::create([
+                    'tenant_id' => $unit->tenant_id,
+                    'name' => $validated['handover_to'],
+                    'roles' => ['vendor', 'partner', 'customer'],
+                    'is_active' => true,
+                ]);
+            }
+
+            DB::transaction(function () use ($unit, $partnerContact, $finalPrice, $validated, $user) {
+                $now = now();
+
+                // 1. Mark unit sold directly (never intermediate holding)
+                $unit->update([
+                    'status' => 'sold',
+                    'handover_to' => $partnerContact->name,
+                    'handed_out_at' => $now,
+                    'sold_at' => $now,
+                    'selling_price' => $finalPrice,
+                    'location' => 'Delivered (Debt Offset)',
+                    'notes' => ! empty($validated['notes'])
+                        ? ($unit->notes ? "{$unit->notes} | {$validated['notes']}" : $validated['notes'])
+                        : $unit->notes,
+                ]);
+
+                // 2. Deduct directly from partner's open payable debts
+                if ($finalPrice > 0) {
+                    $remOffset = $finalPrice;
+                    $openPayables = Debt::where('tenant_id', $user->tenant_id)
+                        ->where('contact_id', $partnerContact->id)
+                        ->where('type', 'payable')
+                        ->whereIn('status', ['open', 'partially_paid'])
+                        ->orderBy('due_date', 'asc')
+                        ->orderBy('created_at', 'asc')
+                        ->get();
+
+                    foreach ($openPayables as $op) {
+                        if ($remOffset <= 0) {
+                            break;
+                        }
+                        $rem = (float) $op->remaining_amount;
+                        $deduct = min($rem, $remOffset);
+
+                        $sn = $unit->imei_or_serial ? " (SN: {$unit->imei_or_serial})" : '';
+                        $devName = $unit->variant?->product?->name ?? 'Device';
+                        DebtPayment::create([
+                            'tenant_id' => $user->tenant_id,
+                            'debt_id' => $op->id,
+                            'amount' => $deduct,
+                            'payment_date' => $now,
+                            'reference_number' => 'BILATERAL-OFFSET',
+                            'notes' => "Handover device: {$devName}{$sn} [unit_id:{$unit->id}]",
+                            'created_by' => $user->id,
+                        ]);
+
+                        $newPaid = (float) $op->paid_amount + $deduct;
+                        $newRemaining = max(0.0, $rem - $deduct);
+                        $newStatus = $newRemaining <= 0.009 ? 'settled' : 'partially_paid';
+
+                        $op->update([
+                            'paid_amount' => $newPaid,
+                            'remaining_amount' => $newRemaining,
+                            'status' => $newStatus,
+                        ]);
+
+                        $remOffset -= $deduct;
+                    }
+                }
+
+                // 3. Create SalesOrder to recognize revenue and realized profit
+                $salesOrder = SalesOrder::create([
+                    'tenant_id' => $user->tenant_id,
+                    'order_number' => 'SO-'.strtoupper(Str::random(8)),
+                    'customer_id' => $partnerContact->id,
+                    'salesperson_id' => $user->id,
+                    'total_amount' => $finalPrice,
+                    'discount_amount' => 0.0,
+                    'paid_amount' => $finalPrice,
+                    'payment_status' => 'paid',
+                    'payment_method' => 'debt_offset',
+                    'financial_account_id' => null,
+                    'notes' => "Handover debt offset to {$partnerContact->name} [unit_id:{$unit->id}]",
+                    'order_date' => $now,
+                ]);
+
+                $unitCost = (float) ($unit->cost_basis ?? 0);
+                SalesOrderItem::create([
+                    'tenant_id' => $user->tenant_id,
+                    'sales_order_id' => $salesOrder->id,
+                    'variant_id' => $unit->variant_id,
+                    'inventory_unit_id' => $unit->id,
+                    'quantity' => 1,
+                    'unit_price' => $finalPrice,
+                    'unit_cost' => $unitCost,
+                    'profit' => $finalPrice - $unitCost,
+                    'sourcing_type' => 'internal_stock',
+                ]);
+
+                (new SynchronizeInventoryStockAction)->execute();
+
+                AuditLog::record(
+                    action: 'unit_instant_offset',
+                    entityType: 'InventoryUnit',
+                    entityId: (string) $unit->id,
+                    newValues: [
+                        'imei_or_serial' => $unit->imei_or_serial,
+                        'handover_to' => $partnerContact->name,
+                        'selling_price' => $finalPrice,
+                        'offset_debt' => true,
+                    ]
+                );
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => "Device handed over and ".number_format($finalPrice, 2)." ETB deducted from {$partnerContact->name}'s debt.",
+                'data' => $unit->fresh()->load('variant.product'),
+                'instant_offset' => true,
+            ]);
+        }
 
         $unit->update([
             'status' => 'out',
@@ -954,6 +1094,57 @@ class InventoryController extends Controller
                         'notes' => ($holdingDebt->notes ? $holdingDebt->notes.' | ' : '')."Settled via bilateral offset with {$vendorName}.",
                     ]);
                 }
+
+                // Deduct from partner's open payable debts owed to them
+                $partnerContact = Contact::where('tenant_id', $user->tenant_id)
+                    ->where('name', 'ilike', $vendorName)
+                    ->first();
+
+                if (! $partnerContact && $unit->supplier_contact_id) {
+                    $partnerContact = Contact::where('tenant_id', $user->tenant_id)
+                        ->where('id', $unit->supplier_contact_id)
+                        ->first();
+                }
+
+                if ($partnerContact && $finalPrice > 0) {
+                    $remOffset = $finalPrice;
+                    $openPayables = Debt::where('tenant_id', $user->tenant_id)
+                        ->where('contact_id', $partnerContact->id)
+                        ->where('type', 'payable')
+                        ->whereIn('status', ['open', 'partially_paid'])
+                        ->orderBy('created_at')
+                        ->get();
+
+                    $deviceSummary = ($unit->variant?->product?->name ?? 'Device').($unit->imei_or_serial ? " (SN: {$unit->imei_or_serial})" : '');
+
+                    foreach ($openPayables as $payable) {
+                        if ($remOffset <= 0) {
+                            break;
+                        }
+                        $applied = min($remOffset, (float) $payable->remaining_amount);
+
+                        DebtPayment::create([
+                            'tenant_id' => $user->tenant_id,
+                            'debt_id' => $payable->id,
+                            'financial_account_id' => null,
+                            'amount' => $applied,
+                            'payment_date' => $validated['payment_date'] ?? $now,
+                            'reference_number' => 'BILATERAL-OFFSET',
+                            'notes' => "Handover device: {$deviceSummary} [unit_id:{$unit->id}]",
+                            'created_by' => $user->id,
+                        ]);
+
+                        $newPaid = (float) $payable->paid_amount + $applied;
+                        $newRemaining = max(0, (float) $payable->original_amount - $newPaid);
+                        $payable->update([
+                            'paid_amount' => $newPaid,
+                            'remaining_amount' => $newRemaining,
+                            'status' => $newRemaining <= 0 ? 'settled' : 'partially_paid',
+                        ]);
+
+                        $remOffset -= $applied;
+                    }
+                }
             } elseif ($settlementType === 'credit') {
                 // Credit: Device sold to end-user, payment collection pending
                 if ($holdingDebt) {
@@ -979,6 +1170,43 @@ class InventoryController extends Controller
                     }
                 }
             }
+
+            // Record SalesOrder & SalesOrderItem to register sales revenue, facts, and gross profit margin (+5,000 ETB etc.)
+            $saleContact = Contact::where('tenant_id', $user->tenant_id)
+                ->where(function ($q) use ($vendorName, $unit) {
+                    $q->where('name', 'ilike', $vendorName);
+                    if ($unit->supplier_contact_id) {
+                        $q->orWhere('id', $unit->supplier_contact_id);
+                    }
+                })
+                ->first();
+
+            $orderNumber = 'SO-'.strtoupper(Str::random(8));
+            $order = SalesOrder::create([
+                'tenant_id' => $user->tenant_id,
+                'order_number' => $orderNumber,
+                'customer_id' => $saleContact?->id,
+                'salesperson_id' => $user->id,
+                'total_amount' => $finalPrice,
+                'paid_amount' => $settlementType === 'credit' ? 0.0 : $finalPrice,
+                'payment_method' => $settlementType === 'offset' ? 'debt_offset' : ($settlementType === 'paid' ? 'bank_transfer' : 'cash'),
+                'payment_status' => $settlementType === 'credit' ? 'partial' : 'paid',
+                'credit_sale' => $settlementType === 'credit',
+                'order_date' => $validated['payment_date'] ?? $now,
+                'notes' => "Handover sale to {$vendorName} ({$settlementType} settlement) [unit_id:{$unit->id}]",
+            ]);
+
+            SalesOrderItem::create([
+                'tenant_id' => $user->tenant_id,
+                'sales_order_id' => $order->id,
+                'variant_id' => $unit->variant_id,
+                'inventory_unit_id' => $unit->id,
+                'quantity' => 1,
+                'unit_price' => $finalPrice,
+                'unit_cost' => (float) $unit->cost_basis,
+                'profit' => max(0, $finalPrice - (float) $unit->cost_basis),
+                'sourcing_type' => 'internal_stock',
+            ]);
 
             // Permanently update unit status to 'sold'
             $notesAppend = "Sold by {$vendorName} on ".$now->format('M d, Y')." ({$settlementType} settlement).";
@@ -1050,29 +1278,77 @@ class InventoryController extends Controller
             'return_reason' => ['required', 'string', 'max:500'],
             'condition' => ['nullable', 'string', 'max:50'],
             'notes' => ['nullable', 'string'],
-            'destination' => ['nullable', 'string', 'in:repair,vendor'],
+            'destination' => ['nullable', 'string', 'in:repair,vendor,restock'],
             'customer_waiting' => ['nullable', 'boolean'],
         ]);
 
         $destination = $validated['destination'] ?? 'repair';
-        $status = $destination === 'vendor' ? 'returned_to_vendor' : 'returned';
-        $location = $destination === 'vendor' ? 'Returned to Vendor/Supplier' : 'Repair & Inspection Shelf';
-        $isCustomerWaiting = array_key_exists('customer_waiting', $validated)
-            ? (bool) $validated['customer_waiting']
-            : true;
+        $status = $destination === 'vendor' ? 'returned_to_vendor' : ($destination === 'restock' ? 'in_stock' : 'returned');
+        $location = $destination === 'vendor' ? 'Returned to Vendor/Supplier' : ($destination === 'restock' ? 'Shop Counter' : 'Repair & Inspection Shelf');
+        $isCustomerWaiting = $destination === 'restock' ? false : (array_key_exists('customer_waiting', $validated) ? (bool) $validated['customer_waiting'] : true);
 
-        $unit->update([
-            'status' => $status,
-            'customer_waiting' => $isCustomerWaiting,
-            'customer_waiting_at' => $isCustomerWaiting ? now() : null,
-            'return_reason' => $validated['return_reason'],
-            'returned_at' => now(),
-            'condition' => $validated['condition'] ?? $unit->condition,
-            'location' => $location,
-            'notes' => ! empty($validated['notes'])
-                ? ($unit->notes ? "{$unit->notes} | Return note: {$validated['notes']}" : "Return note: {$validated['notes']}")
-                : $unit->notes,
-        ]);
+        DB::transaction(function () use ($unit, $status, $destination, $location, $isCustomerWaiting, $validated, $user) {
+            $unit->update([
+                'status' => $status,
+                'customer_waiting' => $isCustomerWaiting,
+                'customer_waiting_at' => $isCustomerWaiting ? now() : null,
+                'return_reason' => $validated['return_reason'],
+                'returned_at' => now(),
+                'condition' => $validated['condition'] ?? $unit->condition,
+                'location' => $location,
+                'sold_at' => $destination === 'restock' ? null : $unit->sold_at,
+                'handover_to' => $destination === 'restock' ? null : $unit->handover_to,
+                'notes' => ! empty($validated['notes'])
+                    ? ($unit->notes ? "{$unit->notes} | Return note: {$validated['notes']}" : "Return note: {$validated['notes']}")
+                    : $unit->notes,
+            ]);
+
+            if ($destination === 'restock') {
+                $stock = InventoryStock::where('variant_id', $unit->variant_id)->first();
+                if ($stock) {
+                    $stock->increment('quantity_on_hand', 1);
+                }
+            }
+
+            // Reverse bilateral debt offset payments if this unit was sold via offset
+            $offsetPayments = DebtPayment::where('tenant_id', $user->tenant_id)
+                ->where('reference_number', 'BILATERAL-OFFSET')
+                ->where(function ($q) use ($unit) {
+                    $q->where('notes', 'like', "%[unit_id:{$unit->id}]%");
+                    if (! empty($unit->imei_or_serial)) {
+                        $q->orWhere('notes', 'like', "%{$unit->imei_or_serial}%");
+                    }
+                })
+                ->get();
+
+            foreach ($offsetPayments as $pmt) {
+                $debt = $pmt->debt;
+                if ($debt) {
+                    $restoredPaid = max(0, (float) $debt->paid_amount - (float) $pmt->amount);
+                    $restoredRemaining = (float) $debt->remaining_amount + (float) $pmt->amount;
+                    $debt->update([
+                        'paid_amount' => $restoredPaid,
+                        'remaining_amount' => $restoredRemaining,
+                        'status' => $restoredRemaining >= (float) $debt->original_amount ? 'open' : 'partially_paid',
+                    ]);
+                }
+                $pmt->delete();
+            }
+
+            // Reverse SalesOrder / realized profit for this unit if one was created
+            $orderItem = SalesOrderItem::where('inventory_unit_id', $unit->id)->latest()->first();
+            if ($orderItem) {
+                $orderItem->update(['profit' => 0.0]);
+                if ($orderItem->salesOrder) {
+                    $orderItem->salesOrder->update([
+                        'payment_status' => 'refunded',
+                        'notes' => ($orderItem->salesOrder->notes ? $orderItem->salesOrder->notes.' | ' : '').'Refunded/Returned',
+                    ]);
+                }
+            }
+
+            (new SynchronizeInventoryStockAction)->execute();
+        });
 
         AuditLog::record(
             action: 'customer_return',
@@ -1088,7 +1364,9 @@ class InventoryController extends Controller
 
         $msg = $destination === 'vendor'
             ? 'Device returned by customer and marked as returned to vendor/supplier.'
-            : 'Device returned by customer. Moved to Repair & Inspection shelf.';
+            : ($destination === 'restock'
+                ? 'Device returned and restocked back to shelf. Offset deductions reversed.'
+                : 'Device returned by customer. Moved to Repair & Inspection shelf.');
 
         return response()->json([
             'success' => true,

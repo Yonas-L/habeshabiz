@@ -22,6 +22,8 @@ class GeneratePartnerStatementAction
      */
     protected function sanitizeContext(string $text): string
     {
+        $text = preg_replace('/\[unit_id:[a-zA-Z0-9_-]+\]/i', '', $text);
+        $text = preg_replace('/^Deducted by handover device:\s*/i', 'Handover device: ', $text);
         $text = preg_replace('/wire\s+payout/i', 'Transferred', $text);
         $text = preg_replace('/(?:in|for|from)?\s*Order\s*#[A-Za-z0-9_-]+/i', '', $text);
         $text = preg_replace('/#ORD-[A-Za-z0-9_-]+/i', '', $text);
@@ -218,6 +220,13 @@ class GeneratePartnerStatementAction
                         'reference_number' => null,
                     ];
                 } elseif ($debt->reference_type === 'handover_holding') {
+                    // If this holding debt was settled via bilateral offset, suppress the temporary holding
+                    // record and its clearing payment so the partner statement cleanly shows only the direct debt offset.
+                    $isOffsetSettled = $debt->payments->contains(fn ($p) => $p->reference_number === 'BILATERAL-OFFSET');
+                    if ($isOffsetSettled) {
+                        continue;
+                    }
+
                     $unit = ! empty($debt->reference_id) ? ($inventoryUnits->get($debt->reference_id) ?? null) : null;
                     if ($unit) {
                         $pName = $unit->variant?->product?->name ?? 'Device';
@@ -287,15 +296,21 @@ class GeneratePartnerStatementAction
                         'reference_number' => 'RETURN-REFUND',
                     ];
                 } else {
+                    $isMutualSettled = $debt->payments->contains(fn ($p) => $p->reference_number === 'MUTUAL-OFFSET');
+                    if ($isMutualSettled && (float) $debt->remaining_amount <= 0) {
+                        continue;
+                    }
+
+                    $remAmount = $isMutualSettled ? (float) $debt->remaining_amount : (float) $debt->original_amount;
                     $rawEntries[] = [
                         'id' => "debt-{$debt->id}",
                         'date' => $debtCreatedDate,
                         'type' => 'manual_receivable',
-                        'type_label' => 'Receivable',
-                        'context' => $debt->notes ?: 'Agreed credit receivable',
+                        'type_label' => $isMutualSettled ? 'Advance Credit' : 'Receivable',
+                        'context' => $debt->notes ?: ($isMutualSettled ? 'Advance credit balance' : 'Agreed credit receivable'),
                         'payable' => 0.0,
-                        'receivable' => (float) $debt->original_amount,
-                        'balance_effect' => (float) $debt->original_amount,
+                        'receivable' => $remAmount,
+                        'balance_effect' => $remAmount,
                         'reference_number' => null,
                     ];
                 }
@@ -303,7 +318,24 @@ class GeneratePartnerStatementAction
 
             // Downstream payments for this debt
             foreach ($debt->payments as $payment) {
-                $payDate = $payment->payment_date ? Carbon::parse($payment->payment_date) : Carbon::parse($payment->created_at);
+                if ($payment->reference_number === 'MUTUAL-OFFSET') {
+                    // Clearing leg of mutual offset; the authoritative deduction on the target debt already accounts for this
+                    continue;
+                }
+
+                $createdAt = $payment->created_at ? Carbon::parse($payment->created_at) : null;
+                if ($payment->payment_date) {
+                    $parsedPayDate = Carbon::parse($payment->payment_date);
+                    if ($createdAt && $parsedPayDate->isSameDay($createdAt)) {
+                        $payDate = $createdAt;
+                    } elseif ($createdAt) {
+                        $payDate = $parsedPayDate->copy()->setTime($createdAt->hour, $createdAt->minute, $createdAt->second);
+                    } else {
+                        $payDate = $parsedPayDate;
+                    }
+                } else {
+                    $payDate = $createdAt ?? now();
+                }
                 $accountName = $payment->financialAccount?->name ?? 'Wire';
 
                 if ($payment->reference_number === 'RETURN-TO-VENDOR') {
@@ -343,28 +375,47 @@ class GeneratePartnerStatementAction
                         'reference_number' => 'RETURN-TO-SHOP',
                     ];
                 } elseif ($payment->reference_number === 'BILATERAL-OFFSET') {
+                    // If this payment is closing a temporary handover holding receivable, skip it
+                    // because the holding debt itself is suppressed and the payable deduction is authoritative.
+                    if ($debt->type === 'receivable') {
+                        continue;
+                    }
+
                     $rawEntries[] = [
                         'id' => "pay-{$payment->id}",
                         'date' => $payDate,
                         'type' => 'bilateral_offset',
-                        'type_label' => 'Bilateral Offset',
-                        'context' => $payment->notes ?: 'Settled via bilateral offset / trade',
-                        'payable' => $debt->type === 'payable' ? -(float) $payment->amount : 0.0,
-                        'receivable' => $debt->type === 'receivable' ? -(float) $payment->amount : 0.0,
-                        'balance_effect' => $debt->type === 'payable' ? (float) $payment->amount : -(float) $payment->amount,
+                        'type_label' => 'Item Sent',
+                        'context' => $this->sanitizeContext($payment->notes ?: 'Handover device'),
+                        'payable' => -(float) $payment->amount,
+                        'receivable' => 0.0,
+                        'balance_effect' => (float) $payment->amount,
                         'reference_number' => 'BILATERAL-OFFSET',
                     ];
-                } elseif ($payment->reference_number === 'OFFSET-INTAKE' || $payment->reference_number === 'DEVICE-OFFSET' || str_contains($payment->notes ?? '', 'device') || str_contains($payment->notes ?? '', 'Offset') || str_contains($payment->notes ?? '', 'Paid by device')) {
+                } elseif ($payment->reference_number === 'OFFSET-INTAKE' || $payment->reference_number === 'DEVICE-OFFSET' || str_contains(strtolower($payment->notes ?? ''), 'device') || str_contains(strtolower($payment->notes ?? ''), 'handover') || str_contains($payment->notes ?? '', 'Paid by device')) {
                     $rawEntries[] = [
                         'id' => "pay-{$payment->id}",
                         'date' => $payDate,
                         'type' => 'device_offset',
-                        'type_label' => 'Paid by Device',
-                        'context' => $payment->notes ?: 'Paid by device intake offset',
+                        'type_label' => 'Item Sent',
+                        'context' => $this->sanitizeContext($payment->notes ?: 'Handover device'),
                         'payable' => $debt->type === 'payable' ? -(float) $payment->amount : 0.0,
                         'receivable' => $debt->type === 'receivable' ? -(float) $payment->amount : 0.0,
                         'balance_effect' => $debt->type === 'payable' ? (float) $payment->amount : -(float) $payment->amount,
                         'reference_number' => 'DEVICE-OFFSET',
+                    ];
+                } elseif (str_starts_with($payment->reference_number ?? '', 'OFFSET-')) {
+                    $accText = ($accountName && $accountName !== 'Wire') ? " ({$accountName})" : '';
+                    $rawEntries[] = [
+                        'id' => "pay-{$payment->id}",
+                        'date' => $payDate,
+                        'type' => $payment->financial_account_id ? 'payment_sent' : 'debt_offset',
+                        'type_label' => $payment->financial_account_id ? 'Payment Sent' : 'Debt Offset',
+                        'context' => $payment->financial_account_id ? "Transferred{$accText}" : 'Mutual credit offset',
+                        'payable' => $debt->type === 'payable' ? -(float) $payment->amount : 0.0,
+                        'receivable' => $debt->type === 'receivable' ? -(float) $payment->amount : 0.0,
+                        'balance_effect' => $debt->type === 'payable' ? (float) $payment->amount : -(float) $payment->amount,
+                        'reference_number' => $payment->reference_number,
                     ];
                 } elseif ($debt->type === 'payable') {
                     $accText = ($accountName && $accountName !== 'Wire') ? " ({$accountName})" : '';
@@ -398,9 +449,11 @@ class GeneratePartnerStatementAction
         }
 
         // Customer purchases (sales orders where this contact is the buyer and no credit debt exists)
+        // Orders settled via debt_offset are already reflected via their DebtPayment ledger entry.
         $creditOrderIds = $debts->where('reference_type', 'sales_order')->pluck('reference_id')->filter()->all();
         $customerOrders = SalesOrder::where('customer_id', $contact->id)
             ->whereNotIn('id', $creditOrderIds)
+            ->where('payment_method', '!=', 'debt_offset')
             ->with(['items.variant.product', 'items.inventoryUnit', 'financialAccount', 'exchangeUnit.variant.product'])
             ->get();
 
@@ -491,7 +544,7 @@ class GeneratePartnerStatementAction
 
         $vendorUnitsWithoutDebt = InventoryUnit::where('supplier_contact_id', $contact->id)
             ->where('cost_basis', '>', 0)
-            ->whereNotIn('source_type', ['exchange', 'vendor_direct', 'consignment'])
+            ->whereNotIn('source_type', ['exchange', 'vendor_direct'])
             ->whereNull('exchange_sales_order_id')
             ->whereNotIn('id', $allDebtedUnitIds)
             ->where(function ($q) {
@@ -578,7 +631,26 @@ class GeneratePartnerStatementAction
         }
 
         // Sort all raw transactions chronologically
-        usort($rawEntries, fn ($a, $b) => $a['date']->getTimestamp() <=> $b['date']->getTimestamp());
+        usort($rawEntries, function ($a, $b) {
+            $timeDiff = $a['date']->getTimestamp() <=> $b['date']->getTimestamp();
+            if ($timeDiff !== 0) {
+                return $timeDiff;
+            }
+
+            // Tie-breaker 1: Incurred debts/items come before payments/settlements
+            $isPayA = str_starts_with($a['id'], 'pay-') ? 1 : 0;
+            $isPayB = str_starts_with($b['id'], 'pay-') ? 1 : 0;
+            if ($isPayA !== $isPayB) {
+                return $isPayA <=> $isPayB;
+            }
+
+            // Tie-breaker 2: When multiple payments occur at the exact same second,
+            // prioritize settling the temporary holding receivable before applying the permanent debt deduction.
+            $isReceivablePayA = ($a['receivable'] < 0) ? 0 : 1;
+            $isReceivablePayB = ($b['receivable'] < 0) ? 0 : 1;
+
+            return $isReceivablePayA <=> $isReceivablePayB;
+        });
 
         // Separate balance prior to $startDate vs within range
         $openingBalance = 0.0;

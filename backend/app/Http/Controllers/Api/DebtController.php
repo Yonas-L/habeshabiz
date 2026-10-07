@@ -20,6 +20,11 @@ class DebtController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
+        $tenantId = TenantScope::getActiveTenantId() ?? $request->user()?->tenant_id;
+        if ($tenantId) {
+            Debt::reconcileAllMutualDebtsForTenant($tenantId);
+        }
+
         $query = Debt::with(['contact.debts', 'payments.financialAccount']);
 
         if ($request->filled('type')) {
@@ -70,6 +75,7 @@ class DebtController extends Controller
             'notes' => ['nullable', 'string'],
             'disburse_account_id' => ['nullable', 'exists:financial_accounts,id'],
             'cash_flow_direction' => ['nullable', 'string', 'in:in,out,none'],
+            'fee' => ['nullable', 'numeric', 'min:0'],
         ]);
 
         $debt = DB::transaction(function () use ($validated, $user) {
@@ -195,6 +201,7 @@ class DebtController extends Controller
                         'amount' => $amount,
                         'fee' => $fee,
                         'contact_id' => $contactId,
+                        'reference_number' => "DEBT-{$debt->id}",
                         'description' => $txDesc,
                         'date' => now(),
                         'created_by' => $user->id,
@@ -228,6 +235,7 @@ class DebtController extends Controller
                         'type' => $txType,
                         'amount' => $amount,
                         'contact_id' => $contactId,
+                        'reference_number' => "DEBT-{$debt->id}",
                         'description' => $txDesc,
                         'date' => now(),
                         'created_by' => $user->id,
@@ -246,9 +254,157 @@ class DebtController extends Controller
                         ]);
                     }
                 }
-            } elseif (! $hasCashMovement && $type === 'payable') {
-                // If pure credit payable, apply any existing vendor advances
-                Debt::applyOpenAdvancesToPayable($debt);
+            }
+
+            // Mutual debt cancellation / offset:
+            // If we record a receivable for someone we already owe, or a payable for someone who owes us,
+            // automatically cancel out against existing open obligations so balances remain strictly synchronized.
+            if (! $isImmediateSettlement) {
+                if ($type === 'receivable') {
+                    $openPayables = Debt::where('tenant_id', $tenantId)
+                        ->where('contact_id', $contactId)
+                        ->where('type', 'payable')
+                        ->whereIn('status', ['open', 'partially_paid'])
+                        ->orderBy('created_at')
+                        ->get();
+
+                    if ($openPayables->isNotEmpty()) {
+                        $remainingToOffset = $amount;
+                        foreach ($openPayables as $openPayable) {
+                            if ($remainingToOffset <= 0) {
+                                break;
+                            }
+
+                            $payAmount = min($remainingToOffset, (float) $openPayable->remaining_amount);
+                            $newPayablePaid = (float) $openPayable->paid_amount + $payAmount;
+                            $newPayableRemaining = max(0, (float) $openPayable->original_amount - $newPayablePaid);
+                            $newPayableStatus = $newPayableRemaining <= 0 ? 'settled' : 'partially_paid';
+
+                            DebtPayment::create([
+                                'tenant_id' => $tenantId,
+                                'debt_id' => $openPayable->id,
+                                'financial_account_id' => $account?->id,
+                                'amount' => $payAmount,
+                                'payment_date' => now(),
+                                'reference_number' => $hasCashMovement ? "PAYOUT-{$debt->id}" : "OFFSET-{$debt->id}",
+                                'notes' => $hasCashMovement
+                                    ? ($account ? "Direct transfer from {$account->name} to pay down debt" : 'Direct payout to pay down debt')
+                                    : 'Mutual credit offset against debt obligation',
+                                'created_by' => $user->id,
+                            ]);
+
+                            $openPayable->update([
+                                'paid_amount' => $newPayablePaid,
+                                'remaining_amount' => $newPayableRemaining,
+                                'status' => $newPayableStatus,
+                            ]);
+
+                            $remainingToOffset -= $payAmount;
+                        }
+
+                        $totalOffsetApplied = $amount - $remainingToOffset;
+                        $newDebtRemaining = max(0, $amount - $totalOffsetApplied);
+                        $newDebtStatus = $newDebtRemaining <= 0 ? 'settled' : ($totalOffsetApplied > 0 ? 'partially_paid' : 'open');
+
+                        $debt->update([
+                            'paid_amount' => $totalOffsetApplied,
+                            'remaining_amount' => $newDebtRemaining,
+                            'status' => $newDebtStatus,
+                            'notes' => $debt->notes
+                                ? "{$debt->notes} | Offset {$totalOffsetApplied} ETB against open payable debt"
+                                : "Offset {$totalOffsetApplied} ETB against open payable debt",
+                        ]);
+
+                        if ($totalOffsetApplied > 0) {
+                            DebtPayment::create([
+                                'tenant_id' => $tenantId,
+                                'debt_id' => $debt->id,
+                                'financial_account_id' => $account?->id,
+                                'amount' => $totalOffsetApplied,
+                                'payment_date' => now(),
+                                'reference_number' => 'MUTUAL-OFFSET',
+                                'notes' => "Applied {$totalOffsetApplied} ETB to pay down open payable debt",
+                                'created_by' => $user->id,
+                            ]);
+                        }
+                    }
+                } elseif ($type === 'payable') {
+                    // Apply any existing vendor advances first
+                    Debt::applyOpenAdvancesToPayable($debt);
+
+                    // Then apply against any other open receivables for this contact
+                    $debt->refresh();
+                    if ((float) $debt->remaining_amount > 0) {
+                        $openReceivables = Debt::where('tenant_id', $tenantId)
+                            ->where('contact_id', $contactId)
+                            ->where('type', 'receivable')
+                            ->whereIn('status', ['open', 'partially_paid'])
+                            ->where('id', '!=', $debt->id)
+                            ->where('reference_type', '!=', 'vendor_advance_payout')
+                            ->orderBy('created_at')
+                            ->get();
+
+                        if ($openReceivables->isNotEmpty()) {
+                            $remainingToOffset = (float) $debt->remaining_amount;
+                            foreach ($openReceivables as $openReceivable) {
+                                if ($remainingToOffset <= 0) {
+                                    break;
+                                }
+
+                                $offsetAmount = min($remainingToOffset, (float) $openReceivable->remaining_amount);
+                                $newReceivablePaid = (float) $openReceivable->paid_amount + $offsetAmount;
+                                $newReceivableRemaining = max(0, (float) $openReceivable->original_amount - $newReceivablePaid);
+                                $newReceivableStatus = $newReceivableRemaining <= 0 ? 'settled' : 'partially_paid';
+
+                                DebtPayment::create([
+                                    'tenant_id' => $tenantId,
+                                    'debt_id' => $openReceivable->id,
+                                    'financial_account_id' => $account?->id,
+                                    'amount' => $offsetAmount,
+                                    'payment_date' => now(),
+                                    'reference_number' => "OFFSET-{$debt->id}",
+                                    'notes' => 'Mutual credit offset against payable obligation',
+                                    'created_by' => $user->id,
+                                ]);
+
+                                $openReceivable->update([
+                                    'paid_amount' => $newReceivablePaid,
+                                    'remaining_amount' => $newReceivableRemaining,
+                                    'status' => $newReceivableStatus,
+                                ]);
+
+                                $remainingToOffset -= $offsetAmount;
+                            }
+
+                            $totalOffsetApplied = (float) $debt->remaining_amount - $remainingToOffset;
+                            $newPayablePaid = (float) $debt->paid_amount + $totalOffsetApplied;
+                            $newPayableRemaining = max(0, (float) $debt->original_amount - $newPayablePaid);
+                            $newPayableStatus = $newPayableRemaining <= 0 ? 'settled' : ($newPayablePaid > 0 ? 'partially_paid' : 'open');
+
+                            $debt->update([
+                                'paid_amount' => $newPayablePaid,
+                                'remaining_amount' => $newPayableRemaining,
+                                'status' => $newPayableStatus,
+                                'notes' => $debt->notes
+                                    ? "{$debt->notes} | Offset {$totalOffsetApplied} ETB against open receivable obligations"
+                                    : "Offset {$totalOffsetApplied} ETB against open receivable obligations",
+                            ]);
+
+                            if ($totalOffsetApplied > 0) {
+                                DebtPayment::create([
+                                    'tenant_id' => $tenantId,
+                                    'debt_id' => $debt->id,
+                                    'financial_account_id' => $account?->id,
+                                    'amount' => $totalOffsetApplied,
+                                    'payment_date' => now(),
+                                    'reference_number' => 'MUTUAL-OFFSET',
+                                    'notes' => "Offset applied against open receivable obligations",
+                                    'created_by' => $user->id,
+                                ]);
+                            }
+                        }
+                    }
+                }
             }
 
             AuditLog::record(

@@ -404,18 +404,19 @@ test('vendor product intake starts payable at -100k while in stock, selling does
     $intakeRes->assertStatus(201);
     $unitId = $intakeRes->json('data.id');
 
-    // Verify NO debt was created at consignment intake
+    // Verify payable debt was created upon stock intake
     $intakeDebt = Debt::where('contact_id', $vendor->id)
         ->where('reference_type', 'stock_intake')
         ->where('reference_id', $unitId)
         ->first();
-    expect($intakeDebt)->toBeNull();
+    expect($intakeDebt)->not->toBeNull();
+    expect((float) $intakeDebt->original_amount)->toBe(100000.0);
+    expect((float) $intakeDebt->remaining_amount)->toBe(100000.0);
 
-    // 2. Check vendor statement while unit is still in stock (zero balance, phone under supplied units)
+    // 2. Check vendor statement while unit is still in stock (we owe 100,000 ETB for the device)
     $statementRes1 = $this->actingAs($this->user, 'sanctum')->getJson("/api/v1/contacts/{$vendor->id}/statement");
     $statementRes1->assertOk();
-    expect((float) $statementRes1->json('data.kpis.range_closing_balance'))->toBe(0.0);
-    expect($statementRes1->json('data.kpis.supplied_units_count'))->toBe(1);
+    expect((float) $statementRes1->json('data.kpis.range_closing_balance'))->toBe(-100000.0);
 
     // 3. Sell the device to an end customer for 120,000 ETB
     $saleRes = $this->actingAs($this->user, 'sanctum')->postJson('/api/v1/sales', [
@@ -434,13 +435,10 @@ test('vendor product intake starts payable at -100k while in stock, selling does
     ]);
     $saleRes->assertStatus(201);
 
-    // Verify payable debt was created on sale
-    $saleDebt = Debt::where('contact_id', $vendor->id)
-        ->where('reference_type', 'consignment_sale')
-        ->first();
-    expect($saleDebt)->not->toBeNull();
-    expect((float) $saleDebt->original_amount)->toBe(100000.0);
+    // Existing intake debt remains in place without duplicate debt creation
     expect(Debt::where('contact_id', $vendor->id)->count())->toBe(1);
+    $intakeDebt->refresh();
+    expect((float) $intakeDebt->remaining_amount)->toBe(100000.0);
 
     // Statement balance should now be -100,000 ETB
     $statementRes2 = $this->actingAs($this->user, 'sanctum')->getJson("/api/v1/contacts/{$vendor->id}/statement");
@@ -457,9 +455,9 @@ test('vendor product intake starts payable at -100k while in stock, selling does
     ]);
     $wireRes->assertStatus(201);
 
-    // Consignment sale debt is partially paid (20,000 remaining)
-    $saleDebt->refresh();
-    expect((float) $saleDebt->remaining_amount)->toBe(20000.0);
+    // Consignment intake debt is partially paid (20,000 remaining)
+    $intakeDebt->refresh();
+    expect((float) $intakeDebt->remaining_amount)->toBe(20000.0);
 
     // Statement balance is now -20,000 ETB
     $statementRes3 = $this->actingAs($this->user, 'sanctum')->getJson("/api/v1/contacts/{$vendor->id}/statement");

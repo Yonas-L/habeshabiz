@@ -556,8 +556,47 @@ class RecordSaleAction
                 ]);
             }
 
+            // Debt offset settlement against customer/vendor's open payable debt
+            if (($data['payment_method'] ?? '') === 'debt_offset' && ! empty($customerId) && $paidAmount > 0) {
+                $remOffset = $paidAmount;
+                $openPayables = Debt::where('tenant_id', $tenantId)
+                    ->where('contact_id', $customerId)
+                    ->where('type', 'payable')
+                    ->whereIn('status', ['open', 'partially_paid'])
+                    ->orderBy('created_at')
+                    ->get();
+
+                foreach ($openPayables as $payable) {
+                    if ($remOffset <= 0) {
+                        break;
+                    }
+                    $applied = min($remOffset, (float) $payable->remaining_amount);
+
+                    DebtPayment::create([
+                        'tenant_id' => $tenantId,
+                        'debt_id' => $payable->id,
+                        'financial_account_id' => null,
+                        'amount' => $applied,
+                        'payment_date' => now(),
+                        'reference_number' => 'BILATERAL-OFFSET',
+                        'notes' => "Deducted by sale Order #{$order->order_number}",
+                        'created_by' => $data['salesperson_id'] ?? auth()->id(),
+                    ]);
+
+                    $newPaid = (float) $payable->paid_amount + $applied;
+                    $newRemaining = max(0, (float) $payable->original_amount - $newPaid);
+                    $payable->update([
+                        'paid_amount' => $newPaid,
+                        'remaining_amount' => $newRemaining,
+                        'status' => $newRemaining <= 0 ? 'settled' : 'partially_paid',
+                    ]);
+
+                    $remOffset -= $applied;
+                }
+            }
+
             // Credit financial account if initial payment was made
-            if ($paidAmount > 0 && ! empty($data['financial_account_id'])) {
+            if ($paidAmount > 0 && ! empty($data['financial_account_id']) && ($data['payment_method'] ?? '') !== 'debt_offset') {
                 $account = FinancialAccount::findOrFail($data['financial_account_id']);
                 $account->increment('current_balance', $paidAmount);
 

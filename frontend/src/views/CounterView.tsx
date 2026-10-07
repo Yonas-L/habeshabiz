@@ -30,6 +30,7 @@ import {
   Wrench,
   Clock3,
   Flag,
+  ArrowLeftRight,
 } from 'lucide-react';
 import { AccountLogo } from '../utils/bankLogos';
 import { ExchangeDeviceModal, type ExchangeDevicePayload } from '../components/counter/ExchangeDeviceModal';
@@ -502,6 +503,10 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
       toast.error('Collect the full amount or mark this checkout as a credit sale.');
       return;
     }
+    if (paymentMethod === 'debt_offset' && (!customerId || customerMode !== 'existing')) {
+      toast.error('Please select an existing customer/vendor contact for debt offset.');
+      return;
+    }
 
     try {
       setSubmitting(true);
@@ -552,7 +557,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
         payment_method: paymentMethod,
         credit_sale: isCreditSale,
         intentional_shortfall: isWriteOff,
-        financial_account_id: paidNum > 0 ? financialAccountId : null,
+        financial_account_id: paidNum > 0 && paymentMethod !== 'debt_offset' ? financialAccountId : null,
         notes: notes || null,
         items: itemsPayload,
       };
@@ -1221,6 +1226,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                     { value: 'cash', label: 'Cash', icon: Banknote },
                     { value: 'cbe', label: 'CBE Transfer', icon: CreditCard },
                     { value: 'bank_transfer', label: 'Other Bank', icon: Wallet },
+                    { value: 'debt_offset', label: 'Debt Offset', icon: ArrowLeftRight },
                     { value: 'credit', label: 'Credit sale', icon: Clock3 },
                     { value: 'writeoff', label: 'Price concession', icon: Flag },
                   ].map((m) => {
@@ -1255,11 +1261,13 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                           isSelected
                             ? m.value === 'credit'
                               ? 'border-slate-800 bg-slate-900 dark:bg-slate-900 text-amber-400 dark:text-amber-400 shadow-xs font-bold ring-1 ring-amber-500/20'
+                              : m.value === 'debt_offset'
+                              ? 'border-slate-800 bg-slate-900 dark:bg-slate-900 text-indigo-400 dark:text-indigo-400 shadow-xs font-bold ring-1 ring-indigo-500/20'
                               : 'border-slate-800 bg-slate-900 dark:bg-slate-900 text-emerald-400 dark:text-emerald-400 shadow-xs font-bold ring-1 ring-emerald-500/20'
                             : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700 bg-white dark:bg-slate-900'
                         }`}
                       >
-                        <Icon className={`w-3.5 h-3.5 ${isSelected ? (m.value === 'credit' ? 'text-amber-400' : 'text-emerald-400') : 'text-slate-400 dark:text-slate-500'}`} />
+                        <Icon className={`w-3.5 h-3.5 ${isSelected ? (m.value === 'credit' ? 'text-amber-400' : m.value === 'debt_offset' ? 'text-indigo-400' : 'text-emerald-400') : 'text-slate-400 dark:text-slate-500'}`} />
                         {m.label}
                       </button>
                     );
@@ -1267,32 +1275,47 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                 </div>
               </div>
 
-              {/* Receiving Account */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    Receiving Account
-                  </label>
-                  {(() => {
-                    const sel = treasuryAccounts.find((a) => a.id === financialAccountId);
-                    return sel ? <AccountLogo account={sel} size="xs" /> : null;
-                  })()}
+              {/* Bilateral Debt Offset Banner */}
+              {paymentMethod === 'debt_offset' && !isCreditSale && !isWriteOff && (
+                <div className="p-2.5 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-200/60 dark:border-indigo-800/40 text-xs text-indigo-900 dark:text-indigo-200 flex items-start gap-2">
+                  <ArrowLeftRight className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-semibold block">Bilateral Debt Offset</span>
+                    <span className="text-[11px] text-indigo-700 dark:text-indigo-300">
+                      Sale proceeds will deduct from the customer's open payable debt. Zero bank cash movement.
+                    </span>
+                  </div>
                 </div>
-                <select
-                  value={financialAccountId}
-                  onChange={(e) => setFinancialAccountId(e.target.value)}
-                  className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
-                >
-                  <option value="">— Select Account —</option>
-                  {treasuryAccounts.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {user?.role === 'owner' && a.current_balance !== null
-                        ? `${a.name} (${Number(a.current_balance).toLocaleString()} ETB)`
-                        : a.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              )}
+
+              {/* Receiving Account (Only for real cash/bank deposits) */}
+              {paymentMethod !== 'debt_offset' && !isCreditSale && !isWriteOff && (
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Receiving Account
+                    </label>
+                    {(() => {
+                      const sel = treasuryAccounts.find((a) => a.id === financialAccountId);
+                      return sel ? <AccountLogo account={sel} size="xs" /> : null;
+                    })()}
+                  </div>
+                  <select
+                    value={financialAccountId}
+                    onChange={(e) => setFinancialAccountId(e.target.value)}
+                    className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+                  >
+                    <option value="">— Select Account —</option>
+                    {treasuryAccounts.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {user?.role === 'owner' && a.current_balance !== null
+                          ? `${a.name} (${Number(a.current_balance).toLocaleString()} ETB)`
+                          : a.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* Customer Selection / New Customer */}
               <div className="space-y-2 pt-1 border-t border-slate-100 dark:border-slate-800/80">

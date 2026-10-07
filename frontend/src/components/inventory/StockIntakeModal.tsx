@@ -848,7 +848,7 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
           source_type: sourceType,
           supplier_contact_id: supplierId || undefined,
           return_deadline: calculatedReturnDeadline,
-          funding_source: sourceType === 'purchase' ? (fundingSource === 'shop_account' ? 'account' : fundingSource === 'unpaid' ? 'none' : fundingSource) : undefined,
+          funding_source: sourceType === 'purchase' ? (fundingSource === 'shop_account' ? 'account' : fundingSource === 'unpaid' ? 'none' : fundingSource) : 'none',
           payment_account_id: (sourceType === 'purchase' && (fundingSource === 'shop_account' || fundingSource === 'split')) ? (paymentAccountId || undefined) : undefined,
           payment_amount: (sourceType === 'purchase' && (fundingSource === 'shop_account' || fundingSource === 'split')) ? (fundingSource === 'split' ? (parseFormattedNumber(splitCashAmount) ?? undefined) : totalInvestmentCost) : undefined,
           receivable_contact_id: (sourceType === 'purchase' && (fundingSource === 'debtor_offset' || fundingSource === 'split')) ? (selectedDebtorContactId || undefined) : undefined,
@@ -866,7 +866,7 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
           source_type: sourceType,
           supplier_contact_id: supplierId || null,
           return_deadline: calculatedReturnDeadline,
-          funding_source: sourceType === 'purchase' ? (fundingSource === 'shop_account' ? 'account' : fundingSource === 'unpaid' ? 'none' : fundingSource) : undefined,
+          funding_source: sourceType === 'purchase' ? (fundingSource === 'shop_account' ? 'account' : fundingSource === 'unpaid' ? 'none' : fundingSource) : 'none',
           payment_account_id: (sourceType === 'purchase' && (fundingSource === 'shop_account' || fundingSource === 'split')) ? (paymentAccountId || undefined) : undefined,
           payment_amount: (sourceType === 'purchase' && (fundingSource === 'shop_account' || fundingSource === 'split')) ? (fundingSource === 'split' ? (parseFormattedNumber(splitCashAmount) ?? undefined) : totalInvestmentCost) : undefined,
           receivable_contact_id: (sourceType === 'purchase' && (fundingSource === 'debtor_offset' || fundingSource === 'split')) ? (selectedDebtorContactId || undefined) : undefined,
@@ -2209,9 +2209,9 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
               >
                 <Handshake className="w-4 h-4 mt-0.5 shrink-0" />
                 <div>
-                  <div className="text-xs font-bold">Vendor Consignment</div>
+                  <div className="text-xs font-bold">Vendor Stock</div>
                   <div className="text-[10px] opacity-75 font-normal mt-0.5">
-                    Vendor owns stock · Payout on sale
+                    Vendor stock · Payable recorded upon intake
                   </div>
                 </div>
               </button>
@@ -2223,9 +2223,9 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                 <div className="flex items-start gap-2 text-xs text-amber-900 dark:text-amber-300">
                   <Handshake className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                   <div>
-                    <span className="font-bold block">Vendor owns this stock</span>
+                    <span className="font-bold block">Vendor Stock Intake</span>
                     <span className="text-[11px] text-amber-800/90 dark:text-amber-400/90 font-normal leading-relaxed block mt-0.5">
-                      No payment or debt is recorded now. A vendor payout is generated automatically only when the device is sold.
+                      Recorded as supplier payable debt owed to vendor upon intake. No shop bank balance is deducted now.
                     </span>
                   </div>
                 </div>

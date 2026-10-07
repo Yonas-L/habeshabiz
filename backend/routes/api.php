@@ -123,6 +123,7 @@ Route::prefix('v1')->group(function () {
         Route::put('/inventory/units/{id}', [InventoryController::class, 'updateUnit']);
         Route::post('/inventory/units/{id}/handover', [InventoryController::class, 'handoverUnit']);
         Route::post('/inventory/units/{id}/mark-handover-sold', [InventoryController::class, 'markHandoverSold']);
+        Route::post('/inventory/units/{id}/mark-sold', [InventoryController::class, 'markHandoverSold']);
         Route::post('/inventory/units/{id}/restock', [InventoryController::class, 'restockUnit']);
         Route::post('/inventory/units/{id}/customer-return', [InventoryController::class, 'customerReturn']);
         Route::post('/inventory/units/{id}/swap', [InventoryController::class, 'swapUnit']);
@@ -164,5 +165,6 @@ Route::prefix('v1')->group(function () {
         // Operational Expenses & Owner Draws
         Route::get('/expenses', [ExpenseController::class, 'index']);
         Route::post('/expenses', [ExpenseController::class, 'store']);
+        Route::delete('/expenses/{id}', [ExpenseController::class, 'destroy']);
     });
 });

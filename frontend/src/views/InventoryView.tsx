@@ -121,14 +121,26 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   // Collapsible state for in_stock grouped products
   const [expandedProductIds, setExpandedProductIds] = useState<Set<string>>(new Set());
 
-  // Handover Modal State (for in_stock -> out)
+  // Handover Modal State (for in_stock -> out or direct debt offset)
   const [handoverTargetUnit, setHandoverTargetUnit] = useState<InventoryUnit | null>(null);
   const [handoverTo, setHandoverTo] = useState('');
+  const [handoverMode, setHandoverMode] = useState<'temporary' | 'offset'>('temporary');
   const [handoverLocation, setHandoverLocation] = useState('');
   const [handoverNotes, setHandoverNotes] = useState('');
   const [handoverReturnDeadline, setHandoverReturnDeadline] = useState('');
   const [handoverPayout, setHandoverPayout] = useState('');
   const [handoverSubmitting, setHandoverSubmitting] = useState(false);
+
+  const openHandoverModal = (unit: InventoryUnit) => {
+    setHandoverTargetUnit(unit);
+    setHandoverTo('');
+    setHandoverMode('temporary');
+    setHandoverLocation('');
+    setHandoverNotes('');
+    setHandoverReturnDeadline('');
+    const defaultPrice = unit.selling_price ? String(unit.selling_price) : '';
+    setHandoverPayout(defaultPrice);
+  };
 
   // Mark Handover Device Sold Modal State (for out -> sold)
   const [markSoldUnit, setMarkSoldUnit] = useState<InventoryUnit | null>(null);
@@ -155,7 +167,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [returnTargetUnit, setReturnTargetUnit] = useState<InventoryUnit | null>(null);
   const [returnReason, setReturnReason] = useState('');
   const [returnCondition, setReturnCondition] = useState('inspection_needed');
-  const [returnDestination, setReturnDestination] = useState<'repair' | 'vendor'>('repair');
+  const [returnDestination, setReturnDestination] = useState<'repair' | 'vendor' | 'restock'>('repair');
   const [returnCustomerWaiting, setReturnCustomerWaiting] = useState(true);
   const [returnNotes, setReturnNotes] = useState('');
   const [returnSubmitting, setReturnSubmitting] = useState(false);
@@ -477,24 +489,33 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     }
   };
 
-  // Submit Handover (Mark out)
+  // Submit Handover (Mark out or Instant Debt Offset)
   const handleSubmitHandover = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!handoverTargetUnit || !handoverTo.trim()) return;
+
+    const isOffset = handoverMode === 'offset';
 
     try {
       setHandoverSubmitting(true);
       await api.handoverInventoryUnit(handoverTargetUnit.id, {
         handover_to: handoverTo.trim(),
-        location: handoverLocation.trim() || undefined,
+        location: isOffset ? 'Delivered (Debt Offset)' : (handoverLocation.trim() || undefined),
         notes: handoverNotes.trim() || undefined,
-        return_deadline: handoverReturnDeadline || undefined,
+        return_deadline: !isOffset ? (handoverReturnDeadline || undefined) : undefined,
         handover_payout: handoverPayout ? parseFloat(handoverPayout) : undefined,
+        instant_offset: isOffset,
       });
 
-      toast.success('Item marked as out for sale', {
-        description: `Handed out to ${handoverTo.trim()} for sale.${handoverPayout ? ` Receivable: ${Number(handoverPayout).toLocaleString()} ETB` : ''}`,
-      });
+      if (isOffset) {
+        toast.success('Debt offset completed', {
+          description: `Device handed over and ${Number(handoverPayout || handoverTargetUnit.selling_price || handoverTargetUnit.cost_basis || 0).toLocaleString()} ETB deducted from ${handoverTo.trim()}'s debt.`,
+        });
+      } else {
+        toast.success('Item marked as out for sale', {
+          description: `Handed out to ${handoverTo.trim()} for sale.${handoverPayout ? ` Receivable: ${Number(handoverPayout).toLocaleString()} ETB` : ''}`,
+        });
+      }
 
       setHandoverTargetUnit(null);
       setHandoverTo('');
@@ -502,10 +523,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       setHandoverNotes('');
       setHandoverReturnDeadline('');
       setHandoverPayout('');
+      setHandoverMode('temporary');
       loadInventory();
       onInventoryChange?.();
     } catch (err: any) {
-      toast.error('Failed to handover unit', { description: err.message });
+      toast.error('Failed to process handover', { description: err.message });
     } finally {
       setHandoverSubmitting(false);
     }
@@ -565,11 +587,15 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       });
 
       toast.success(
-        returnDestination === 'vendor'
+        returnDestination === 'restock'
+          ? 'Device restocked to shelf'
+          : returnDestination === 'vendor'
           ? (returnCustomerWaiting ? 'Sent to vendor (Customer Waiting)' : 'Returned directly to vendor')
           : 'Customer return recorded',
         {
-          description: returnDestination === 'vendor'
+          description: returnDestination === 'restock'
+            ? 'Placed back into active shop shelf stock. Bilateral offsets reversed.'
+            : returnDestination === 'vendor'
             ? (returnCustomerWaiting
                 ? 'Device sent to vendor under warranty. Customer ticket active.'
                 : 'Device returned to supplier/broker. Active stock updated.')
@@ -1270,14 +1296,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                                     )}
                                     {(isOwner || canHandover) && (
                                       <button
-                                      onClick={() => {
-                                        setHandoverTargetUnit(unit);
-                                        setHandoverTo('');
-                                        setHandoverLocation('');
-                                        setHandoverNotes('');
-                                        setHandoverReturnDeadline('');
-                                        setHandoverPayout('');
-                                      }}
+                                      onClick={() => openHandoverModal(unit)}
                                       className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-amber-950/50 text-slate-700 dark:text-slate-300 hover:text-amber-700 dark:hover:text-amber-400 transition-colors shadow-2xs active:scale-95 cursor-pointer"
                                       title="Handover device to staff or broker"
                                     >
@@ -1688,14 +1707,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
                               {(isOwner || canHandover) && unit.status === 'in_stock' && (
                                 <button
-                                  onClick={() => {
-                                    setHandoverTargetUnit(unit);
-                                    setHandoverTo('');
-                                    setHandoverLocation('');
-                                    setHandoverNotes('');
-                                    setHandoverReturnDeadline('');
-                                    setHandoverPayout('');
-                                  }}
+                                  onClick={() => openHandoverModal(unit)}
                                   className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-amber-950/50 text-slate-700 dark:text-slate-300 hover:text-amber-700 dark:hover:text-amber-400 transition-colors shadow-2xs active:scale-95 cursor-pointer"
                                   title="Handover this device to a staff member or broker to sell"
                                 >
@@ -2185,19 +2197,63 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               <div className="font-bold text-slate-900 dark:text-white">
                 {handoverTargetUnit.variant?.product?.name}
               </div>
-              <div className="text-[11px] text-slate-400 font-mono mt-0.5">
-                Serial IMEI: {handoverTargetUnit.imei_or_serial || 'Standard stock'}
+              <div className="flex items-center justify-between text-[11px] text-slate-400 mt-0.5">
+                <span className="font-mono">SN: {handoverTargetUnit.imei_or_serial || 'Standard stock'}</span>
+                {handoverTargetUnit.cost_basis && Number(handoverTargetUnit.cost_basis) > 0 && (
+                  <span className="font-mono font-medium text-slate-500 dark:text-slate-400">
+                    Cost: {Number(handoverTargetUnit.cost_basis).toLocaleString()} ETB
+                  </span>
+                )}
               </div>
             </div>
 
             <form onSubmit={handleSubmitHandover} className="space-y-3.5">
+              {/* Mode Toggle: Temporary Handout vs Deduct from Debt */}
+              <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 dark:bg-slate-800/60 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setHandoverMode('temporary')}
+                  className={`flex flex-col items-center justify-center py-2 px-3 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    handoverMode === 'temporary'
+                      ? 'bg-white dark:bg-[#1a2234] text-slate-900 dark:text-white shadow-xs'
+                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <UserCheck className="w-3.5 h-3.5" />
+                    <span>Temporary Handout</span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-normal mt-0.5">Staff / Broker to sell</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHandoverMode('offset');
+                    if (!handoverPayout && handoverTargetUnit.selling_price) {
+                      setHandoverPayout(String(handoverTargetUnit.selling_price));
+                    }
+                  }}
+                  className={`flex flex-col items-center justify-center py-2 px-3 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    handoverMode === 'offset'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <ArrowLeftRight className="w-3.5 h-3.5" />
+                    <span>Deduct from Debt</span>
+                  </div>
+                  <span className={`text-[10px] font-normal mt-0.5 ${handoverMode === 'offset' ? 'text-emerald-100' : 'text-slate-400'}`}>
+                    Settle what you owe
+                  </span>
+                </button>
+              </div>
+
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                    Handed Out To *
-                  </label>
-                  <span className="text-[10px] text-slate-400 font-medium">Select partner or enter name</span>
-                </div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  {handoverMode === 'offset' ? 'Select Partner You Owe *' : 'Handed Out To *'}
+                </label>
 
                 {/* Partner Dropdown */}
                 <select
@@ -2212,11 +2268,15 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   <option value="">-- Choose Partner or Vendor --</option>
                   {contacts
                     .filter((c) => c.is_active !== false)
-                    .map((c) => (
-                      <option key={c.id} value={c.name}>
-                        {c.name} {c.phone ? `· ${c.phone}` : ''} {c.roles?.includes('peer_vendor') ? '· Broker' : c.roles?.includes('supplier') ? '· Supplier' : ''}
-                      </option>
-                    ))}
+                    .map((c) => {
+                      const net = c.net_balance ?? 0;
+                      const debtHint = net < 0 ? ` (You owe ${Math.abs(net).toLocaleString()} ETB)` : net > 0 ? ` (Owes you ${net.toLocaleString()} ETB)` : '';
+                      return (
+                        <option key={c.id} value={c.name}>
+                          {c.name} {debtHint}
+                        </option>
+                      );
+                    })}
                 </select>
 
                 {/* Direct Name Input */}
@@ -2226,7 +2286,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     required
                     value={handoverTo}
                     onChange={(e) => setHandoverTo(e.target.value)}
-                    placeholder="Or enter recipient name..."
+                    placeholder={handoverMode === 'offset' ? 'Or enter partner name...' : 'Or enter recipient name...'}
                     className="w-full h-9 px-3 pr-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700 placeholder:text-slate-400"
                   />
                   {handoverTo && (
@@ -2241,140 +2301,146 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Destination Location
-                </label>
-                <input
-                  type="text"
-                  value={handoverLocation}
-                  onChange={(e) => setHandoverLocation(e.target.value)}
-                  placeholder="e.g. Bole Medhanialem Mall demo, Given to neighbour shop"
-                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700"
-                />
-              </div>
-
-              {/* Agreed Return Window & Payout */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Agreed Return Window
-                  </label>
-                  <input
-                    type="date"
-                    value={handoverReturnDeadline}
-                    onChange={(e) => setHandoverReturnDeadline(e.target.value)}
-                    min={new Date().toISOString().split('T')[0]}
-                    className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700"
-                  />
-                  <p className="text-[10px] text-slate-400 mt-0.5">Return if unsold by this date</p>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Agreed Vendor Payout ETB
-                  </label>
-                  <input
-                    type="number"
-                    value={handoverPayout}
-                    onChange={(e) => setHandoverPayout(e.target.value)}
-                    placeholder="e.g. 25000"
-                    min="0"
-                    step="0.01"
-                    className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700"
-                  />
-                  <p className="text-[10px] text-slate-400 mt-0.5">Amount vendor owes on sale</p>
-                  <div className="flex gap-1.5 mt-1.5 flex-wrap">
-                    {handoverTargetUnit.selling_price && Number(handoverTargetUnit.selling_price) > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setHandoverPayout(String(handoverTargetUnit.selling_price))}
-                        className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
-                      >
-                        Retail: {Number(handoverTargetUnit.selling_price).toLocaleString()} ETB
-                      </button>
-                    )}
-                    {handoverTargetUnit.cost_basis && Number(handoverTargetUnit.cost_basis) > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setHandoverPayout(String(handoverTargetUnit.cost_basis))}
-                        className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
-                      >
-                        Cost: {Number(handoverTargetUnit.cost_basis).toLocaleString()} ETB
-                      </button>
-                    )}
+              {handoverMode === 'offset' ? (
+                <>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                        Agreed Device Deduction Value (ETB) *
+                      </label>
+                      <span className="text-[10px] text-slate-400">Deducted from partner debt</span>
+                    </div>
+                    <input
+                      type="number"
+                      required
+                      value={handoverPayout}
+                      onChange={(e) => setHandoverPayout(e.target.value)}
+                      placeholder="e.g. 50000"
+                      min="0"
+                      step="0.01"
+                      className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] text-sm font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                    />
+                    <div className="flex gap-2 mt-1.5">
+                      {handoverTargetUnit.selling_price && Number(handoverTargetUnit.selling_price) > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setHandoverPayout(String(handoverTargetUnit.selling_price))}
+                          className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 transition-colors cursor-pointer"
+                        >
+                          Use Retail: {Number(handoverTargetUnit.selling_price).toLocaleString()} ETB
+                        </button>
+                      )}
+                      {handoverTargetUnit.cost_basis && Number(handoverTargetUnit.cost_basis) > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setHandoverPayout(String(handoverTargetUnit.cost_basis))}
+                          className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                        >
+                          Use Cost: {Number(handoverTargetUnit.cost_basis).toLocaleString()} ETB
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </div>
 
-              {/* Partner Balance & Handover Offset Preview */}
-              {(() => {
-                const selectedPartner = contacts.find((c) => c.name.toLowerCase() === handoverTo.trim().toLowerCase());
-                const payoutNum = parseFloat(handoverPayout) || 0;
-                const hasNet = selectedPartner && typeof selectedPartner.net_balance === 'number';
+                  {/* Clean Visual Breakdown */}
+                  {(() => {
+                    const selectedPartner = contacts.find((c) => c.name.toLowerCase() === handoverTo.trim().toLowerCase());
+                    const currentDebt = selectedPartner && typeof selectedPartner.net_balance === 'number' && selectedPartner.net_balance < 0
+                      ? Math.abs(selectedPartner.net_balance)
+                      : 0;
+                    const offsetVal = parseFloat(handoverPayout) || 0;
+                    const unitCost = Number(handoverTargetUnit.cost_basis || 0);
+                    const profit = offsetVal > 0 && unitCost > 0 ? offsetVal - unitCost : 0;
+                    const remainingDebt = Math.max(0, currentDebt - offsetVal);
 
-                return (
-                  <>
-                    {hasNet && (
-                      <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200/60 dark:border-slate-800/60 text-[11px] space-y-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-slate-500 dark:text-slate-400">Current Partner Balance:</span>
-                          <span className={`font-mono font-bold ${
-                            (selectedPartner.net_balance ?? 0) > 0
-                              ? 'text-emerald-600 dark:text-emerald-400'
-                              : (selectedPartner.net_balance ?? 0) < 0
-                              ? 'text-rose-600 dark:text-rose-400'
-                              : 'text-slate-600 dark:text-slate-400'
-                          }`}>
-                            {(selectedPartner.net_balance ?? 0) > 0
-                              ? `+${(selectedPartner.net_balance ?? 0).toLocaleString()} ETB · Owes us`
-                              : (selectedPartner.net_balance ?? 0) < 0
-                              ? `${(selectedPartner.net_balance ?? 0).toLocaleString()} ETB · Shop owes`
-                              : '0.00 ETB · Settled'}
+                    return (
+                      <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 space-y-2 text-xs">
+                        <div className="flex justify-between text-slate-500 dark:text-slate-400">
+                          <span>Current Debt You Owe:</span>
+                          <span className="font-mono font-semibold text-rose-600 dark:text-rose-400">
+                            {currentDebt > 0 ? `${currentDebt.toLocaleString()} ETB` : 'No open debt detected'}
                           </span>
                         </div>
-                        {payoutNum > 0 && (
-                          <div className="flex items-center justify-between pt-1 border-t border-slate-200/50 dark:border-slate-800/40">
-                            <span className="text-slate-600 dark:text-slate-300 font-medium">After Handover Offset:</span>
-                            {(() => {
-                              const newBal = (selectedPartner.net_balance ?? 0) + payoutNum;
-                              return (
-                                <span className={`font-mono font-bold ${
-                                  newBal > 0
-                                    ? 'text-emerald-600 dark:text-emerald-400'
-                                    : newBal < 0
-                                    ? 'text-rose-600 dark:text-rose-400'
-                                    : 'text-slate-600 dark:text-slate-400'
-                                }`}>
-                                  {newBal > 0
-                                    ? `+${newBal.toLocaleString()} ETB · Partner owes`
-                                    : newBal < 0
-                                    ? `${newBal.toLocaleString()} ETB · Reduces debt`
-                                    : '0.00 ETB · Balanced'}
-                                </span>
-                              );
-                            })()}
+                        <div className="flex justify-between text-slate-700 dark:text-slate-200 font-medium">
+                          <span>Deducted by this Handover:</span>
+                          <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                            -{offsetVal.toLocaleString()} ETB
+                          </span>
+                        </div>
+                        <div className="flex justify-between pt-1.5 border-t border-slate-200/60 dark:border-slate-800 font-semibold">
+                          <span className="text-slate-900 dark:text-white">Remaining Debt After Handover:</span>
+                          <span className="font-mono text-slate-900 dark:text-white">
+                            {remainingDebt.toLocaleString()} ETB
+                          </span>
+                        </div>
+                        {profit > 0 && (
+                          <div className="flex justify-between items-center pt-1.5 border-t border-emerald-200/50 dark:border-emerald-900/50 text-emerald-700 dark:text-emerald-400 font-semibold">
+                            <span>Your Profit from Handover:</span>
+                            <span className="font-mono text-xs bg-emerald-100 dark:bg-emerald-950 px-2 py-0.5 rounded-md">
+                              +{profit.toLocaleString()} ETB
+                            </span>
                           </div>
                         )}
                       </div>
-                    )}
+                    );
+                  })()}
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Destination / Location
+                    </label>
+                    <input
+                      type="text"
+                      value={handoverLocation}
+                      onChange={(e) => setHandoverLocation(e.target.value)}
+                      placeholder="e.g. Bole Medhanialem Mall demo, Given to neighbour shop"
+                      className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700"
+                    />
+                  </div>
 
-                    {payoutNum > 0 && (
-                      <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-800/50 text-[11px] text-emerald-700 dark:text-emerald-400 font-medium">
-                        💰 A receivable of <span className="font-bold">{payoutNum.toLocaleString()} ETB</span> will be booked. The vendor owes this on sale or must return the device{handoverReturnDeadline ? ` by ${new Date(handoverReturnDeadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}.
-                      </div>
-                    )}
-                  </>
-                );
-              })()}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        Agreed Return Window
+                      </label>
+                      <input
+                        type="date"
+                        value={handoverReturnDeadline}
+                        onChange={(e) => setHandoverReturnDeadline(e.target.value)}
+                        min={new Date().toISOString().split('T')[0]}
+                        className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700"
+                      />
+                      <p className="text-[10px] text-slate-400 mt-0.5">Return if unsold by this date</p>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        Agreed Selling Price ETB
+                      </label>
+                      <input
+                        type="number"
+                        value={handoverPayout}
+                        onChange={(e) => setHandoverPayout(e.target.value)}
+                        placeholder="e.g. 50000"
+                        min="0"
+                        step="0.01"
+                        className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700"
+                      />
+                      <p className="text-[10px] text-slate-400 mt-0.5">Amount recipient owes on sale</p>
+                    </div>
+                  </div>
+                </>
+              )}
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Handover Note
+                  Note (Optional)
                 </label>
                 <textarea
                   value={handoverNotes}
                   onChange={(e) => setHandoverNotes(e.target.value)}
-                  placeholder="e.g. Expected return by 5:00 PM if unsold"
+                  placeholder={handoverMode === 'offset' ? 'e.g. Settles half of iPhone 15 intake debt' : 'e.g. Expected return by 5:00 PM if unsold'}
                   rows={2}
                   className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700"
                 />
@@ -2384,17 +2450,27 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setHandoverTargetUnit(null)}
-                  className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={handoverSubmitting || !handoverTo.trim()}
-                  className="h-9 px-4 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition-all shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                  disabled={handoverSubmitting || !handoverTo.trim() || (handoverMode === 'offset' && (!handoverPayout || parseFloat(handoverPayout) <= 0))}
+                  className={`h-9 px-5 rounded-xl text-white text-xs font-bold transition-all shadow-xs disabled:opacity-50 flex items-center gap-1.5 cursor-pointer ${
+                    handoverMode === 'offset'
+                      ? 'bg-emerald-600 hover:bg-emerald-700'
+                      : 'bg-amber-600 hover:bg-amber-700'
+                  }`}
                 >
-                  {handoverSubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserCheck className="w-3.5 h-3.5" />}
-                  <span>Confirm Handover Out</span>
+                  {handoverSubmitting ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : handoverMode === 'offset' ? (
+                    <ArrowLeftRight className="w-3.5 h-3.5" />
+                  ) : (
+                    <UserCheck className="w-3.5 h-3.5" />
+                  )}
+                  <span>{handoverMode === 'offset' ? 'Confirm & Deduct Debt' : 'Confirm Handover Out'}</span>
                 </button>
               </div>
             </form>
@@ -2574,18 +2650,56 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 </div>
               )}
 
-              {/* Informational Banner for Offset */}
-              {markSoldSettlementType === 'offset' && (
-                <div className="p-3 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-200/60 dark:border-indigo-800/40 text-xs text-indigo-900 dark:text-indigo-200 flex items-start gap-2">
-                  <ArrowLeftRight className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-semibold block">Bilateral Offset / Mutual Debt Clearance</span>
-                    <span className="text-[11px] text-indigo-700 dark:text-indigo-300">
-                      The holding receivable obligation will be marked as settled against mutual debts or product trade. No cash moves through shop bank accounts.
-                    </span>
+              {/* Informational Banner & Balance Preview for Offset */}
+              {markSoldSettlementType === 'offset' && (() => {
+                const partnerName = markSoldUnit.handover_to || '';
+                const selectedPartner = contacts.find((c) => c.name.toLowerCase() === partnerName.toLowerCase());
+                const priceNum = parseFloat(markSoldPrice) || Number(markSoldUnit.handover_payout || markSoldUnit.selling_price || 0);
+                const costBasis = Number(markSoldUnit.cost_basis || 0);
+                const profitNum = priceNum - costBasis;
+                const currentBal = selectedPartner?.net_balance ?? 0;
+                const newBal = currentBal + priceNum;
+
+                return (
+                  <div className="p-3.5 rounded-2xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200/70 dark:border-indigo-800/50 space-y-2 text-xs">
+                    <div className="flex items-center justify-between font-semibold text-indigo-950 dark:text-indigo-200">
+                      <span className="flex items-center gap-1.5">
+                        <ArrowLeftRight className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                        Bilateral Debt Offset
+                      </span>
+                      <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-mono font-bold">
+                        Zero Bank Cash
+                      </span>
+                    </div>
+
+                    {selectedPartner && (
+                      <div className="grid grid-cols-2 gap-2 pt-1 border-t border-indigo-200/50 dark:border-indigo-800/40 text-[11px]">
+                        <div>
+                          <span className="text-slate-500 dark:text-slate-400 block text-[10px]">Owed to {partnerName}:</span>
+                          <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
+                            {currentBal < 0 ? `${Math.abs(currentBal).toLocaleString()} ETB` : '0.00 ETB'}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-slate-500 dark:text-slate-400 block text-[10px]">Remaining After Offset:</span>
+                          <span className="font-mono font-bold text-indigo-700 dark:text-indigo-300">
+                            {newBal < 0 ? `${Math.abs(newBal).toLocaleString()} ETB` : newBal > 0 ? `+${newBal.toLocaleString()} ETB (Owes us)` : '0.00 ETB (Settled)'}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {costBasis > 0 && priceNum > 0 && (
+                      <div className="flex items-center justify-between pt-1.5 border-t border-indigo-200/50 dark:border-indigo-800/40 text-[11px]">
+                        <span className="text-slate-600 dark:text-slate-400">Realized Gross Margin:</span>
+                        <span className={`font-mono font-bold ${profitNum >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                          {profitNum >= 0 ? '+' : ''}{profitNum.toLocaleString()} ETB
+                        </span>
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* Informational Banner for Credit */}
               {markSoldSettlementType === 'credit' && (
@@ -2754,11 +2868,22 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                       Return Destination
                     </label>
-                    <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl text-xs font-semibold">
+                    <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl text-xs font-semibold">
+                      <button
+                        type="button"
+                        onClick={() => setReturnDestination('restock')}
+                        className={`py-1.5 px-2 rounded-lg transition-all cursor-pointer text-center ${
+                          returnDestination === 'restock'
+                            ? 'bg-white dark:bg-[#131926] text-emerald-600 dark:text-emerald-400 shadow-xs font-bold'
+                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                        }`}
+                      >
+                        Restock Shelf
+                      </button>
                       <button
                         type="button"
                         onClick={() => setReturnDestination('repair')}
-                        className={`py-1.5 px-3 rounded-lg transition-all cursor-pointer ${
+                        className={`py-1.5 px-2 rounded-lg transition-all cursor-pointer text-center ${
                           returnDestination === 'repair'
                             ? 'bg-white dark:bg-[#131926] text-slate-900 dark:text-white shadow-xs font-bold'
                             : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -2769,16 +2894,25 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                       <button
                         type="button"
                         onClick={() => setReturnDestination('vendor')}
-                        className={`py-1.5 px-3 rounded-lg transition-all cursor-pointer ${
+                        className={`py-1.5 px-2 rounded-lg transition-all cursor-pointer text-center ${
                           returnDestination === 'vendor'
                             ? 'bg-white dark:bg-[#131926] text-amber-600 dark:text-amber-400 shadow-xs font-bold'
                             : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                         }`}
                       >
-                        Return to Vendor
+                        Return Vendor
                       </button>
                     </div>
                   </div>
+
+                  {returnDestination === 'restock' && (
+                    <div className="p-3 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-800/40 text-xs text-emerald-900 dark:text-emerald-200">
+                      <span className="font-semibold block">Restock to Active Counter</span>
+                      <span className="text-[11px] text-emerald-700 dark:text-emerald-400 mt-0.5 block">
+                        Device will be placed back into active shop shelf stock. Any bilateral debt offset deductions will be reversed.
+                      </span>
+                    </div>
+                  )}
 
                   {returnDestination === 'vendor' && (
                     <div className="p-3 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-800/40 space-y-2">
@@ -3678,14 +3812,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           setSelectedUnit(updated);
           loadInventory();
         }}
-        onOpenHandover={(unit) => {
-          setHandoverTargetUnit(unit);
-          setHandoverTo('');
-          setHandoverLocation('');
-          setHandoverNotes('');
-          setHandoverReturnDeadline('');
-          setHandoverPayout('');
-        }}
+        onOpenHandover={(unit) => openHandoverModal(unit)}
         onOpenCustomerReturn={(unit) => {
           setReturnTargetUnit(unit);
           setReturnReason('');
