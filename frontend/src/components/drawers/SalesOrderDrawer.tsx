@@ -124,8 +124,24 @@ export const SalesOrderDrawer: React.FC<SalesOrderDrawerProps> = ({
   const netPayable = Math.max(0, grossAmount - discountAmount - exchangeAllowance);
   const paidAmount = parseFloat(String(order.paid_amount)) || 0;
   const remainingDebt = Math.max(0, netPayable - paidAmount - writeOffAmount);
-  const isPaid = order.payment_status === 'paid' || remainingDebt === 0;
+  const isRefunded = order.payment_status === 'refunded' || (order.items.length > 0 && order.items.every((i) => i.inventory_unit?.status === 'returned' || i.inventory_unit?.status === 'returned_to_vendor'));
+  const isOffset = order.payment_method === 'debt_offset';
+  const isB2B = isOffset || (order.customer?.roles?.some((r: string) => ['peer_vendor', 'vendor', 'supplier', 'partner'].includes(r)) ?? false);
+  const isPaid = !isRefunded && (order.payment_status === 'paid' || remainingDebt === 0);
   const settledSaleValue = Math.max(0, netPayable - writeOffAmount);
+
+  const sanitizeOrderNotes = (notes?: string | null) => {
+    if (!notes) return null;
+    return notes
+      .replace(/\[unit_id:[a-zA-Z0-9_-]+\]/gi, '')
+      .split('\n')
+      .map((line) => {
+        const segments = line.split('|').map((s) => s.trim()).filter(Boolean);
+        return Array.from(new Set(segments)).join(' · ');
+      })
+      .filter(Boolean)
+      .join('\n');
+  };
 
   const itemProfit = order.items.reduce(
     (sum, i) => sum + parseFloat(String(i.profit || '0')),
@@ -268,30 +284,42 @@ export const SalesOrderDrawer: React.FC<SalesOrderDrawerProps> = ({
       })
       .join('\n\n');
 
+    const headerTitle = isB2B ? 'B2B TRADE & DEBT OFFSET VOUCHER' : 'OFFICIAL SALES INVOICE & RECEIPT';
+    const customerLabel = isB2B ? 'Trade Partner' : 'Customer';
+    const statusText = isRefunded
+      ? 'REFUNDED / RETURNED'
+      : isPaid && isOffset
+      ? 'SETTLED VIA OFFSET'
+      : isPaid
+      ? 'PAID IN FULL'
+      : 'CREDIT DUE';
+
     return `========================================
 HABESHABIZ ELECTRONICS
 Bole Medhanialem • Addis Ababa
 Tel: +251 91 123 4567
 ========================================
-OFFICIAL SALES INVOICE & RECEIPT
+${headerTitle}
 Ref: ${order.order_number}
 Date: ${formattedDate} ${formattedTime}
-Customer: ${order.customer?.name || 'Walk-in Customer'} ${order.customer?.phone ? `• ${order.customer.phone}` : ''}
+${customerLabel}: ${order.customer?.name || (isB2B ? 'Trade Partner' : 'Walk-in Customer')} ${order.customer?.phone ? `• ${order.customer.phone}` : ''}
 Sales Attendant: ${order.salesperson?.name || 'Habeshabiz Sales Staff'}
 Payment Method: ${formatPaymentMethod(order.payment_method)}
-Status: ${isPaid ? 'PAID IN FULL' : 'CREDIT DUE'}
+Status: ${statusText}
 ========================================
-ITEMS PURCHASED:
+ITEMS TRANSACTED:
 ${itemsText}
 ========================================
 Subtotal: ${grossAmount.toLocaleString()} ETB
-${discountAmount > 0 ? `Discount: -${discountAmount.toLocaleString()} ETB\n` : ''}${writeOffAmount > 0 ? `Intentional Price Concession: -${writeOffAmount.toLocaleString()} ETB\n` : ''}${exchangeAllowance > 0 ? `Exchanged Device: ${exchangeAllowance.toLocaleString()} ETB\n` : ''}${exchangeAllowance > 0 ? 'Cash Difference to Pay' : 'Final Agreed Sale Value'}: ${settledSaleValue.toLocaleString()} ETB
+${discountAmount > 0 ? `Discount: -${discountAmount.toLocaleString()} ETB\n` : ''}${writeOffAmount > 0 ? `Intentional Price Concession: -${writeOffAmount.toLocaleString()} ETB\n` : ''}${exchangeAllowance > 0 ? `Exchanged Device: ${exchangeAllowance.toLocaleString()} ETB\n` : ''}${exchangeAllowance > 0 ? 'Cash Difference to Pay' : 'Final Agreed Value'}: ${settledSaleValue.toLocaleString()} ETB
 Amount Paid: ${paidAmount.toLocaleString()} ETB
 ${remainingDebt > 0 ? `Balance Due: ${remainingDebt.toLocaleString()} ETB\n` : ''}========================================
-WARRANTY & TERMS:
+${isB2B ? `B2B SETTLEMENT NOTICE:
+• Transacted as mutual partner trade / debt offset.
+• Subject to standard bilateral trade & defect agreements.` : `WARRANTY & TERMS:
 • 7 Days Testing Warranty on internal hardware.
 • Valid receipt and matching IMEI required for warranty claims.
-• Physical or water damage voids warranty.
+• Physical or water damage voids warranty.`}
 
 Thank you for choosing Habeshabiz Electronics!
 ========================================`;
@@ -328,16 +356,36 @@ Thank you for choosing Habeshabiz Electronics!
         badge={
           <span
             className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-              writeOffAmount > 0
+              isRefunded
+                ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border border-rose-200/60 dark:border-rose-800/60'
+                : writeOffAmount > 0
                 ? 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                : isPaid && isOffset
+                ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border border-indigo-200/60 dark:border-indigo-800/60'
                 : isPaid
                 ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60'
                 : 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/60 dark:border-amber-800/60'
             }`}
           >
-            {isPaid ? <CheckCircle2 className="w-3 h-3 shrink-0" /> : <Clock className="w-3 h-3 shrink-0" />}
+            {isRefunded ? (
+              <Undo2 className="w-3 h-3 shrink-0" />
+            ) : isPaid && isOffset ? (
+              <ArrowLeftRight className="w-3 h-3 shrink-0" />
+            ) : isPaid ? (
+              <CheckCircle2 className="w-3 h-3 shrink-0" />
+            ) : (
+              <Clock className="w-3 h-3 shrink-0" />
+            )}
             <span>
-              {writeOffAmount > 0 ? 'Concession Settled' : isPaid ? 'Paid in Full' : 'Credit Due'}
+              {isRefunded
+                ? 'Refunded / Returned'
+                : writeOffAmount > 0
+                ? 'Concession Settled'
+                : isPaid && isOffset
+                ? 'Settled (B2B Offset)'
+                : isPaid
+                ? 'Paid in Full'
+                : 'Credit Due'}
             </span>
           </span>
         }
@@ -579,13 +627,18 @@ Thank you for choosing Habeshabiz Electronics!
           {/* ═══ SECTION 2: CUSTOMER & ATtENDANT METADATA ═══ */}
           <div className="p-4 rounded-2xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800 space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              {/* Customer */}
+              {/* Customer / Partner */}
               <div>
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                  Customer
+                  {isB2B ? 'Trade Partner / Vendor' : 'Customer'}
                 </span>
-                <div className="font-bold text-slate-900 dark:text-white mt-0.5">
-                  {order.customer?.name || 'Walk-in Customer'}
+                <div className="font-bold text-slate-900 dark:text-white mt-0.5 flex items-center gap-1.5">
+                  <span>{order.customer?.name || (isB2B ? 'Partner' : 'Walk-in Customer')}</span>
+                  {isB2B && (
+                    <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border border-indigo-200/50 dark:border-indigo-800/50">
+                      B2B Partner
+                    </span>
+                  )}
                 </div>
                 {order.customer?.phone && (
                   <div className="text-[11px] font-mono text-slate-500 dark:text-slate-400 mt-0.5">
@@ -893,7 +946,7 @@ Thank you for choosing Habeshabiz Electronics!
                 Order Notes & Service History
               </span>
               <div className="text-slate-700 dark:text-slate-300 font-sans whitespace-pre-line leading-relaxed">
-                {order.notes}
+                {sanitizeOrderNotes(order.notes)}
               </div>
             </div>
           )}

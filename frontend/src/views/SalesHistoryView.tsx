@@ -37,11 +37,12 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
   const [sales, setSales] = useState<SalesOrder[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
-  const [counts, setCounts] = useState<{ all: number; paid: number; credit: number; exchange: number }>({
+  const [counts, setCounts] = useState<{ all: number; paid: number; credit: number; exchange: number; b2b?: number }>({
     all: 0,
     paid: 0,
     credit: 0,
     exchange: 0,
+    b2b: 0,
   });
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -308,6 +309,24 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
             <Repeat className="w-3 h-3 text-purple-500" />
             Exchange • {counts.exchange}
           </button>
+          <button
+            onClick={() => {
+              if (sourceFilter === 'b2b') {
+                setSourceFilter('');
+              } else {
+                setSourceFilter('b2b');
+                setStatusFilter('');
+              }
+            }}
+            className={`px-3 sm:px-4 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+              sourceFilter === 'b2b'
+                ? 'bg-white dark:bg-[#131926] text-slate-900 dark:text-white shadow-xs font-bold'
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <Handshake className="w-3 h-3 text-indigo-500" />
+            B2B Trade • {counts.b2b || 0}
+          </button>
         </div>
 
         {/* Search */}
@@ -409,8 +428,15 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
 
                       {/* Col 2: Customer */}
                       <td className="py-2.5 px-3.5 whitespace-nowrap">
-                        <div className="font-semibold text-slate-900 dark:text-white text-xs truncate max-w-[130px]">
-                          {order.customer?.name || <span className="text-slate-400 font-normal italic">Walk-in</span>}
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-semibold text-slate-900 dark:text-white text-xs truncate max-w-[120px]">
+                            {order.customer?.name || <span className="text-slate-400 font-normal italic">Walk-in</span>}
+                          </span>
+                          {(order.payment_method === 'debt_offset' || order.customer?.roles?.some((r: string) => ['peer_vendor', 'vendor', 'supplier', 'partner'].includes(r))) && (
+                            <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border border-indigo-200/50 dark:border-indigo-800/50 shrink-0" title="B2B Vendor / Partner Trade">
+                              B2B
+                            </span>
+                          )}
                         </div>
                         {order.customer?.phone && (
                           <div className="text-[10px] text-slate-400 font-mono truncate mt-0.5">
@@ -514,12 +540,29 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
                         ) : null}
                       </td>
 
-                      {/* Col 6: Status (Border-free minimal colored text) */}
+                      {/* Col 6: Status (High-contrast minimal badges) */}
                       <td className="py-2.5 px-3.5 text-center whitespace-nowrap">
-                        {order.payment_status === 'paid' ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            Paid
+                        {order.payment_status === 'refunded' || order.items.every((i) => i.inventory_unit?.status === 'returned' || i.inventory_unit?.status === 'returned_to_vendor') ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-600 dark:text-rose-400">
+                            <Undo2 className="w-3.5 h-3.5" />
+                            Refunded
+                          </span>
+                        ) : order.payment_status === 'paid' || netPayable - (Number(order.paid_amount) || 0) - (Number(order.write_off_amount) || 0) <= 0 ? (
+                          order.payment_method === 'debt_offset' ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 dark:text-indigo-400" title="Settled via B2B debt offset">
+                              <ArrowLeftRight className="w-3.5 h-3.5" />
+                              B2B Offset
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              Paid
+                            </span>
+                          )
+                        ) : order.payment_status === 'partial' ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400">
+                            <Clock className="w-3.5 h-3.5" />
+                            Partial
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400">
@@ -615,12 +658,21 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
                       <div className="font-mono font-bold text-slate-900 dark:text-white text-sm">
                         {order.order_number}
                       </div>
-                      <div className="text-[11px] text-slate-400 mt-0.5">
-                        {new Date(order.order_date).toLocaleDateString(undefined, {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric',
-                        })} • {order.customer?.name || 'Walk-in'}
+                      <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1">
+                        <span>
+                          {new Date(order.order_date).toLocaleDateString(undefined, {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                          })}
+                        </span>
+                        <span>•</span>
+                        <span className="font-medium text-slate-700 dark:text-slate-300">{order.customer?.name || 'Walk-in'}</span>
+                        {(order.payment_method === 'debt_offset' || order.customer?.roles?.some((r: string) => ['peer_vendor', 'vendor', 'supplier', 'partner'].includes(r))) && (
+                          <span className="inline-flex items-center px-1 py-0.1 rounded text-[9px] font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border border-indigo-200/50 dark:border-indigo-800/50 shrink-0">
+                            B2B
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="text-right shrink-0">
@@ -637,10 +689,27 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
                         </div>
                       ) : null}
                       <div className="mt-1">
-                        {order.payment_status === 'paid' ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            Paid
+                        {order.payment_status === 'refunded' || order.items.every((i) => i.inventory_unit?.status === 'returned' || i.inventory_unit?.status === 'returned_to_vendor') ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-600 dark:text-rose-400">
+                            <Undo2 className="w-3.5 h-3.5" />
+                            Refunded
+                          </span>
+                        ) : order.payment_status === 'paid' || netPayable - (Number(order.paid_amount) || 0) - (Number(order.write_off_amount) || 0) <= 0 ? (
+                          order.payment_method === 'debt_offset' ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 dark:text-indigo-400" title="Settled via B2B debt offset">
+                              <ArrowLeftRight className="w-3.5 h-3.5" />
+                              B2B Offset
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              Paid
+                            </span>
+                          )
+                        ) : order.payment_status === 'partial' ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400">
+                            <Clock className="w-3.5 h-3.5" />
+                            Partial
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400">

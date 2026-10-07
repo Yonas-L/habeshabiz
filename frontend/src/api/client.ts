@@ -302,7 +302,7 @@ export interface SalesOrder {
   exchange_unit?: InventoryUnit;
   total_bonus_amount?: string | number;
   paid_amount: string | number;
-  payment_status: 'paid' | 'partially_paid' | 'unpaid';
+  payment_status: 'paid' | 'partially_paid' | 'unpaid' | 'partial' | 'refunded' | 'cancelled';
   payment_method: string;
   financial_account_id?: string | null;
   financial_account?: FinancialAccount;

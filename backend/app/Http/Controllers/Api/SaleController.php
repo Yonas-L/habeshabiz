@@ -78,6 +78,21 @@ class SaleController extends Controller
                 });
             } elseif ($request->source_type === 'brokered') {
                 $query->whereHas('items', fn ($iq) => $iq->where('sourcing_type', 'brokered_neighbour'));
+            } elseif ($request->source_type === 'b2b') {
+                $query->where(function ($q) {
+                    $q->where('payment_method', 'debt_offset')
+                        ->orWhereHas('customer', fn ($cq) => $cq->whereJsonContains('roles', 'peer_vendor')
+                            ->orWhereJsonContains('roles', 'vendor')
+                            ->orWhereJsonContains('roles', 'supplier'));
+                });
+            } elseif ($request->source_type === 'retail') {
+                $query->where('payment_method', '!=', 'debt_offset')
+                    ->where(function ($q) {
+                        $q->whereNull('customer_id')
+                            ->orWhereDoesntHave('customer', fn ($cq) => $cq->whereJsonContains('roles', 'peer_vendor')
+                                ->orWhereJsonContains('roles', 'vendor')
+                                ->orWhereJsonContains('roles', 'supplier'));
+                    });
             }
         }
 
@@ -95,6 +110,12 @@ class SaleController extends Controller
                 $q->whereNotNull('exchange_unit_id')
                     ->orWhere('exchange_allowance', '>', 0)
                     ->orWhereHas('items.inventoryUnit', fn ($iq) => $iq->where('source_type', 'exchange')->orWhereNotNull('exchange_sales_order_id'));
+            })->count(),
+            'b2b' => (clone $countsQuery)->where(function ($q) {
+                $q->where('payment_method', 'debt_offset')
+                    ->orWhereHas('customer', fn ($cq) => $cq->whereJsonContains('roles', 'peer_vendor')
+                        ->orWhereJsonContains('roles', 'vendor')
+                        ->orWhereJsonContains('roles', 'supplier'));
             })->count(),
         ];
 

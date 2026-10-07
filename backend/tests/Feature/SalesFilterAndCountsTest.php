@@ -134,6 +134,7 @@ test('sales api returns accurate counts for all, paid, credit, and exchange tabs
         'paid' => 2,      // orderPaid and orderExchange
         'credit' => 2,    // orderCredit1 (partially_paid) and orderCredit2 (unpaid)
         'exchange' => 1,  // orderExchange
+        'b2b' => 0,
     ]);
     expect(count($data['data']))->toBe(4);
 });
@@ -157,6 +158,7 @@ test('sales api filters by payment_status=credit to include both unpaid and part
         'paid' => 2,
         'credit' => 2,
         'exchange' => 1,
+        'b2b' => 0,
     ]);
 });
 
@@ -197,6 +199,7 @@ test('salesperson receives tab counts scoped to their own sales', function () {
         'paid' => 1,
         'credit' => 1,
         'exchange' => 0,
+        'b2b' => 0,
     ]);
     expect(count($data['data']))->toBe(2);
 });
@@ -225,6 +228,7 @@ test('salesperson with can_manage_inventory privilege can see all store sales fo
         'paid' => 2,
         'credit' => 2,
         'exchange' => 1,
+        'b2b' => 0,
     ]);
     expect(count($data['data']))->toBe(4);
 });
