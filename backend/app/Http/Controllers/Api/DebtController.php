@@ -76,6 +76,10 @@ class DebtController extends Controller
             'disburse_account_id' => ['nullable', 'exists:financial_accounts,id'],
             'cash_flow_direction' => ['nullable', 'string', 'in:in,out,none'],
             'fee' => ['nullable', 'numeric', 'min:0'],
+            'payment_splits' => ['nullable', 'array'],
+            'payment_splits.*.financial_account_id' => ['required', 'exists:financial_accounts,id'],
+            'payment_splits.*.amount' => ['required', 'numeric', 'min:0.01'],
+            'payment_splits.*.fee' => ['nullable', 'numeric', 'min:0'],
         ]);
 
         $debt = DB::transaction(function () use ($validated, $user) {
@@ -132,13 +136,50 @@ class DebtController extends Controller
 
             $amount = (float) $validated['amount'];
             $type = $validated['type'];
-            $hasCashMovement = ! empty($validated['disburse_account_id']);
-            $direction = $validated['cash_flow_direction'] ?? ($type === 'receivable' ? 'out' : 'in');
 
-            $account = null;
-            if ($hasCashMovement) {
-                $account = FinancialAccount::where('tenant_id', $tenantId)->findOrFail($validated['disburse_account_id']);
+            // Parse and prepare payment splits if provided or fallback to single disburse account
+            $rawSplits = $validated['payment_splits'] ?? null;
+            $hasCashMovement = false;
+            $preparedSplits = [];
+
+            if (is_array($rawSplits) && count($rawSplits) > 0) {
+                $hasCashMovement = true;
+                $splitSum = (float) collect($rawSplits)->sum(fn ($s) => (float) ($s['amount'] ?? 0));
+                if (abs($splitSum - $amount) > 0.01) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'payment_splits' => ["Split allocation total (".number_format($splitSum, 2)." ETB) does not match total amount (".number_format($amount, 2)." ETB)."],
+                    ]);
+                }
+                foreach ($rawSplits as $s) {
+                    $acc = FinancialAccount::where('tenant_id', $tenantId)->findOrFail($s['financial_account_id']);
+                    $sAmount = (float) $s['amount'];
+                    $sFee = $acc->calculateOutgoingFee($sAmount, isset($s['fee']) ? (float) $s['fee'] : null);
+                    $preparedSplits[] = [
+                        'account' => $acc,
+                        'financial_account_id' => $acc->id,
+                        'account_name' => $acc->name,
+                        'amount' => $sAmount,
+                        'fee' => $sFee,
+                        'total' => $sAmount + $sFee,
+                    ];
+                }
+            } elseif (! empty($validated['disburse_account_id'])) {
+                $hasCashMovement = true;
+                $acc = FinancialAccount::where('tenant_id', $tenantId)->findOrFail($validated['disburse_account_id']);
+                $sFee = $acc->calculateOutgoingFee($amount, isset($validated['fee']) ? (float) $validated['fee'] : null);
+                $preparedSplits[] = [
+                    'account' => $acc,
+                    'financial_account_id' => $acc->id,
+                    'account_name' => $acc->name,
+                    'amount' => $amount,
+                    'fee' => $sFee,
+                    'total' => $amount + $sFee,
+                ];
             }
+
+            $primaryAccount = count($preparedSplits) > 0 ? $preparedSplits[0]['account'] : null;
+            $account = $primaryAccount;
+            $direction = $validated['cash_flow_direction'] ?? ($type === 'receivable' ? 'out' : 'in');
 
             // Determine if this cash movement immediately settles the obligation:
             // Payable + Cash Out = immediate vendor payout / bill paid -> SETTLED
@@ -157,6 +198,13 @@ class DebtController extends Controller
             $remainingAmount = $isImmediateSettlement ? 0.0 : $amount;
             $status = $isImmediateSettlement ? 'settled' : 'open';
 
+            $paymentSplitsData = count($preparedSplits) > 1 ? array_map(fn ($p) => [
+                'financial_account_id' => $p['financial_account_id'],
+                'account_name' => $p['account_name'],
+                'amount' => $p['amount'],
+                'fee' => $p['fee'],
+            ], $preparedSplits) : null;
+
             $debt = Debt::create([
                 'tenant_id' => $tenantId,
                 'contact_id' => $contactId,
@@ -169,89 +217,109 @@ class DebtController extends Controller
                 'due_date' => $isImmediateSettlement ? now() : ($validated['due_date'] ?? null),
                 'status' => $status,
                 'notes' => $validated['notes'] ?? null,
+                'payment_splits' => $paymentSplitsData,
             ]);
 
-            // Handle cash movement & financial transactions
-            if ($hasCashMovement && $account) {
+            // Handle cash movement & financial transactions across split accounts
+            if ($hasCashMovement && count($preparedSplits) > 0) {
                 $contactLabel = $contact ? $contact->name : 'Contact';
                 $notesDesc = ! empty($validated['notes']) ? ": {$validated['notes']}" : '';
+                $splitGroupId = count($preparedSplits) > 1 ? (string) Str::uuid() : null;
 
                 if ($direction === 'out') {
-                    // Money leaves our account immediately
-                    $fee = $account->calculateOutgoingFee($amount, isset($validated['fee']) ? (float) $validated['fee'] : null);
-                    $totalDeduction = $amount + $fee;
-
-                    if ((float) $account->current_balance < $totalDeduction) {
-                        throw \Illuminate\Validation\ValidationException::withMessages([
-                            'disburse_account_id' => ["Insufficient balance in account '{$account->name}'. Available: ".number_format((float) $account->current_balance, 2)." ETB, Required: ".number_format($totalDeduction, 2)." ETB (including fee)."],
-                        ]);
+                    // Check balances for all split accounts
+                    foreach ($preparedSplits as $p) {
+                        if ((float) $p['account']->current_balance < $p['total']) {
+                            $errKey = ! empty($validated['payment_splits']) ? 'payment_splits' : 'disburse_account_id';
+                            throw \Illuminate\Validation\ValidationException::withMessages([
+                                $errKey => ["Insufficient balance in account '{$p['account_name']}'. Available: ".number_format((float) $p['account']->current_balance, 2)." ETB, Required: ".number_format($p['total'], 2)." ETB (including fee)."],
+                            ]);
+                        }
                     }
-                    $account->decrement('current_balance', $totalDeduction);
 
-                    $txType = $type === 'payable' ? 'supplier_payment' : 'loan_disbursement';
-                    $txDesc = $type === 'payable'
-                        ? "Peer vendor payout to {$contactLabel}{$notesDesc}"
-                        : "Cash lent/disbursed to {$contactLabel}{$notesDesc}";
+                    // Deduct balances and record individual ledger transactions
+                    foreach ($preparedSplits as $p) {
+                        $p['account']->decrement('current_balance', $p['total']);
 
-                    FinancialTransaction::create([
-                        'tenant_id' => $tenantId,
-                        'transaction_number' => 'TXN-'.strtoupper(Str::random(8)),
-                        'source_account_id' => $account->id,
-                        'type' => $txType,
-                        'amount' => $amount,
-                        'fee' => $fee,
-                        'contact_id' => $contactId,
-                        'reference_number' => "DEBT-{$debt->id}",
-                        'description' => $txDesc,
-                        'date' => now(),
-                        'created_by' => $user->id,
-                    ]);
+                        $txType = $type === 'payable' ? 'supplier_payment' : 'loan_disbursement';
+                        $baseDesc = $type === 'payable'
+                            ? "Peer vendor payout to {$contactLabel}{$notesDesc}"
+                            : "Cash lent/disbursed to {$contactLabel}{$notesDesc}";
+                        $txDesc = count($preparedSplits) > 1
+                            ? "{$baseDesc} (Split via {$p['account_name']})"
+                            : $baseDesc;
 
-                    if ($isImmediateSettlement) {
-                        DebtPayment::create([
+                        FinancialTransaction::create([
                             'tenant_id' => $tenantId,
-                            'debt_id' => $debt->id,
-                            'financial_account_id' => $account->id,
-                            'amount' => $amount,
-                            'payment_date' => now(),
-                            'reference_number' => 'PAYOUT-DIRECT',
-                            'notes' => 'Settled via direct cash payout',
+                            'transaction_number' => 'TXN-'.strtoupper(Str::random(8)),
+                            'source_account_id' => $p['financial_account_id'],
+                            'type' => $txType,
+                            'amount' => $p['amount'],
+                            'fee' => $p['fee'],
+                            'contact_id' => $contactId,
+                            'reference_number' => "DEBT-{$debt->id}",
+                            'description' => $txDesc,
+                            'date' => now(),
                             'created_by' => $user->id,
                         ]);
+
+                        if ($isImmediateSettlement) {
+                            DebtPayment::create([
+                                'tenant_id' => $tenantId,
+                                'debt_id' => $debt->id,
+                                'split_group_id' => $splitGroupId,
+                                'financial_account_id' => $p['financial_account_id'],
+                                'amount' => $p['amount'],
+                                'payment_date' => now(),
+                                'reference_number' => 'PAYOUT-DIRECT',
+                                'notes' => count($preparedSplits) > 1
+                                    ? "Settled via direct cash payout (Split via {$p['account_name']})"
+                                    : 'Settled via direct cash payout',
+                                'created_by' => $user->id,
+                            ]);
+                        }
                     }
                 } elseif ($direction === 'in') {
-                    // Money enters our account immediately
-                    $account->increment('current_balance', $amount);
+                    // Money enters our accounts
+                    foreach ($preparedSplits as $p) {
+                        $p['account']->increment('current_balance', $p['amount']);
 
-                    $txType = $type === 'receivable' ? 'customer_payment' : 'borrowed_funds';
-                    $txDesc = $type === 'receivable'
-                        ? "Payment received from {$contactLabel}{$notesDesc}"
-                        : "Borrowed cash received from {$contactLabel}{$notesDesc}";
+                        $txType = $type === 'receivable' ? 'customer_payment' : 'borrowed_funds';
+                        $baseDesc = $type === 'receivable'
+                            ? "Payment received from {$contactLabel}{$notesDesc}"
+                            : "Borrowed cash received from {$contactLabel}{$notesDesc}";
+                        $txDesc = count($preparedSplits) > 1
+                            ? "{$baseDesc} (Split via {$p['account_name']})"
+                            : $baseDesc;
 
-                    FinancialTransaction::create([
-                        'tenant_id' => $tenantId,
-                        'transaction_number' => 'TXN-'.strtoupper(Str::random(8)),
-                        'destination_account_id' => $account->id,
-                        'type' => $txType,
-                        'amount' => $amount,
-                        'contact_id' => $contactId,
-                        'reference_number' => "DEBT-{$debt->id}",
-                        'description' => $txDesc,
-                        'date' => now(),
-                        'created_by' => $user->id,
-                    ]);
-
-                    if ($isImmediateSettlement) {
-                        DebtPayment::create([
+                        FinancialTransaction::create([
                             'tenant_id' => $tenantId,
-                            'debt_id' => $debt->id,
-                            'financial_account_id' => $account->id,
-                            'amount' => $amount,
-                            'payment_date' => now(),
-                            'reference_number' => 'RECEIPT-DIRECT',
-                            'notes' => 'Settled via direct cash receipt',
+                            'transaction_number' => 'TXN-'.strtoupper(Str::random(8)),
+                            'destination_account_id' => $p['financial_account_id'],
+                            'type' => $txType,
+                            'amount' => $p['amount'],
+                            'contact_id' => $contactId,
+                            'reference_number' => "DEBT-{$debt->id}",
+                            'description' => $txDesc,
+                            'date' => now(),
                             'created_by' => $user->id,
                         ]);
+
+                        if ($isImmediateSettlement) {
+                            DebtPayment::create([
+                                'tenant_id' => $tenantId,
+                                'debt_id' => $debt->id,
+                                'split_group_id' => $splitGroupId,
+                                'financial_account_id' => $p['financial_account_id'],
+                                'amount' => $p['amount'],
+                                'payment_date' => now(),
+                                'reference_number' => 'RECEIPT-DIRECT',
+                                'notes' => count($preparedSplits) > 1
+                                    ? "Settled via direct cash receipt (Split via {$p['account_name']})"
+                                    : 'Settled via direct cash receipt',
+                                'created_by' => $user->id,
+                            ]);
+                        }
                     }
                 }
             }
@@ -538,7 +606,11 @@ class DebtController extends Controller
 
         $validated = $request->validate([
             'amount' => ['required', 'numeric', 'min:0.01'],
-            'financial_account_id' => ['required', 'exists:financial_accounts,id'],
+            'financial_account_id' => ['nullable', 'required_without:payment_splits', 'exists:financial_accounts,id'],
+            'payment_splits' => ['nullable', 'array', 'min:1'],
+            'payment_splits.*.financial_account_id' => ['required', 'exists:financial_accounts,id'],
+            'payment_splits.*.amount' => ['required', 'numeric', 'min:0.01'],
+            'payment_splits.*.reference_number' => ['nullable', 'string', 'max:100'],
             'payment_date' => ['nullable', 'date'],
             'reference_number' => ['nullable', 'string', 'max:100'],
             'notes' => ['nullable', 'string'],
@@ -550,7 +622,7 @@ class DebtController extends Controller
             'success' => true,
             'message' => 'Payment settled and financial accounts updated.',
             'data' => [
-                'debt' => $debt->fresh(['contact', 'payments']),
+                'debt' => $debt->fresh(['contact', 'payments.financialAccount']),
                 'payment' => $payment->load('financialAccount'),
             ],
         ]);

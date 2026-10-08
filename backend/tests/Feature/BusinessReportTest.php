@@ -368,3 +368,49 @@ test('report dates are validated', function (): void {
         ->assertUnprocessable()
         ->assertJsonValidationErrors('to');
 });
+
+test('dashboard and business report exclude vendor_payout from operating expenses and preserve net profit', function (): void {
+    // Record real operating expense (food)
+    Expense::create([
+        'tenant_id' => $this->tenant->id,
+        'financial_account_id' => $this->account->id,
+        'category' => 'food',
+        'amount' => 500,
+        'description' => 'Staff lunch',
+        'date' => Carbon::parse('2026-10-05'),
+        'created_by' => $this->owner->id,
+        'is_owner_draw' => false,
+    ]);
+
+    // Record vendor debt settlement via vendor_payout
+    Expense::create([
+        'tenant_id' => $this->tenant->id,
+        'financial_account_id' => $this->account->id,
+        'vendor_contact_id' => $this->vendor->id,
+        'category' => 'vendor_payout',
+        'amount' => 15000,
+        'description' => 'Transfer to supplier',
+        'date' => Carbon::parse('2026-10-06'),
+        'created_by' => $this->owner->id,
+        'is_owner_draw' => false,
+    ]);
+
+    // 1. Check Dashboard API
+    $dashRes = $this->actingAs($this->owner)
+        ->getJson('/api/v1/dashboard/summary?month=2026-10')
+        ->assertOk();
+
+    // Operating expenses must only be 500 ETB, NOT 15,500 ETB
+    $dashRes->assertJsonPath('data.monthly_performance.operating_expenses', 500)
+        ->assertJsonPath('data.monthly_performance.manual_expenses', 500)
+        ->assertJsonPath('data.monthly_performance.net_profit', -500);
+
+    // 2. Check Business Report API
+    $reportRes = $this->actingAs($this->owner)
+        ->getJson('/api/v1/reports/summary?from=2026-10-01&to=2026-10-31')
+        ->assertOk();
+
+    // Business report summary operating expenses must only be 500 ETB
+    $reportRes->assertJsonPath('data.summary.operating_expenses', 500)
+        ->assertJsonPath('data.summary.net_profit', -500);
+});

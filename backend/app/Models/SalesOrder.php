@@ -28,6 +28,7 @@ class SalesOrder extends Model
         'credit_sale',
         'payment_method',
         'financial_account_id',
+        'payment_splits',
         'exchange_unit_id',
         'is_vendor_sourced',
         'vendor_contact_id',
@@ -48,6 +49,7 @@ class SalesOrder extends Model
             'paid_amount' => 'decimal:2',
             'credit_sale' => 'boolean',
             'is_vendor_sourced' => 'boolean',
+            'payment_splits' => 'array',
             'vendor_cost_basis' => 'decimal:2',
             'order_date' => 'datetime',
         ];

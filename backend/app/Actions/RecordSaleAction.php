@@ -199,6 +199,7 @@ class RecordSaleAction
                 'credit_sale' => $creditSale,
                 'payment_method' => $data['payment_method'] ?? 'cash',
                 'financial_account_id' => $data['financial_account_id'] ?? null,
+                'payment_splits' => ! empty($data['payment_splits']) ? $data['payment_splits'] : null,
                 'notes' => $data['notes'] ?? null,
                 'order_date' => now(),
             ]);
@@ -297,6 +298,9 @@ class RecordSaleAction
                     $vendorAccountId = $itemData['vendor_payment_account_id'] ?? null;
 
                     if ($isPaidNow) {
+                        $vendorSplits = $itemData['vendor_payment_splits'] ?? null;
+                        $hasSplits = is_array($vendorSplits) && count($vendorSplits) > 0;
+
                         $brokeredDebt = Debt::create([
                             'tenant_id' => $tenantId,
                             'contact_id' => $vendorContactId,
@@ -308,10 +312,34 @@ class RecordSaleAction
                             'remaining_amount' => 0.0,
                             'due_date' => now(),
                             'status' => 'settled',
+                            'payment_splits' => $hasSplits ? $vendorSplits : null,
                             'notes' => "Brokered sourcing for Order #{$order->order_number} (Paid on spot)",
                         ]);
 
-                        if ($vendorAccountId) {
+                        if ($hasSplits) {
+                            $splitGroupId = count($vendorSplits) > 1 ? (string) Str::uuid() : null;
+                            foreach ($vendorSplits as $vSplit) {
+                                $vSplitAmt = (float) ($vSplit['amount'] ?? 0);
+                                if ($vSplitAmt <= 0) {
+                                    continue;
+                                }
+                                $vAcc = FinancialAccount::find($vSplit['financial_account_id']);
+                                $accName = $vAcc?->name ?? 'Account';
+                                DebtPayment::create([
+                                    'tenant_id' => $tenantId,
+                                    'debt_id' => $brokeredDebt->id,
+                                    'split_group_id' => $splitGroupId,
+                                    'financial_account_id' => $vSplit['financial_account_id'],
+                                    'amount' => $vSplitAmt,
+                                    'payment_date' => now(),
+                                    'reference_number' => $vSplit['reference_number'] ?? null,
+                                    'notes' => count($vendorSplits) > 1
+                                        ? "Settled immediately at POS sale (Split via {$accName})"
+                                        : 'Settled immediately at POS sale',
+                                    'created_by' => $data['salesperson_id'] ?? auth()->id(),
+                                ]);
+                            }
+                        } elseif ($vendorAccountId) {
                             DebtPayment::create([
                                 'tenant_id' => $tenantId,
                                 'debt_id' => $brokeredDebt->id,
@@ -591,22 +619,44 @@ class RecordSaleAction
                 }
             }
 
-            // Credit financial account if initial payment was made
-            if ($paidAmount > 0 && ! empty($data['financial_account_id']) && ($data['payment_method'] ?? '') !== 'debt_offset') {
-                $account = FinancialAccount::findOrFail($data['financial_account_id']);
-                $account->increment('current_balance', $paidAmount);
+            // Credit financial account(s) if initial payment was made
+            if ($paidAmount > 0 && ($data['payment_method'] ?? '') !== 'debt_offset') {
+                $rawSplits = $data['payment_splits'] ?? null;
+                if (is_array($rawSplits) && count($rawSplits) > 0) {
+                    $splits = $rawSplits;
+                } elseif (! empty($data['financial_account_id'])) {
+                    $splits = [
+                        [
+                            'financial_account_id' => $data['financial_account_id'],
+                            'amount' => $paidAmount,
+                        ],
+                    ];
+                } else {
+                    $splits = [];
+                }
 
-                FinancialTransaction::create([
-                    'tenant_id' => $tenantId,
-                    'transaction_number' => 'TXN-'.strtoupper(Str::random(8)),
-                    'destination_account_id' => $account->id,
-                    'type' => 'customer_payment',
-                    'amount' => $paidAmount,
-                    'contact_id' => $customerId,
-                    'description' => "Payment received for Order #{$order->order_number}",
-                    'date' => now(),
-                    'created_by' => auth()->id(),
-                ]);
+                foreach ($splits as $split) {
+                    $splitAmount = (float) ($split['amount'] ?? 0);
+                    if ($splitAmount <= 0) {
+                        continue;
+                    }
+                    $account = FinancialAccount::findOrFail($split['financial_account_id']);
+                    $account->increment('current_balance', $splitAmount);
+
+                    FinancialTransaction::create([
+                        'tenant_id' => $tenantId,
+                        'transaction_number' => 'TXN-'.strtoupper(Str::random(8)),
+                        'destination_account_id' => $account->id,
+                        'type' => 'customer_payment',
+                        'amount' => $splitAmount,
+                        'contact_id' => $customerId,
+                        'description' => count($splits) > 1
+                            ? "Payment received for Order #{$order->order_number} ({$account->name})"
+                            : "Payment received for Order #{$order->order_number}",
+                        'date' => now(),
+                        'created_by' => auth()->id(),
+                    ]);
+                }
             }
 
             AuditLog::record(

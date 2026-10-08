@@ -77,6 +77,14 @@ export interface Product {
   variants: ProductVariant[];
 }
 
+export interface PaymentSplit {
+  financial_account_id: string;
+  amount: number;
+  account_name?: string;
+  fee?: number;
+  reference_number?: string;
+}
+
 export interface MaintenanceRecord {
   id: string;
   inventory_unit_id: string;
@@ -87,6 +95,7 @@ export interface MaintenanceRecord {
   vendor_contact?: Contact;
   vendor_debt_id?: string | null;
   financial_account_id?: string | null;
+  payment_splits?: PaymentSplit[] | null;
   description: string;
   date: string;
   created_at?: string;
@@ -104,6 +113,7 @@ export interface InventoryUnit {
   cost_basis?: string | number;
   selling_price?: string | number | null;
   status: 'in_stock' | 'out' | 'sold' | 'returned' | 'returned_to_vendor' | 'reserved' | 'damaged' | 'fixed';
+  payment_splits?: PaymentSplit[] | null;
   customer_waiting?: boolean;
   customer_waiting_at?: string | null;
   is_repaired?: boolean;
@@ -306,6 +316,7 @@ export interface SalesOrder {
   payment_method: string;
   financial_account_id?: string | null;
   financial_account?: FinancialAccount;
+  payment_splits?: PaymentSplit[] | null;
   is_vendor_sourced?: boolean;
   vendor_contact_id?: string | null;
   vendor_cost_basis?: string | number | null;
@@ -322,6 +333,7 @@ export interface DebtPayment {
   amount: string | number;
   payment_date: string;
   reference_number: string | null;
+  split_group_id?: string | null;
   financial_account?: FinancialAccount;
 }
 
@@ -339,6 +351,7 @@ export interface Debt {
   notes: string | null;
   created_at: string;
   payments?: DebtPayment[];
+  payment_splits?: { financial_account_id: string; account_name?: string; amount: number; fee?: number }[];
 }
 
 export interface FinancialAccount {
@@ -396,6 +409,7 @@ export interface Expense {
   id: string;
   financial_account_id: string;
   financial_account?: FinancialAccount;
+  payment_splits?: PaymentSplit[] | null;
   category: string;
   amount: string | number;
   is_owner_draw: boolean;
@@ -1085,6 +1099,7 @@ export const api = {
     sim_type?: string;
     funding_source?: 'none' | 'account' | 'debtor_offset' | 'split';
     payment_account_id?: string | null;
+    payment_splits?: PaymentSplit[];
     receivable_contact_id?: string | null;
     receivable_offset_amount?: number;
     units?: Array<{
@@ -1137,6 +1152,7 @@ export const api = {
       settlement_type: 'paid' | 'offset' | 'credit';
       selling_price?: number;
       financial_account_id?: string;
+      payment_splits?: PaymentSplit[];
       payment_date?: string;
       reference_number?: string;
       notes?: string;
@@ -1274,10 +1290,12 @@ export const api = {
     vendor_cost: number;
     vendor_payment_method: 'paid_now' | 'owed';
     vendor_payment_account_id?: string | null;
+    vendor_payment_splits?: { financial_account_id: string; amount: number; reference_number?: string }[];
     selling_price: number;
     paid_amount: number;
     payment_method: 'cash' | 'telebirr' | 'cbe' | 'bank_transfer' | 'credit';
     financial_account_id?: string | null;
+    payment_splits?: { financial_account_id: string; amount: number; reference_number?: string }[];
     customer_id?: string | null;
     customer_name?: string;
     customer_phone?: string;
@@ -1292,7 +1310,8 @@ export const api = {
     orderId: string,
     data: {
       amount: number;
-      financial_account_id: string;
+      financial_account_id?: string;
+      payment_splits?: PaymentSplit[];
       reference_number?: string;
       notes?: string;
     }
@@ -1310,8 +1329,17 @@ export const api = {
     return request<Debt[]>(`/debts?${query.toString()}`);
   },
 
-  settleDebtPayment: (debtId: string, data: { amount: number; financial_account_id: string; reference_number?: string; notes?: string }) =>
-    request<{ debt: Debt; payment: DebtPayment }>(`/debts/${debtId}/payments`, {
+  settleDebtPayment: (
+    debtId: string,
+    data: {
+      amount: number;
+      financial_account_id?: string;
+      payment_splits?: PaymentSplit[];
+      reference_number?: string;
+      notes?: string;
+    }
+  ) =>
+    request<{ debt: Debt; payment: DebtPayment; payments?: DebtPayment[] }>(`/debts/${debtId}/payments`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
@@ -1327,6 +1355,7 @@ export const api = {
     disburse_account_id?: string;
     cash_flow_direction?: 'in' | 'out' | 'none';
     fee?: number;
+    payment_splits?: { financial_account_id: string; amount: number; fee?: number }[];
   }) =>
     request<Debt>('/debts', {
       method: 'POST',
@@ -1479,7 +1508,19 @@ export const api = {
     return request<ExpensesData>(`/expenses?${query.toString()}`);
   },
 
-  recordExpense: (data: { financial_account_id: string; inventory_unit_id?: string; category: string; amount: number; is_owner_draw?: boolean; vendor_billing?: 'shop' | 'vendor_deduct' | 'vendor_reimburse'; vendor_contact_id?: string; description: string; date?: string; fee?: number }) =>
+  recordExpense: (data: {
+    financial_account_id?: string;
+    payment_splits?: PaymentSplit[];
+    inventory_unit_id?: string;
+    category: string;
+    amount: number;
+    is_owner_draw?: boolean;
+    vendor_billing?: 'shop' | 'vendor_deduct' | 'vendor_reimburse';
+    vendor_contact_id?: string;
+    description: string;
+    date?: string;
+    fee?: number;
+  }) =>
     request<Expense>('/expenses', {
       method: 'POST',
       body: JSON.stringify(data),

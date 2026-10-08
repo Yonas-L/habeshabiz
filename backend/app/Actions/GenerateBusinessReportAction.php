@@ -51,6 +51,7 @@ class GenerateBusinessReportAction
         $operatingExpenses = (float) Expense::query()
             ->whereBetween('date', [$start, $end])
             ->where('is_owner_draw', false)
+            ->where('category', '!=', 'vendor_payout')
             ->sum('amount');
         $transactionFees = (float) FinancialTransaction::query()
             ->whereBetween('date', [$start, $end])

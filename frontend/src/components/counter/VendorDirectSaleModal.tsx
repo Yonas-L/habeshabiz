@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { LdrsSpinner } from '../loading/LdrsSpinner';
 import { PartnerFormModal } from '../partners/PartnerFormModal';
+import { SplitPaymentSelector, type PaymentSplitItem } from '../common/SplitPaymentSelector';
 
 interface VendorDirectSaleModalProps {
   isOpen: boolean;
@@ -61,6 +62,8 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
   const [vendorCost, setVendorCost] = useState('');
   const [vendorPaymentType, setVendorPaymentType] = useState<'immediate_account' | 'payable_debt'>('immediate_account');
   const [vendorAccountId, setVendorAccountId] = useState('');
+  const [isVendorSplit, setIsVendorSplit] = useState(false);
+  const [vendorPaymentSplits, setVendorPaymentSplits] = useState<PaymentSplitItem[]>([]);
   const [isAddPartnerOpen, setIsAddPartnerOpen] = useState(false);
   const [liveContacts, setLiveContacts] = useState<Contact[]>(contacts);
 
@@ -116,6 +119,8 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
         if (!vendorAccountId) setVendorAccountId(accounts[0].id);
         if (!customerAccountId) setCustomerAccountId(accounts[0].id);
       }
+      setIsVendorSplit(false);
+      setVendorPaymentSplits([]);
     }
   }, [isOpen, initialProductId, products, accounts]);
 
@@ -176,6 +181,28 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
     return totalVendorDeduction > Number(selectedVendorAccount.current_balance);
   }, [vendorPaymentType, isOwner, selectedVendorAccount, totalVendorDeduction]);
 
+  const vendorSplitTotal = useMemo(() => {
+    return vendorPaymentSplits.reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
+  }, [vendorPaymentSplits]);
+
+  const isVendorSplitMismatch = isVendorSplit && Math.abs(vendorSplitTotal - vendorCostNum) > 0.01;
+
+  const isAnyVendorSplitOverdrawn = useMemo(() => {
+    if (vendorPaymentType !== 'immediate_account' || !isVendorSplit) return false;
+    if (!isOwner) return false;
+    return vendorPaymentSplits.some((split) => {
+      const acc = accounts.find((a) => a.id === split.financial_account_id);
+      if (!acc || acc.current_balance === null) return false;
+      const amt = Number(split.amount) || 0;
+      let fee = 0;
+      if (acc.default_fee_type === 'fixed') fee = Number(acc.default_fee_amount) || 0;
+      else if (acc.default_fee_type === 'percentage') {
+        fee = Math.round(((amt * (Number(acc.default_fee_amount) || 0)) / 100) * 100) / 100;
+      }
+      return (amt + fee) > Number(acc.current_balance);
+    });
+  }, [vendorPaymentType, isVendorSplit, isOwner, vendorPaymentSplits, accounts]);
+
   // Auto-sync paidAmount when sellingPrice changes (if paid was equal or empty)
   const handleSellingPriceChange = (val: string) => {
     const formatted = formatCurrencyInput(val);
@@ -210,9 +237,22 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
       return;
     }
 
-    if (vendorPaymentType === 'immediate_account' && isVendorAccountOverdrawn) {
-      toast.error('Insufficient balance in selected payout account');
-      return;
+    if (vendorPaymentType === 'immediate_account') {
+      if (isVendorSplit) {
+        if (isVendorSplitMismatch) {
+          toast.error(`Vendor payment split total (${vendorSplitTotal.toLocaleString()} ETB) does not match vendor cost (${vendorCostNum.toLocaleString()} ETB)`);
+          return;
+        }
+        if (isAnyVendorSplitOverdrawn) {
+          toast.error('Insufficient balance in one or more split payout accounts');
+          return;
+        }
+      } else {
+        if (isVendorAccountOverdrawn) {
+          toast.error('Insufficient balance in selected payout account');
+          return;
+        }
+      }
     }
 
     if (paidAmountNum > 0 && paymentMethod !== 'cash' && !customerAccountId) {
@@ -240,7 +280,13 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
         vendor_contact_id: vendorContactId,
         vendor_cost: vendorCostNum,
         vendor_payment_method: vendorPaymentType === 'immediate_account' ? ('paid_now' as const) : ('owed' as const),
-        vendor_payment_account_id: vendorPaymentType === 'immediate_account' ? vendorAccountId : undefined,
+        vendor_payment_account_id: vendorPaymentType === 'immediate_account' ? (isVendorSplit ? undefined : vendorAccountId) : undefined,
+        vendor_payment_splits: (vendorPaymentType === 'immediate_account' && isVendorSplit)
+          ? vendorPaymentSplits.map((s) => ({
+              financial_account_id: s.financial_account_id,
+              amount: Number(s.amount) || 0,
+            }))
+          : undefined,
         selling_price: sellingPriceNum,
         paid_amount: paidAmountNum,
         payment_method: paymentMethod as any,
@@ -266,6 +312,8 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
       setVendorCost('');
       setRam('');
       setNotes('');
+      setIsVendorSplit(false);
+      setVendorPaymentSplits([]);
 
       onSaleSuccess();
       onClose();
@@ -594,33 +642,31 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
             {/* Payout Account selection if Pay Now */}
             {vendorPaymentType === 'immediate_account' && (
               <div className="space-y-1.5 pt-1">
-                <div className="flex items-center justify-between">
-                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">
-                    Vendor Payout Account *
-                  </label>
-                  {isVendorAccountOverdrawn && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200 dark:border-rose-900/60">
-                      <ShieldAlert className="w-3 h-3" />
-                      Insufficient balance
-                    </span>
-                  )}
-                </div>
-                <select
-                  value={vendorAccountId}
-                  required
-                  onChange={(e) => setVendorAccountId(e.target.value)}
-                  className={`w-full h-10 px-3 rounded-xl border bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none cursor-pointer ${
-                    isVendorAccountOverdrawn ? 'border-rose-300 dark:border-rose-700 ring-1 ring-rose-500/20' : 'border-slate-200 dark:border-slate-700'
-                  }`}
-                >
-                  {accounts.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                      {isOwner && a.current_balance !== null ? ` (${Number(a.current_balance).toLocaleString()} ETB)` : ''}
-                    </option>
-                  ))}
-                </select>
-                {selectedVendorAccount && selectedVendorAccount.default_fee_type && selectedVendorAccount.default_fee_type !== 'none' && Number(selectedVendorAccount.default_fee_amount) > 0 && vendorCostNum > 0 && (
+                <SplitPaymentSelector
+                  accounts={accounts}
+                  targetAmount={vendorCostNum}
+                  singleAccountId={vendorAccountId}
+                  onSingleAccountChange={setVendorAccountId}
+                  isSplit={isVendorSplit}
+                  onIsSplitChange={setIsVendorSplit}
+                  splits={vendorPaymentSplits}
+                  onSplitsChange={setVendorPaymentSplits}
+                  direction="outflow"
+                  label="Vendor Payout Account *"
+                />
+                {!isVendorSplit && isVendorAccountOverdrawn && (
+                  <div className="text-[11px] text-rose-600 dark:text-rose-400 flex items-center gap-1">
+                    <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
+                    <span>Insufficient balance in selected payout account</span>
+                  </div>
+                )}
+                {isVendorSplit && isAnyVendorSplitOverdrawn && (
+                  <div className="text-[11px] text-rose-600 dark:text-rose-400 flex items-center gap-1">
+                    <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
+                    <span>Insufficient balance in one or more split payout accounts</span>
+                  </div>
+                )}
+                {!isVendorSplit && selectedVendorAccount && selectedVendorAccount.default_fee_type && selectedVendorAccount.default_fee_type !== 'none' && Number(selectedVendorAccount.default_fee_amount) > 0 && vendorCostNum > 0 && (
                   <div className="flex items-center justify-between text-[11px] px-2.5 py-1.5 rounded-lg bg-amber-50/90 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-900/40 text-amber-800 dark:text-amber-300">
                     <span className="flex items-center gap-1">
                       <span className="font-bold">Outgoing Fee ({Number(selectedVendorAccount.default_fee_amount)}{selectedVendorAccount.default_fee_type === 'percentage' ? '%' : ' ETB'}):</span>
@@ -880,7 +926,7 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
                 !vendorContactId ||
                 vendorCostNum <= 0 ||
                 sellingPriceNum <= 0 ||
-                (vendorPaymentType === 'immediate_account' && isVendorAccountOverdrawn)
+                (vendorPaymentType === 'immediate_account' && (isVendorSplit ? (isAnyVendorSplitOverdrawn || isVendorSplitMismatch) : isVendorAccountOverdrawn))
               }
               className="h-10 px-5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-800 text-emerald-400 dark:text-emerald-400 active:scale-[0.98] text-xs font-bold transition-all shadow-xs flex items-center gap-2 disabled:opacity-50 cursor-pointer"
             >

@@ -11,6 +11,7 @@ import {
   Loader2,
   Handshake,
 } from 'lucide-react';
+import { SplitPaymentSelector, type PaymentSplitItem } from './common/SplitPaymentSelector';
 
 interface RecordExpenseModalProps {
   isOpen: boolean;
@@ -35,6 +36,8 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [accountId, setAccountId] = useState('');
+  const [isSplit, setIsSplit] = useState(false);
+  const [paymentSplits, setPaymentSplits] = useState<PaymentSplitItem[]>([]);
   const [isOwnerDraw, setIsOwnerDraw] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -134,7 +137,30 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!amount || !description || !accountId) return;
+    if (!amount || !description) return;
+    const numAmount = parseFloat(amount);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      toast.error('Please enter a valid expense amount');
+      return;
+    }
+
+    if (isSplit) {
+      const totalAllocated = paymentSplits.reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
+      if (Math.abs(totalAllocated - numAmount) > 0.01) {
+        toast.error(`Split amounts (${totalAllocated.toLocaleString()} ETB) must equal total expense (${numAmount.toLocaleString()} ETB)`);
+        return;
+      }
+      if (paymentSplits.length === 0 || paymentSplits.some((s) => !s.financial_account_id || s.amount <= 0)) {
+        toast.error('All split accounts must have a valid account and amount greater than 0');
+        return;
+      }
+    } else {
+      if (!accountId) {
+        toast.error('Please select an account');
+        return;
+      }
+    }
+
     if (category === 'vendor_payout' && !selectedVendorContactId) {
       toast.error('Please select the partner or vendor receiving this transfer');
       return;
@@ -150,10 +176,11 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
         : selectedVendorContactId || undefined;
 
       await api.recordExpense({
-        financial_account_id: accountId,
+        financial_account_id: isSplit ? undefined : accountId,
+        payment_splits: isSplit ? paymentSplits : undefined,
         inventory_unit_id: category === 'maintenance' && selectedUnitId ? selectedUnitId : undefined,
         category,
-        amount: parseFloat(amount),
+        amount: numAmount,
         is_owner_draw: isDraw,
         vendor_billing: category === 'maintenance' && selectedUnitId && hasVendor ? vendorBilling : 'shop',
         vendor_contact_id: finalVendorContactId || undefined,
@@ -171,7 +198,7 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
           ? 'Vendor Reimbursement Claim Created (Receivable)'
           : 'Operating Expense Recorded',
         {
-          description: `${parseFloat(amount).toLocaleString()} ETB • ${description}`,
+          description: `${numAmount.toLocaleString()} ETB • ${description}`,
         }
       );
 
@@ -180,6 +207,8 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
       setSelectedUnitId('');
       setSelectedVendorContactId('');
       setIsOwnerDraw(false);
+      setIsSplit(false);
+      setPaymentSplits([]);
       setCategory('ride');
       setVendorBilling('shop');
       onClose();
@@ -415,43 +444,36 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                Amount (ETB)
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="e.g. 350"
-                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono tabular-nums font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 focus:border-slate-900 dark:focus:border-slate-600"
-                required
-                autoFocus
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                Paid From Account
-              </label>
-              <select
-                value={accountId}
-                onChange={(e) => setAccountId(e.target.value)}
-                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 focus:border-slate-900 dark:focus:border-slate-600 cursor-pointer"
-                required
-              >
-                {availableAccounts.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name} ({Number(a.current_balance).toLocaleString()} ETB)
-                  </option>
-                ))}
-              </select>
-            </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+              Amount (ETB)
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="e.g. 350"
+              className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono tabular-nums font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 focus:border-slate-900 dark:focus:border-slate-600"
+              required
+              autoFocus
+            />
           </div>
 
-          {(() => {
+          <SplitPaymentSelector
+            accounts={availableAccounts}
+            targetAmount={parseFloat(amount) || 0}
+            singleAccountId={accountId}
+            onSingleAccountChange={setAccountId}
+            isSplit={isSplit}
+            onIsSplitChange={setIsSplit}
+            splits={paymentSplits}
+            onSplitsChange={setPaymentSplits}
+            direction="outflow"
+            label="Paid From Account"
+          />
+
+          {!isSplit && (() => {
             const selectedAcc = availableAccounts.find((a) => a.id === accountId);
             const amtNum = parseFloat(amount) || 0;
             if (!selectedAcc || !selectedAcc.default_fee_type || selectedAcc.default_fee_type === 'none' || amtNum <= 0) return null;

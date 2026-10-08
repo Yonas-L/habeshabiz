@@ -26,6 +26,7 @@ class Debt extends Model
         'due_date',
         'status',
         'notes',
+        'payment_splits',
     ];
 
     protected function casts(): array
@@ -35,6 +36,7 @@ class Debt extends Model
             'paid_amount' => 'decimal:2',
             'remaining_amount' => 'decimal:2',
             'due_date' => 'date',
+            'payment_splits' => 'array',
         ];
     }
 

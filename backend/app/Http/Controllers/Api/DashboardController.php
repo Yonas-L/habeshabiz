@@ -139,6 +139,7 @@ class DashboardController extends Controller
 
         $monthlyManualExpenses = (float) Expense::whereBetween('date', [$startOfMonth, $endOfMonth])
             ->where('is_owner_draw', false)
+            ->where('category', '!=', 'vendor_payout')
             ->sum('amount');
 
         $monthlyTransactionFees = (float) FinancialTransaction::whereBetween('date', [$startOfMonth, $endOfMonth])

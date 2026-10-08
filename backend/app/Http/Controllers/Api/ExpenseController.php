@@ -62,7 +62,11 @@ class ExpenseController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'financial_account_id' => ['required', 'exists:financial_accounts,id'],
+            'financial_account_id' => ['nullable', 'required_without:payment_splits', 'exists:financial_accounts,id'],
+            'payment_splits' => ['nullable', 'array', 'min:1'],
+            'payment_splits.*.financial_account_id' => ['required', 'exists:financial_accounts,id'],
+            'payment_splits.*.amount' => ['required', 'numeric', 'min:0.01'],
+            'payment_splits.*.fee' => ['nullable', 'numeric', 'min:0'],
             'inventory_unit_id' => ['nullable', 'exists:inventory_units,id'],
             'category' => ['required', 'string', 'in:ride,food,rent,utilities,maintenance,salary,personal_owner_draw,vendor_payout,other'],
             'amount' => ['required', 'numeric', 'min:0.01'],
@@ -76,19 +80,64 @@ class ExpenseController extends Controller
 
         $expense = DB::transaction(function () use ($validated) {
             $tenantId = TenantScope::getActiveTenantId();
-            $account = FinancialAccount::findOrFail($validated['financial_account_id']);
             $amount = (float) $validated['amount'];
 
-            // Deduct from financial account (paying technician/service/vendor)
-            $fee = $account->calculateOutgoingFee($amount, isset($validated['fee']) ? (float) $validated['fee'] : null);
-            $totalDeduction = $amount + $fee;
-
-            if ((float) $account->current_balance < $totalDeduction) {
-                throw \Illuminate\Validation\ValidationException::withMessages([
-                    'financial_account_id' => ["Insufficient balance in account '{$account->name}'. Available: ".number_format((float) $account->current_balance, 2)." ETB, Required: ".number_format($totalDeduction, 2)." ETB (including fee)."],
-                ]);
+            $rawSplits = $validated['payment_splits'] ?? null;
+            if (is_array($rawSplits) && count($rawSplits) > 0) {
+                $splits = $rawSplits;
+                $splitSum = (float) collect($splits)->sum(fn ($s) => (float) ($s['amount'] ?? 0));
+                if (abs($splitSum - $amount) > 0.01) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'payment_splits' => ["Split allocation total (".number_format($splitSum, 2)." ETB) does not match total expense amount (".number_format($amount, 2)." ETB)."],
+                    ]);
+                }
+            } else {
+                $splits = [
+                    [
+                        'financial_account_id' => $validated['financial_account_id'],
+                        'amount' => $amount,
+                        'fee' => $validated['fee'] ?? null,
+                    ],
+                ];
             }
-            $account->decrement('current_balance', $totalDeduction);
+
+            // Prepare and validate accounts and overdraft
+            $preparedSplits = [];
+            foreach ($splits as $split) {
+                $splitAccount = FinancialAccount::findOrFail($split['financial_account_id']);
+                $splitAmount = (float) $split['amount'];
+                $splitFee = $splitAccount->calculateOutgoingFee($splitAmount, isset($split['fee']) ? (float) $split['fee'] : (isset($validated['fee']) && count($splits) === 1 ? (float) $validated['fee'] : null));
+                $splitTotal = $splitAmount + $splitFee;
+
+                if ((float) $splitAccount->current_balance < $splitTotal) {
+                    $errorKey = ! empty($validated['payment_splits']) ? 'payment_splits' : 'financial_account_id';
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        $errorKey => ["Insufficient balance in account '{$splitAccount->name}'. Available: ".number_format((float) $splitAccount->current_balance, 2)." ETB, Required: ".number_format($splitTotal, 2)." ETB (including fee)."],
+                    ]);
+                }
+
+                $preparedSplits[] = [
+                    'account' => $splitAccount,
+                    'financial_account_id' => $splitAccount->id,
+                    'account_name' => $splitAccount->name,
+                    'amount' => $splitAmount,
+                    'fee' => $splitFee,
+                    'total' => $splitTotal,
+                ];
+            }
+
+            // Deduct balances from each account
+            foreach ($preparedSplits as $p) {
+                $p['account']->decrement('current_balance', $p['total']);
+            }
+
+            $primaryAccount = $preparedSplits[0]['account'];
+            $paymentSplitsData = count($preparedSplits) > 1 ? array_map(fn ($p) => [
+                'financial_account_id' => $p['financial_account_id'],
+                'account_name' => $p['account_name'],
+                'amount' => $p['amount'],
+                'fee' => $p['fee'],
+            ], $preparedSplits) : null;
 
             $vendorBilling = $validated['vendor_billing'] ?? 'shop';
             $vendorContactId = $validated['vendor_contact_id'] ?? null;
@@ -96,7 +145,8 @@ class ExpenseController extends Controller
 
             $expense = Expense::create([
                 'tenant_id' => $tenantId,
-                'financial_account_id' => $account->id,
+                'financial_account_id' => $primaryAccount->id,
+                'payment_splits' => $paymentSplitsData,
                 'inventory_unit_id' => $validated['inventory_unit_id'] ?? null,
                 'vendor_billing' => $vendorBilling,
                 'vendor_contact_id' => $vendorContactId,
@@ -118,26 +168,47 @@ class ExpenseController extends Controller
                     ->get();
 
                 $remainingToSettle = $amount;
+                $splitIndex = 0;
+                $currentSplitRem = $preparedSplits[0]['amount'];
+                $currentSplitAcc = $preparedSplits[0]['account'];
+
                 foreach ($openPayables as $openPayable) {
                     if ($remainingToSettle <= 0) {
                         break;
                     }
 
                     $payAmount = min($remainingToSettle, (float) $openPayable->remaining_amount);
+                    $remForThisPayable = $payAmount;
+
+                    while ($remForThisPayable > 0 && $splitIndex < count($preparedSplits)) {
+                        $fromCurrentSplit = min($remForThisPayable, $currentSplitRem);
+
+                        DebtPayment::create([
+                            'tenant_id' => $tenantId,
+                            'debt_id' => $openPayable->id,
+                            'financial_account_id' => $currentSplitAcc->id,
+                            'amount' => $fromCurrentSplit,
+                            'payment_date' => $expense->date ?? now(),
+                            'reference_number' => "EXP-{$expense->id}",
+                            'notes' => "Payout via Expense: {$validated['description']}",
+                            'created_by' => auth()->id(),
+                        ]);
+
+                        $currentSplitRem -= $fromCurrentSplit;
+                        $remForThisPayable -= $fromCurrentSplit;
+
+                        if ($currentSplitRem <= 0.001) {
+                            $splitIndex++;
+                            if ($splitIndex < count($preparedSplits)) {
+                                $currentSplitRem = $preparedSplits[$splitIndex]['amount'];
+                                $currentSplitAcc = $preparedSplits[$splitIndex]['account'];
+                            }
+                        }
+                    }
+
                     $newPaid = (float) $openPayable->paid_amount + $payAmount;
                     $newRemaining = max(0, (float) $openPayable->original_amount - $newPaid);
                     $newStatus = $newRemaining <= 0 ? 'settled' : 'partially_paid';
-
-                    DebtPayment::create([
-                        'tenant_id' => $tenantId,
-                        'debt_id' => $openPayable->id,
-                        'financial_account_id' => $account->id,
-                        'amount' => $payAmount,
-                        'payment_date' => $expense->date ?? now(),
-                        'reference_number' => "EXP-{$expense->id}",
-                        'notes' => "Payout via Expense: {$validated['description']}",
-                        'created_by' => auth()->id(),
-                    ]);
 
                     $openPayable->update([
                         'paid_amount' => $newPaid,
@@ -193,7 +264,7 @@ class ExpenseController extends Controller
                             DebtPayment::create([
                                 'tenant_id' => $tenantId,
                                 'debt_id' => $openPayable->id,
-                                'financial_account_id' => $account->id,
+                                'financial_account_id' => $primaryAccount->id,
                                 'amount' => $amount,
                                 'payment_date' => $expense->date ?? now(),
                                 'reference_number' => 'REPAIR-OFFSET',
@@ -206,8 +277,8 @@ class ExpenseController extends Controller
                                 'remaining_amount' => $newRemaining,
                                 'status' => $newStatus,
                                 'notes' => $openPayable->notes
-                                    ? "{$openPayable->notes} | Deducted {$amount} ETB repair cost for SN: ".($unit->imei_or_serial ?? 'Unit')
-                                    : "Deducted {$amount} ETB repair cost for SN: ".($unit->imei_or_serial ?? 'Unit'),
+                                ? "{$openPayable->notes} | Deducted {$amount} ETB repair cost for SN: ".($unit->imei_or_serial ?? 'Unit')
+                                : "Deducted {$amount} ETB repair cost for SN: ".($unit->imei_or_serial ?? 'Unit'),
                             ]);
                             $vendorDebtId = $openPayable->id;
                         } else {
@@ -277,24 +348,36 @@ class ExpenseController extends Controller
                     'billing_type' => $vendorBilling,
                     'vendor_contact_id' => $vendorContactId,
                     'vendor_debt_id' => $vendorDebtId,
-                    'financial_account_id' => $account->id,
+                    'financial_account_id' => $primaryAccount->id,
+                    'payment_splits' => $paymentSplitsData,
                     'description' => $validated['description'],
                     'date' => $expense->date,
                 ]);
             }
 
-            FinancialTransaction::create([
-                'tenant_id' => $tenantId,
-                'transaction_number' => 'EXP-'.strtoupper(Str::random(8)),
-                'source_account_id' => $account->id,
-                'type' => ($validated['is_owner_draw'] ?? false) ? 'owner_draw' : 'expense',
-                'amount' => $amount,
-                'fee' => $fee,
-                'reference_number' => "EXP-{$expense->id}",
-                'description' => $validated['description'],
-                'date' => $expense->date,
-                'created_by' => auth()->id(),
-            ]);
+            foreach ($preparedSplits as $p) {
+                $splitDesc = count($preparedSplits) > 1
+                    ? "{$validated['description']} (Split via {$p['account_name']})"
+                    : $validated['description'];
+
+                $txnType = ($validated['category'] === 'vendor_payout')
+                    ? 'supplier_payment'
+                    : (($validated['is_owner_draw'] ?? false) ? 'owner_draw' : 'expense');
+
+                FinancialTransaction::create([
+                    'tenant_id' => $tenantId,
+                    'transaction_number' => 'EXP-'.strtoupper(Str::random(8)),
+                    'source_account_id' => $p['financial_account_id'],
+                    'type' => $txnType,
+                    'contact_id' => $vendorContactId,
+                    'amount' => $p['amount'],
+                    'fee' => $p['fee'],
+                    'reference_number' => "EXP-{$expense->id}",
+                    'description' => $splitDesc,
+                    'date' => $expense->date,
+                    'created_by' => auth()->id(),
+                ]);
+            }
 
             return $expense->load(['financialAccount', 'inventoryUnit.variant.product', 'vendorContact']);
         });
@@ -322,34 +405,52 @@ class ExpenseController extends Controller
         $expense = Expense::where('tenant_id', $tenantId)->findOrFail($id);
 
         DB::transaction(function () use ($expense, $tenantId) {
+            $refundAmount = (float) $expense->amount;
+
             // 1. Revert financial transaction & calculate refund (principal + any bank fee)
-            $tx = FinancialTransaction::where('tenant_id', $tenantId)
-                ->where(function ($q) use ($expense) {
-                    $q->where('reference_number', "EXP-{$expense->id}")
-                        ->orWhere(function ($sub) use ($expense) {
-                            $sub->where('source_account_id', $expense->financial_account_id)
-                                ->where('amount', $expense->amount)
-                                ->whereIn('type', ['expense', 'owner_draw'])
-                                ->where('description', $expense->description);
-                        });
-                })
-                ->latest()
-                ->first();
-
-            $fee = $tx ? (float) $tx->fee : 0.0;
-            $refundAmount = (float) $expense->amount + $fee;
-
-            if ($expense->financial_account_id) {
-                $account = FinancialAccount::where('tenant_id', $tenantId)
-                    ->withTrashed()
-                    ->find($expense->financial_account_id);
-                if ($account) {
-                    $account->increment('current_balance', $refundAmount);
+            if (! empty($expense->payment_splits) && is_array($expense->payment_splits)) {
+                $totalRefunded = 0.0;
+                foreach ($expense->payment_splits as $split) {
+                    $splitAcc = FinancialAccount::where('tenant_id', $tenantId)->withTrashed()->find($split['financial_account_id']);
+                    $splitRefund = (float) $split['amount'] + (float) ($split['fee'] ?? 0);
+                    if ($splitAcc) {
+                        $splitAcc->increment('current_balance', $splitRefund);
+                    }
+                    $totalRefunded += $splitRefund;
                 }
-            }
+                $refundAmount = $totalRefunded;
+                FinancialTransaction::where('tenant_id', $tenantId)
+                    ->where('reference_number', "EXP-{$expense->id}")
+                    ->delete();
+            } else {
+                $tx = FinancialTransaction::where('tenant_id', $tenantId)
+                    ->where(function ($q) use ($expense) {
+                        $q->where('reference_number', "EXP-{$expense->id}")
+                            ->orWhere(function ($sub) use ($expense) {
+                                $sub->where('source_account_id', $expense->financial_account_id)
+                                    ->where('amount', $expense->amount)
+                                    ->whereIn('type', ['expense', 'owner_draw', 'supplier_payment'])
+                                    ->where('description', $expense->description);
+                            });
+                    })
+                    ->latest()
+                    ->first();
 
-            if ($tx) {
-                $tx->delete();
+                $fee = $tx ? (float) $tx->fee : 0.0;
+                $refundAmount = (float) $expense->amount + $fee;
+
+                if ($expense->financial_account_id) {
+                    $account = FinancialAccount::where('tenant_id', $tenantId)
+                        ->withTrashed()
+                        ->find($expense->financial_account_id);
+                    if ($account) {
+                        $account->increment('current_balance', $refundAmount);
+                    }
+                }
+
+                if ($tx) {
+                    $tx->delete();
+                }
             }
 
             // 2. Revert vendor debt payments settled via this expense payout

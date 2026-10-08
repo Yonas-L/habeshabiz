@@ -165,6 +165,10 @@ class InventoryController extends Controller
                 'return_deadline' => ['nullable', 'date'],
                 'funding_source' => ['nullable', 'string', 'in:none,unpaid,account,shop_account,debtor_offset,split'],
                 'payment_account_id' => ['nullable', 'exists:financial_accounts,id'],
+                'payment_splits' => ['nullable', 'array', 'min:1'],
+                'payment_splits.*.financial_account_id' => ['required', 'exists:financial_accounts,id'],
+                'payment_splits.*.amount' => ['required', 'numeric', 'min:0.01'],
+                'payment_splits.*.fee' => ['nullable', 'numeric', 'min:0'],
                 'payment_amount' => ['nullable', 'numeric', 'min:0'],
                 'receivable_contact_id' => ['nullable', 'exists:contacts,id'],
                 'receivable_offset_amount' => ['nullable', 'numeric', 'min:0'],
@@ -190,6 +194,10 @@ class InventoryController extends Controller
                 'return_deadline' => ['nullable', 'date'],
                 'funding_source' => ['nullable', 'string', 'in:none,unpaid,account,shop_account,debtor_offset,split'],
                 'payment_account_id' => ['nullable', 'exists:financial_accounts,id'],
+                'payment_splits' => ['nullable', 'array', 'min:1'],
+                'payment_splits.*.financial_account_id' => ['required', 'exists:financial_accounts,id'],
+                'payment_splits.*.amount' => ['required', 'numeric', 'min:0.01'],
+                'payment_splits.*.fee' => ['nullable', 'numeric', 'min:0'],
                 'payment_amount' => ['nullable', 'numeric', 'min:0'],
                 'receivable_contact_id' => ['nullable', 'exists:contacts,id'],
                 'receivable_offset_amount' => ['nullable', 'numeric', 'min:0'],
@@ -308,10 +316,11 @@ class InventoryController extends Controller
         $offsetAmount = 0.0;
 
         if ($fundingSource === 'account') {
-            if (empty($paymentAccountId)) {
+            $rawSplits = $validated['payment_splits'] ?? null;
+            if (empty($paymentAccountId) && (empty($rawSplits) || count($rawSplits) === 0)) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Please select a shop payment account to fund this stock intake.',
+                    'message' => 'Please select a shop payment account or allocate payment splits to fund this stock intake.',
                 ], 422);
             }
             $bankAmount = $totalCost;
@@ -324,33 +333,75 @@ class InventoryController extends Controller
             }
             $offsetAmount = $receivableOffsetAmount > 0 ? min($totalCost, $receivableOffsetAmount) : $totalCost;
         } elseif ($fundingSource === 'split') {
-            if (empty($paymentAccountId)) {
+            $rawSplits = $validated['payment_splits'] ?? null;
+            if (empty($paymentAccountId) && (empty($rawSplits) || count($rawSplits) === 0)) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Please select a payment account for split funding.',
+                    'message' => 'Please select a payment account or allocate splits for split funding.',
                 ], 422);
             }
-            if (empty($receivableContactId)) {
+            if (empty($receivableContactId) && $receivableOffsetAmount > 0) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Please select a debtor contact for split funding.',
+                    'message' => 'Please select a debtor contact for split funding offset.',
                 ], 422);
             }
-            $offsetAmount = min($totalCost, $receivableOffsetAmount);
+            $offsetAmount = (! empty($receivableContactId) && $receivableOffsetAmount > 0)
+                ? min($totalCost, $receivableOffsetAmount)
+                : 0.0;
             $bankAmount = max(0, $totalCost - $offsetAmount);
         }
 
-        // Overdraft guard: verify bank balance
-        $account = null;
-        $bankFee = 0.0;
-        if ($bankAmount > 0 && ! empty($paymentAccountId)) {
-            $account = FinancialAccount::where('tenant_id', $user->tenant_id)->findOrFail($paymentAccountId);
-            $bankFee = $account->calculateOutgoingFee($bankAmount);
-            $totalBankDeduction = $bankAmount + $bankFee;
-            if ((float) $account->current_balance < $totalBankDeduction) {
-                throw ValidationException::withMessages([
-                    'payment_account_id' => ["Insufficient balance in account '{$account->name}'. Available: ".number_format((float) $account->current_balance, 2).' ETB, Required: '.number_format($totalBankDeduction, 2).' ETB (including fee).'],
-                ]);
+        // Overdraft guard: verify bank balance(s)
+        $preparedBankSplits = [];
+        $primaryPaymentAccountId = $paymentAccountId;
+
+        if ($bankAmount > 0) {
+            $rawSplits = $validated['payment_splits'] ?? null;
+            if (is_array($rawSplits) && count($rawSplits) > 0) {
+                $splitSum = (float) collect($rawSplits)->sum(fn ($s) => (float) ($s['amount'] ?? 0));
+                if (abs($splitSum - $bankAmount) > 0.01) {
+                    throw ValidationException::withMessages([
+                        'payment_splits' => ["Split funding total (".number_format($splitSum, 2)." ETB) does not match required funding amount (".number_format($bankAmount, 2)." ETB)."],
+                    ]);
+                }
+                $splitsToProcess = $rawSplits;
+            } elseif (! empty($paymentAccountId)) {
+                $splitsToProcess = [
+                    [
+                        'financial_account_id' => $paymentAccountId,
+                        'amount' => $bankAmount,
+                    ],
+                ];
+            } else {
+                $splitsToProcess = [];
+            }
+
+            foreach ($splitsToProcess as $split) {
+                $splitAcc = FinancialAccount::where('tenant_id', $user->tenant_id)->findOrFail($split['financial_account_id']);
+                $splitAmt = (float) $split['amount'];
+                $splitFee = $splitAcc->calculateOutgoingFee($splitAmt, isset($split['fee']) ? (float) $split['fee'] : null);
+                $totalSplitDeduction = $splitAmt + $splitFee;
+
+                if ((float) $splitAcc->current_balance < $totalSplitDeduction) {
+                    $errorKey = ! empty($validated['payment_splits']) ? 'payment_splits' : 'payment_account_id';
+                    throw ValidationException::withMessages([
+                        $errorKey => ["Insufficient balance in account '{$splitAcc->name}'. Available: ".number_format((float) $splitAcc->current_balance, 2).' ETB, Required: '.number_format($totalSplitDeduction, 2).' ETB (including fee).'],
+                    ]);
+                }
+
+                $preparedBankSplits[] = [
+                    'account' => $splitAcc,
+                    'financial_account_id' => $splitAcc->id,
+                    'account_name' => $splitAcc->name,
+                    'amount' => $splitAmt,
+                    'fee' => $splitFee,
+                    'total' => $totalSplitDeduction,
+                ];
+            }
+
+            if (count($preparedBankSplits) > 0) {
+                $primaryPaymentAccountId = $preparedBankSplits[0]['financial_account_id'];
             }
         }
 
@@ -377,13 +428,12 @@ class InventoryController extends Controller
             $unitItems,
             $variants,
             $fundingSource,
-            $paymentAccountId,
+            $primaryPaymentAccountId,
             $receivableContactId,
             $offsetAmount,
             $bankAmount,
-            $bankFee,
+            $preparedBankSplits,
             $totalCost,
-            $account,
             $user,
             &$createdUnits
         ) {
@@ -413,7 +463,13 @@ class InventoryController extends Controller
                     'status' => 'in_stock',
                     'source_type' => $validated['source_type'] ?? 'purchase',
                     'funding_source' => $fundingSource,
-                    'payment_account_id' => $paymentAccountId,
+                    'payment_account_id' => $primaryPaymentAccountId,
+                    'payment_splits' => count($preparedBankSplits) > 1 ? array_map(fn ($p) => [
+                        'financial_account_id' => $p['financial_account_id'],
+                        'account_name' => $p['account_name'],
+                        'amount' => $p['amount'],
+                        'fee' => $p['fee'],
+                    ], $preparedBankSplits) : null,
                     'receivable_contact_id' => $receivableContactId,
                     'receivable_offset_amount' => $unitOffset,
                     'supplier_contact_id' => $validated['supplier_contact_id'] ?? null,
@@ -501,22 +557,25 @@ class InventoryController extends Controller
             }
 
             // 2. Bank Account Deduction
-            if ($bankAmount > 0 && $account) {
-                $totalBankDeduction = $bankAmount + $bankFee;
-                $account->decrement('current_balance', $totalBankDeduction);
+            if (count($preparedBankSplits) > 0) {
+                foreach ($preparedBankSplits as $p) {
+                    $p['account']->decrement('current_balance', $p['total']);
 
-                FinancialTransaction::create([
-                    'tenant_id' => $tenantId,
-                    'transaction_number' => 'TXN-'.strtoupper(Str::random(8)),
-                    'source_account_id' => $account->id,
-                    'type' => 'supplier_payment',
-                    'amount' => $bankAmount,
-                    'fee' => $bankFee,
-                    'contact_id' => $validated['supplier_contact_id'] ?? null,
-                    'description' => 'Stock intake funding for '.count($createdUnits).' unit(s)',
-                    'date' => now(),
-                    'created_by' => $user->id,
-                ]);
+                    FinancialTransaction::create([
+                        'tenant_id' => $tenantId,
+                        'transaction_number' => 'TXN-'.strtoupper(Str::random(8)),
+                        'source_account_id' => $p['financial_account_id'],
+                        'type' => 'supplier_payment',
+                        'amount' => $p['amount'],
+                        'fee' => $p['fee'],
+                        'contact_id' => $validated['supplier_contact_id'] ?? null,
+                        'description' => count($preparedBankSplits) > 1
+                            ? 'Stock intake funding for '.count($createdUnits)." unit(s) ({$p['account_name']})"
+                            : 'Stock intake funding for '.count($createdUnits).' unit(s)',
+                        'date' => now(),
+                        'created_by' => $user->id,
+                    ]);
+                }
             }
 
             // 3. Supplier Debt Tracking (for all vendor stock on credit / consignment where cash was not paid upfront)
@@ -1018,7 +1077,10 @@ class InventoryController extends Controller
         $validated = $request->validate([
             'settlement_type' => ['required', 'string', 'in:paid,offset,credit'],
             'selling_price' => ['nullable', 'numeric', 'min:0'],
-            'financial_account_id' => ['required_if:settlement_type,paid', 'nullable', 'uuid', 'exists:financial_accounts,id'],
+            'financial_account_id' => ['nullable', 'required_if:settlement_type,paid', 'uuid', 'exists:financial_accounts,id'],
+            'payment_splits' => ['nullable', 'array', 'min:1'],
+            'payment_splits.*.financial_account_id' => ['required', 'exists:financial_accounts,id'],
+            'payment_splits.*.amount' => ['required', 'numeric', 'min:0.01'],
             'payment_date' => ['nullable', 'date'],
             'reference_number' => ['nullable', 'string', 'max:100'],
             'notes' => ['nullable', 'string', 'max:500'],
@@ -1040,32 +1102,38 @@ class InventoryController extends Controller
                 ->first();
 
             if ($settlementType === 'paid') {
-                $account = FinancialAccount::findOrFail($validated['financial_account_id']);
                 $paymentAmount = $holdingDebt ? (float) $holdingDebt->remaining_amount : $finalPrice;
 
                 if ($holdingDebt && $paymentAmount > 0) {
                     (new SettleDebtPaymentAction)->execute($holdingDebt, [
                         'amount' => $paymentAmount,
-                        'financial_account_id' => $account->id,
+                        'financial_account_id' => $validated['financial_account_id'] ?? null,
+                        'payment_splits' => $validated['payment_splits'] ?? null,
                         'payment_date' => $validated['payment_date'] ?? $now,
                         'reference_number' => $validated['reference_number'] ?? null,
                         'notes' => $validated['notes'] ?? "Handover device sale collected from {$vendorName}",
                     ]);
                 } elseif ($paymentAmount > 0) {
-                    $account->increment('current_balance', $paymentAmount);
-                    FinancialTransaction::create([
-                        'tenant_id' => $user->tenant_id,
-                        'financial_account_id' => $account->id,
-                        'type' => 'income',
-                        'category' => 'Sales Revenue',
-                        'amount' => $paymentAmount,
-                        'balance_after' => (float) $account->current_balance,
-                        'transaction_date' => $validated['payment_date'] ?? $now,
-                        'description' => "Handover device sale payout from {$vendorName} for SN {$unit->imei_or_serial}",
-                        'reference_type' => 'inventory_unit',
-                        'reference_id' => $unit->id,
-                        'created_by' => $user->id,
-                    ]);
+                    $rawSplits = $validated['payment_splits'] ?? null;
+                    $splits = is_array($rawSplits) && count($rawSplits) > 0
+                        ? $rawSplits
+                        : [['financial_account_id' => $validated['financial_account_id'], 'amount' => $paymentAmount]];
+
+                    foreach ($splits as $split) {
+                        $splitAccount = FinancialAccount::findOrFail($split['financial_account_id']);
+                        $splitAmt = (float) $split['amount'];
+                        $splitAccount->increment('current_balance', $splitAmt);
+                        FinancialTransaction::create([
+                            'tenant_id' => $user->tenant_id,
+                            'destination_account_id' => $splitAccount->id,
+                            'type' => 'customer_payment',
+                            'amount' => $splitAmt,
+                            'reference_number' => $validated['reference_number'] ?? null,
+                            'date' => $validated['payment_date'] ?? $now,
+                            'description' => "Handover device sale payout from {$vendorName} for SN {$unit->imei_or_serial} via {$splitAccount->name}",
+                            'created_by' => $user->id,
+                        ]);
+                    }
                 }
             } elseif ($settlementType === 'offset') {
                 // Bilateral offset: mutual debt or device swap cover

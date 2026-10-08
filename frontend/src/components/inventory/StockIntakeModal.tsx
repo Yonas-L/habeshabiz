@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { LdrsSpinner } from '../loading/LdrsSpinner';
 import { PartnerFormModal } from '../partners/PartnerFormModal';
+import { SplitPaymentSelector, type PaymentSplitItem } from '../common/SplitPaymentSelector';
 
 interface StockIntakeModalProps {
   isOpen: boolean;
@@ -157,6 +158,8 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
   // Cost Funding State
   const [fundingSource, setFundingSource] = useState<'unpaid' | 'shop_account' | 'debtor_offset' | 'split'>('unpaid');
   const [paymentAccountId, setPaymentAccountId] = useState<string>('');
+  const [isAccountSplit, setIsAccountSplit] = useState(false);
+  const [accountSplits, setAccountSplits] = useState<PaymentSplitItem[]>([]);
   const [selectedDebtorContactId, setSelectedDebtorContactId] = useState<string>('');
   const [splitOffsetAmount, setSplitOffsetAmount] = useState<string>('');
   const [splitCashAmount, setSplitCashAmount] = useState<string>('');
@@ -730,6 +733,21 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
     setSplitCashAmount(formatCurrencyInput(remainder));
   };
 
+  const handleSplitCashChange = (val: string) => {
+    setSplitCashAmount(val);
+    const cash = parseFormattedNumber(val) || 0;
+    const remainderOffset = Math.max(0, totalInvestmentCost - cash);
+    setSplitOffsetAmount(formatCurrencyInput(remainderOffset));
+  };
+
+  useEffect(() => {
+    if (fundingSource === 'split') {
+      const offset = parseFormattedNumber(splitOffsetAmount) || 0;
+      const remainder = Math.max(0, totalInvestmentCost - offset);
+      setSplitCashAmount(formatCurrencyInput(remainder));
+    }
+  }, [totalInvestmentCost, fundingSource]);
+
   // Submit Stock Intake
   const handleSubmitIntake = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -810,9 +828,33 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
     }
 
     // Overdraft validation for shop purchase
-    if (sourceType === 'purchase' && (fundingSource === 'shop_account' || fundingSource === 'split') && isAccountOverdrawn) {
+    if (sourceType === 'purchase' && (fundingSource === 'shop_account' || fundingSource === 'split') && !isAccountSplit && isAccountOverdrawn) {
       toast.error('Insufficient balance in selected account');
       return;
+    }
+
+    if (sourceType === 'purchase' && (fundingSource === 'shop_account' || fundingSource === 'split') && isAccountSplit) {
+      const targetFundingAmount = fundingSource === 'split' ? (parseFormattedNumber(splitCashAmount) || 0) : totalInvestmentCost;
+      const splitSum = accountSplits.reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
+      if (Math.abs(splitSum - targetFundingAmount) > 0.01) {
+        toast.error(`Split amounts (${splitSum.toLocaleString()} ETB) must equal funding amount (${targetFundingAmount.toLocaleString()} ETB)`);
+        return;
+      }
+      if (accountSplits.length === 0 || accountSplits.some((s) => !s.financial_account_id || s.amount <= 0)) {
+        toast.error('All split accounts must have a valid account and amount greater than 0');
+        return;
+      }
+      if (isOwner) {
+        const overdrawn = accountSplits.some((split) => {
+          const acc = accounts.find((a) => a.id === split.financial_account_id);
+          if (!acc || acc.current_balance === null) return false;
+          return (Number(split.amount) || 0) > Number(acc.current_balance);
+        });
+        if (overdrawn) {
+          toast.error('Insufficient balance in one or more split accounts');
+          return;
+        }
+      }
     }
 
     try {
@@ -849,7 +891,8 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
           supplier_contact_id: supplierId || undefined,
           return_deadline: calculatedReturnDeadline,
           funding_source: sourceType === 'purchase' ? (fundingSource === 'shop_account' ? 'account' : fundingSource === 'unpaid' ? 'none' : fundingSource) : 'none',
-          payment_account_id: (sourceType === 'purchase' && (fundingSource === 'shop_account' || fundingSource === 'split')) ? (paymentAccountId || undefined) : undefined,
+          payment_account_id: (sourceType === 'purchase' && (fundingSource === 'shop_account' || fundingSource === 'split')) ? (isAccountSplit ? undefined : (paymentAccountId || undefined)) : undefined,
+          payment_splits: (sourceType === 'purchase' && (fundingSource === 'shop_account' || fundingSource === 'split') && isAccountSplit) ? accountSplits : undefined,
           payment_amount: (sourceType === 'purchase' && (fundingSource === 'shop_account' || fundingSource === 'split')) ? (fundingSource === 'split' ? (parseFormattedNumber(splitCashAmount) ?? undefined) : totalInvestmentCost) : undefined,
           receivable_contact_id: (sourceType === 'purchase' && (fundingSource === 'debtor_offset' || fundingSource === 'split')) ? (selectedDebtorContactId || undefined) : undefined,
           receivable_offset_amount: (sourceType === 'purchase' && (fundingSource === 'debtor_offset' || fundingSource === 'split')) ? (fundingSource === 'split' ? (parseFormattedNumber(splitOffsetAmount) ?? undefined) : totalInvestmentCost) : undefined,
@@ -867,7 +910,8 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
           supplier_contact_id: supplierId || null,
           return_deadline: calculatedReturnDeadline,
           funding_source: sourceType === 'purchase' ? (fundingSource === 'shop_account' ? 'account' : fundingSource === 'unpaid' ? 'none' : fundingSource) : 'none',
-          payment_account_id: (sourceType === 'purchase' && (fundingSource === 'shop_account' || fundingSource === 'split')) ? (paymentAccountId || undefined) : undefined,
+          payment_account_id: (sourceType === 'purchase' && (fundingSource === 'shop_account' || fundingSource === 'split')) ? (isAccountSplit ? undefined : (paymentAccountId || undefined)) : undefined,
+          payment_splits: (sourceType === 'purchase' && (fundingSource === 'shop_account' || fundingSource === 'split') && isAccountSplit) ? accountSplits : undefined,
           payment_amount: (sourceType === 'purchase' && (fundingSource === 'shop_account' || fundingSource === 'split')) ? (fundingSource === 'split' ? (parseFormattedNumber(splitCashAmount) ?? undefined) : totalInvestmentCost) : undefined,
           receivable_contact_id: (sourceType === 'purchase' && (fundingSource === 'debtor_offset' || fundingSource === 'split')) ? (selectedDebtorContactId || undefined) : undefined,
           receivable_offset_amount: (sourceType === 'purchase' && (fundingSource === 'debtor_offset' || fundingSource === 'split')) ? (fundingSource === 'split' ? (parseFormattedNumber(splitOffsetAmount) ?? undefined) : totalInvestmentCost) : undefined,
@@ -904,6 +948,8 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
       setCostBasis('');
       setSellingPrice('');
       setNotes('');
+      setIsAccountSplit(false);
+      setAccountSplits([]);
       onIntakeSuccess();
       onClose();
     } catch (err: any) {
@@ -2439,6 +2485,8 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                     type="button"
                     onClick={() => {
                       setFundingSource('split');
+                      setIsAccountSplit(false);
+                      setAccountSplits([]);
                       if (!selectedDebtorContactId && debtorsWithBalance.length > 0) {
                         setSelectedDebtorContactId(debtorsWithBalance[0].contact.id);
                         const debtorMax = debtorsWithBalance[0].totalOwed;
@@ -2466,32 +2514,25 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                 )}
 
                 {fundingSource === 'shop_account' && (
-                  <div className="space-y-2 pt-1">
-                    <div className="flex items-center justify-between">
-                      <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">
-                        Payment Account
-                      </label>
-                      {isAccountOverdrawn && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200 dark:border-rose-900/60">
-                          <ShieldAlert className="w-3 h-3" />
-                          Insufficient balance
-                        </span>
-                      )}
-                    </div>
-                    <select
-                      value={paymentAccountId}
-                      onChange={(e) => setPaymentAccountId(e.target.value)}
-                      className={`w-full h-10 px-3 rounded-xl border bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none cursor-pointer ${
-                        isAccountOverdrawn ? 'border-rose-300 dark:border-rose-700 ring-1 ring-rose-500/20' : 'border-slate-200 dark:border-slate-700'
-                      }`}
-                    >
-                      {accounts.map((a) => (
-                        <option key={a.id} value={a.id}>
-                          {a.name}
-                          {isOwner && a.current_balance !== null ? ` (${Number(a.current_balance).toLocaleString()} ETB)` : ''}
-                        </option>
-                      ))}
-                    </select>
+                  <div className="pt-1">
+                    <SplitPaymentSelector
+                      accounts={accounts}
+                      targetAmount={totalInvestmentCost}
+                      singleAccountId={paymentAccountId}
+                      onSingleAccountChange={setPaymentAccountId}
+                      isSplit={isAccountSplit}
+                      onIsSplitChange={setIsAccountSplit}
+                      splits={accountSplits}
+                      onSplitsChange={setAccountSplits}
+                      direction="outflow"
+                      label="Payment Account"
+                    />
+                    {!isAccountSplit && isAccountOverdrawn && (
+                      <div className="mt-1 text-[11px] text-rose-600 dark:text-rose-400 flex items-center gap-1">
+                        <ShieldAlert className="w-3.5 h-3.5" />
+                        <span>Insufficient balance in selected account</span>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -2521,61 +2562,70 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                 )}
 
                 {fundingSource === 'split' && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                        Debtor Contact
-                      </label>
-                      <select
-                        value={selectedDebtorContactId}
-                        onChange={(e) => setSelectedDebtorContactId(e.target.value)}
-                        className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none cursor-pointer"
-                      >
-                        {debtorsWithBalance.map((d) => (
-                          <option key={d.contact.id} value={d.contact.id}>
-                            {d.contact.name} ({d.totalOwed.toLocaleString()} ETB)
-                          </option>
-                        ))}
-                      </select>
-                      <input
-                        type="text"
-                        placeholder="Offset Amount (ETB)"
-                        value={splitOffsetAmount}
-                        onChange={(e) => handleSplitOffsetChange(formatCurrencyInput(e.target.value))}
-                        className="w-full h-9 px-3 mt-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-medium text-slate-900 dark:text-white focus:outline-none"
-                      />
+                  <div className="space-y-3 pt-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                          Debtor Contact (Offset)
+                        </label>
+                        <select
+                          value={selectedDebtorContactId}
+                          onChange={(e) => setSelectedDebtorContactId(e.target.value)}
+                          className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none cursor-pointer"
+                        >
+                          <option value="">— Select Debtor Contact —</option>
+                          {debtorsWithBalance.map((d) => (
+                            <option key={d.contact.id} value={d.contact.id}>
+                              {d.contact.name} ({d.totalOwed.toLocaleString()} ETB)
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          type="text"
+                          placeholder="Offset Amount (ETB)"
+                          value={splitOffsetAmount}
+                          onChange={(e) => handleSplitOffsetChange(formatCurrencyInput(e.target.value))}
+                          className="w-full h-9 px-3 mt-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-medium text-slate-900 dark:text-white focus:outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                          Bank Cash Amount (ETB)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Bank Cash Amount (ETB)"
+                          value={splitCashAmount}
+                          onChange={(e) => handleSplitCashChange(formatCurrencyInput(e.target.value))}
+                          className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none"
+                        />
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1.5">
+                          Remaining after offset: {Math.max(0, totalInvestmentCost - (parseFormattedNumber(splitOffsetAmount) || 0)).toLocaleString()} ETB
+                        </p>
+                      </div>
                     </div>
 
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">
-                          Shop Account
-                        </label>
-                        {isAccountOverdrawn && (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-50 text-rose-600 border border-rose-200">
-                            Insufficient
-                          </span>
-                        )}
-                      </div>
-                      <select
-                        value={paymentAccountId}
-                        onChange={(e) => setPaymentAccountId(e.target.value)}
-                        className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none cursor-pointer"
-                      >
-                        {accounts.map((a) => (
-                          <option key={a.id} value={a.id}>
-                            {a.name}
-                            {isOwner && a.current_balance !== null ? ` (${Number(a.current_balance).toLocaleString()} ETB)` : ''}
-                          </option>
-                        ))}
-                      </select>
-                      <input
-                        type="text"
-                        placeholder="Bank Cash Amount (ETB)"
-                        value={splitCashAmount}
-                        onChange={(e) => setSplitCashAmount(formatCurrencyInput(e.target.value))}
-                        className="w-full h-9 px-3 mt-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-medium text-slate-900 dark:text-white focus:outline-none"
+                    {/* Bank Account / Split Accounts for the bank cash portion - Always visible */}
+                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                      <SplitPaymentSelector
+                        accounts={accounts}
+                        targetAmount={parseFormattedNumber(splitCashAmount) || 0}
+                        singleAccountId={paymentAccountId}
+                        onSingleAccountChange={setPaymentAccountId}
+                        isSplit={isAccountSplit}
+                        onIsSplitChange={setIsAccountSplit}
+                        splits={accountSplits}
+                        onSplitsChange={setAccountSplits}
+                        direction="outflow"
+                        label="Shop Funding Account(s)"
                       />
+                      {!isAccountSplit && isAccountOverdrawn && (
+                        <div className="mt-1 text-[11px] text-rose-600 dark:text-rose-400 flex items-center gap-1">
+                          <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
+                          <span>Insufficient balance in selected account</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -2675,6 +2725,7 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                 (intakeMode === 'bulk' && duplicateImeisInBulk.length > 0) ||
                 (sourceType === 'purchase' &&
                   (fundingSource === 'shop_account' || fundingSource === 'split') &&
+                  !isAccountSplit &&
                   isAccountOverdrawn)
               }
               className="h-10 px-5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-800 text-emerald-400 dark:text-emerald-400 text-xs font-bold transition-all shadow-xs flex items-center gap-2 disabled:opacity-50 active:scale-[0.98] cursor-pointer shrink-0 whitespace-nowrap"

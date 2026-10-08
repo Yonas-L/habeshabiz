@@ -14,6 +14,7 @@ import {
   CalendarDays,
   FileText,
 } from 'lucide-react';
+import { SplitPaymentSelector, type PaymentSplitItem } from '../common/SplitPaymentSelector';
 
 interface RecordDebtModalProps {
   isOpen: boolean;
@@ -40,7 +41,10 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
   const [amount, setAmount] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [notes, setNotes] = useState('');
+  const [movementMode, setMovementMode] = useState<'bank' | 'credit_only'>('bank');
   const [disburseAccountId, setDisburseAccountId] = useState('');
+  const [isSplit, setIsSplit] = useState(false);
+  const [paymentSplits, setPaymentSplits] = useState<PaymentSplitItem[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -58,6 +62,9 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
       setAmount('');
       setDueDate('');
       setNotes('');
+      setMovementMode('bank');
+      setIsSplit(false);
+      setPaymentSplits([]);
       setDisburseAccountId(treasuryAccounts[0]?.id || '');
       loadContacts();
     }
@@ -85,7 +92,7 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
     }
   };
 
-  const effectiveDirection: 'in' | 'out' | undefined = !disburseAccountId
+  const effectiveDirection: 'in' | 'out' | undefined = movementMode === 'credit_only'
     ? undefined
     : debtType === 'receivable'
     ? 'out'
@@ -120,6 +127,19 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
       return;
     }
 
+    if (movementMode === 'bank') {
+      if (isSplit) {
+        const splitSum = paymentSplits.reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
+        if (Math.abs(splitSum - amountNum) > 0.01) {
+          toast.error(`Split allocation total (${splitSum.toLocaleString()} ETB) does not match total amount (${amountNum.toLocaleString()} ETB).`);
+          return;
+        }
+      } else if (!disburseAccountId) {
+        toast.error('Please select an account or choose Credit Only');
+        return;
+      }
+    }
+
     try {
       setSubmitting(true);
       await api.createDebt({
@@ -127,24 +147,39 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
         ...(contactMode === 'existing'
           ? { contact_id: contactId }
           : { contact_name: contactName.trim(), contact_phone: contactPhone.trim() || undefined }),
-        amount: parseFloat(amount),
+        amount: amountNum,
         due_date: dueDate || undefined,
         notes: notes.trim() || undefined,
-        disburse_account_id: disburseAccountId || undefined,
         cash_flow_direction: effectiveDirection,
-        fee: disburseAccountId && disburseFee > 0 ? disburseFee : undefined,
+        ...(movementMode === 'bank'
+          ? isSplit
+            ? {
+                payment_splits: paymentSplits.map((s) => ({
+                  financial_account_id: s.financial_account_id,
+                  amount: Number(s.amount),
+                })),
+              }
+            : {
+                disburse_account_id: disburseAccountId,
+                fee: disburseAccountId && disburseFee > 0 ? disburseFee : undefined,
+              }
+          : {}),
       });
 
-      const successTitle = !disburseAccountId
+      const successTitle = movementMode === 'credit_only'
         ? debtType === 'receivable'
-          ? 'Receivable recorded'
-          : 'Payable recorded'
+          ? 'Receivable recorded (Credit only)'
+          : 'Payable recorded (Credit only)'
         : debtType === 'receivable'
-        ? 'Deducted from account & recorded'
+        ? isSplit
+          ? 'Deducted from split accounts & recorded'
+          : 'Deducted from account & recorded'
+        : isSplit
+        ? 'Deposited to split accounts & recorded'
         : 'Deposited to account & recorded';
 
       toast.success(successTitle, {
-        description: `${parseFloat(amount).toLocaleString()} ETB — ${
+        description: `${amountNum.toLocaleString()} ETB — ${
           contactMode === 'existing'
             ? contacts.find((c) => c.id === contactId)?.name
             : contactName
@@ -372,55 +407,70 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
             />
           </div>
 
-          {/* Account Selector (Shown directly by default) */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
+          {/* Account & Settlement Movement */}
+          <div className="space-y-3 pt-1">
+            <div className="flex items-center justify-between">
               <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
                 <Wallet className="w-3.5 h-3.5 text-slate-400" />
-                {debtType === 'receivable' ? 'Pay / Transfer From Account' : 'Deposit Into Account'}
+                <span>{debtType === 'receivable' ? 'Disbursement / Cash Flow' : 'Deposit / Cash Flow'}</span>
               </label>
-              {disburseAccountId && (
-                <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
-                  {debtType === 'receivable' ? 'Deducts from account' : 'Deposits to account'}
-                </span>
-              )}
+              <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg text-[10px] font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setMovementMode('bank')}
+                  className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                    movementMode === 'bank'
+                      ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  {debtType === 'receivable' ? 'Pay From Account' : 'Deposit Into Account'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMovementMode('credit_only')}
+                  className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                    movementMode === 'credit_only'
+                      ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  Credit Only (No Cash Movement)
+                </button>
+              </div>
             </div>
-            <select
-              value={disburseAccountId}
-              onChange={(e) => setDisburseAccountId(e.target.value)}
-              className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 focus:border-slate-900 dark:focus:border-slate-600"
-            >
-              {treasuryAccounts.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name} ({Number(a.current_balance).toLocaleString()} ETB)
-                </option>
-              ))}
-              <option value="">— No Account Movement (Credit Only) —</option>
-            </select>
 
-            {/* Context notice */}
-            {disburseAccountId && selectedDisburseAccount ? (
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5">
-                {debtType === 'receivable'
-                  ? `Deducts ${amountNum > 0 ? `${amountNum.toLocaleString()} ETB` : 'amount'} from ${selectedDisburseAccount.name} as money sent to contact.`
-                  : `Adds ${amountNum > 0 ? `${amountNum.toLocaleString()} ETB` : 'amount'} to ${selectedDisburseAccount.name} as money received from contact.`}
-              </p>
+            {movementMode === 'bank' ? (
+              <div className="space-y-2">
+                <SplitPaymentSelector
+                  accounts={treasuryAccounts}
+                  targetAmount={amountNum}
+                  singleAccountId={disburseAccountId}
+                  onSingleAccountChange={setDisburseAccountId}
+                  isSplit={isSplit}
+                  onIsSplitChange={setIsSplit}
+                  splits={paymentSplits}
+                  onSplitsChange={setPaymentSplits}
+                  direction={debtType === 'receivable' ? 'outflow' : 'inflow'}
+                  label={debtType === 'receivable' ? 'Disburse / Pay From Account' : 'Deposit Into Account'}
+                />
+
+                {/* Single Account Outgoing Fee notice */}
+                {!isSplit && debtType === 'receivable' && selectedDisburseAccount && selectedDisburseAccount.default_fee_type && selectedDisburseAccount.default_fee_type !== 'none' && Number(selectedDisburseAccount.default_fee_amount) > 0 && amountNum > 0 && (
+                  <div className="flex items-center justify-between text-[11px] px-2.5 py-1.5 rounded-lg bg-amber-50/90 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-900/40 text-amber-800 dark:text-amber-300">
+                    <span className="flex items-center gap-1">
+                      <span className="font-bold">Outgoing Fee ({Number(selectedDisburseAccount.default_fee_amount)}{selectedDisburseAccount.default_fee_type === 'percentage' ? '%' : ' ETB'}):</span>
+                      <span>+{disburseFee.toLocaleString()} ETB</span>
+                    </span>
+                    <span className="font-semibold text-slate-600 dark:text-slate-300">
+                      Total deducted: <span className="font-bold font-mono text-slate-900 dark:text-white">{(amountNum + disburseFee).toLocaleString()} ETB</span>
+                    </span>
+                  </div>
+                )}
+              </div>
             ) : (
-              <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1.5">
-                Pure credit obligation. No money will be deducted or added to any account.
-              </p>
-            )}
-
-            {/* Outgoing Fee breakdown */}
-            {debtType === 'receivable' && selectedDisburseAccount && selectedDisburseAccount.default_fee_type && selectedDisburseAccount.default_fee_type !== 'none' && Number(selectedDisburseAccount.default_fee_amount) > 0 && amountNum > 0 && (
-              <div className="flex items-center justify-between text-[11px] px-2.5 py-1.5 rounded-lg bg-amber-50/90 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-900/40 text-amber-800 dark:text-amber-300 mt-2">
-                <span className="flex items-center gap-1">
-                  <span className="font-bold">Outgoing Fee ({Number(selectedDisburseAccount.default_fee_amount)}{selectedDisburseAccount.default_fee_type === 'percentage' ? '%' : ' ETB'}):</span>
-                  <span>+{disburseFee.toLocaleString()} ETB</span>
-                </span>
-                <span className="font-semibold text-slate-600 dark:text-slate-300">
-                  Total deducted: <span className="font-bold font-mono text-slate-900 dark:text-white">{(amountNum + disburseFee).toLocaleString()} ETB</span>
-                </span>
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400">
+                Pure credit obligation. No money will be deducted from or added to any bank or cash account.
               </div>
             )}
           </div>
@@ -442,7 +492,7 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
           >
             {submitting ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : effectiveDirection === 'in' || (!disburseAccountId && debtType === 'receivable') ? (
+            ) : effectiveDirection === 'in' || (movementMode === 'credit_only' && debtType === 'receivable') ? (
               <ArrowDownLeft className="w-3.5 h-3.5 text-emerald-400 dark:text-emerald-600" />
             ) : (
               <ArrowUpRight className="w-3.5 h-3.5 text-rose-400 dark:text-rose-600" />
@@ -450,13 +500,17 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
             <span>
               {submitting
                 ? 'Recording...'
-                : disburseAccountId
+                : movementMode === 'credit_only'
                 ? debtType === 'receivable'
-                  ? 'Record & Deduct from Account'
-                  : 'Record & Deposit to Account'
+                  ? 'Record Receivable'
+                  : 'Record Payable'
                 : debtType === 'receivable'
-                ? 'Record Receivable'
-                : 'Record Payable'}
+                ? isSplit
+                  ? 'Record & Deduct from Split Accounts'
+                  : 'Record & Deduct from Account'
+                : isSplit
+                ? 'Record & Deposit to Split Accounts'
+                : 'Record & Deposit to Account'}
             </span>
           </button>
         </div>

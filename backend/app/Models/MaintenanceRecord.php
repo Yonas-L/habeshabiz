@@ -21,6 +21,7 @@ class MaintenanceRecord extends Model
         'vendor_contact_id',
         'vendor_debt_id',
         'financial_account_id',
+        'payment_splits',
         'description',
         'date',
     ];
@@ -30,6 +31,7 @@ class MaintenanceRecord extends Model
         return [
             'cost' => 'decimal:2',
             'is_capitalized' => 'boolean',
+            'payment_splits' => 'array',
             'date' => 'datetime',
         ];
     }

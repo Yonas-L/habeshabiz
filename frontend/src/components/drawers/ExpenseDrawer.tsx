@@ -139,13 +139,49 @@ export const ExpenseDrawer: React.FC<ExpenseDrawerProps> = ({
             </span>
           </div>
 
-          <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
-            <span className="text-slate-400">Paid from Account</span>
-            <div className="flex items-center gap-1.5 font-mono font-bold text-slate-900 dark:text-white">
-              <Landmark className="w-3.5 h-3.5 text-slate-400" />
-              <span>{expense.financial_account?.name || 'Cash Drawer'}</span>
+          {expense.payment_splits && expense.payment_splits.length > 1 ? (
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Funding Method</span>
+                <span className="font-semibold text-blue-600 dark:text-blue-400">
+                  Split Payment ({expense.payment_splits.length} Accounts)
+                </span>
+              </div>
+              <div className="space-y-1.5">
+                {expense.payment_splits.map((s, idx) => (
+                  <div
+                    key={idx}
+                    className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-800 flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <Landmark className="w-3.5 h-3.5 text-slate-400" />
+                      <span className="font-medium text-slate-800 dark:text-slate-200">
+                        {s.account_name || 'Account'}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="font-mono font-bold text-slate-900 dark:text-white">
+                        {Number(s.amount).toLocaleString()} ETB
+                      </span>
+                      {Number(s.fee || 0) > 0 && (
+                        <span className="text-[10px] text-amber-600 dark:text-amber-400 block">
+                          +{Number(s.fee).toLocaleString()} fee
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
+              <span className="text-slate-400">Paid from Account</span>
+              <div className="flex items-center gap-1.5 font-mono font-bold text-slate-900 dark:text-white">
+                <Landmark className="w-3.5 h-3.5 text-slate-400" />
+                <span>{expense.financial_account?.name || 'Cash Drawer'}</span>
+              </div>
+            </div>
+          )}
         </div>
       </ProgressiveSection>
 

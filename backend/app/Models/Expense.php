@@ -15,6 +15,7 @@ class Expense extends Model
     protected $fillable = [
         'tenant_id',
         'financial_account_id',
+        'payment_splits',
         'inventory_unit_id',
         'vendor_billing',
         'vendor_contact_id',
@@ -31,6 +32,7 @@ class Expense extends Model
         return [
             'amount' => 'decimal:2',
             'is_owner_draw' => 'boolean',
+            'payment_splits' => 'array',
             'date' => 'datetime',
         ];
     }

@@ -33,6 +33,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { InventoryUnitDrawer } from '../components/drawers/InventoryUnitDrawer';
+import { SplitPaymentSelector, type PaymentSplitItem } from '../components/common/SplitPaymentSelector';
 import { SalesOrderDrawer } from '../components/drawers/SalesOrderDrawer';
 import { Pagination } from '../components/Pagination';
 import { StockIntakeModal } from '../components/inventory/StockIntakeModal';
@@ -147,6 +148,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [markSoldSettlementType, setMarkSoldSettlementType] = useState<'paid' | 'offset' | 'credit'>('paid');
   const [markSoldPrice, setMarkSoldPrice] = useState<string>('');
   const [markSoldAccountId, setMarkSoldAccountId] = useState<string>('');
+  const [isMarkSoldSplit, setIsMarkSoldSplit] = useState(false);
+  const [markSoldSplits, setMarkSoldSplits] = useState<PaymentSplitItem[]>([]);
   const [markSoldPaymentDate, setMarkSoldPaymentDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [markSoldReference, setMarkSoldReference] = useState<string>('');
   const [markSoldNotes, setMarkSoldNotes] = useState<string>('');
@@ -158,6 +161,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     const defaultPrice = unit.handover_payout ? String(unit.handover_payout) : (unit.selling_price ? String(unit.selling_price) : '');
     setMarkSoldPrice(defaultPrice);
     setMarkSoldAccountId(accounts[0]?.id || '');
+    setIsMarkSoldSplit(false);
+    setMarkSoldSplits([]);
     setMarkSoldPaymentDate(new Date().toISOString().split('T')[0]);
     setMarkSoldReference('');
     setMarkSoldNotes('');
@@ -538,9 +543,23 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     e.preventDefault();
     if (!markSoldUnit) return;
 
-    if (markSoldSettlementType === 'paid' && !markSoldAccountId) {
-      toast.error('Please select an account to deposit funds');
-      return;
+    const finalPrice = markSoldPrice ? parseFloat(markSoldPrice) : ((markSoldUnit.handover_payout ?? markSoldUnit.selling_price) ? parseFloat(String(markSoldUnit.handover_payout ?? markSoldUnit.selling_price)) : 0);
+
+    if (markSoldSettlementType === 'paid') {
+      if (isMarkSoldSplit) {
+        const splitSum = markSoldSplits.reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
+        if (Math.abs(splitSum - finalPrice) > 0.01) {
+          toast.error(`Split amounts (${splitSum.toLocaleString()} ETB) must equal settlement price (${finalPrice.toLocaleString()} ETB)`);
+          return;
+        }
+        if (markSoldSplits.length === 0 || markSoldSplits.some((s) => !s.financial_account_id || s.amount <= 0)) {
+          toast.error('All split accounts must have a valid account and amount greater than 0');
+          return;
+        }
+      } else if (!markSoldAccountId) {
+        toast.error('Please select an account to deposit funds');
+        return;
+      }
     }
 
     try {
@@ -548,7 +567,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       await api.markHandoverSold(markSoldUnit.id, {
         settlement_type: markSoldSettlementType,
         selling_price: markSoldPrice ? parseFloat(markSoldPrice) : undefined,
-        financial_account_id: markSoldSettlementType === 'paid' ? markSoldAccountId : undefined,
+        financial_account_id: markSoldSettlementType === 'paid' && !isMarkSoldSplit ? markSoldAccountId : undefined,
+        payment_splits: markSoldSettlementType === 'paid' && isMarkSoldSplit ? markSoldSplits : undefined,
         payment_date: markSoldPaymentDate || undefined,
         reference_number: markSoldReference.trim() || undefined,
         notes: markSoldNotes.trim() || undefined,
@@ -2603,24 +2623,18 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               {/* Conditional Account Selector for Paid */}
               {markSoldSettlementType === 'paid' && (
                 <div className="space-y-3 p-3.5 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/40">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                      Deposit Into Financial Account *
-                    </label>
-                    <select
-                      required
-                      value={markSoldAccountId}
-                      onChange={(e) => setMarkSoldAccountId(e.target.value)}
-                      className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer"
-                    >
-                      <option value="">-- Choose Account --</option>
-                      {accounts.map((acc) => (
-                        <option key={acc.id} value={acc.id}>
-                          {acc.name} ({acc.type}) • {Number(acc.current_balance).toLocaleString()} ETB
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <SplitPaymentSelector
+                    accounts={accounts}
+                    targetAmount={parseFloat(markSoldPrice) || (markSoldUnit?.handover_payout ? Number(markSoldUnit.handover_payout) : (markSoldUnit?.selling_price ? Number(markSoldUnit.selling_price) : 0))}
+                    singleAccountId={markSoldAccountId}
+                    onSingleAccountChange={setMarkSoldAccountId}
+                    isSplit={isMarkSoldSplit}
+                    onIsSplitChange={setIsMarkSoldSplit}
+                    splits={markSoldSplits}
+                    onSplitsChange={setMarkSoldSplits}
+                    direction="inflow"
+                    label="Deposit Into Financial Account"
+                  />
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>

@@ -17,6 +17,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { AccountLogo } from '../../utils/bankLogos';
+import { SplitPaymentSelector, type PaymentSplitItem } from '../common/SplitPaymentSelector';
 
 interface DebtDrawerProps {
   debt: Debt | null;
@@ -38,6 +39,8 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
   const [showPayForm, setShowPayForm] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentAccountId, setPaymentAccountId] = useState('');
+  const [isSplit, setIsSplit] = useState(false);
+  const [paymentSplits, setPaymentSplits] = useState<PaymentSplitItem[]>([]);
   const [referenceNumber, setReferenceNumber] = useState('');
   const [notes, setNotes] = useState('');
   const [settling, setSettling] = useState(false);
@@ -64,6 +67,8 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
       setPaymentAmount(String(debt.remaining_amount));
       const defaultAcc = accounts.find((a) => a.type === 'bank' || a.type === 'mobile_money') || accounts[0];
       setPaymentAccountId(defaultAcc ? defaultAcc.id : '');
+      setIsSplit(false);
+      setPaymentSplits([]);
       setReferenceNumber('');
       setNotes('');
       setShowPayForm(false);
@@ -80,13 +85,36 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
 
   const handleSettle = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!debt || !paymentAmount || !paymentAccountId) return;
+    if (!debt || !paymentAmount) return;
+    const numAmount = parseFloat(paymentAmount);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      toast.error('Please enter a valid payment amount');
+      return;
+    }
+
+    if (isSplit) {
+      const totalAllocated = paymentSplits.reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
+      if (Math.abs(totalAllocated - numAmount) > 0.01) {
+        toast.error(`Split amounts (${totalAllocated.toLocaleString()} ETB) must equal total payment (${numAmount.toLocaleString()} ETB)`);
+        return;
+      }
+      if (paymentSplits.length === 0 || paymentSplits.some((s) => !s.financial_account_id || s.amount <= 0)) {
+        toast.error('All split accounts must have a valid account and amount greater than 0');
+        return;
+      }
+    } else {
+      if (!paymentAccountId) {
+        toast.error('Please select an account');
+        return;
+      }
+    }
 
     try {
       setSettling(true);
       await api.settleDebtPayment(debt.id, {
-        amount: parseFloat(paymentAmount),
-        financial_account_id: paymentAccountId,
+        amount: numAmount,
+        financial_account_id: isSplit ? undefined : paymentAccountId,
+        payment_splits: isSplit ? paymentSplits : undefined,
         reference_number: referenceNumber || undefined,
         notes: notes || undefined,
       });
@@ -94,7 +122,7 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
       toast.success(
         isReceivable ? 'Receivable payment collected' : 'Payable settled',
         {
-          description: `${parseFloat(paymentAmount).toLocaleString()} ETB processed with ${debt.contact?.name}`,
+          description: `${numAmount.toLocaleString()} ETB processed with ${debt.contact?.name}`,
         }
       );
 
@@ -303,29 +331,17 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
             />
           </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                {isReceivable ? 'Deposit Into Account' : 'Debit From Account'}
-              </label>
-              {(() => {
-                const sel = accounts.find((a) => a.id === paymentAccountId);
-                return sel ? <AccountLogo account={sel} size="xs" /> : null;
-              })()}
-            </div>
-            <select
-              value={paymentAccountId}
-              onChange={(e) => setPaymentAccountId(e.target.value)}
-              className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white"
-              required
-            >
-              {accounts.filter((a) => !a.is_custom_asset).map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name} • {Number(a.current_balance).toLocaleString()} ETB
-                </option>
-              ))}
-            </select>
-          </div>
+          <SplitPaymentSelector
+            accounts={accounts}
+            targetAmount={parseFloat(paymentAmount) || 0}
+            singleAccountId={paymentAccountId}
+            onSingleAccountChange={setPaymentAccountId}
+            isSplit={isSplit}
+            onIsSplitChange={setIsSplit}
+            splits={paymentSplits}
+            onSplitsChange={setPaymentSplits}
+            direction={isReceivable ? 'inflow' : 'outflow'}
+          />
 
           <div>
             <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
@@ -475,9 +491,16 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
                     </div>
                   </div>
                 </div>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold">
-                  Cleared
-                </span>
+                <div className="flex items-center gap-1.5">
+                  {p.split_group_id && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-semibold border border-blue-200/50 dark:border-blue-800/50">
+                      Split
+                    </span>
+                  )}
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold">
+                    Cleared
+                  </span>
+                </div>
               </div>
             ))}
           </div>

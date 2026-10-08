@@ -15,6 +15,7 @@ class DebtPayment extends Model
     protected $fillable = [
         'tenant_id',
         'debt_id',
+        'split_group_id',
         'financial_account_id',
         'amount',
         'payment_date',

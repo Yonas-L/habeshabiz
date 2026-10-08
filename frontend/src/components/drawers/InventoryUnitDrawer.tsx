@@ -1528,6 +1528,30 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
                 )}
               </div>
             )}
+
+            {/* Split Funding Breakdown if present */}
+            {canViewCost && currentUnit.payment_splits && currentUnit.payment_splits.length > 1 && (
+              <div className="col-span-full pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5 text-xs">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                  Funded via Split Accounts ({currentUnit.payment_splits.length})
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                  {currentUnit.payment_splits.map((s, idx) => (
+                    <div
+                      key={idx}
+                      className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/50 dark:border-slate-800 flex items-center justify-between text-xs"
+                    >
+                      <span className="font-medium text-slate-700 dark:text-slate-300">
+                        {s.account_name || 'Account'}
+                      </span>
+                      <span className="font-mono font-bold text-slate-900 dark:text-white">
+                        {Number(s.amount).toLocaleString()} ETB
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Maintenance & Capitalized Cost History Card */}
@@ -1611,6 +1635,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
                             </div>
                             <div className="text-[10px] text-slate-400">
                               {new Date(rec.date).toLocaleDateString()} {rec.financial_account?.name ? `• ${rec.financial_account.name}` : ''}
+                              {rec.payment_splits && rec.payment_splits.length > 1 ? ` • Split (${rec.payment_splits.length} accounts)` : ''}
                             </div>
                           </div>
                           <div className="text-right shrink-0">

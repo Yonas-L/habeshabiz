@@ -32,7 +32,7 @@ import {
   Flag,
   ArrowLeftRight,
 } from 'lucide-react';
-import { AccountLogo } from '../utils/bankLogos';
+import { SplitPaymentSelector, type PaymentSplitItem } from '../components/common/SplitPaymentSelector';
 import { ExchangeDeviceModal, type ExchangeDevicePayload } from '../components/counter/ExchangeDeviceModal';
 import { VendorDirectSaleModal } from '../components/counter/VendorDirectSaleModal';
 import type { ProductCategory } from '../api/client';
@@ -89,6 +89,8 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
   const [isCreditSale, setIsCreditSale] = useState(false);
   const [isWriteOff, setIsWriteOff] = useState(false);
   const [financialAccountId, setFinancialAccountId] = useState<string>('');
+  const [isSplitPayment, setIsSplitPayment] = useState(false);
+  const [paymentSplits, setPaymentSplits] = useState<PaymentSplitItem[]>([]);
   const [customerId, setCustomerId] = useState<string>('');
   const [customerMode, setCustomerMode] = useState<'walk_in' | 'new' | 'existing'>('walk_in');
   const [customerName, setCustomerName] = useState<string>('');
@@ -443,6 +445,8 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
     setPaidAmount('');
     setIsCreditSale(false);
     setIsWriteOff(false);
+    setIsSplitPayment(false);
+    setPaymentSplits([]);
     setCustomerId('');
     setCustomerName('');
     setCustomerPhone('');
@@ -460,6 +464,8 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
     setUnitSellingPrice('');
     setDiscountValue('');
     setPaidAmount('');
+    setIsSplitPayment(false);
+    setPaymentSplits([]);
     setProductSearch('');
     setTimeout(() => {
       searchRef.current?.focus();
@@ -508,6 +514,23 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
       return;
     }
 
+    if (paidNum > 0 && paymentMethod !== 'debt_offset' && !isCreditSale && !isWriteOff) {
+      if (isSplitPayment) {
+        const splitSum = paymentSplits.reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
+        if (Math.abs(splitSum - paidNum) > 0.01) {
+          toast.error(`Split amounts (${splitSum.toLocaleString()} ETB) must equal paid amount (${paidNum.toLocaleString()} ETB)`);
+          return;
+        }
+        if (paymentSplits.length === 0 || paymentSplits.some((s) => !s.financial_account_id || s.amount <= 0)) {
+          toast.error('All split accounts must have a valid account and amount greater than 0');
+          return;
+        }
+      } else if (!financialAccountId) {
+        toast.error('Please select an account for depositing funds');
+        return;
+      }
+    }
+
     try {
       setSubmitting(true);
 
@@ -554,10 +577,11 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
         customer_phone: customerMode === 'new' && customerPhone.trim() ? customerPhone.trim() : null,
         discount_amount: calculatedDiscountAmount,
         paid_amount: paidNum,
-        payment_method: paymentMethod,
+        payment_method: isSplitPayment && paidNum > 0 ? 'split' : paymentMethod,
         credit_sale: isCreditSale,
         intentional_shortfall: isWriteOff,
-        financial_account_id: paidNum > 0 && paymentMethod !== 'debt_offset' ? financialAccountId : null,
+        financial_account_id: paidNum > 0 && paymentMethod !== 'debt_offset' && !isSplitPayment ? financialAccountId : null,
+        payment_splits: isSplitPayment && paidNum > 0 && paymentMethod !== 'debt_offset' ? paymentSplits : undefined,
         notes: notes || null,
         items: itemsPayload,
       };
@@ -1290,31 +1314,18 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
 
               {/* Receiving Account (Only for real cash/bank deposits) */}
               {paymentMethod !== 'debt_offset' && !isCreditSale && !isWriteOff && (
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                      Receiving Account
-                    </label>
-                    {(() => {
-                      const sel = treasuryAccounts.find((a) => a.id === financialAccountId);
-                      return sel ? <AccountLogo account={sel} size="xs" /> : null;
-                    })()}
-                  </div>
-                  <select
-                    value={financialAccountId}
-                    onChange={(e) => setFinancialAccountId(e.target.value)}
-                    className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
-                  >
-                    <option value="">— Select Account —</option>
-                    {treasuryAccounts.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {user?.role === 'owner' && a.current_balance !== null
-                          ? `${a.name} (${Number(a.current_balance).toLocaleString()} ETB)`
-                          : a.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <SplitPaymentSelector
+                  accounts={treasuryAccounts}
+                  targetAmount={parseFloat(paidAmount) || 0}
+                  singleAccountId={financialAccountId}
+                  onSingleAccountChange={setFinancialAccountId}
+                  isSplit={isSplitPayment}
+                  onIsSplitChange={setIsSplitPayment}
+                  splits={paymentSplits}
+                  onSplitsChange={setPaymentSplits}
+                  direction="inflow"
+                  label="Receiving Account"
+                />
               )}
 
               {/* Customer Selection / New Customer */}

@@ -21,9 +21,9 @@ import {
   Undo2,
   ArrowLeftRight,
 } from 'lucide-react';
-import { AccountLogo } from '../../utils/bankLogos';
 import { SwapDeviceModal } from '../inventory/SwapDeviceModal';
 import { downloadPdf } from '../../utils/downloadPdf';
+import { SplitPaymentSelector, type PaymentSplitItem } from '../common/SplitPaymentSelector';
 
 interface SalesOrderDrawerProps {
   order: SalesOrder | null;
@@ -64,6 +64,8 @@ export const SalesOrderDrawer: React.FC<SalesOrderDrawerProps> = ({
   const [showCollectModal, setShowCollectModal] = useState(false);
   const [collectAmount, setCollectAmount] = useState('');
   const [collectAccountId, setCollectAccountId] = useState('');
+  const [isCollectSplit, setIsCollectSplit] = useState(false);
+  const [collectSplits, setCollectSplits] = useState<PaymentSplitItem[]>([]);
   const [collectRef, setCollectRef] = useState('');
   const [collectNotes, setCollectNotes] = useState('');
   const [submittingPayment, setSubmittingPayment] = useState(false);
@@ -210,6 +212,8 @@ export const SalesOrderDrawer: React.FC<SalesOrderDrawerProps> = ({
     if (activeAccounts.length > 0) {
       setCollectAccountId((prev) => (prev && activeAccounts.some((a) => a.id === prev) ? prev : activeAccounts[0].id));
     }
+    setIsCollectSplit(false);
+    setCollectSplits([]);
     setCollectRef('');
     setCollectNotes('');
     setShowCollectModal(true);
@@ -225,16 +229,29 @@ export const SalesOrderDrawer: React.FC<SalesOrderDrawerProps> = ({
       return;
     }
 
-    if (!collectAccountId) {
-      toast.error('Please select an account to deposit funds.');
-      return;
+    if (isCollectSplit) {
+      const totalAllocated = collectSplits.reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
+      if (Math.abs(totalAllocated - amt) > 0.01) {
+        toast.error(`Split amounts (${totalAllocated.toLocaleString()} ETB) must equal total collection (${amt.toLocaleString()} ETB)`);
+        return;
+      }
+      if (collectSplits.length === 0 || collectSplits.some((s) => !s.financial_account_id || s.amount <= 0)) {
+        toast.error('All split accounts must have a valid account and amount greater than 0');
+        return;
+      }
+    } else {
+      if (!collectAccountId) {
+        toast.error('Please select an account to deposit funds.');
+        return;
+      }
     }
 
     try {
       setSubmittingPayment(true);
       const res = await api.collectSalesPayment(order.id, {
         amount: amt,
-        financial_account_id: collectAccountId,
+        financial_account_id: isCollectSplit ? undefined : collectAccountId,
+        payment_splits: isCollectSplit ? collectSplits : undefined,
         reference_number: collectRef.trim() || undefined,
         notes: collectNotes.trim() || undefined,
       });
@@ -594,7 +611,9 @@ Thank you for choosing Habeshabiz Electronics!
                 {paidAmount.toLocaleString()} <span className="text-xs font-normal text-slate-400 font-sans">ETB</span>
               </div>
               <span className="text-[10px] text-slate-400 block mt-0.5 truncate">
-                via {formatPaymentMethod(order.payment_method)}
+                {order.payment_splits && order.payment_splits.length > 1
+                  ? `via Split Accounts (${order.payment_splits.length})`
+                  : `via ${formatPaymentMethod(order.payment_method)}`}
               </span>
             </div>
 
@@ -622,6 +641,27 @@ Thank you for choosing Habeshabiz Electronics!
                 {order.financial_account?.name || (isPaid ? 'Ledger verified' : 'Collection pending')}
               </span>
             </div>
+
+            {/* Split Breakdown Details if present */}
+            {order.payment_splits && order.payment_splits.length > 1 && (
+              <div className="col-span-2 sm:col-span-3 p-3 rounded-2xl bg-slate-50/80 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800 space-y-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                  Deposit Accounts Split Breakdown
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {order.payment_splits.map((s, idx) => (
+                    <div key={idx} className="p-2 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/60 dark:border-slate-800 flex items-center justify-between text-xs">
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">
+                        {s.account_name || 'Account'}
+                      </span>
+                      <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                        {Number(s.amount).toLocaleString()} ETB
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* ═══ SECTION 2: CUSTOMER & ATtENDANT METADATA ═══ */}
@@ -1107,32 +1147,19 @@ Thank you for choosing Habeshabiz Electronics!
                 </div>
               </div>
 
-              {/* Financial Account Selector */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                    Deposit Account <span className="text-rose-500">*</span>
-                  </label>
-                  {(() => {
-                    const sel = internalAccounts.find((a) => a.id === collectAccountId);
-                    return sel ? <AccountLogo account={sel} size="xs" /> : null;
-                  })()}
-                </div>
-                <select
-                  value={collectAccountId}
-                  onChange={(e) => setCollectAccountId(e.target.value)}
-                  required
-                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
-                >
-                  {internalAccounts
-                    .filter((a) => !a.is_custom_asset && a.is_active !== false)
-                    .map((acc) => (
-                      <option key={acc.id} value={acc.id}>
-                        {acc.name} • {Number(acc.current_balance).toLocaleString()} ETB
-                      </option>
-                    ))}
-                </select>
-              </div>
+              {/* Financial Account Selector / Split */}
+              <SplitPaymentSelector
+                accounts={internalAccounts}
+                targetAmount={parseFloat(collectAmount) || 0}
+                singleAccountId={collectAccountId}
+                onSingleAccountChange={setCollectAccountId}
+                isSplit={isCollectSplit}
+                onIsSplitChange={setIsCollectSplit}
+                splits={collectSplits}
+                onSplitsChange={setCollectSplits}
+                direction="inflow"
+                label="Deposit Account"
+              />
 
               {/* Reference Number */}
               <div>
