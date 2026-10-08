@@ -343,7 +343,7 @@ class GenerateBusinessReportAction
     {
         // A cash reconciliation must contain only liquid accounts. Custom assets
         // are reported in the financial position and must not be called cash.
-        $allAccounts = FinancialAccount::query()
+        $allAccounts = FinancialAccount::withTrashed()
             ->where('is_custom_asset', false)
             ->get();
 

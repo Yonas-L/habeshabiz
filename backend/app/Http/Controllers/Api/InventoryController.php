@@ -528,7 +528,7 @@ class InventoryController extends Controller
                         'amount' => $applied,
                         'payment_date' => now(),
                         'reference_number' => 'OFFSET-INTAKE',
-                        'notes' => "Paid by device: {$deviceSummary}",
+                        'notes' => 'Agreed credit balance settlement',
                         'created_by' => $user->id,
                     ]);
 

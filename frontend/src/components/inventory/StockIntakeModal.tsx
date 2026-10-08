@@ -729,19 +729,45 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
   const handleSplitOffsetChange = (val: string) => {
     setSplitOffsetAmount(val);
     const offset = parseFormattedNumber(val) || 0;
-    const remainder = Math.max(0, totalInvestmentCost - offset);
-    setSplitCashAmount(formatCurrencyInput(remainder));
+    if (totalInvestmentCost > 0) {
+      const remainder = Math.max(0, totalInvestmentCost - offset);
+      setSplitCashAmount(formatCurrencyInput(remainder));
+    } else {
+      // If total investment cost hasn't been set yet, preserve bank cash amount
+      const currentCash = isAccountSplit
+        ? accountSplits.reduce((sum, s) => sum + (Number(s.amount) || 0), 0)
+        : (parseFormattedNumber(splitCashAmount) || 0);
+      if (intakeMode !== 'batch' && (!costBasis || parseFormattedNumber(costBasis) === 0)) {
+        const combined = offset + currentCash;
+        if (combined > 0) {
+          const qty = parseInt(quantity, 10) || 1;
+          setCostBasis(formatCurrencyInput(combined / (qty > 0 ? qty : 1)));
+        }
+      }
+    }
   };
 
   const handleSplitCashChange = (val: string) => {
     setSplitCashAmount(val);
     const cash = parseFormattedNumber(val) || 0;
-    const remainderOffset = Math.max(0, totalInvestmentCost - cash);
-    setSplitOffsetAmount(formatCurrencyInput(remainderOffset));
+    if (totalInvestmentCost > 0) {
+      const remainderOffset = Math.max(0, totalInvestmentCost - cash);
+      setSplitOffsetAmount(formatCurrencyInput(remainderOffset));
+    } else {
+      // If total investment cost hasn't been set yet, preserve debtor offset amount
+      const currentOffset = parseFormattedNumber(splitOffsetAmount) || 0;
+      if (intakeMode !== 'batch' && (!costBasis || parseFormattedNumber(costBasis) === 0)) {
+        const combined = currentOffset + cash;
+        if (combined > 0) {
+          const qty = parseInt(quantity, 10) || 1;
+          setCostBasis(formatCurrencyInput(combined / (qty > 0 ? qty : 1)));
+        }
+      }
+    }
   };
 
   useEffect(() => {
-    if (fundingSource === 'split') {
+    if (fundingSource === 'split' && totalInvestmentCost > 0) {
       const offset = parseFormattedNumber(splitOffsetAmount) || 0;
       const remainder = Math.max(0, totalInvestmentCost - offset);
       setSplitCashAmount(formatCurrencyInput(remainder));
@@ -2490,9 +2516,14 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                       if (!selectedDebtorContactId && debtorsWithBalance.length > 0) {
                         setSelectedDebtorContactId(debtorsWithBalance[0].contact.id);
                         const debtorMax = debtorsWithBalance[0].totalOwed;
-                        const defaultOffset = Math.min(debtorMax, totalInvestmentCost / 2);
-                        setSplitOffsetAmount(formatCurrencyInput(defaultOffset));
-                        setSplitCashAmount(formatCurrencyInput(Math.max(0, totalInvestmentCost - defaultOffset)));
+                        if (totalInvestmentCost > 0) {
+                          const defaultOffset = Math.min(debtorMax, totalInvestmentCost / 2);
+                          setSplitOffsetAmount(formatCurrencyInput(defaultOffset));
+                          setSplitCashAmount(formatCurrencyInput(Math.max(0, totalInvestmentCost - defaultOffset)));
+                        } else {
+                          setSplitOffsetAmount('');
+                          setSplitCashAmount('');
+                        }
                       }
                     }}
                     className={`py-1.5 px-2 rounded-lg text-center transition-all cursor-pointer ${
@@ -2601,7 +2632,12 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                           className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none"
                         />
                         <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1.5">
-                          Remaining after offset: {Math.max(0, totalInvestmentCost - (parseFormattedNumber(splitOffsetAmount) || 0)).toLocaleString()} ETB
+                          {totalInvestmentCost > 0
+                            ? `Remaining after offset: ${Math.max(0, totalInvestmentCost - (parseFormattedNumber(splitOffsetAmount) || 0)).toLocaleString()} ETB`
+                            : (parseFormattedNumber(splitCashAmount) || 0) > 0
+                              ? `Bank Cash to fund: ${(parseFormattedNumber(splitCashAmount) || 0).toLocaleString()} ETB`
+                              : 'Enter debtor offset and bank cash amounts'
+                          }
                         </p>
                       </div>
                     </div>
@@ -2616,7 +2652,20 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                         isSplit={isAccountSplit}
                         onIsSplitChange={setIsAccountSplit}
                         splits={accountSplits}
-                        onSplitsChange={setAccountSplits}
+                        onSplitsChange={(newSplits) => {
+                          setAccountSplits(newSplits);
+                          const sumSplits = newSplits.reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
+                          if (totalInvestmentCost <= 0 || !parseFormattedNumber(splitCashAmount)) {
+                            if (sumSplits > 0) {
+                              setSplitCashAmount(formatCurrencyInput(sumSplits));
+                              const off = parseFormattedNumber(splitOffsetAmount) || 0;
+                              if (intakeMode !== 'batch' && (!costBasis || parseFormattedNumber(costBasis) === 0)) {
+                                const qty = parseInt(quantity, 10) || 1;
+                                setCostBasis(formatCurrencyInput((off + sumSplits) / (qty > 0 ? qty : 1)));
+                              }
+                            }
+                          }
+                        }}
                         direction="outflow"
                         label="Shop Funding Account(s)"
                       />

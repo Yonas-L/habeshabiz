@@ -420,7 +420,19 @@ class GeneratePartnerStatementAction
                         'balance_effect' => -$revPayable,
                         'reference_number' => 'RECEIVE-FROM-VENDOR',
                     ];
-                } elseif ($payment->reference_number === 'OFFSET-INTAKE' || $payment->reference_number === 'DEVICE-OFFSET' || str_contains(strtolower($payment->notes ?? ''), 'device') || str_contains(strtolower($payment->notes ?? ''), 'handover') || str_contains($payment->notes ?? '', 'Paid by device')) {
+                } elseif ($payment->reference_number === 'OFFSET-INTAKE') {
+                    $rawEntries[] = [
+                        'id' => "pay-{$payment->id}",
+                        'date' => $payDate,
+                        'type' => 'debt_offset',
+                        'type_label' => 'Agreed Settlement',
+                        'context' => 'Agreed credit balance settlement',
+                        'payable' => $debt->type === 'payable' ? -(float) $payment->amount : 0.0,
+                        'receivable' => $debt->type === 'receivable' ? -(float) $payment->amount : 0.0,
+                        'balance_effect' => $debt->type === 'payable' ? (float) $payment->amount : -(float) $payment->amount,
+                        'reference_number' => 'OFFSET-SETTLEMENT',
+                    ];
+                } elseif ($payment->reference_number === 'DEVICE-OFFSET' || str_contains(strtolower($payment->notes ?? ''), 'device') || str_contains(strtolower($payment->notes ?? ''), 'handover') || str_contains($payment->notes ?? '', 'Paid by device')) {
                     $rawEntries[] = [
                         'id' => "pay-{$payment->id}",
                         'date' => $payDate,
