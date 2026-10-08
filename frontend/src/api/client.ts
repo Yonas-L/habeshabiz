@@ -1102,6 +1102,14 @@ export const api = {
     payment_splits?: PaymentSplit[];
     receivable_contact_id?: string | null;
     receivable_offset_amount?: number;
+    immediate_handover?: boolean;
+    handover_mode?: 'offset' | 'temporary';
+    handover_to?: string;
+    handover_contact_id?: string | null;
+    handover_payout?: number;
+    handover_return_deadline?: string | null;
+    handover_location?: string | null;
+    handover_notes?: string | null;
     units?: Array<{
       variant_id: string;
       imei_or_serial?: string | null;
@@ -1115,7 +1123,7 @@ export const api = {
       notes?: string | null;
     }>;
   }) =>
-    request<{ data: InventoryUnit; units_created: number }>('/inventory/units', {
+    request<{ data: InventoryUnit; units_created: number; success?: boolean; message?: string }>('/inventory/units', {
       method: 'POST',
       body: JSON.stringify(data),
     }),

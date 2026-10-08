@@ -204,6 +204,14 @@ class InventoryController extends Controller
                 'offset_amount' => ['nullable', 'numeric', 'min:0'],
                 'location' => ['nullable', 'string', 'max:100'],
                 'notes' => ['nullable', 'string'],
+                'immediate_handover' => ['nullable', 'boolean'],
+                'handover_mode' => ['nullable', 'string', 'in:offset,temporary'],
+                'handover_to' => ['required_if:immediate_handover,true', 'nullable', 'string', 'max:100'],
+                'handover_contact_id' => ['nullable', 'exists:contacts,id'],
+                'handover_payout' => ['nullable', 'numeric', 'min:0'],
+                'handover_return_deadline' => ['nullable', 'date'],
+                'handover_location' => ['nullable', 'string', 'max:100'],
+                'handover_notes' => ['nullable', 'string'],
             ]);
 
             $imeisList = [];
@@ -232,6 +240,27 @@ class InventoryController extends Controller
                     'location' => $validated['location'] ?? 'Shop Counter',
                     'notes' => $validated['notes'] ?? null,
                 ];
+            }
+        }
+
+        if ($request->boolean('immediate_handover')) {
+            if (! ($user->isOwner() || $user->canHandover())) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized. Immediate device handover is restricted to authorized personnel.',
+                ], 403);
+            }
+            if (($validated['source_type'] ?? 'purchase') !== 'consignment') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Immediate handover is only supported for vendor stock (consignment).',
+                ], 422);
+            }
+            if (count($unitItems) !== 1) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Immediate handover is only supported for single device intakes.',
+                ], 422);
             }
         }
 
@@ -604,6 +633,209 @@ class InventoryController extends Controller
                 Debt::reconcileContactMutualDebts($tenantId, (string) $validated['supplier_contact_id']);
             }
 
+            // 4. Immediate Handover (if requested for single vendor stock intake)
+            if (! empty($validated['immediate_handover']) && count($createdUnits) === 1) {
+                $unit = $createdUnits[0];
+                $handoverMode = $validated['handover_mode'] ?? 'offset';
+
+                if ($handoverMode === 'offset') {
+                    $finalPrice = ! empty($validated['handover_payout'])
+                        ? (float) $validated['handover_payout']
+                        : (float) ($unit->selling_price ?? $unit->cost_basis ?? 0);
+
+                    $partnerContact = null;
+                    if (! empty($validated['handover_contact_id'])) {
+                        $partnerContact = Contact::where('tenant_id', $tenantId)->find($validated['handover_contact_id']);
+                    }
+                    if (! $partnerContact && ! empty($validated['handover_to'])) {
+                        $partnerContact = Contact::where('tenant_id', $tenantId)
+                            ->where('name', 'ilike', $validated['handover_to'])
+                            ->first();
+                    }
+                    if (! $partnerContact && ! empty($validated['handover_to'])) {
+                        $partnerContact = Contact::create([
+                            'tenant_id' => $tenantId,
+                            'name' => $validated['handover_to'],
+                            'roles' => ['vendor', 'partner', 'customer'],
+                            'is_active' => true,
+                        ]);
+                    }
+
+                    if (! $partnerContact) {
+                        throw ValidationException::withMessages([
+                            'handover_to' => ['Please select or enter a valid partner to offset debt.'],
+                        ]);
+                    }
+
+                    $now = now();
+                    $unitNotes = ! empty($validated['handover_notes'])
+                        ? ($unit->notes ? "{$unit->notes} | {$validated['handover_notes']}" : $validated['handover_notes'])
+                        : $unit->notes;
+
+                    $unit->update([
+                        'status' => 'sold',
+                        'handover_to' => $partnerContact->name,
+                        'handed_out_at' => $now,
+                        'sold_at' => $now,
+                        'selling_price' => $finalPrice,
+                        'location' => 'Delivered (Debt Offset)',
+                        'notes' => $unitNotes,
+                    ]);
+
+                    if ($finalPrice > 0) {
+                        $remOffset = $finalPrice;
+                        $openPayables = Debt::where('tenant_id', $tenantId)
+                            ->where('contact_id', $partnerContact->id)
+                            ->where('type', 'payable')
+                            ->whereIn('status', ['open', 'partially_paid'])
+                            ->with('payments')
+                            ->orderBy('due_date', 'asc')
+                            ->orderBy('created_at', 'asc')
+                            ->get();
+
+                        foreach ($openPayables as $op) {
+                            if ($remOffset <= 0) {
+                                break;
+                            }
+                            $rem = (float) $op->remaining_amount;
+                            $deduct = min($rem, $remOffset);
+
+                            $sn = $unit->imei_or_serial ? " (SN: {$unit->imei_or_serial})" : '';
+                            $devName = $unit->variant?->product?->name ?? 'Device';
+                            $pmt = DebtPayment::create([
+                                'tenant_id' => $tenantId,
+                                'debt_id' => $op->id,
+                                'amount' => $deduct,
+                                'payment_date' => $now,
+                                'reference_number' => 'BILATERAL-OFFSET',
+                                'notes' => "Handover device: {$devName}{$sn} [unit_id:{$unit->id}]",
+                                'created_by' => $user->id,
+                            ]);
+
+                            $op->payments->push($pmt);
+                            $op->recalculateSettlement();
+
+                            $remOffset -= $deduct;
+                        }
+                    }
+
+                    $salesOrder = SalesOrder::create([
+                        'tenant_id' => $tenantId,
+                        'order_number' => 'SO-'.strtoupper(Str::random(8)),
+                        'customer_id' => $partnerContact->id,
+                        'salesperson_id' => $user->id,
+                        'total_amount' => $finalPrice,
+                        'discount_amount' => 0.0,
+                        'paid_amount' => $finalPrice,
+                        'payment_status' => 'paid',
+                        'payment_method' => 'debt_offset',
+                        'financial_account_id' => null,
+                        'notes' => "Handover debt offset to {$partnerContact->name} [unit_id:{$unit->id}]",
+                        'order_date' => $now,
+                    ]);
+
+                    $unitCost = (float) ($unit->cost_basis ?? 0);
+                    SalesOrderItem::create([
+                        'tenant_id' => $tenantId,
+                        'sales_order_id' => $salesOrder->id,
+                        'variant_id' => $unit->variant_id,
+                        'inventory_unit_id' => $unit->id,
+                        'quantity' => 1,
+                        'unit_price' => $finalPrice,
+                        'unit_cost' => $unitCost,
+                        'profit' => $finalPrice - $unitCost,
+                        'sourcing_type' => 'consignment',
+                    ]);
+
+                    (new SynchronizeInventoryStockAction)->execute();
+
+                    AuditLog::record(
+                        action: 'unit_instant_offset',
+                        entityType: 'InventoryUnit',
+                        entityId: (string) $unit->id,
+                        newValues: [
+                            'imei_or_serial' => $unit->imei_or_serial,
+                            'handover_to' => $partnerContact->name,
+                            'selling_price' => $finalPrice,
+                            'offset_debt' => true,
+                            'immediate' => true,
+                        ]
+                    );
+                } else {
+                    // Temporary Handout to Staff / Broker
+                    $recipientName = $validated['handover_to'];
+                    $unitNotes = ! empty($validated['handover_notes'])
+                        ? ($unit->notes ? "{$unit->notes} | {$validated['handover_notes']}" : $validated['handover_notes'])
+                        : $unit->notes;
+
+                    $unit->update([
+                        'status' => 'out',
+                        'handover_to' => $recipientName,
+                        'handed_out_at' => now(),
+                        'location' => $validated['handover_location'] ?? "Out with {$recipientName}",
+                        'return_deadline' => $validated['handover_return_deadline'] ?? null,
+                        'handover_payout' => $validated['handover_payout'] ?? null,
+                        'notes' => $unitNotes,
+                    ]);
+
+                    $debtCreated = false;
+                    if (! empty($validated['handover_payout']) && (float) $validated['handover_payout'] > 0) {
+                        $payoutAmount = (float) $validated['handover_payout'];
+                        $contact = null;
+                        if (! empty($validated['handover_contact_id'])) {
+                            $contact = Contact::where('tenant_id', $tenantId)->find($validated['handover_contact_id']);
+                        }
+                        if (! $contact) {
+                            $contact = Contact::where('tenant_id', $tenantId)
+                                ->where('name', 'ilike', $recipientName)
+                                ->first();
+                        }
+                        if (! $contact) {
+                            $contact = Contact::create([
+                                'tenant_id' => $tenantId,
+                                'name' => $recipientName,
+                                'roles' => ['vendor', 'partner'],
+                                'is_active' => true,
+                            ]);
+                        }
+
+                        if ($contact) {
+                            Debt::create([
+                                'tenant_id' => $tenantId,
+                                'contact_id' => $contact->id,
+                                'type' => 'receivable',
+                                'reference_type' => 'handover_holding',
+                                'reference_id' => $unit->id,
+                                'original_amount' => $payoutAmount,
+                                'paid_amount' => 0.0,
+                                'remaining_amount' => $payoutAmount,
+                                'due_date' => $validated['handover_return_deadline'] ?? now()->addDays(7),
+                                'status' => 'open',
+                                'notes' => "Handover payout for {$unit->imei_or_serial} to {$recipientName}. Vendor must pay this amount on sale or return the device.",
+                            ]);
+                            $debtCreated = true;
+                        }
+                    }
+
+                    (new SynchronizeInventoryStockAction)->execute();
+
+                    AuditLog::record(
+                        action: 'unit_handover',
+                        entityType: 'InventoryUnit',
+                        entityId: (string) $unit->id,
+                        newValues: [
+                            'imei_or_serial' => $unit->imei_or_serial,
+                            'handover_to' => $recipientName,
+                            'location' => $unit->location,
+                            'return_deadline' => $validated['handover_return_deadline'] ?? null,
+                            'handover_payout' => $validated['handover_payout'] ?? null,
+                            'debt_created' => $debtCreated,
+                            'immediate' => true,
+                        ]
+                    );
+                }
+            }
+
             AuditLog::record(
                 action: 'stock_intake',
                 entityType: 'InventoryUnit',
@@ -614,6 +846,7 @@ class InventoryController extends Controller
                     'funding_source' => $fundingSource,
                     'bank_amount' => $bankAmount,
                     'offset_amount' => $offsetAmount,
+                    'immediate_handover' => ! empty($validated['immediate_handover']),
                 ]
             );
         });
@@ -621,10 +854,23 @@ class InventoryController extends Controller
         $count = count($createdUnits);
         $unitLabel = $count === 1 ? '1 unit' : "{$count} units";
 
+        $message = "Successfully recorded {$unitLabel} into stock.";
+        if (! empty($validated['immediate_handover'])) {
+            $u = $createdUnits[0]->fresh();
+            if (($validated['handover_mode'] ?? 'offset') === 'offset') {
+                $finalPriceFormatted = number_format((float) ($validated['handover_payout'] ?? $u->selling_price ?? $u->cost_basis ?? 0), 2);
+                $partnerName = $u->handover_to ?? 'partner';
+                $message = "Device intaken and {$finalPriceFormatted} ETB deducted from {$partnerName}'s debt.";
+            } else {
+                $recipientName = $u->handover_to ?? 'staff';
+                $message = "Device intaken and handed out to {$recipientName} for sale.";
+            }
+        }
+
         return response()->json([
             'success' => true,
-            'message' => "Successfully recorded {$unitLabel} into stock.",
-            'data' => $createdUnits[0]->load('variant.product'),
+            'message' => $message,
+            'data' => $createdUnits[0]->fresh()->load('variant.product'),
             'units_created' => $count,
         ], 201);
     }

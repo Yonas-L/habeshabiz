@@ -18,6 +18,7 @@ import {
   Copy,
   Trash2,
   ShieldAlert,
+  ArrowRightLeft,
 } from 'lucide-react';
 import { LdrsSpinner } from '../loading/LdrsSpinner';
 import { PartnerFormModal } from '../partners/PartnerFormModal';
@@ -164,6 +165,16 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
   const [splitOffsetAmount, setSplitOffsetAmount] = useState<string>('');
   const [splitCashAmount, setSplitCashAmount] = useState<string>('');
   const [receivableDebts, setReceivableDebts] = useState<Debt[]>([]);
+  const [payableDebts, setPayableDebts] = useState<Debt[]>([]);
+
+  // Immediate Handover State (Vendor Stock)
+  const [isImmediateHandover, setIsImmediateHandover] = useState(false);
+  const [immediateHandoverMode, setImmediateHandoverMode] = useState<'offset' | 'temporary'>('offset');
+  const [immediateRecipientContactId, setImmediateRecipientContactId] = useState<string>('');
+  const [immediateRecipientName, setImmediateRecipientName] = useState<string>('');
+  const [immediatePayoutAmount, setImmediatePayoutAmount] = useState<string>('');
+  const [immediateReturnDeadlineDays, setImmediateReturnDeadlineDays] = useState<number | 'custom' | 'none'>(7);
+  const [immediateCustomReturnDate, setImmediateCustomReturnDate] = useState<string>('');
 
   useEffect(() => {
     setLocalProducts(products);
@@ -678,11 +689,15 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
     return parts.filter(Boolean).join(' · ') || 'Standard';
   };
 
-  // Load receivable debts
+  // Load debts (receivable for debtor offsets, payable for handover debt settlement)
   useEffect(() => {
     if (isOpen) {
       api.getDebts({ type: 'receivable' })
         .then((res) => setReceivableDebts(res))
+        .catch(() => {});
+
+      api.getDebts({ type: 'payable' })
+        .then((res) => setPayableDebts(res))
         .catch(() => {});
     }
   }, [isOpen]);
@@ -708,6 +723,26 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
     }
     return Array.from(map.values());
   }, [receivableDebts]);
+
+  const partnersWeOwe = useMemo(() => {
+    const map = new Map<string, { contact: Contact; totalOwed: number }>();
+    for (const d of payableDebts) {
+      if (!d.contact_id || !d.contact) continue;
+      const remaining = Number(d.remaining_amount || 0);
+      if (remaining <= 0) continue;
+      const existing = map.get(d.contact_id);
+      if (existing) {
+        existing.totalOwed += remaining;
+      } else {
+        map.set(d.contact_id, { contact: d.contact, totalOwed: remaining });
+      }
+    }
+    return Array.from(map.values());
+  }, [payableDebts]);
+
+  const selectedPayablePartner = useMemo(() => {
+    return partnersWeOwe.find((p) => p.contact.id === immediateRecipientContactId) || null;
+  }, [partnersWeOwe, immediateRecipientContactId]);
 
   const selectedAccount = useMemo(() => {
     return accounts.find((a) => a.id === paymentAccountId) || accounts[0];
@@ -853,6 +888,20 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
       return;
     }
 
+    if (sourceType === 'consignment' && intakeMode === 'single' && isImmediateHandover) {
+      if (immediateHandoverMode === 'offset') {
+        if (!immediateRecipientContactId && !immediateRecipientName.trim()) {
+          toast.error('Please select a partner to settle debt with');
+          return;
+        }
+      } else {
+        if (!immediateRecipientName.trim()) {
+          toast.error('Please specify who the device is handed to');
+          return;
+        }
+      }
+    }
+
     // Overdraft validation for shop purchase
     if (sourceType === 'purchase' && (fundingSource === 'shop_account' || fundingSource === 'split') && !isAccountSplit && isAccountOverdrawn) {
       toast.error('Insufficient balance in selected account');
@@ -958,11 +1007,32 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
         } else {
           payload.quantity = parseInt(quantity, 10) || 1;
         }
+
+        if (sourceType === 'consignment' && intakeMode === 'single' && isImmediateHandover) {
+          let calculatedImmediateDeadline: string | null = null;
+          if (immediateHandoverMode === 'temporary' && immediateReturnDeadlineDays !== 'none') {
+            if (immediateReturnDeadlineDays === 'custom' && immediateCustomReturnDate) {
+              calculatedImmediateDeadline = immediateCustomReturnDate;
+            } else if (typeof immediateReturnDeadlineDays === 'number') {
+              const d = new Date();
+              d.setDate(d.getDate() + immediateReturnDeadlineDays);
+              calculatedImmediateDeadline = d.toISOString().split('T')[0];
+            }
+          }
+
+          payload.immediate_handover = true;
+          payload.handover_mode = immediateHandoverMode;
+          payload.handover_to = immediateRecipientName.trim() || undefined;
+          payload.handover_contact_id = immediateRecipientContactId || undefined;
+          const payoutNum = parseFormattedNumber(immediatePayoutAmount) ?? (parseFormattedNumber(sellingPrice) || parseFormattedNumber(costBasis) || undefined);
+          payload.handover_payout = payoutNum;
+          payload.handover_return_deadline = calculatedImmediateDeadline;
+        }
       }
 
-      await api.intakeInventoryUnit(payload);
+      const intakeRes = await api.intakeInventoryUnit(payload);
 
-      toast.success('Stock added successfully', {
+      toast.success(intakeRes.message || 'Stock added successfully', {
         description: `${totalUnitsToReceive} unit(s) received into inventory.`,
       });
 
@@ -976,6 +1046,13 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
       setNotes('');
       setIsAccountSplit(false);
       setAccountSplits([]);
+      setIsImmediateHandover(false);
+      setImmediateHandoverMode('offset');
+      setImmediateRecipientContactId('');
+      setImmediateRecipientName('');
+      setImmediatePayoutAmount('');
+      setImmediateReturnDeadlineDays(7);
+      setImmediateCustomReturnDate('');
       onIntakeSuccess();
       onClose();
     } catch (err: any) {
@@ -2289,61 +2366,79 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
               </button>
             </div>
 
-            {/* Consignment Policy Banner & Return Deadline */}
+            {/* Vendor Stock Return Window & Broker Selection */}
             {sourceType === 'consignment' && (
-              <div className="p-3 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/60 space-y-2.5">
-                <div className="flex items-start gap-2 text-xs text-amber-900 dark:text-amber-300">
-                  <Handshake className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-bold block">Vendor Stock Intake</span>
-                    <span className="text-[11px] text-amber-800/90 dark:text-amber-400/90 font-normal leading-relaxed block mt-0.5">
-                      Recorded as supplier payable debt owed to vendor upon intake. No shop bank balance is deducted now.
-                    </span>
+              <div className="space-y-3 pt-1">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1.5 flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Return Window</span>
+                  </label>
+                  <div className="grid grid-cols-5 gap-1.5 text-[11px] font-semibold">
+                    {[
+                      { label: 'None', value: 'none' },
+                      { label: '3 Days', value: 3 },
+                      { label: '7 Days', value: 7 },
+                      { label: '14 Days', value: 14 },
+                      { label: 'Custom', value: 'custom' },
+                    ].map((option) => (
+                      <button
+                        key={option.label}
+                        type="button"
+                        onClick={() => setReturnDeadlineDays(option.value as any)}
+                        className={`py-1.5 px-2 rounded-lg border text-center transition-all cursor-pointer ${
+                          returnDeadlineDays === option.value
+                            ? 'border-amber-600 bg-amber-600 text-white font-bold'
+                            : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
                   </div>
+                  {returnDeadlineDays === 'custom' && (
+                    <input
+                      type="date"
+                      value={customReturnDate}
+                      onChange={(e) => setCustomReturnDate(e.target.value)}
+                      className="w-full h-9 mt-2 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-medium focus:outline-none"
+                    />
+                  )}
                 </div>
 
-                <div className="pt-2 border-t border-amber-200/60 dark:border-amber-800/40">
+                <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900 dark:text-amber-300">
-                      <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                      <span>Return Window to Broker (Optional)</span>
-                    </div>
-                  <span className="text-[10px] text-amber-700/80 dark:text-amber-400/80">
-                    Optional return deadline
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-5 gap-1.5 text-[11px] font-semibold">
-                  {[
-                    { label: 'None', value: 'none' },
-                    { label: '3 Days', value: 3 },
-                    { label: '7 Days', value: 7 },
-                    { label: '14 Days', value: 14 },
-                    { label: 'Custom', value: 'custom' },
-                  ].map((option) => (
+                    <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+                      Broker <span className="text-rose-500">*</span>
+                    </label>
                     <button
-                      key={option.label}
                       type="button"
-                      onClick={() => setReturnDeadlineDays(option.value as any)}
-                      className={`py-1.5 px-2 rounded-lg border text-center transition-all cursor-pointer ${
-                        returnDeadlineDays === option.value
-                          ? 'border-amber-600 bg-amber-600 text-white font-bold'
-                          : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50'
-                      }`}
+                      onClick={() => setIsAddSupplierOpen(true)}
+                      className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-0.5 cursor-pointer"
                     >
-                      {option.label}
+                      <Plus className="w-3 h-3" />
+                      <span>New Partner</span>
                     </button>
-                  ))}
-                </div>
-
-                {returnDeadlineDays === 'custom' && (
-                  <input
-                    type="date"
-                    value={customReturnDate}
-                    onChange={(e) => setCustomReturnDate(e.target.value)}
-                    className="w-full h-9 px-2.5 rounded-lg border border-amber-300 dark:border-amber-800 bg-white dark:bg-slate-900 text-xs font-mono font-medium focus:outline-none"
-                  />
-                )}
+                  </div>
+                  <select
+                    value={supplierId}
+                    required
+                    onChange={(e) => setSupplierId(e.target.value)}
+                    className={`w-full h-10 px-3 rounded-xl border bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none cursor-pointer ${
+                      !supplierId
+                        ? 'border-amber-400 dark:border-amber-600'
+                        : 'border-slate-200 dark:border-slate-700'
+                    }`}
+                  >
+                    <option value="">Select broker</option>
+                    {liveContacts
+                      .filter((c) => (c.roles || []).some((r) => r !== 'customer'))
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} {c.phone ? `(${c.phone})` : ''}
+                        </option>
+                      ))}
+                  </select>
                 </div>
               </div>
             )}
@@ -2681,49 +2776,270 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
               </div>
             )}
 
-            {/* Supplier / Broker & Notes */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">
-                    {sourceType === 'consignment' ? (
-                      <span>Broker <span className="text-rose-500">*</span></span>
-                    ) : (
-                      <span>Supplier <span className="font-normal text-slate-400">(optional)</span></span>
-                    )}
-                  </label>
+            {/* Immediate Handover (Vendor Stock) */}
+            {sourceType === 'consignment' && intakeMode === 'single' && (
+              <div className="space-y-3 pt-1">
+                <div className="flex items-center gap-2.5 py-1">
+                  <ArrowRightLeft className="w-4 h-4 text-amber-500 dark:text-amber-400 shrink-0" />
+                  <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                    Immediate Handover
+                  </span>
                   <button
                     type="button"
-                    onClick={() => setIsAddSupplierOpen(true)}
-                    className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-0.5 cursor-pointer"
+                    onClick={() => {
+                      const next = !isImmediateHandover;
+                      setIsImmediateHandover(next);
+                      if (next && !immediatePayoutAmount) {
+                        setImmediatePayoutAmount(sellingPrice || costBasis || '');
+                      }
+                    }}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      isImmediateHandover ? 'bg-amber-500' : 'bg-slate-200 dark:bg-slate-700'
+                    }`}
                   >
-                    <Plus className="w-3 h-3" />
-                    <span>New Partner</span>
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-xs ring-0 transition duration-200 ease-in-out ${
+                        isImmediateHandover ? 'translate-x-4' : 'translate-x-0'
+                      }`}
+                    />
                   </button>
                 </div>
-                <select
-                  value={supplierId}
-                  required={sourceType === 'consignment'}
-                  onChange={(e) => setSupplierId(e.target.value)}
-                  className={`w-full h-10 px-3 rounded-xl border bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none cursor-pointer ${
-                    sourceType === 'consignment' && !supplierId
-                      ? 'border-amber-400 dark:border-amber-600'
-                      : 'border-slate-200 dark:border-slate-700'
-                  }`}
-                >
-                  <option value="">
-                    {sourceType === 'consignment' ? 'Select broker' : 'None'}
-                  </option>
-                  {liveContacts
-                    .filter((c) => (c.roles || []).some((r) => r !== 'customer'))
-                    .map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} {c.phone ? `(${c.phone})` : ''}
-                      </option>
-                    ))}
-                </select>
-              </div>
 
+                {isImmediateHandover && (
+                  <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 space-y-3">
+                    {/* Handover Mode Tabs */}
+                    <div className="grid grid-cols-2 gap-1.5 p-1 bg-amber-500/10 dark:bg-amber-950/40 rounded-xl text-xs font-semibold">
+                      <button
+                        type="button"
+                        onClick={() => setImmediateHandoverMode('offset')}
+                        className={`py-1.5 px-3 rounded-lg text-center transition-all cursor-pointer ${
+                          immediateHandoverMode === 'offset'
+                            ? 'bg-amber-500 text-white font-bold shadow-xs'
+                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                        }`}
+                      >
+                        Settle Debt
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setImmediateHandoverMode('temporary')}
+                        className={`py-1.5 px-3 rounded-lg text-center transition-all cursor-pointer ${
+                          immediateHandoverMode === 'temporary'
+                            ? 'bg-amber-500 text-white font-bold shadow-xs'
+                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                        }`}
+                      >
+                        Staff Handout
+                      </button>
+                    </div>
+
+                    {immediateHandoverMode === 'offset' ? (
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                              Partner to Settle <span className="text-rose-500">*</span>
+                            </label>
+                            <select
+                              value={immediateRecipientContactId}
+                              onChange={(e) => {
+                                const cId = e.target.value;
+                                setImmediateRecipientContactId(cId);
+                                const found = liveContacts.find((c) => c.id === cId) || partnersWeOwe.find((p) => p.contact.id === cId)?.contact;
+                                if (found) {
+                                  setImmediateRecipientName(found.name);
+                                }
+                              }}
+                              className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none cursor-pointer"
+                            >
+                              <option value="">Select partner</option>
+                              {partnersWeOwe.length > 0 && (
+                                <optgroup label="Partners with Open Debt">
+                                  {partnersWeOwe.map((p) => (
+                                    <option key={p.contact.id} value={p.contact.id}>
+                                      {p.contact.name} ({p.totalOwed.toLocaleString()} ETB owed)
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              )}
+                              <optgroup label="Other Contacts">
+                                {liveContacts
+                                  .filter((c) => !partnersWeOwe.some((p) => p.contact.id === c.id))
+                                  .map((c) => (
+                                    <option key={c.id} value={c.id}>
+                                      {c.name}
+                                    </option>
+                                  ))}
+                              </optgroup>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                              Settlement Amount (ETB)
+                            </label>
+                            <input
+                              type="text"
+                              value={immediatePayoutAmount || sellingPrice || costBasis}
+                              onChange={(e) => setImmediatePayoutAmount(formatCurrencyInput(e.target.value))}
+                              placeholder="Amount to deduct..."
+                              className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-medium text-slate-900 dark:text-white focus:outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        {selectedPayablePartner && (
+                          <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between text-xs">
+                            <span className="text-slate-600 dark:text-slate-400">
+                              Current Debt: <strong className="text-slate-900 dark:text-white font-mono">{selectedPayablePartner.totalOwed.toLocaleString()} ETB</strong>
+                            </span>
+                            <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                              Remaining After Settlement:{' '}
+                              <strong className="font-mono">
+                                {Math.max(
+                                  0,
+                                  selectedPayablePartner.totalOwed -
+                                    (parseFormattedNumber(immediatePayoutAmount) ||
+                                      parseFormattedNumber(sellingPrice) ||
+                                      parseFormattedNumber(costBasis) ||
+                                      0)
+                                ).toLocaleString()}{' '}
+                                ETB
+                              </strong>
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                              Handed To <span className="text-rose-500">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              list="handover-contacts-list"
+                              value={immediateRecipientName}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setImmediateRecipientName(val);
+                                const match = liveContacts.find((c) => c.name.toLowerCase() === val.toLowerCase());
+                                if (match) setImmediateRecipientContactId(match.id);
+                              }}
+                              placeholder="Staff name..."
+                              className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
+                            />
+                            <datalist id="handover-contacts-list">
+                              {liveContacts.map((c) => (
+                                <option key={c.id} value={c.name} />
+                              ))}
+                            </datalist>
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                              Target Payout (ETB)
+                            </label>
+                            <input
+                              type="text"
+                              value={immediatePayoutAmount || sellingPrice || costBasis}
+                              onChange={(e) => setImmediatePayoutAmount(formatCurrencyInput(e.target.value))}
+                              placeholder="Expected payout..."
+                              className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-medium text-slate-900 dark:text-white focus:outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                            Return Deadline
+                          </label>
+                          <div className="grid grid-cols-5 gap-1.5 text-[11px] font-semibold">
+                            {[
+                              { label: 'None', value: 'none' },
+                              { label: '3 Days', value: 3 },
+                              { label: '7 Days', value: 7 },
+                              { label: '14 Days', value: 14 },
+                              { label: 'Custom', value: 'custom' },
+                            ].map((opt) => (
+                              <button
+                                key={opt.label}
+                                type="button"
+                                onClick={() => setImmediateReturnDeadlineDays(opt.value as any)}
+                                className={`py-1.5 px-2 rounded-lg border text-center transition-all cursor-pointer ${
+                                  immediateReturnDeadlineDays === opt.value
+                                    ? 'border-amber-500 bg-amber-500 text-white font-bold'
+                                    : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-50'
+                                }`}
+                              >
+                                {opt.label}
+                              </button>
+                            ))}
+                          </div>
+                          {immediateReturnDeadlineDays === 'custom' && (
+                            <input
+                              type="date"
+                              value={immediateCustomReturnDate}
+                              onChange={(e) => setImmediateCustomReturnDate(e.target.value)}
+                              className="w-full h-9 mt-2 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-medium focus:outline-none"
+                            />
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Supplier / Notes */}
+            {sourceType === 'purchase' ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+                      Supplier <span className="font-normal text-slate-400">(optional)</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setIsAddSupplierOpen(true)}
+                      className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-0.5 cursor-pointer"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>New Partner</span>
+                    </button>
+                  </div>
+                  <select
+                    value={supplierId}
+                    onChange={(e) => setSupplierId(e.target.value)}
+                    className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none cursor-pointer"
+                  >
+                    <option value="">None</option>
+                    {liveContacts
+                      .filter((c) => (c.roles || []).some((r) => r !== 'customer'))
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} {c.phone ? `(${c.phone})` : ''}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
+                    Notes
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Optional intake note..."
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none"
+                  />
+                </div>
+              </div>
+            ) : (
               <div>
                 <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
                   Notes
@@ -2736,7 +3052,7 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                   className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none"
                 />
               </div>
-            </div>
+            )}
           </div>
         </form>
 

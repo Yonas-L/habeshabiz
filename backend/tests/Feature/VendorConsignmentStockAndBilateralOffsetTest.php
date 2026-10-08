@@ -523,4 +523,98 @@ test('bilateral multi-cycle device handover and vendor returns maintain mathemat
         ->and($statementA->json('data.kpis.balance_verdict'))->toBe('Settled (0.00 ETB)');
 });
 
+test('can intake vendor stock with immediate debt offset handover', function () {
+    // Sourcing from Partner A (cost 60,000 ETB)
+    // Partner B is owed 70,000 ETB payable debt
+    $payableB = Debt::create([
+        'tenant_id' => $this->tenant->id,
+        'contact_id' => $this->partnerB->id,
+        'type' => 'payable',
+        'reference_type' => 'stock_intake',
+        'original_amount' => 70000.00,
+        'paid_amount' => 0.00,
+        'remaining_amount' => 70000.00,
+        'status' => 'open',
+        'due_date' => now()->addDays(30),
+        'notes' => 'Prior consignment debt to Partner B',
+    ]);
+
+    // Intake phone from Partner A with immediate handover offset to Partner B
+    $res = $this->actingAs($this->user, 'sanctum')->postJson('/api/v1/inventory/units', [
+        'variant_id' => $this->variantA->id,
+        'imei_or_serial' => 'IMMEDIATE-OFFSET-001',
+        'condition' => 'new',
+        'cost_basis' => 60000.00,
+        'selling_price' => 70000.00,
+        'source_type' => 'consignment',
+        'supplier_contact_id' => $this->partnerA->id,
+        'immediate_handover' => true,
+        'handover_mode' => 'offset',
+        'handover_to' => $this->partnerB->name,
+        'handover_contact_id' => $this->partnerB->id,
+        'handover_payout' => 70000.00,
+    ]);
+
+    $res->assertCreated();
+    expect($res->json('success'))->toBeTrue();
+
+    // 1. Sourcing debt created for Partner A
+    $debtA = Debt::where('contact_id', $this->partnerA->id)
+        ->where('reference_type', 'stock_intake')
+        ->where('original_amount', 60000.00)
+        ->first();
+    expect($debtA)->not->toBeNull()
+        ->and((float) $debtA->remaining_amount)->toBe(60000.00);
+
+    // 2. Unit status is immediately 'sold' to Partner B
+    $unit = InventoryUnit::where('imei_or_serial', 'IMMEDIATE-OFFSET-001')->first();
+    expect($unit)->not->toBeNull()
+        ->and($unit->status)->toBe('sold')
+        ->and($unit->handover_to)->toBe($this->partnerB->name);
+
+    // 3. Partner B's debt is deducted by 70,000 ETB
+    $payableB->refresh();
+    expect((float) $payableB->remaining_amount)->toBe(0.00)
+        ->and($payableB->status)->toBe('settled');
+
+    // 4. P&L recognizes realized profit of +10,000 ETB (70,000 selling - 60,000 cost)
+    $profitRes = $this->actingAs($this->user, 'sanctum')->getJson('/api/v1/reports/summary');
+    $profitRes->assertOk();
+    expect((float) $profitRes->json('data.summary.gross_profit'))->toBe(10000.00);
+});
+
+test('can intake vendor stock with immediate temporary handout to staff', function () {
+    $res = $this->actingAs($this->user, 'sanctum')->postJson('/api/v1/inventory/units', [
+        'variant_id' => $this->variantA->id,
+        'imei_or_serial' => 'IMMEDIATE-STAFF-001',
+        'condition' => 'new',
+        'cost_basis' => 50000.00,
+        'selling_price' => 60000.00,
+        'source_type' => 'consignment',
+        'supplier_contact_id' => $this->partnerA->id,
+        'immediate_handover' => true,
+        'handover_mode' => 'temporary',
+        'handover_to' => 'Dawit Sales',
+        'handover_payout' => 58000.00,
+        'handover_return_deadline' => now()->addDays(5)->toDateString(),
+    ]);
+
+    $res->assertCreated();
+    expect($res->json('success'))->toBeTrue();
+
+    // Unit status is 'out' with Dawit Sales
+    $unit = InventoryUnit::where('imei_or_serial', 'IMMEDIATE-STAFF-001')->first();
+    expect($unit)->not->toBeNull()
+        ->and($unit->status)->toBe('out')
+        ->and($unit->handover_to)->toBe('Dawit Sales');
+
+    // Holding debt created for the agreed payout
+    $holdingDebt = Debt::where('reference_type', 'handover_holding')
+        ->where('reference_id', $unit->id)
+        ->first();
+    expect($holdingDebt)->not->toBeNull()
+        ->and((float) $holdingDebt->original_amount)->toBe(58000.00);
+});
+
+
 
