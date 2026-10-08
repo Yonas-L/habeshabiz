@@ -341,12 +341,18 @@ class GeneratePartnerStatementAction
                 $accountName = $payment->financialAccount?->name ?? 'Wire';
 
                 if ($payment->reference_number === 'RETURN-TO-VENDOR') {
+                    $context = 'Returned to vendor';
+                    if ($debt->notes) {
+                        $context = 'Returned: ' . str_ireplace('Stock intake: ', '', $this->sanitizeContext($debt->notes));
+                    } elseif ($payment->notes && ! str_contains($payment->notes, 'canceling payable obligation')) {
+                        $context = $this->sanitizeContext($payment->notes);
+                    }
                     $rawEntries[] = [
                         'id' => "pay-{$payment->id}",
                         'date' => $payDate,
                         'type' => 'vendor_return',
                         'type_label' => 'Return',
-                        'context' => 'Returned to vendor'.($debt->notes ? " · {$debt->notes}" : ''),
+                        'context' => $context,
                         'payable' => -(float) $payment->amount,
                         'receivable' => 0.0,
                         'balance_effect' => (float) $payment->amount,

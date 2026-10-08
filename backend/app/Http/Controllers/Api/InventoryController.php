@@ -1688,6 +1688,83 @@ class InventoryController extends Controller
                 }
             }
 
+            // If destination is vendor, execute return-to-vendor cancellation on original supplier debt
+            if ($destination === 'vendor') {
+                $supplierPayables = Debt::where('tenant_id', $user->tenant_id)
+                    ->where('type', 'payable')
+                    ->where(function ($q) use ($unit) {
+                        $q->where('reference_id', $unit->id);
+                        if ($unit->supplier_contact_id) {
+                            $q->orWhere(function ($sq) use ($unit) {
+                                $sq->where('contact_id', $unit->supplier_contact_id)
+                                    ->where(function ($nq) use ($unit) {
+                                        if (! empty($unit->imei_or_serial)) {
+                                            $nq->where('notes', 'like', "%{$unit->imei_or_serial}%");
+                                        }
+                                    });
+                            });
+                        }
+                    })
+                    ->with('payments')
+                    ->get();
+
+                $totalRefundOwed = 0.0;
+                foreach ($supplierPayables as $sDebt) {
+                    $realPaidAmount = (float) $sDebt->payments
+                        ->filter(function ($p) {
+                            return ! empty($p->financial_account_id)
+                                && ! in_array($p->reference_number, [
+                                    'RETURN-TO-VENDOR',
+                                    'RECEIVE-FROM-VENDOR',
+                                    'BILATERAL-OFFSET',
+                                    'DEVICE-OFFSET',
+                                    'OFFSET-INTAKE',
+                                    'RETURN-OFFSET',
+                                    'MUTUAL-OFFSET',
+                                    'REPAIR-OFFSET',
+                                ], true);
+                        })
+                        ->sum('amount');
+
+                    if ($realPaidAmount > 0) {
+                        $totalRefundOwed += $realPaidAmount;
+                    }
+
+                    if ($sDebt->remaining_amount > 0) {
+                        $retPmt = DebtPayment::create([
+                            'tenant_id' => $unit->tenant_id,
+                            'debt_id' => $sDebt->id,
+                            'amount' => (float) $sDebt->remaining_amount,
+                            'payment_date' => now(),
+                            'reference_number' => 'RETURN-TO-VENDOR',
+                            'notes' => 'Device returned to vendor, canceling payable obligation',
+                            'created_by' => $user->id,
+                        ]);
+                        $sDebt->payments->push($retPmt);
+                        $sDebt->recalculateSettlement();
+                    }
+                }
+
+                if ($totalRefundOwed > 0 && $unit->supplier_contact_id) {
+                    $pName = $unit->variant?->product?->name ?? 'Device';
+                    $sn = $unit->imei_or_serial ? " (SN: {$unit->imei_or_serial})" : '';
+
+                    Debt::create([
+                        'tenant_id' => $user->tenant_id,
+                        'contact_id' => $unit->supplier_contact_id,
+                        'type' => 'receivable',
+                        'reference_type' => 'vendor_return_refund',
+                        'reference_id' => $unit->id,
+                        'original_amount' => $totalRefundOwed,
+                        'paid_amount' => 0.0,
+                        'remaining_amount' => $totalRefundOwed,
+                        'due_date' => now()->addDays(7),
+                        'status' => 'open',
+                        'notes' => "Refund owed by vendor for returned device: {$pName}{$sn}. Device was previously paid for and returned.",
+                    ]);
+                }
+            }
+
             // Reverse SalesOrder / realized profit for this unit if one was created
             $orderItem = SalesOrderItem::where('inventory_unit_id', $unit->id)->latest()->first();
             if ($orderItem) {
@@ -1932,9 +2009,9 @@ class InventoryController extends Controller
                 'status' => 'returned_to_vendor',
                 'returned_at' => now(),
                 'return_reason' => $validated['return_reason'] ?? 'Returned unsold to vendor within agreed terms',
-                'location' => 'Returned to Vendor',
-                'handover_to' => null,
-                'handed_out_at' => null,
+                'location' => $unit->supplier ? "Returned to {$unit->supplier->name}" : 'Returned to Vendor',
+                'handover_to' => $unit->customer_waiting ? $unit->handover_to : null,
+                'handed_out_at' => $unit->customer_waiting ? $unit->handed_out_at : null,
             ]);
 
             // Decrement active stock if it was previously in_stock or out
@@ -1946,11 +2023,24 @@ class InventoryController extends Controller
             }
 
             // Handle debts linked to this unit:
-            // 1. Cancel any remaining unpaid payable obligations
+            // 1. Cancel any remaining unpaid payable obligations to the supplier
             // 2. If the store ALREADY paid real money/wire to the vendor for this unit,
             //    the vendor now owes us a REFUND (open receivable) for that paid amount!
-            $unitPayables = Debt::where('reference_id', $unit->id)
+            $unitPayables = Debt::where('tenant_id', $unit->tenant_id)
                 ->where('type', 'payable')
+                ->where(function ($q) use ($unit) {
+                    $q->where('reference_id', $unit->id);
+                    if ($unit->supplier_contact_id) {
+                        $q->orWhere(function ($sq) use ($unit) {
+                            $sq->where('contact_id', $unit->supplier_contact_id)
+                                ->where(function ($nq) use ($unit) {
+                                    if (! empty($unit->imei_or_serial)) {
+                                        $nq->where('notes', 'like', "%{$unit->imei_or_serial}%");
+                                    }
+                                });
+                        });
+                    }
+                })
                 ->with('payments')
                 ->get();
 
@@ -2074,6 +2164,17 @@ class InventoryController extends Controller
         ]);
 
         $action = $validated['action'];
+
+        if ($action === 'deliver_to_customer') {
+            $hasPriorCustomer = $unit->salesOrderItem !== null || ! empty($unit->handover_to) || $unit->customer_waiting;
+            if (! $hasPriorCustomer) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This unit was never sold to a customer or assigned to a partner. Please select "Restock to Shelf".',
+                ], 422);
+            }
+        }
+
         $targetImei = array_key_exists('imei_or_serial', $validated)
             ? (trim($validated['imei_or_serial'] ?? '') ?: null)
             : $unit->imei_or_serial;
@@ -2104,42 +2205,46 @@ class InventoryController extends Controller
             $prevNotes = $unit->notes;
             $vendorName = $unit->supplier?->name ?? 'Vendor';
 
-            // 1. Re-instate / restore the payable debt obligation to the vendor (Yenus)
-            $vendorPayables = Debt::where('reference_id', $unit->id)
+            // 1. Re-instate / restore the payable debt obligation to the original vendor (Yenus)
+            $vendorPayables = Debt::where('tenant_id', $user->tenant_id)
                 ->where('type', 'payable')
+                ->where(function ($q) use ($unit) {
+                    $q->where('reference_id', $unit->id);
+                    if ($unit->supplier_contact_id) {
+                        $q->orWhere('contact_id', $unit->supplier_contact_id);
+                    }
+                })
                 ->with('payments')
                 ->get();
 
             foreach ($vendorPayables as $debt) {
-                $returnToVendorPayment = $debt->payments
+                $totalReturnAmount = (float) $debt->payments
                     ->where('reference_number', 'RETURN-TO-VENDOR')
-                    ->sortByDesc('created_at')
-                    ->first();
+                    ->sum('amount');
 
-                if ($returnToVendorPayment) {
-                    $reversalAmount = (float) $returnToVendorPayment->amount;
+                $totalReceiveAmount = (float) abs($debt->payments
+                    ->where('reference_number', 'RECEIVE-FROM-VENDOR')
+                    ->sum('amount'));
+
+                $unreversedReturn = $totalReturnAmount - $totalReceiveAmount;
+
+                if ($unreversedReturn > 0) {
                     $sn = $unit->imei_or_serial ? " (SN: {$unit->imei_or_serial})" : '';
                     $devName = $unit->variant?->product?->name ?? 'Device';
 
-                    $existingReceivePayment = $debt->payments
-                        ->where('reference_number', 'RECEIVE-FROM-VENDOR')
-                        ->first();
+                    $recPmt = DebtPayment::create([
+                        'tenant_id' => $user->tenant_id,
+                        'debt_id' => $debt->id,
+                        'financial_account_id' => null,
+                        'amount' => -$unreversedReturn,
+                        'payment_date' => $now,
+                        'reference_number' => 'RECEIVE-FROM-VENDOR',
+                        'notes' => "Received fixed from vendor: {$devName}{$sn} [unit_id:{$unit->id}]",
+                        'created_by' => $user->id,
+                    ]);
+                    $debt->payments->push($recPmt);
 
-                    if (! $existingReceivePayment) {
-                        $recPmt = DebtPayment::create([
-                            'tenant_id' => $user->tenant_id,
-                            'debt_id' => $debt->id,
-                            'financial_account_id' => null,
-                            'amount' => -$reversalAmount,
-                            'payment_date' => $now,
-                            'reference_number' => 'RECEIVE-FROM-VENDOR',
-                            'notes' => "Received fixed from vendor: {$devName}{$sn} [unit_id:{$unit->id}]",
-                            'created_by' => $user->id,
-                        ]);
-                        $debt->payments->push($recPmt);
-
-                        $debt->recalculateSettlement();
-                    }
+                    $debt->recalculateSettlement();
                 }
             }
 
@@ -2154,10 +2259,30 @@ class InventoryController extends Controller
                     'paid_amount' => DB::raw('original_amount'),
                 ]);
 
+            $handoverTo = null;
             if ($action === 'deliver_to_customer') {
+                // Identify the recipient customer or partner
+                $recipientCustomer = $unit->salesOrderItem?->salesOrder?->customer;
+                if (! $recipientCustomer && ! empty($unit->handover_to)) {
+                    $recipientCustomer = Contact::where('tenant_id', $user->tenant_id)
+                        ->where('name', $unit->handover_to)
+                        ->first();
+                }
+
+                $customerName = $recipientCustomer?->name ?? $unit->handover_to ?? 'Customer';
                 $status = 'sold';
-                $location = 'With Customer';
-                $appendNote = "Received fixed from {$vendorName} and delivered back to customer on ".$now->format('M d, Y').'.';
+
+                // Determine if recipient is a B2B vendor / peer partner
+                $isB2bVendor = $recipientCustomer && (
+                    $recipientCustomer->hasRole('peer_vendor')
+                    || $recipientCustomer->hasRole('vendor')
+                    || $recipientCustomer->hasRole('supplier')
+                );
+
+                $location = $isB2bVendor ? "With {$customerName}" : 'With Customer';
+                $handoverTo = $isB2bVendor ? $customerName : null;
+
+                $appendNote = "Received fixed from {$vendorName} and delivered back to {$customerName} on ".$now->format('M d, Y').'.';
                 if (! empty($validated['notes'])) {
                     $appendNote .= " Note: {$validated['notes']}";
                 }
@@ -2165,7 +2290,7 @@ class InventoryController extends Controller
                 $salesOrderItem = $unit->salesOrderItem;
                 if ($salesOrderItem && $salesOrderItem->salesOrder) {
                     $salesOrder = $salesOrderItem->salesOrder;
-                    $orderAuditNote = '[Vendor Return '.$now->format('M d, Y H:i').": SN {$unit->imei_or_serial} repaired by {$vendorName} and delivered to customer.]";
+                    $orderAuditNote = '[Vendor Return '.$now->format('M d, Y H:i').": SN {$unit->imei_or_serial} repaired by {$vendorName} and delivered to {$customerName}.]";
                     $salesOrder->update([
                         'payment_status' => 'paid',
                         'notes' => $salesOrder->notes ? "{$salesOrder->notes}\n{$orderAuditNote}" : $orderAuditNote,
@@ -2175,64 +2300,113 @@ class InventoryController extends Controller
                     $salesOrderItem->update(['profit' => $realProfit]);
                 }
 
-                // If this unit was originally offset against a partner debt (e.g. Nati) and reversed on return:
-                $returnOffsetPayments = DebtPayment::where('tenant_id', $user->tenant_id)
-                    ->where('reference_number', 'RETURN-OFFSET')
-                    ->where(function ($q) use ($unit) {
-                        $q->where('notes', 'like', "%[unit_id:{$unit->id}]%");
-                        if (! empty($unit->imei_or_serial)) {
-                            $q->orWhere('notes', 'like', "%{$unit->imei_or_serial}%");
+                if ($isB2bVendor) {
+                    $offsetAmount = (float) ($salesOrderItem?->unit_price ?? $unit->selling_price ?? $unit->cost_basis ?? 0);
+                    $sn = $unit->imei_or_serial ? " (SN: {$unit->imei_or_serial})" : '';
+                    $devName = $unit->variant?->product?->name ?? 'Device';
+                    $remOffset = $offsetAmount;
+
+                    // 1. First, check debts with RETURN-OFFSET for this unit
+                    $returnOffsetDebts = Debt::where('tenant_id', $user->tenant_id)
+                        ->where('contact_id', $recipientCustomer->id)
+                        ->where('type', 'payable')
+                        ->whereHas('payments', function ($pq) use ($unit) {
+                            $pq->where('reference_number', 'RETURN-OFFSET')
+                                ->where(function ($q) use ($unit) {
+                                    $q->where('notes', 'like', "%[unit_id:{$unit->id}]%");
+                                    if (! empty($unit->imei_or_serial)) {
+                                        $q->orWhere('notes', 'like', "%{$unit->imei_or_serial}%");
+                                    }
+                                });
+                        })
+                        ->with('payments')
+                        ->get();
+
+                    foreach ($returnOffsetDebts as $pDebt) {
+                        if ($remOffset <= 0) {
+                            break;
                         }
-                    })
-                    ->with('debt.payments')
-                    ->get();
 
-                foreach ($returnOffsetPayments as $retPmt) {
-                    $pDebt = $retPmt->debt;
-                    if ($pDebt) {
-                        $offsetAmount = abs((float) $retPmt->amount);
-                        $sn = $unit->imei_or_serial ? " (SN: {$unit->imei_or_serial})" : '';
-                        $devName = $unit->variant?->product?->name ?? 'Device';
-
-                        $existingReOffset = $pDebt->payments
+                        $alreadyReOffset = $pDebt->payments
                             ->where('reference_number', 'BILATERAL-OFFSET')
                             ->filter(fn ($p) => str_contains($p->notes ?? '', "(Repaired)") && str_contains($p->notes ?? '', "[unit_id:{$unit->id}]"))
                             ->first();
 
-                        if (! $existingReOffset) {
+                        if (! $alreadyReOffset && $pDebt->remaining_amount > 0) {
+                            $deduct = min((float) $pDebt->remaining_amount, $remOffset);
                             $rePmt = DebtPayment::create([
                                 'tenant_id' => $user->tenant_id,
                                 'debt_id' => $pDebt->id,
                                 'financial_account_id' => null,
-                                'amount' => $offsetAmount,
+                                'amount' => $deduct,
                                 'payment_date' => $now,
                                 'reference_number' => 'BILATERAL-OFFSET',
                                 'notes' => "Handover device (Repaired): {$devName}{$sn} [unit_id:{$unit->id}]",
                                 'created_by' => $user->id,
                             ]);
                             $pDebt->payments->push($rePmt);
-
                             $pDebt->recalculateSettlement();
+                            $remOffset -= $deduct;
+                        }
+                    }
+
+                    // 2. If still remaining offset, deduct any other open payable owed to this partner
+                    if ($remOffset > 0) {
+                        $otherOpenPayables = Debt::where('tenant_id', $user->tenant_id)
+                            ->where('contact_id', $recipientCustomer->id)
+                            ->where('type', 'payable')
+                            ->whereIn('status', ['open', 'partially_paid'])
+                            ->with('payments')
+                            ->orderBy('created_at')
+                            ->get();
+
+                        foreach ($otherOpenPayables as $opDebt) {
+                            if ($remOffset <= 0) {
+                                break;
+                            }
+                            if ($opDebt->remaining_amount <= 0) {
+                                continue;
+                            }
+
+                            $deduct = min((float) $opDebt->remaining_amount, $remOffset);
+                            $rePmt = DebtPayment::create([
+                                'tenant_id' => $user->tenant_id,
+                                'debt_id' => $opDebt->id,
+                                'financial_account_id' => null,
+                                'amount' => $deduct,
+                                'payment_date' => $now,
+                                'reference_number' => 'BILATERAL-OFFSET',
+                                'notes' => "Handover device (Repaired): {$devName}{$sn} [unit_id:{$unit->id}]",
+                                'created_by' => $user->id,
+                            ]);
+                            $opDebt->payments->push($rePmt);
+                            $opDebt->recalculateSettlement();
+                            $remOffset -= $deduct;
                         }
                     }
                 }
             } else {
                 $status = 'in_stock';
                 $location = 'Shop Counter';
+                $handoverTo = null;
                 $appendNote = "Received fixed from {$vendorName} and restocked to shelf on ".$now->format('M d, Y').'.';
                 if (! empty($validated['notes'])) {
                     $appendNote .= " Note: {$validated['notes']}";
                 }
             }
 
+            $cleanPrevNotes = $prevNotes ? preg_replace('/(\s*\|\s*)?Received fixed from [^|]+(\.|$)/i', '', $prevNotes) : '';
+            $cleanPrevNotes = trim($cleanPrevNotes, " |");
+
             $updateData = [
                 'status' => $status,
                 'location' => $location,
+                'handover_to' => $handoverTo,
                 'customer_waiting' => false,
                 'customer_waiting_at' => null,
                 'is_repaired' => true,
                 'condition' => $validated['condition'] ?? $unit->condition,
-                'notes' => $prevNotes ? "{$prevNotes} | {$appendNote}" : $appendNote,
+                'notes' => $cleanPrevNotes ? "{$cleanPrevNotes} | {$appendNote}" : $appendNote,
             ];
 
             if (array_key_exists('battery_health', $validated)) {
@@ -2317,6 +2491,16 @@ class InventoryController extends Controller
         ]);
 
         $replacementImei = trim($validated['replacement_imei']);
+
+        if ($validated['action'] === 'deliver_to_customer') {
+            $hasPriorCustomer = $oldUnit->salesOrderItem !== null || ! empty($oldUnit->handover_to) || $oldUnit->customer_waiting;
+            if (! $hasPriorCustomer) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This unit was never sold to a customer or assigned to a partner. Please select "Restock to Shelf".',
+                ], 422);
+            }
+        }
 
         // Check for active IMEI conflict in tenant
         $exists = InventoryUnit::where('tenant_id', $user->tenant_id)
