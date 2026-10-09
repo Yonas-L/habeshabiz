@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import type { BusinessReportData, Tenant } from '../api/client';
 import { api, resolveImageUrl } from '../api/client';
 import { downloadPdf } from '../utils/downloadPdf';
+import { formatLocalDate } from '../utils/dateUtils';
 import {
   Download,
   Loader2,
@@ -17,6 +18,7 @@ import {
   CheckCircle2,
   ChevronDown,
   FileDown,
+  Wallet,
 } from 'lucide-react';
 
 interface ReportsViewProps {
@@ -28,18 +30,18 @@ type DatePreset = 'this_month' | 'last_month' | 'last_30' | 'last_7' | 'ytd' | '
 
 const formatMoney = (amount: number) => `${Math.round(amount).toLocaleString()} ETB`;
 
-const asDateInput = (date: Date) => date.toISOString().slice(0, 10);
+const asDateInput = (date: Date) => formatLocalDate(date);
 
 const getMonthStart = (offset = 0) => {
-  const date = new Date();
-  date.setMonth(date.getMonth() + offset, 1);
+  const now = new Date();
+  const date = new Date(now.getFullYear(), now.getMonth() + offset, 1);
   return asDateInput(date);
 };
 
 const getMonthRange = (month?: string): [string, string] => {
   const now = new Date();
   const [year, monthIndex] = (month || '').split('-').map(Number);
-  const date = year && monthIndex ? new Date(year, monthIndex - 1, 1) : now;
+  const date = year && monthIndex ? new Date(year, monthIndex - 1, 1) : new Date(now.getFullYear(), now.getMonth(), 1);
   const end = new Date(date.getFullYear(), date.getMonth() + 1, 0);
   const isCurrentMonth = date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth();
 
@@ -950,216 +952,388 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ tenant, selectedMonth 
             </div>
           </section>
 
-          {/* ─── Bottom Cash & Financial Balance Reconciliation Table ─── */}
-          {report.reconciliation && (
-            <div data-pdf-section className="max-w-3xl mx-auto w-full pt-4 print:pt-6">
-              <div id="report-reconciliation-table" className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-[#131926] shadow-2xs">
-                <PdfBrandHeader tenant={tenant} title="Balance Reconciliation Ledger" />
-                {/* Header */}
-                <div className="flex items-center justify-between px-4 py-3 bg-slate-50 dark:bg-slate-900/70 border-b border-slate-200 dark:border-slate-800">
-                  <div className="flex items-center gap-2">
-                    <Scale className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                    <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
-                      Balance Reconciliation Ledger
-                    </h2>
+          {/* ══════════════════════════════════════════════════════════════
+              ROW 4: Financial Position (Balance Sheet) & Cash Reconciliation (2 Columns)
+             ══════════════════════════════════════════════════════════════ */}
+          {(report.financial_position || report.reconciliation) && (
+            <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start pt-2">
+              {/* 7. Financial Position & Net Worth */}
+              {report.financial_position && (
+                <div id="report-position-table" data-pdf-section className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-[#131926]">
+                  <PdfBrandHeader tenant={tenant} title="Financial Position & Liabilities" />
+                  {/* Header */}
+                  <div className="flex items-center justify-between px-4 py-3 bg-slate-50 dark:bg-slate-900/70 border-b border-slate-200 dark:border-slate-800">
+                    <div className="flex items-center gap-2">
+                      <Wallet className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                      <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+                        Financial Position & Liabilities
+                      </h2>
+                    </div>
+                    <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${
+                      report.financial_position.net_position >= 0
+                        ? 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500/20'
+                        : 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 border-amber-500/20'
+                    }`}>
+                      Net Worth: {formatMoney(report.financial_position.net_position)}
+                    </span>
+                    <TableDownloadButton label="Financial Position" loading={downloadingTable === 'report-position-table'} onClick={() => void downloadTable('report-position-table', 'Financial_Position')} />
                   </div>
-                  <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${
-                    report.reconciliation.is_reconciled
-                      ? 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500/20'
-                      : 'text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 border-rose-500/20'
-                  }`}>
-                    <CheckCircle2 className={`w-3.5 h-3.5 ${report.reconciliation.is_reconciled ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`} />
-                    {report.reconciliation.is_reconciled
-                      ? `Cash Ledger Reconciled (${formatMoney(report.reconciliation.variance)} variance)`
-                      : `Discrepancy: ${formatMoney(Math.abs(report.reconciliation.variance))}`}
-                  </span>
-                  <TableDownloadButton label="Balance Reconciliation" loading={downloadingTable === 'report-reconciliation-table'} onClick={() => void downloadTable('report-reconciliation-table', 'Balance_Reconciliation')} />
+
+                  {/* Table */}
+                  <div data-report-scroll className="h-[420px] overflow-auto print:h-auto print:overflow-visible">
+                    <table className="w-full text-xs text-left">
+                      <thead>
+                        <tr className="border-b border-slate-200 dark:border-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 bg-slate-50/50 dark:bg-slate-900/40">
+                          <th className="py-2 px-4">Balance Sheet Element</th>
+                          <th className="py-2 px-3 text-center">Type</th>
+                          <th className="py-2 px-4 text-right">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                        {/* Liquid Cash & Bank */}
+                        <tr className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
+                          <td className="py-2.5 px-4 font-medium text-slate-900 dark:text-white">
+                            Liquid Cash & Bank Balances
+                          </td>
+                          <td className="py-2.5 px-3 text-center font-mono text-[10px] text-emerald-600 font-bold">
+                            Asset
+                          </td>
+                          <td className="py-2.5 px-4 text-right font-mono font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                            +{formatMoney(report.financial_position.assets.cash_and_bank)}
+                          </td>
+                        </tr>
+
+                        {/* Owned Stock */}
+                        {report.financial_position.assets.owned_stock > 0 && (
+                          <tr className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
+                            <td className="py-2 px-4 text-slate-600 dark:text-slate-300">
+                              Owned inventory (at cost)
+                            </td>
+                            <td className="py-2 px-3 text-center font-mono text-[10px] text-emerald-600 font-bold">
+                              Asset
+                            </td>
+                            <td className="py-2 px-4 text-right font-mono font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                              +{formatMoney(report.financial_position.assets.owned_stock)}
+                            </td>
+                          </tr>
+                        )}
+
+                        {/* Customer Receivables */}
+                        {report.financial_position.assets.customer_receivables > 0 && (
+                          <tr className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
+                            <td className="py-2 px-4 text-slate-600 dark:text-slate-300">
+                              Customer receivables owed to shop
+                            </td>
+                            <td className="py-2 px-3 text-center font-mono text-[10px] text-emerald-600 font-bold">
+                              Asset
+                            </td>
+                            <td className="py-2 px-4 text-right font-mono font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                              +{formatMoney(report.financial_position.assets.customer_receivables)}
+                            </td>
+                          </tr>
+                        )}
+
+                        {/* Custom Assets */}
+                        {report.financial_position.assets.custom_assets > 0 && (
+                          <tr className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
+                            <td className="py-2 px-4 text-slate-600 dark:text-slate-300">
+                              Custom business assets
+                            </td>
+                            <td className="py-2 px-3 text-center font-mono text-[10px] text-emerald-600 font-bold">
+                              Asset
+                            </td>
+                            <td className="py-2 px-4 text-right font-mono font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                              +{formatMoney(report.financial_position.assets.custom_assets)}
+                            </td>
+                          </tr>
+                        )}
+
+                        {/* Total Assets Subtotal */}
+                        <tr className="bg-slate-50/80 dark:bg-slate-900/50 font-semibold border-t border-slate-200 dark:border-slate-700">
+                          <td className="py-2 px-4 text-[10px] uppercase tracking-wider text-slate-600 dark:text-slate-300">
+                            Subtotal Owned Assets
+                          </td>
+                          <td className="py-2 px-3 text-center font-mono text-[10px] text-slate-400">
+                            Total
+                          </td>
+                          <td className="py-2 px-4 text-right font-mono font-bold text-slate-900 dark:text-white tabular-nums">
+                            {formatMoney(report.financial_position.assets.total)}
+                          </td>
+                        </tr>
+
+                        {/* Liabilities / Payables breakdown */}
+                        {report.financial_position.liabilities.payables.map((p) => (
+                          <tr key={p.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
+                            <td className="py-2 px-4 text-slate-600 dark:text-slate-300">
+                              <div className="font-medium text-slate-900 dark:text-white">{p.contact}</div>
+                              <div className="text-[10px] text-slate-400">
+                                {p.reference_type === 'customer_return_refund'
+                                  ? 'Return Refund Due'
+                                  : p.reference_type === 'stock_intake'
+                                  ? 'Supplier Stock Payable'
+                                  : p.reference_type.replace('_', ' ')}
+                              </div>
+                            </td>
+                            <td className="py-2 px-3 text-center font-mono text-[10px] text-rose-600 font-bold">
+                              Liability
+                            </td>
+                            <td className="py-2 px-4 text-right font-mono font-semibold text-rose-600 dark:text-rose-400 tabular-nums">
+                              −{formatMoney(p.remaining_amount)}
+                            </td>
+                          </tr>
+                        ))}
+                        {report.financial_position.liabilities.payables.length === 0 && (
+                          <tr>
+                            <td colSpan={3} className="py-3 text-center text-slate-400 italic text-[11px]">
+                              No open liabilities or payable debts
+                            </td>
+                          </tr>
+                        )}
+
+                        {/* Total Liabilities Subtotal */}
+                        <tr className="bg-rose-50/40 dark:bg-rose-950/20 font-semibold border-t border-rose-200/50 dark:border-rose-900/30">
+                          <td className="py-2 px-4 text-[10px] uppercase tracking-wider text-rose-700 dark:text-rose-300">
+                            Subtotal Open Payables & Liabilities
+                          </td>
+                          <td className="py-2 px-3 text-center font-mono text-[10px] text-rose-500">
+                            Total
+                          </td>
+                          <td className="py-2 px-4 text-right font-mono font-bold text-rose-600 dark:text-rose-400 tabular-nums">
+                            −{formatMoney(report.financial_position.liabilities.open_payables)}
+                          </td>
+                        </tr>
+                      </tbody>
+
+                      {/* Net Worth Grand Total */}
+                      <tfoot>
+                        <tr className="border-t-2 border-slate-900 dark:border-slate-500 bg-slate-50 dark:bg-slate-900/80 font-bold">
+                          <td colSpan={2} className="py-3 px-4 text-slate-900 dark:text-white uppercase tracking-wider text-[11px]">
+                            Net Financial Worth (Assets − Liabilities)
+                          </td>
+                          <td className={`py-3 px-4 text-right font-mono text-sm tabular-nums ${
+                            report.financial_position.net_position >= 0
+                              ? 'text-emerald-600 dark:text-emerald-400'
+                              : 'text-amber-600 dark:text-amber-400'
+                          }`}>
+                            {formatMoney(report.financial_position.net_position)}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
                 </div>
+              )}
 
-                {/* Table */}
-                <div data-report-scroll className="h-[420px] overflow-auto print:h-auto print:overflow-visible">
-                <table className="w-full text-xs text-left">
-                  <thead>
-                    <tr className="border-b border-slate-200 dark:border-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 bg-slate-50/50 dark:bg-slate-900/40">
-                      <th className="py-2 px-4">Financial Flow / Reconciliation Item</th>
-                      <th className="py-2 px-3 text-center">Effect</th>
-                      <th className="py-2 px-4 text-right">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                    {/* Opening Balance */}
-                    <tr className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
-                      <td className="py-2.5 px-4 font-medium text-slate-900 dark:text-white">
-                        Opening balance (start of period)
-                      </td>
-                      <td className="py-2.5 px-3 text-center font-mono text-[10px] text-slate-400">
-                        Base
-                      </td>
-                      <td className="py-2.5 px-4 text-right font-mono font-semibold text-slate-900 dark:text-white tabular-nums">
-                        {formatMoney(report.reconciliation.opening_balance)}
-                      </td>
-                    </tr>
+              {/* 8. Balance Reconciliation Ledger */}
+              {report.reconciliation && (
+                <div id="report-reconciliation-table" data-pdf-section className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-[#131926] shadow-2xs">
+                  <PdfBrandHeader tenant={tenant} title="Balance Reconciliation Ledger" />
+                  {/* Header */}
+                  <div className="flex items-center justify-between px-4 py-3 bg-slate-50 dark:bg-slate-900/70 border-b border-slate-200 dark:border-slate-800">
+                    <div className="flex items-center gap-2">
+                      <Scale className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                      <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+                        Balance Reconciliation Ledger
+                      </h2>
+                    </div>
+                    <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${
+                      report.reconciliation.is_reconciled
+                        ? 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500/20'
+                        : 'text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 border-rose-500/20'
+                    }`}>
+                      <CheckCircle2 className={`w-3.5 h-3.5 ${report.reconciliation.is_reconciled ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`} />
+                      {report.reconciliation.is_reconciled
+                        ? `Cash Reconciled (${formatMoney(report.reconciliation.variance)} var)`
+                        : `Discrepancy: ${formatMoney(Math.abs(report.reconciliation.variance))}`}
+                    </span>
+                    <TableDownloadButton label="Balance Reconciliation" loading={downloadingTable === 'report-reconciliation-table'} onClick={() => void downloadTable('report-reconciliation-table', 'Balance_Reconciliation')} />
+                  </div>
 
-                    {/* Capital deposits */}
-                    {report.reconciliation.capital_deposits > 0 && (
+                  {/* Table */}
+                  <div data-report-scroll className="h-[420px] overflow-auto print:h-auto print:overflow-visible">
+                  <table className="w-full text-xs text-left">
+                    <thead>
+                      <tr className="border-b border-slate-200 dark:border-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 bg-slate-50/50 dark:bg-slate-900/40">
+                        <th className="py-2 px-4">Financial Flow / Reconciliation Item</th>
+                        <th className="py-2 px-3 text-center">Effect</th>
+                        <th className="py-2 px-4 text-right">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                      {/* Opening Balance */}
+                      <tr className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
+                        <td className="py-2.5 px-4 font-medium text-slate-900 dark:text-white">
+                          Opening balance (start of period)
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-mono text-[10px] text-slate-400">
+                          Base
+                        </td>
+                        <td className="py-2.5 px-4 text-right font-mono font-semibold text-slate-900 dark:text-white tabular-nums">
+                          {formatMoney(report.reconciliation.opening_balance)}
+                        </td>
+                      </tr>
+
+                      {/* Capital deposits */}
+                      {report.reconciliation.capital_deposits > 0 && (
+                        <tr className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
+                          <td className="py-2 px-4 text-slate-600 dark:text-slate-300">
+                            Capital deposits / opening bank deposits
+                          </td>
+                          <td className="py-2 px-3 text-center font-mono text-[10px] text-emerald-600 font-bold">
+                            + Inflow
+                          </td>
+                          <td className="py-2 px-4 text-right font-mono font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                            +{formatMoney(report.reconciliation.capital_deposits)}
+                          </td>
+                        </tr>
+                      )}
+
+                      {/* Customer collections */}
                       <tr className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
                         <td className="py-2 px-4 text-slate-600 dark:text-slate-300">
-                          Capital deposits / opening bank deposits
+                          Sales receipts & customer collections
                         </td>
                         <td className="py-2 px-3 text-center font-mono text-[10px] text-emerald-600 font-bold">
                           + Inflow
                         </td>
                         <td className="py-2 px-4 text-right font-mono font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
-                          +{formatMoney(report.reconciliation.capital_deposits)}
+                          +{formatMoney(report.reconciliation.customer_collections)}
                         </td>
                       </tr>
-                    )}
 
-                    {/* Customer collections */}
-                    <tr className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
-                      <td className="py-2 px-4 text-slate-600 dark:text-slate-300">
-                        Sales receipts & customer collections
-                      </td>
-                      <td className="py-2 px-3 text-center font-mono text-[10px] text-emerald-600 font-bold">
-                        + Inflow
-                      </td>
-                      <td className="py-2 px-4 text-right font-mono font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
-                        +{formatMoney(report.reconciliation.customer_collections)}
-                      </td>
-                    </tr>
+                      {/* Borrowed funds */}
+                      {report.reconciliation.borrowed_funds > 0 && (
+                        <tr className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
+                          <td className="py-2 px-4 text-slate-600 dark:text-slate-300">
+                            External debt / borrowed capital receipts
+                          </td>
+                          <td className="py-2 px-3 text-center font-mono text-[10px] text-emerald-600 font-bold">
+                            + Inflow
+                          </td>
+                          <td className="py-2 px-4 text-right font-mono font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                            +{formatMoney(report.reconciliation.borrowed_funds)}
+                          </td>
+                        </tr>
+                      )}
 
-                    {/* Borrowed funds */}
-                    {report.reconciliation.borrowed_funds > 0 && (
+                      {/* Other direct income */}
+                      {report.reconciliation.other_income > 0 && (
+                        <tr className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
+                          <td className="py-2 px-4 text-slate-600 dark:text-slate-300">
+                            Other direct income
+                          </td>
+                          <td className="py-2 px-3 text-center font-mono text-[10px] text-emerald-600 font-bold">
+                            + Inflow
+                          </td>
+                          <td className="py-2 px-4 text-right font-mono font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                            +{formatMoney(report.reconciliation.other_income)}
+                          </td>
+                        </tr>
+                      )}
+
+                      {/* Supplier payments */}
                       <tr className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
                         <td className="py-2 px-4 text-slate-600 dark:text-slate-300">
-                          External debt / borrowed capital receipts
-                        </td>
-                        <td className="py-2 px-3 text-center font-mono text-[10px] text-emerald-600 font-bold">
-                          + Inflow
-                        </td>
-                        <td className="py-2 px-4 text-right font-mono font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
-                          +{formatMoney(report.reconciliation.borrowed_funds)}
-                        </td>
-                      </tr>
-                    )}
-
-                    {/* Other direct income */}
-                    {report.reconciliation.other_income > 0 && (
-                      <tr className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
-                        <td className="py-2 px-4 text-slate-600 dark:text-slate-300">
-                          Other direct income
-                        </td>
-                        <td className="py-2 px-3 text-center font-mono text-[10px] text-emerald-600 font-bold">
-                          + Inflow
-                        </td>
-                        <td className="py-2 px-4 text-right font-mono font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
-                          +{formatMoney(report.reconciliation.other_income)}
-                        </td>
-                      </tr>
-                    )}
-
-                    {/* Supplier payments */}
-                    <tr className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
-                      <td className="py-2 px-4 text-slate-600 dark:text-slate-300">
-                        Supplier payments & inventory disbursements
-                      </td>
-                      <td className="py-2 px-3 text-center font-mono text-[10px] text-rose-600 font-bold">
-                        − Outflow
-                      </td>
-                      <td className="py-2 px-4 text-right font-mono font-semibold text-rose-600 dark:text-rose-400 tabular-nums">
-                        −{formatMoney(report.reconciliation.supplier_payments)}
-                      </td>
-                    </tr>
-
-                    {/* Operating expenses */}
-                    {report.reconciliation.operating_expenses > 0 && (
-                      <tr className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
-                        <td className="py-2 px-4 text-slate-600 dark:text-slate-300">
-                          Operating overhead expenses
+                          Supplier payments & inventory disbursements
                         </td>
                         <td className="py-2 px-3 text-center font-mono text-[10px] text-rose-600 font-bold">
                           − Outflow
                         </td>
                         <td className="py-2 px-4 text-right font-mono font-semibold text-rose-600 dark:text-rose-400 tabular-nums">
-                          −{formatMoney(report.reconciliation.operating_expenses)}
+                          −{formatMoney(report.reconciliation.supplier_payments)}
                         </td>
                       </tr>
-                    )}
 
-                    {/* Owner draws */}
-                    {report.reconciliation.owner_draws > 0 && (
-                      <tr className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
-                        <td className="py-2 px-4 text-slate-600 dark:text-slate-300">
-                          Owner equity drawings (withdrawals)
+                      {/* Operating expenses */}
+                      {report.reconciliation.operating_expenses > 0 && (
+                        <tr className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
+                          <td className="py-2 px-4 text-slate-600 dark:text-slate-300">
+                            Operating overhead expenses
+                          </td>
+                          <td className="py-2 px-3 text-center font-mono text-[10px] text-rose-600 font-bold">
+                            − Outflow
+                          </td>
+                          <td className="py-2 px-4 text-right font-mono font-semibold text-rose-600 dark:text-rose-400 tabular-nums">
+                            −{formatMoney(report.reconciliation.operating_expenses)}
+                          </td>
+                        </tr>
+                      )}
+
+                      {/* Owner draws */}
+                      {report.reconciliation.owner_draws > 0 && (
+                        <tr className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
+                          <td className="py-2 px-4 text-slate-600 dark:text-slate-300">
+                            Owner equity drawings (withdrawals)
+                          </td>
+                          <td className="py-2 px-3 text-center font-mono text-[10px] text-amber-600 font-bold">
+                            − Outflow
+                          </td>
+                          <td className="py-2 px-4 text-right font-mono font-semibold text-amber-600 dark:text-amber-400 tabular-nums">
+                            −{formatMoney(report.reconciliation.owner_draws)}
+                          </td>
+                        </tr>
+                      )}
+
+                      {/* Loan disbursements */}
+                      {report.reconciliation.loan_disbursements > 0 && (
+                        <tr className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
+                          <td className="py-2 px-4 text-slate-600 dark:text-slate-300">
+                            Loan disbursements / extended receivables
+                          </td>
+                          <td className="py-2 px-3 text-center font-mono text-[10px] text-rose-600 font-bold">
+                            − Outflow
+                          </td>
+                          <td className="py-2 px-4 text-right font-mono font-semibold text-rose-600 dark:text-rose-400 tabular-nums">
+                            −{formatMoney(report.reconciliation.loan_disbursements)}
+                          </td>
+                        </tr>
+                      )}
+
+                      {/* Transaction fees */}
+                      {report.reconciliation.transaction_fees > 0 && (
+                        <tr className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
+                          <td className="py-2 px-4 text-slate-600 dark:text-slate-300">
+                            Transaction & gateway banking fees
+                          </td>
+                          <td className="py-2 px-3 text-center font-mono text-[10px] text-rose-600 font-bold">
+                            − Outflow
+                          </td>
+                          <td className="py-2 px-4 text-right font-mono font-semibold text-rose-600 dark:text-rose-400 tabular-nums">
+                            −{formatMoney(report.reconciliation.transaction_fees)}
+                          </td>
+                        </tr>
+                      )}
+
+                      {/* Closing Balance */}
+                      <tr className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30 bg-slate-50/40 dark:bg-slate-900/40">
+                        <td className="py-2.5 px-4 font-semibold text-slate-900 dark:text-white">
+                          Closing liquid balance (end of period)
                         </td>
-                        <td className="py-2 px-3 text-center font-mono text-[10px] text-amber-600 font-bold">
-                          − Outflow
+                        <td className="py-2.5 px-3 text-center font-mono text-[10px] text-slate-400">
+                          Actual
                         </td>
-                        <td className="py-2 px-4 text-right font-mono font-semibold text-amber-600 dark:text-amber-400 tabular-nums">
-                          −{formatMoney(report.reconciliation.owner_draws)}
+                        <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-900 dark:text-white tabular-nums">
+                          {formatMoney(report.reconciliation.closing_balance)}
                         </td>
                       </tr>
-                    )}
+                    </tbody>
 
-                    {/* Loan disbursements */}
-                    {report.reconciliation.loan_disbursements > 0 && (
-                      <tr className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
-                        <td className="py-2 px-4 text-slate-600 dark:text-slate-300">
-                          Loan disbursements / extended receivables
+                    {/* Total Reconciliation Row */}
+                    <tfoot>
+                      <tr className="border-t-2 border-slate-900 dark:border-slate-500 bg-slate-50 dark:bg-slate-900/80 font-bold">
+                        <td colSpan={2} className="py-3 px-4 text-slate-900 dark:text-white uppercase tracking-wider text-[11px]">
+                          Reconciliation Difference (Opening + Inflows − Outflows − Closing)
                         </td>
-                        <td className="py-2 px-3 text-center font-mono text-[10px] text-rose-600 font-bold">
-                          − Outflow
-                        </td>
-                        <td className="py-2 px-4 text-right font-mono font-semibold text-rose-600 dark:text-rose-400 tabular-nums">
-                          −{formatMoney(report.reconciliation.loan_disbursements)}
+                        <td className="py-3 px-4 text-right font-mono text-sm text-emerald-600 dark:text-emerald-400 tabular-nums">
+                          {formatMoney(report.reconciliation.variance)}
                         </td>
                       </tr>
-                    )}
-
-                    {/* Transaction fees */}
-                    {report.reconciliation.transaction_fees > 0 && (
-                      <tr className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
-                        <td className="py-2 px-4 text-slate-600 dark:text-slate-300">
-                          Transaction & gateway banking fees
-                        </td>
-                        <td className="py-2 px-3 text-center font-mono text-[10px] text-rose-600 font-bold">
-                          − Outflow
-                        </td>
-                        <td className="py-2 px-4 text-right font-mono font-semibold text-rose-600 dark:text-rose-400 tabular-nums">
-                          −{formatMoney(report.reconciliation.transaction_fees)}
-                        </td>
-                      </tr>
-                    )}
-
-                    {/* Closing Balance */}
-                    <tr className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30 bg-slate-50/40 dark:bg-slate-900/40">
-                      <td className="py-2.5 px-4 font-semibold text-slate-900 dark:text-white">
-                        Closing liquid balance (end of period)
-                      </td>
-                      <td className="py-2.5 px-3 text-center font-mono text-[10px] text-slate-400">
-                        Actual
-                      </td>
-                      <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-900 dark:text-white tabular-nums">
-                        {formatMoney(report.reconciliation.closing_balance)}
-                      </td>
-                    </tr>
-                  </tbody>
-
-                  {/* Total Reconciliation Row */}
-                  <tfoot>
-                    <tr className="border-t-2 border-slate-900 dark:border-slate-500 bg-slate-50 dark:bg-slate-900/80 font-bold">
-                      <td colSpan={2} className="py-3 px-4 text-slate-900 dark:text-white uppercase tracking-wider text-[11px]">
-                        Reconciliation Difference (Opening + Inflows − Outflows − Closing)
-                      </td>
-                      <td className="py-3 px-4 text-right font-mono text-sm text-emerald-600 dark:text-emerald-400 tabular-nums">
-                        {formatMoney(report.reconciliation.variance)}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
+                    </tfoot>
+                  </table>
+                  </div>
                 </div>
-              </div>
-            </div>
+              )}
+            </section>
           )}
 
           {/* Printable Signature & Endorsement Block */}

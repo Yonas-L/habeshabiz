@@ -1477,13 +1477,20 @@ class InventoryController extends Controller
 
             // Record SalesOrder & SalesOrderItem to register sales revenue, facts, and gross profit margin (+5,000 ETB etc.)
             $saleContact = Contact::where('tenant_id', $user->tenant_id)
-                ->where(function ($q) use ($vendorName, $unit) {
-                    $q->where('name', 'ilike', $vendorName);
-                    if ($unit->supplier_contact_id) {
-                        $q->orWhere('id', $unit->supplier_contact_id);
-                    }
-                })
+                ->where('name', 'ilike', $vendorName)
                 ->first();
+
+            if (! $saleContact && ! empty($unit->handover_to)) {
+                $saleContact = Contact::where('tenant_id', $user->tenant_id)
+                    ->where('name', 'ilike', $unit->handover_to)
+                    ->first();
+            }
+
+            if (! $saleContact && $unit->supplier_contact_id) {
+                $saleContact = Contact::where('tenant_id', $user->tenant_id)
+                    ->where('id', $unit->supplier_contact_id)
+                    ->first();
+            }
 
             $orderNumber = 'SO-'.strtoupper(Str::random(8));
             $order = SalesOrder::create([
@@ -1770,10 +1777,52 @@ class InventoryController extends Controller
             if ($orderItem) {
                 $orderItem->update(['profit' => 0.0]);
                 if ($orderItem->salesOrder) {
-                    $orderItem->salesOrder->update([
+                    $salesOrder = $orderItem->salesOrder;
+                    $salesOrder->update([
                         'payment_status' => 'refunded',
-                        'notes' => ($orderItem->salesOrder->notes ? $orderItem->salesOrder->notes.' | ' : '').'Refunded/Returned',
+                        'notes' => ($salesOrder->notes ? $salesOrder->notes.' | ' : '').'Refunded/Returned',
                     ]);
+
+                    // If customer/partner already paid money for this order, record an open refund payable debt
+                    $returnCustomer = $salesOrder->customer;
+                    if (! $returnCustomer && ! empty($unit->handover_to)) {
+                        $returnCustomer = Contact::where('tenant_id', $user->tenant_id)
+                            ->where('name', 'ilike', $unit->handover_to)
+                            ->first();
+                    }
+
+                    $isDebtOffsetSale = $salesOrder->payment_method === 'debt_offset'
+                        || str_contains(strtolower($salesOrder->notes ?? ''), 'offset settlement');
+
+                    if ($returnCustomer && ! $isDebtOffsetSale && (float) $salesOrder->paid_amount > 0) {
+                        $refundAmount = (float) $salesOrder->paid_amount;
+                        $pName = $unit->variant?->product?->name ?? 'Device';
+                        $sn = $unit->imei_or_serial ? " (SN: {$unit->imei_or_serial})" : '';
+
+                        $existingRefundDebt = Debt::where('tenant_id', $user->tenant_id)
+                            ->where('contact_id', $returnCustomer->id)
+                            ->where('type', 'payable')
+                            ->where('reference_type', 'customer_return_refund')
+                            ->where('reference_id', $unit->id)
+                            ->whereIn('status', ['open', 'partially_paid'])
+                            ->first();
+
+                        if (! $existingRefundDebt) {
+                            Debt::create([
+                                'tenant_id' => $user->tenant_id,
+                                'contact_id' => $returnCustomer->id,
+                                'type' => 'payable',
+                                'reference_type' => 'customer_return_refund',
+                                'reference_id' => $unit->id,
+                                'original_amount' => $refundAmount,
+                                'paid_amount' => 0.0,
+                                'remaining_amount' => $refundAmount,
+                                'due_date' => now()->addDays(7),
+                                'status' => 'open',
+                                'notes' => "Refund payable to {$returnCustomer->name} for returned {$pName}{$sn} (Order #{$salesOrder->order_number}).",
+                            ]);
+                        }
+                    }
                 }
             }
 
@@ -2262,11 +2311,14 @@ class InventoryController extends Controller
             $handoverTo = null;
             if ($action === 'deliver_to_customer') {
                 // Identify the recipient customer or partner
-                $recipientCustomer = $unit->salesOrderItem?->salesOrder?->customer;
-                if (! $recipientCustomer && ! empty($unit->handover_to)) {
+                $recipientCustomer = null;
+                if (! empty($unit->handover_to)) {
                     $recipientCustomer = Contact::where('tenant_id', $user->tenant_id)
                         ->where('name', $unit->handover_to)
                         ->first();
+                }
+                if (! $recipientCustomer) {
+                    $recipientCustomer = $unit->salesOrderItem?->salesOrder?->customer;
                 }
 
                 $customerName = $recipientCustomer?->name ?? $unit->handover_to ?? 'Customer';
@@ -2298,6 +2350,30 @@ class InventoryController extends Controller
 
                     $realProfit = ((float) $salesOrderItem->unit_price - (float) $salesOrderItem->unit_cost) * (int) $salesOrderItem->quantity - (float) $salesOrderItem->bonus_amount;
                     $salesOrderItem->update(['profit' => $realProfit]);
+                }
+
+                // Settle any open customer refund debts for this unit upon redelivery
+                $refundDebts = Debt::where('tenant_id', $user->tenant_id)
+                    ->where('reference_type', 'customer_return_refund')
+                    ->where('reference_id', $unit->id)
+                    ->whereIn('status', ['open', 'partially_paid'])
+                    ->get();
+
+                foreach ($refundDebts as $rDebt) {
+                    $settleAmt = (float) $rDebt->remaining_amount;
+                    if ($settleAmt > 0) {
+                        DebtPayment::create([
+                            'tenant_id' => $user->tenant_id,
+                            'debt_id' => $rDebt->id,
+                            'financial_account_id' => null,
+                            'amount' => $settleAmt,
+                            'payment_date' => $now,
+                            'reference_number' => 'REPAIR-REDELIVERY',
+                            'notes' => "Refund liability settled upon redelivery of repaired device to {$customerName}.",
+                            'created_by' => $user->id,
+                        ]);
+                        $rDebt->recalculateSettlement();
+                    }
                 }
 
                 if ($isB2bVendor) {

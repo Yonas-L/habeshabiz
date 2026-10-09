@@ -507,7 +507,143 @@ class VendorReturnAndSwapWorkflowTest extends TestCase
         $this->assertEquals(40000.0, (float) $debt->remaining_amount);
         $this->assertEquals('open', $debt->status);
     }
+
+    public function test_triangular_b2b_handover_sale_customer_return_and_vendor_repair_lifecycle(): void
+    {
+        $supplier = Contact::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Supplier Nati',
+            'roles' => ['peer_vendor'],
+        ]);
+
+        $buyer = Contact::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Partner Yenus',
+            'roles' => ['peer_vendor'],
+        ]);
+
+        $account = \App\Models\FinancialAccount::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Main Bank',
+            'type' => 'bank',
+            'current_balance' => 0,
+        ]);
+
+        // 1. Stock intake from Supplier Nati (50k cost)
+        $unit = InventoryUnit::create([
+            'tenant_id' => $this->tenant->id,
+            'variant_id' => $this->variant->id,
+            'imei_or_serial' => '74623874623874999',
+            'cost_basis' => 50000,
+            'status' => 'out',
+            'location' => 'Out with Partner Yenus',
+            'handover_to' => $buyer->name,
+            'handover_payout' => 100000,
+            'source_type' => 'consignment',
+            'supplier_contact_id' => $supplier->id,
+            'condition' => 'refurbished',
+            'sim_type' => 'physical',
+        ]);
+
+        $supplierDebt = Debt::create([
+            'tenant_id' => $this->tenant->id,
+            'contact_id' => $supplier->id,
+            'type' => 'payable',
+            'reference_type' => 'stock_intake',
+            'reference_id' => $unit->id,
+            'original_amount' => 50000,
+            'paid_amount' => 0,
+            'remaining_amount' => 50000,
+            'status' => 'open',
+            'notes' => 'Stock intake: iPhone 15',
+        ]);
+
+        $holdingDebt = Debt::create([
+            'tenant_id' => $this->tenant->id,
+            'contact_id' => $buyer->id,
+            'type' => 'receivable',
+            'reference_type' => 'handover_holding',
+            'reference_id' => $unit->id,
+            'original_amount' => 100000,
+            'paid_amount' => 0,
+            'remaining_amount' => 100000,
+            'status' => 'open',
+            'notes' => 'Handover holding debt',
+        ]);
+
+        // 2. Mark Handover Sold: Buyer Yenus pays 100k cash
+        $this->actingAs($this->owner)
+            ->postJson("/api/v1/inventory/units/{$unit->id}/mark-sold", [
+                'selling_price' => 100000,
+                'settlement_type' => 'paid',
+                'financial_account_id' => $account->id,
+            ])
+            ->assertOk();
+
+        // Verify order created with Buyer Yenus (NOT Supplier Nati)
+        $salesOrder = SalesOrder::where('notes', 'like', "%{$unit->id}%")->first();
+        $this->assertNotNull($salesOrder);
+        $this->assertEquals($buyer->id, $salesOrder->customer_id);
+        $this->assertEquals(50000.0, (float) $salesOrder->items->first()->profit);
+
+        // 3. Customer Return: Buyer Yenus returns defective unit directly to supplier
+        $this->actingAs($this->owner)
+            ->postJson("/api/v1/inventory/units/{$unit->id}/customer-return", [
+                'return_reason' => 'Defective Camera',
+                'destination' => 'vendor',
+                'customer_waiting' => true,
+            ])
+            ->assertOk();
+
+        // Profit zeroed, order marked refunded
+        $salesOrder->refresh();
+        $this->assertEquals('refunded', $salesOrder->payment_status);
+        $this->assertEquals(0.0, (float) $salesOrder->items->first()->profit);
+
+        // Refund payable debt created for Buyer Yenus (we owe Yenus 100k)
+        $buyerRefundDebt = Debt::where('contact_id', $buyer->id)
+            ->where('reference_type', 'customer_return_refund')
+            ->where('reference_id', $unit->id)
+            ->first();
+        $this->assertNotNull($buyerRefundDebt);
+        $this->assertEquals('open', $buyerRefundDebt->status);
+        $this->assertEquals(100000.0, (float) $buyerRefundDebt->remaining_amount);
+
+        // Supplier Nati debt cancelled via RETURN-TO-VENDOR (we owe Nati 0k while device is with Nati)
+        $supplierDebt->refresh();
+        $this->assertEquals(0.0, (float) $supplierDebt->remaining_amount);
+        $this->assertEquals('settled', $supplierDebt->status);
+
+        // 4. Supplier Nati repairs device and returns it -> Deliver to Customer (Buyer Yenus)
+        $this->actingAs($this->owner)
+            ->postJson("/api/v1/inventory/units/{$unit->id}/receive-from-vendor", [
+                'action' => 'deliver_to_customer',
+                'condition' => 'refurbished',
+            ])
+            ->assertOk();
+
+        // Supplier Nati debt reinstated (we owe Nati 50k again)
+        $supplierDebt->refresh();
+        $this->assertEquals(50000.0, (float) $supplierDebt->remaining_amount);
+        $this->assertEquals('open', $supplierDebt->status);
+
+        // Buyer Yenus refund debt settled upon redelivery (we owe Yenus 0k)
+        $buyerRefundDebt->refresh();
+        $this->assertEquals(0.0, (float) $buyerRefundDebt->remaining_amount);
+        $this->assertEquals('settled', $buyerRefundDebt->status);
+
+        // Profit restored on Sales Order
+        $salesOrder->refresh();
+        $this->assertEquals('paid', $salesOrder->payment_status);
+        $this->assertEquals(50000.0, (float) $salesOrder->items->first()->profit);
+
+        // Unit marked sold with Buyer Yenus
+        $unit->refresh();
+        $this->assertEquals('sold', $unit->status);
+        $this->assertEquals($buyer->name, $unit->handover_to);
+    }
 }
+
 
 
 

@@ -21,6 +21,7 @@ import { AnimatedNumber } from '../components/AnimatedNumber';
 import { VendorStatementPrintModal } from '../components/partners/VendorStatementPrintModal';
 import { PartnerFormModal } from '../components/partners/PartnerFormModal';
 import { CustomPageLoader } from '../components/loading/CustomPageLoader';
+import { formatLocalDate } from '../utils/dateUtils';
 
 interface PartnerDetailViewProps {
   contactId: string;
@@ -69,18 +70,18 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
       const now = new Date();
       if (dateFilter === 'this_month') {
         const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-        startDate = firstDay.toISOString().split('T')[0];
-        endDate = now.toISOString().split('T')[0];
+        startDate = formatLocalDate(firstDay);
+        endDate = formatLocalDate(now);
       } else if (dateFilter === 'last_month') {
         const firstDayPrev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
         const lastDayPrev = new Date(now.getFullYear(), now.getMonth(), 0);
-        startDate = firstDayPrev.toISOString().split('T')[0];
-        endDate = lastDayPrev.toISOString().split('T')[0];
+        startDate = formatLocalDate(firstDayPrev);
+        endDate = formatLocalDate(lastDayPrev);
       } else if (dateFilter === 'last_30_days') {
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        startDate = thirtyDaysAgo.toISOString().split('T')[0];
-        endDate = now.toISOString().split('T')[0];
+        startDate = formatLocalDate(thirtyDaysAgo);
+        endDate = formatLocalDate(now);
       } else if (dateFilter === 'custom') {
         if (customStartDate) startDate = customStartDate;
         if (customEndDate) endDate = customEndDate;

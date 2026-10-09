@@ -5,6 +5,7 @@ import { SlideOverDrawer } from './SlideOverDrawer';
 import { AccountLogo } from '../../utils/bankLogos';
 import { AnimatedNumber } from '../AnimatedNumber';
 import { toast } from 'sonner';
+import { formatLocalDate } from '../../utils/dateUtils';
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -63,19 +64,19 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
       setStartDate('');
       setEndDate('');
     } else if (preset === 'today') {
-      const isoToday = now.toISOString().split('T')[0];
-      setStartDate(isoToday);
-      setEndDate(isoToday);
+      const todayStr = formatLocalDate(now);
+      setStartDate(todayStr);
+      setEndDate(todayStr);
     } else if (preset === 'this_month') {
-      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+      const firstDay = formatLocalDate(new Date(now.getFullYear(), now.getMonth(), 1));
+      const lastDay = formatLocalDate(new Date(now.getFullYear(), now.getMonth() + 1, 0));
       setStartDate(firstDay);
       setEndDate(lastDay);
     } else if (preset === 'last_30_days') {
-      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      const isoToday = now.toISOString().split('T')[0];
-      setStartDate(thirtyDaysAgo);
-      setEndDate(isoToday);
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      setStartDate(formatLocalDate(thirtyDaysAgo));
+      setEndDate(formatLocalDate(now));
     }
   };
 

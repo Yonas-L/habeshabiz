@@ -67,7 +67,7 @@ class GeneratePartnerStatementAction
             ->get()
             ->keyBy('id');
 
-        $unitIds = $debts->whereIn('reference_type', ['handover_holding', 'vendor_repair_reimbursement', 'repair_reimbursement', 'vendor_return_refund'])
+        $unitIds = $debts->whereIn('reference_type', ['handover_holding', 'vendor_repair_reimbursement', 'repair_reimbursement', 'vendor_return_refund', 'customer_return_refund', 'stock_intake'])
             ->pluck('reference_id')
             ->filter()
             ->unique()
@@ -175,6 +175,23 @@ class GeneratePartnerStatementAction
                         'date' => $debtCreatedDate,
                         'type' => 'stock_intake',
                         'type_label' => 'Item Received',
+                        'context' => $context,
+                        'payable' => (float) $debt->original_amount,
+                        'receivable' => 0.0,
+                        'balance_effect' => -(float) $debt->original_amount,
+                        'reference_number' => null,
+                    ];
+                } elseif ($debt->reference_type === 'customer_return_refund') {
+                    $unit = ! empty($debt->reference_id) ? ($inventoryUnits->get($debt->reference_id) ?? null) : null;
+                    $pName = $unit?->variant?->product?->name ?? 'Device';
+                    $sn = $unit?->imei_or_serial ? " (SN: {$unit->imei_or_serial})" : '';
+                    $context = $unit ? "Return Refund: {$pName}{$sn}" : ($debt->notes ? $this->sanitizeContext($debt->notes) : 'Return Refund');
+
+                    $rawEntries[] = [
+                        'id' => "debt-{$debt->id}",
+                        'date' => $debtCreatedDate,
+                        'type' => 'customer_return_refund',
+                        'type_label' => 'Return Refund',
                         'context' => $context,
                         'payable' => (float) $debt->original_amount,
                         'receivable' => 0.0,
@@ -462,6 +479,19 @@ class GeneratePartnerStatementAction
                         'receivable' => $debt->type === 'receivable' ? -(float) $payment->amount : 0.0,
                         'balance_effect' => $debt->type === 'payable' ? (float) $payment->amount : -(float) $payment->amount,
                         'reference_number' => $payment->reference_number,
+                    ];
+                } elseif ($payment->reference_number === 'REPAIR-REDELIVERY') {
+                    $context = $payment->notes ? $this->sanitizeContext($payment->notes) : 'Repaired device delivered';
+                    $rawEntries[] = [
+                        'id' => "pay-{$payment->id}",
+                        'date' => $payDate,
+                        'type' => 'repair_redelivery',
+                        'type_label' => 'Repaired Device',
+                        'context' => $context,
+                        'payable' => -(float) $payment->amount,
+                        'receivable' => 0.0,
+                        'balance_effect' => (float) $payment->amount,
+                        'reference_number' => 'REPAIR-REDELIVERY',
                     ];
                 } elseif ($debt->type === 'payable') {
                     $accText = ($accountName && $accountName !== 'Wire') ? " ({$accountName})" : '';
