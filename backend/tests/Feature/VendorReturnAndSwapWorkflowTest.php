@@ -11,6 +11,7 @@ use App\Models\ProductVariant;
 use App\Models\SalesOrder;
 use App\Models\SalesOrderItem;
 use App\Models\Debt;
+use App\Models\FinancialAccount;
 use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -641,6 +642,101 @@ class VendorReturnAndSwapWorkflowTest extends TestCase
         $unit->refresh();
         $this->assertEquals('sold', $unit->status);
         $this->assertEquals($buyer->name, $unit->handover_to);
+    }
+
+    public function test_collecting_payment_on_handover_debt_automatically_marks_unit_sold_and_creates_sales_order_and_profit(): void
+    {
+        $supplier = Contact::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Supplier Yenus',
+            'phone' => '+251911999888',
+            'roles' => ['supplier'],
+            'is_active' => true,
+        ]);
+
+        $partner = Contact::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Broker Nati',
+            'phone' => '+251922777666',
+            'roles' => ['peer_vendor'],
+            'is_active' => true,
+        ]);
+
+        $account = FinancialAccount::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'CBE Main',
+            'type' => 'bank',
+            'current_balance' => 0,
+            'is_active' => true,
+        ]);
+
+        // 1. Stock intake from Yenus at 100k
+        $unit = InventoryUnit::create([
+            'tenant_id' => $this->tenant->id,
+            'variant_id' => $this->variant->id,
+            'imei_or_serial' => 'SN-HANDOVER-COLLECT-TEST',
+            'cost_basis' => 100000,
+            'selling_price' => 150000,
+            'status' => 'out',
+            'source_type' => 'consignment',
+            'supplier_contact_id' => $supplier->id,
+            'handover_to' => $partner->name,
+            'handed_out_at' => now(),
+            'condition' => 'new',
+            'sim_type' => 'physical',
+        ]);
+
+        $handoverDebt = Debt::create([
+            'tenant_id' => $this->tenant->id,
+            'contact_id' => $partner->id,
+            'type' => 'receivable',
+            'reference_type' => 'handover_holding',
+            'reference_id' => $unit->id,
+            'original_amount' => 150000,
+            'paid_amount' => 0,
+            'remaining_amount' => 150000,
+            'status' => 'open',
+            'notes' => "Handover payout for {$unit->imei_or_serial} to {$partner->name}",
+        ]);
+
+        // 2. User collects payment on the receivable debt via drawer
+        $res = $this->actingAs($this->owner)
+            ->postJson("/api/v1/debts/{$handoverDebt->id}/payments", [
+                'amount' => 150000,
+                'financial_account_id' => $account->id,
+            ]);
+
+        $res->assertOk();
+
+        // 3. Assert debt is settled
+        $handoverDebt->refresh();
+        $this->assertEquals('settled', $handoverDebt->status);
+        $this->assertEquals(0.0, (float) $handoverDebt->remaining_amount);
+        $this->assertEquals(150000.0, (float) $handoverDebt->paid_amount);
+
+        // 4. Assert unit is marked as sold
+        $unit->refresh();
+        $this->assertEquals('sold', $unit->status);
+        $this->assertEquals("Sold by {$partner->name}", $unit->location);
+        $this->assertNotNull($unit->sold_at);
+
+        // 5. Assert SalesOrder was automatically created
+        $orderItem = SalesOrderItem::where('inventory_unit_id', $unit->id)->first();
+        $this->assertNotNull($orderItem);
+        $this->assertEquals(150000.0, (float) $orderItem->unit_price);
+        $this->assertEquals(100000.0, (float) $orderItem->unit_cost);
+        $this->assertEquals(50000.0, (float) $orderItem->profit);
+
+        $salesOrder = $orderItem->salesOrder;
+        $this->assertNotNull($salesOrder);
+        $this->assertEquals($partner->id, $salesOrder->customer_id);
+        $this->assertEquals(150000.0, (float) $salesOrder->total_amount);
+        $this->assertEquals(150000.0, (float) $salesOrder->paid_amount);
+        $this->assertEquals('paid', $salesOrder->payment_status);
+
+        // 6. Assert Bank Account received the 150,000 ETB
+        $account->refresh();
+        $this->assertEquals(150000.0, (float) $account->current_balance);
     }
 }
 

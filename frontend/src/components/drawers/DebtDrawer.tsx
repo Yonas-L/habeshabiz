@@ -144,6 +144,8 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
       subtitle={
         debt.reference_type === 'salesperson_bonus'
           ? 'Sales Agent Upsell Bonus Payout'
+          : debt.reference_type === 'handover_holding'
+          ? 'Handover Stock Holding'
           : isReceivable
           ? 'Receivable'
           : 'Payable'
@@ -153,6 +155,11 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
           {debt.reference_type === 'salesperson_bonus' && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800/80">
               Sales Bonus
+            </span>
+          )}
+          {debt.reference_type === 'handover_holding' && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/80">
+              Handover Stock
             </span>
           )}
           <span
@@ -295,6 +302,21 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
           <span>Original: {original.toLocaleString()} ETB</span>
         </div>
       </div>
+
+      {/* Handover Device Holding Context Banner */}
+      {debt.reference_type === 'handover_holding' && (
+        <div className="p-3.5 rounded-2xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/70 dark:border-amber-800/60 flex items-start gap-2.5 text-xs">
+          <CheckCircle2 className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+          <div>
+            <span className="font-bold text-amber-900 dark:text-amber-200 block text-[11px]">
+              Handover Device Obligation
+            </span>
+            <p className="text-amber-800/90 dark:text-amber-300/90 text-[11px] mt-0.5 leading-relaxed">
+              Collecting payment here automatically marks the device as sold, logs the sale in your sales history, and realizes your gross profit in reports.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Interactive In-Drawer Settlement Form */}
       {showPayForm && (

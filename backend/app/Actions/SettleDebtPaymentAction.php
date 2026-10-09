@@ -10,6 +10,9 @@ use App\Models\FinancialAccount;
 use App\Models\FinancialTransaction;
 use App\Models\InventoryStock;
 use App\Models\InventoryUnit;
+use App\Models\SalesOrder;
+use App\Models\SalesOrderItem;
+use App\Models\User;
 use App\Scopes\TenantScope;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -140,23 +143,90 @@ class SettleDebtPaymentAction
             // Update debt amounts
             $debt->recalculateSettlement();
 
-            // If this was a handover holding debt and now fully settled, auto-mark unit as sold
-            if ($debt->reference_type === 'handover_holding' && $debt->status === 'settled' && ! empty($debt->reference_id)) {
+            // If this was a handover holding debt and payment is made, auto-mark unit as sold and record sales order
+            if ($debt->reference_type === 'handover_holding' && ! empty($debt->reference_id)) {
                 $unit = InventoryUnit::find($debt->reference_id);
-                if ($unit && $unit->status === 'out') {
-                    $vendorName = $unit->handover_to ?? 'Vendor/Broker';
-                    $unit->update([
-                        'status' => 'sold',
-                        'sold_at' => now(),
-                        'location' => "Sold by {$vendorName}",
-                    ]);
+                if ($unit) {
+                    $vendorName = $unit->handover_to ?? ($debt->contact?->name ?? 'Vendor/Broker');
 
-                    $stock = InventoryStock::where('variant_id', $unit->variant_id)->first();
-                    if ($stock && $stock->quantity_on_hand > 0) {
-                        $stock->decrement('quantity_on_hand', 1);
+                    // If unit was out on handover or in stock, transition status to sold
+                    if ($unit->status === 'out' || $unit->status === 'in_stock') {
+                        $unit->update([
+                            'status' => 'sold',
+                            'sold_at' => $data['payment_date'] ?? now(),
+                            'location' => "Sold by {$vendorName}",
+                        ]);
+
+                        $stock = InventoryStock::where('variant_id', $unit->variant_id)->first();
+                        if ($stock && $stock->quantity_on_hand > 0) {
+                            $stock->decrement('quantity_on_hand', 1);
+                        }
+
+                        (new SynchronizeInventoryStockAction)->execute();
                     }
 
-                    (new \App\Actions\SynchronizeInventoryStockAction())->execute();
+                    // Ensure SalesOrder and SalesOrderItem exist and are synchronized
+                    $orderItem = SalesOrderItem::where('inventory_unit_id', $unit->id)->first();
+                    $finalPrice = (float) $unit->selling_price > 0
+                        ? (float) $unit->selling_price
+                        : (float) $debt->original_amount;
+                    if ($finalPrice <= 0) {
+                        $finalPrice = (float) $debt->original_amount;
+                    }
+
+                    $orderPaid = (float) $debt->paid_amount;
+                    $paymentStatus = $debt->status === 'settled' ? 'paid' : 'partial';
+
+                    if (! $orderItem) {
+                        $customerContact = $debt->contact;
+                        if (! $customerContact && ! empty($unit->handover_to)) {
+                            $customerContact = Contact::where('tenant_id', $tenantId)
+                                ->where('name', 'ilike', $unit->handover_to)
+                                ->first();
+                        }
+
+                        $salespersonId = auth()->id() ?? User::where('tenant_id', $tenantId)->first()?->id;
+
+                        $orderNumber = 'SO-'.strtoupper(Str::random(8));
+                        $order = SalesOrder::create([
+                            'tenant_id' => $tenantId,
+                            'order_number' => $orderNumber,
+                            'customer_id' => $customerContact?->id ?? $debt->contact_id,
+                            'salesperson_id' => $salespersonId,
+                            'total_amount' => $finalPrice,
+                            'paid_amount' => $orderPaid,
+                            'payment_method' => 'bank_transfer',
+                            'payment_status' => $paymentStatus,
+                            'credit_sale' => $debt->status !== 'settled',
+                            'order_date' => $data['payment_date'] ?? now(),
+                            'notes' => "Handover sale to {$vendorName} collected via debt payment [unit_id:{$unit->id}]",
+                        ]);
+
+                        $costBasis = (float) $unit->cost_basis;
+                        $profit = max(0, $finalPrice - $costBasis);
+
+                        SalesOrderItem::create([
+                            'tenant_id' => $tenantId,
+                            'sales_order_id' => $order->id,
+                            'variant_id' => $unit->variant_id,
+                            'inventory_unit_id' => $unit->id,
+                            'quantity' => 1,
+                            'unit_price' => $finalPrice,
+                            'unit_cost' => $costBasis,
+                            'profit' => $profit,
+                            'sourcing_type' => 'internal_stock',
+                        ]);
+                    } else {
+                        // Keep existing order in sync with debt settlement
+                        $existingOrder = $orderItem->salesOrder;
+                        if ($existingOrder) {
+                            $existingOrder->update([
+                                'paid_amount' => $orderPaid,
+                                'payment_status' => $paymentStatus,
+                                'credit_sale' => $debt->status !== 'settled',
+                            ]);
+                        }
+                    }
 
                     AuditLog::record(
                         action: 'unit_sold_via_debt_collection',
@@ -166,6 +236,7 @@ class SettleDebtPaymentAction
                             'imei_or_serial' => $unit->imei_or_serial,
                             'handover_to' => $unit->handover_to,
                             'settled_amount' => $debt->paid_amount,
+                            'status' => $unit->status,
                         ]
                     );
                 }
