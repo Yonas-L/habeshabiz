@@ -738,6 +738,175 @@ class VendorReturnAndSwapWorkflowTest extends TestCase
         $account->refresh();
         $this->assertEquals(150000.0, (float) $account->current_balance);
     }
+
+    public function test_triangular_return_to_shelf_and_subsequent_return_to_vendor_clears_supplier_debt_but_preserves_customer_refund_debt(): void
+    {
+        $supplier = Contact::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Supplier Yenus',
+            'phone' => '+251911999888',
+            'roles' => ['supplier'],
+            'is_active' => true,
+        ]);
+
+        $partner = Contact::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Partner Nati',
+            'phone' => '+251922777666',
+            'roles' => ['peer_vendor'],
+            'is_active' => true,
+        ]);
+
+        $account = FinancialAccount::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'CBE Main',
+            'type' => 'bank',
+            'current_balance' => 0,
+            'is_active' => true,
+        ]);
+
+        // 1. Stock intake from Yenus at 100k
+        $unit = InventoryUnit::create([
+            'tenant_id' => $this->tenant->id,
+            'variant_id' => $this->variant->id,
+            'imei_or_serial' => 'SN-TRIANGLE-RETURN-TEST',
+            'cost_basis' => 100000,
+            'selling_price' => 120000,
+            'status' => 'out',
+            'source_type' => 'consignment',
+            'supplier_contact_id' => $supplier->id,
+            'handover_to' => $partner->name,
+            'handed_out_at' => now(),
+            'condition' => 'new',
+            'sim_type' => 'physical',
+        ]);
+
+        $supplierDebt = Debt::create([
+            'tenant_id' => $this->tenant->id,
+            'contact_id' => $supplier->id,
+            'type' => 'payable',
+            'reference_type' => 'stock_intake',
+            'reference_id' => $unit->id,
+            'original_amount' => 100000,
+            'paid_amount' => 0,
+            'remaining_amount' => 100000,
+            'status' => 'open',
+            'notes' => "Stock intake: {$this->variant->product->name} (SN: {$unit->imei_or_serial})",
+        ]);
+
+        $handoverDebt = Debt::create([
+            'tenant_id' => $this->tenant->id,
+            'contact_id' => $partner->id,
+            'type' => 'receivable',
+            'reference_type' => 'handover_holding',
+            'reference_id' => $unit->id,
+            'original_amount' => 120000,
+            'paid_amount' => 0,
+            'remaining_amount' => 120000,
+            'status' => 'open',
+            'notes' => "Handover payout for {$unit->imei_or_serial} to {$partner->name}",
+        ]);
+
+        // 2. Partner sells device and we collect payment
+        $this->actingAs($this->owner)
+            ->postJson("/api/v1/debts/{$handoverDebt->id}/payments", [
+                'amount' => 120000,
+                'financial_account_id' => $account->id,
+            ])
+            ->assertOk();
+
+        $unit->refresh();
+        $this->assertEquals('sold', $unit->status);
+
+        // 3. Customer/Partner returns the device to shelf
+        $this->actingAs($this->owner)
+            ->postJson("/api/v1/inventory/units/{$unit->id}/customer-return", [
+                'return_reason' => 'Customer changed mind',
+                'destination' => 'repair',
+            ])
+            ->assertOk();
+
+        $unit->refresh();
+        $this->assertEquals('returned', $unit->status);
+
+        // Assert customer refund debt exists and is open for 120k
+        $customerRefundDebt = Debt::where('tenant_id', $this->tenant->id)
+            ->where('contact_id', $partner->id)
+            ->where('type', 'payable')
+            ->where('reference_type', 'customer_return_refund')
+            ->where('reference_id', $unit->id)
+            ->first();
+
+        $this->assertNotNull($customerRefundDebt);
+        $this->assertEquals('open', $customerRefundDebt->status);
+        $this->assertEquals(120000.0, (float) $customerRefundDebt->remaining_amount);
+
+        // 4. Return device from shelf to upstream supplier Yenus
+        $this->actingAs($this->owner)
+            ->postJson("/api/v1/inventory/units/{$unit->id}/return-to-vendor", [
+                'return_reason' => 'Defective consignment returned to supplier',
+            ])
+            ->assertOk();
+
+        $unit->refresh();
+        $this->assertEquals('returned_to_vendor', $unit->status);
+
+        // 5. Assert:
+        // A) Supplier payable to Yenus is settled (cancelled)
+        $supplierDebt->refresh();
+        $this->assertEquals('settled', $supplierDebt->status);
+        $this->assertEquals(0.0, (float) $supplierDebt->remaining_amount);
+
+        // B) Customer refund payable to Nati is STILL OPEN (120k owed to Nati!)
+        $customerRefundDebt->refresh();
+        $this->assertEquals('open', $customerRefundDebt->status);
+        $this->assertEquals(120000.0, (float) $customerRefundDebt->remaining_amount);
+        $this->assertEquals(0.0, (float) $customerRefundDebt->paid_amount);
+
+        // C) Partner Statement for Nati shows 120k payable
+        $action = app(\App\Actions\GeneratePartnerStatementAction::class);
+        $natiStmt = $action->execute($partner);
+        $this->assertEquals(120000.0, (float) $natiStmt['kpis']['current_open_payable']);
+        $this->assertEquals(-120000.0, (float) $natiStmt['kpis']['current_net_balance']);
+
+        // D) Partner Statement for Yenus shows 0 payable (settled)
+        $yenusStmt = $action->execute($supplier);
+        $this->assertEquals(0.0, (float) $yenusStmt['kpis']['current_open_payable']);
+        $this->assertEquals(0.0, (float) $yenusStmt['kpis']['current_net_balance']);
+
+        // 6. Upstream supplier Yenus fixes the phone and returns it -> We redeliver to partner Nati
+        $this->actingAs($this->owner)
+            ->postJson("/api/v1/inventory/units/{$unit->id}/receive-from-vendor", [
+                'action' => 'deliver_to_customer',
+                'notes' => 'Fixed screen defect and handed back to Nati',
+            ])
+            ->assertOk();
+
+        $unit->refresh();
+        $this->assertEquals('sold', $unit->status);
+        $this->assertEquals("With {$partner->name}", $unit->location);
+
+        // 7. Assert:
+        // A) Supplier payable to Yenus is restored (100k owed to Yenus)
+        $supplierDebt->refresh();
+        $this->assertEquals('open', $supplierDebt->status);
+        $this->assertEquals(100000.0, (float) $supplierDebt->remaining_amount);
+
+        // B) Customer refund payable to Nati is settled upon redelivery
+        $customerRefundDebt->refresh();
+        $this->assertEquals('settled', $customerRefundDebt->status);
+        $this->assertEquals(0.0, (float) $customerRefundDebt->remaining_amount);
+
+        // C) Partner Statement for Yenus shows 100k payable
+        $yenusStmt2 = $action->execute($supplier);
+        $this->assertEquals(100000.0, (float) $yenusStmt2['kpis']['current_open_payable']);
+        $this->assertEquals(-100000.0, (float) $yenusStmt2['kpis']['current_net_balance']);
+
+        // D) Partner Statement for Nati shows 0 payable (settled)
+        $natiStmt2 = $action->execute($partner);
+        $this->assertEquals(0.0, (float) $natiStmt2['kpis']['current_open_payable']);
+        $this->assertEquals(0.0, (float) $natiStmt2['kpis']['current_net_balance']);
+    }
 }
 
 

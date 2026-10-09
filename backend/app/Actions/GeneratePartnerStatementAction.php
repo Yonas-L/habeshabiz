@@ -480,18 +480,19 @@ class GeneratePartnerStatementAction
                         'balance_effect' => $debt->type === 'payable' ? (float) $payment->amount : -(float) $payment->amount,
                         'reference_number' => $payment->reference_number,
                     ];
-                } elseif ($payment->reference_number === 'REPAIR-REDELIVERY') {
-                    $context = $payment->notes ? $this->sanitizeContext($payment->notes) : 'Repaired device delivered';
+                } elseif (in_array($payment->reference_number, ['REPAIR-REDELIVERY', 'VENDOR-SWAP-DELIVERY', 'WARRANTY-SWAP'], true)) {
+                    $context = $payment->notes ? $this->sanitizeContext($payment->notes) : 'Device redelivered / swapped';
+                    $typeLabel = $payment->reference_number === 'REPAIR-REDELIVERY' ? 'Repaired Device' : 'Warranty Replacement';
                     $rawEntries[] = [
                         'id' => "pay-{$payment->id}",
                         'date' => $payDate,
                         'type' => 'repair_redelivery',
-                        'type_label' => 'Repaired Device',
+                        'type_label' => $typeLabel,
                         'context' => $context,
                         'payable' => -(float) $payment->amount,
                         'receivable' => 0.0,
                         'balance_effect' => (float) $payment->amount,
-                        'reference_number' => 'REPAIR-REDELIVERY',
+                        'reference_number' => $payment->reference_number,
                     ];
                 } elseif ($debt->type === 'payable') {
                     $accText = ($accountName && $accountName !== 'Wire') ? " ({$accountName})" : '';

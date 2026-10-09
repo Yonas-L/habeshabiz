@@ -1699,17 +1699,19 @@ class InventoryController extends Controller
             if ($destination === 'vendor') {
                 $supplierPayables = Debt::where('tenant_id', $user->tenant_id)
                     ->where('type', 'payable')
+                    ->where('reference_type', '!=', 'customer_return_refund')
+                    ->where('reference_type', '!=', 'salesperson_bonus')
                     ->where(function ($q) use ($unit) {
-                        $q->where('reference_id', $unit->id);
                         if ($unit->supplier_contact_id) {
-                            $q->orWhere(function ($sq) use ($unit) {
-                                $sq->where('contact_id', $unit->supplier_contact_id)
-                                    ->where(function ($nq) use ($unit) {
-                                        if (! empty($unit->imei_or_serial)) {
-                                            $nq->where('notes', 'like', "%{$unit->imei_or_serial}%");
-                                        }
-                                    });
-                            });
+                            $q->where('contact_id', $unit->supplier_contact_id)
+                                ->where(function ($sq) use ($unit) {
+                                    $sq->where('reference_id', $unit->id);
+                                    if (! empty($unit->imei_or_serial)) {
+                                        $sq->orWhere('notes', 'like', "%{$unit->imei_or_serial}%");
+                                    }
+                                });
+                        } else {
+                            $q->where('reference_id', $unit->id);
                         }
                     })
                     ->with('payments')
@@ -1943,8 +1945,37 @@ class InventoryController extends Controller
                 $salesOrder = $salesOrderItem->salesOrder;
                 $orderAuditNote = '[Shop Repair '.now()->format('M d, Y H:i').': Repaired and delivered to customer.]';
                 $salesOrder->update([
+                    'payment_status' => 'paid',
                     'notes' => $salesOrder->notes ? "{$salesOrder->notes}\n{$orderAuditNote}" : $orderAuditNote,
                 ]);
+
+                $realProfit = ((float) $salesOrderItem->unit_price - (float) $salesOrderItem->unit_cost) * (int) $salesOrderItem->quantity - (float) $salesOrderItem->bonus_amount;
+                $salesOrderItem->update(['profit' => $realProfit]);
+            }
+
+            // Settle any open customer refund debts for this unit upon redelivery
+            $customerName = $unit->salesOrderItem?->salesOrder?->customer?->name ?? $unit->handover_to ?? 'Customer';
+            $refundDebts = Debt::where('tenant_id', $user->tenant_id)
+                ->where('reference_type', 'customer_return_refund')
+                ->where('reference_id', $unit->id)
+                ->whereIn('status', ['open', 'partially_paid'])
+                ->get();
+
+            foreach ($refundDebts as $rDebt) {
+                $settleAmt = (float) $rDebt->remaining_amount;
+                if ($settleAmt > 0) {
+                    DebtPayment::create([
+                        'tenant_id' => $user->tenant_id,
+                        'debt_id' => $rDebt->id,
+                        'financial_account_id' => null,
+                        'amount' => $settleAmt,
+                        'payment_date' => now(),
+                        'reference_number' => 'REPAIR-REDELIVERY',
+                        'notes' => "Refund liability settled upon redelivery of shop-repaired device to {$customerName}.",
+                        'created_by' => $user->id,
+                    ]);
+                    $rDebt->recalculateSettlement();
+                }
             }
         } else {
             $unitUpdate = [
@@ -2077,17 +2108,19 @@ class InventoryController extends Controller
             //    the vendor now owes us a REFUND (open receivable) for that paid amount!
             $unitPayables = Debt::where('tenant_id', $unit->tenant_id)
                 ->where('type', 'payable')
+                ->where('reference_type', '!=', 'customer_return_refund')
+                ->where('reference_type', '!=', 'salesperson_bonus')
                 ->where(function ($q) use ($unit) {
-                    $q->where('reference_id', $unit->id);
                     if ($unit->supplier_contact_id) {
-                        $q->orWhere(function ($sq) use ($unit) {
-                            $sq->where('contact_id', $unit->supplier_contact_id)
-                                ->where(function ($nq) use ($unit) {
-                                    if (! empty($unit->imei_or_serial)) {
-                                        $nq->where('notes', 'like', "%{$unit->imei_or_serial}%");
-                                    }
-                                });
-                        });
+                        $q->where('contact_id', $unit->supplier_contact_id)
+                            ->where(function ($sq) use ($unit) {
+                                $sq->where('reference_id', $unit->id);
+                                if (! empty($unit->imei_or_serial)) {
+                                    $sq->orWhere('notes', 'like', "%{$unit->imei_or_serial}%");
+                                }
+                            });
+                    } else {
+                        $q->where('reference_id', $unit->id);
                     }
                 })
                 ->with('payments')
@@ -2257,10 +2290,19 @@ class InventoryController extends Controller
             // 1. Re-instate / restore the payable debt obligation to the original vendor (Yenus)
             $vendorPayables = Debt::where('tenant_id', $user->tenant_id)
                 ->where('type', 'payable')
+                ->where('reference_type', '!=', 'customer_return_refund')
+                ->where('reference_type', '!=', 'salesperson_bonus')
                 ->where(function ($q) use ($unit) {
-                    $q->where('reference_id', $unit->id);
                     if ($unit->supplier_contact_id) {
-                        $q->orWhere('contact_id', $unit->supplier_contact_id);
+                        $q->where('contact_id', $unit->supplier_contact_id)
+                            ->where(function ($sq) use ($unit) {
+                                $sq->where('reference_id', $unit->id);
+                                if (! empty($unit->imei_or_serial)) {
+                                    $sq->orWhere('notes', 'like', "%{$unit->imei_or_serial}%");
+                                }
+                            });
+                    } else {
+                        $q->where('reference_id', $unit->id);
                     }
                 })
                 ->with('payments')
@@ -2643,8 +2685,37 @@ class InventoryController extends Controller
                 if ($salesOrder) {
                     $orderAuditNote = '[Vendor Warranty Swap '.$now->format('M d, Y H:i').": {$vendorName} replaced defective SN {$oldUnit->imei_or_serial} with new SN {$replacementImei}. Delivered to customer under Order #{$salesOrder->order_number}.]";
                     $salesOrder->update([
+                        'payment_status' => 'paid',
                         'notes' => $salesOrder->notes ? "{$salesOrder->notes}\n{$orderAuditNote}" : $orderAuditNote,
                     ]);
+
+                    $realProfit = ((float) $salesOrderItem->unit_price - (float) $salesOrderItem->unit_cost) * (int) $salesOrderItem->quantity - (float) $salesOrderItem->bonus_amount;
+                    $salesOrderItem->update(['profit' => $realProfit]);
+                }
+
+                // Settle any open customer refund debts for old unit upon delivery of vendor replacement
+                $customerName = $salesOrder?->customer?->name ?? $oldUnit->handover_to ?? 'Customer';
+                $refundDebts = Debt::where('tenant_id', $user->tenant_id)
+                    ->where('reference_type', 'customer_return_refund')
+                    ->where('reference_id', $oldUnit->id)
+                    ->whereIn('status', ['open', 'partially_paid'])
+                    ->get();
+
+                foreach ($refundDebts as $rDebt) {
+                    $settleAmt = (float) $rDebt->remaining_amount;
+                    if ($settleAmt > 0) {
+                        DebtPayment::create([
+                            'tenant_id' => $user->tenant_id,
+                            'debt_id' => $rDebt->id,
+                            'financial_account_id' => null,
+                            'amount' => $settleAmt,
+                            'payment_date' => $now,
+                            'reference_number' => 'VENDOR-SWAP-DELIVERY',
+                            'notes' => "Refund liability settled upon delivery of vendor replacement device (SN: {$replacementImei}) to {$customerName}.",
+                            'created_by' => $user->id,
+                        ]);
+                        $rDebt->recalculateSettlement();
+                    }
                 }
             }
 
@@ -2762,7 +2833,7 @@ class InventoryController extends Controller
         $destination = $validated['destination'] ?? 'repair';
         $salesOrder = $salesOrderItem->salesOrder;
 
-        DB::transaction(function () use ($oldUnit, $replacementUnit, $salesOrderItem, $salesOrder, $validated, $destination) {
+        DB::transaction(function () use ($oldUnit, $replacementUnit, $salesOrderItem, $salesOrder, $validated, $destination, $user) {
             $now = now();
             $oldImei = $oldUnit->imei_or_serial ?? 'N/A';
             $newImei = $replacementUnit->imei_or_serial ?? 'N/A';
@@ -2816,6 +2887,31 @@ class InventoryController extends Controller
             $salesOrder->update([
                 'notes' => $salesOrder->notes ? "{$salesOrder->notes}\n{$orderAuditNote}" : $orderAuditNote,
             ]);
+
+            // Settle any open customer refund debts for old unit upon warranty swap
+            $customerName = $salesOrder->customer?->name ?? $oldUnit->handover_to ?? 'Customer';
+            $refundDebts = Debt::where('tenant_id', $user->tenant_id)
+                ->where('reference_type', 'customer_return_refund')
+                ->where('reference_id', $oldUnit->id)
+                ->whereIn('status', ['open', 'partially_paid'])
+                ->get();
+
+            foreach ($refundDebts as $rDebt) {
+                $settleAmt = (float) $rDebt->remaining_amount;
+                if ($settleAmt > 0) {
+                    DebtPayment::create([
+                        'tenant_id' => $user->tenant_id,
+                        'debt_id' => $rDebt->id,
+                        'financial_account_id' => null,
+                        'amount' => $settleAmt,
+                        'payment_date' => $now,
+                        'reference_number' => 'WARRANTY-SWAP',
+                        'notes' => "Refund liability settled upon warranty replacement device (SN: {$newImei}) delivered to {$customerName}.",
+                        'created_by' => $user->id,
+                    ]);
+                    $rDebt->recalculateSettlement();
+                }
+            }
 
             // 5. Synchronize inventory stock levels
             (new SynchronizeInventoryStockAction)->execute();
