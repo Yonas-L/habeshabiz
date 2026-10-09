@@ -11,10 +11,14 @@ Thumbs.db
 /backend/vendor/
 /backend/bootstrap/cache/*.php
 /backend/storage/*.key
-/backend/storage/logs/
-/backend/storage/framework/cache/
-/backend/storage/framework/sessions/
-/backend/storage/framework/views/
+/backend/storage/logs/*
+!/backend/storage/logs/.gitignore
+/backend/storage/framework/cache/*
+!/backend/storage/framework/cache/.gitignore
+/backend/storage/framework/sessions/*
+!/backend/storage/framework/sessions/.gitignore
+/backend/storage/framework/views/*
+!/backend/storage/framework/views/.gitignore
 .phpunit.result.cache
 .pest/
 
