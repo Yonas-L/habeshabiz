@@ -50,20 +50,48 @@ export const getCurrentMonth = (): string => {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 };
 
+export const VALID_NAV_TABS: NavTab[] = [
+  'overview',
+  'counter',
+  'inventory',
+  'sales',
+  'partners',
+  'debts',
+  'treasury',
+  'expenses',
+  'reports',
+  'staff',
+  'logs',
+  'settings',
+];
+
+export const getTabFromUrl = (): NavTab => {
+  if (typeof window === 'undefined') return 'overview';
+
+  // 1. Check hash: e.g. #/inventory, #inventory
+  const hash = window.location.hash.replace(/^#\/?/, '').split('?')[0].split('/')[0].toLowerCase();
+  if (VALID_NAV_TABS.includes(hash as NavTab)) {
+    return hash as NavTab;
+  }
+
+  // 2. Check path: e.g. /inventory
+  const path = window.location.pathname.replace(/^\//, '').split('/')[0].toLowerCase();
+  if (VALID_NAV_TABS.includes(path as NavTab)) {
+    return path as NavTab;
+  }
+
+  return 'overview';
+};
+
+export const getHashForTab = (tab: NavTab): string => {
+  return tab === 'overview' ? '#/' : `#/${tab}`;
+};
+
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [tenant, setTenant] = useState<Tenant | null>(null);
-  const [activeTab, setActiveTab] = useState<NavTab>('overview');
+  const [activeTab, setActiveTab] = useState<NavTab>(getTabFromUrl);
   const [isPageLoading, setIsPageLoading] = useState<boolean>(false);
-
-  const handleNavigateTab = useCallback((tab: NavTab) => {
-    if (tab === activeTab) return;
-    setIsPageLoading(true);
-    setActiveTab(tab);
-    setTimeout(() => {
-      setIsPageLoading(false);
-    }, 320);
-  }, [activeTab]);
 
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
@@ -81,6 +109,7 @@ export default function App() {
     showIntake?: boolean;
     showRecordExpense?: boolean;
   }>({});
+
   const resolveCurrentPath = () => {
     if (typeof window !== 'undefined') {
       const hash = window.location.hash;
@@ -100,12 +129,109 @@ export default function App() {
     return false;
   });
 
+  const handleNavigateTab = useCallback((tab: NavTab, replace = false) => {
+    setIsMobileSidebarOpen(false);
+    setIsQuickSearchOpen(false);
+    setIsProfileModalOpen(false);
+
+    if (tab === activeTab) return;
+    setIsPageLoading(true);
+    setActiveTab(tab);
+
+    if (typeof window !== 'undefined') {
+      const targetHash = getHashForTab(tab);
+      const isModalInState = Boolean(window.history.state?.modal);
+      if (window.location.hash !== targetHash || isModalInState) {
+        if (replace || isModalInState) {
+          window.history.replaceState({ tab }, '', targetHash);
+        } else {
+          window.history.pushState({ tab }, '', targetHash);
+        }
+      }
+    }
+
+    setTimeout(() => {
+      setIsPageLoading(false);
+    }, 220);
+  }, [activeTab]);
+
+  const handleOpenMobileSidebar = useCallback(() => {
+    setIsMobileSidebarOpen(true);
+    if (typeof window !== 'undefined') {
+      window.history.pushState({ modal: 'mobile_sidebar', tab: activeTab }, '', window.location.hash);
+    }
+  }, [activeTab]);
+
+  const handleCloseMobileSidebar = useCallback(() => {
+    setIsMobileSidebarOpen(false);
+    if (typeof window !== 'undefined' && window.history.state?.modal === 'mobile_sidebar') {
+      window.history.back();
+    }
+  }, []);
+
+  const handleOpenProfileModal = useCallback(() => {
+    setIsProfileModalOpen(true);
+    if (typeof window !== 'undefined') {
+      window.history.pushState({ modal: 'profile', tab: activeTab }, '', window.location.hash);
+    }
+  }, [activeTab]);
+
+  const handleCloseProfileModal = useCallback(() => {
+    setIsProfileModalOpen(false);
+    if (typeof window !== 'undefined' && window.history.state?.modal === 'profile') {
+      window.history.back();
+    }
+  }, []);
+
+  const handleOpenQuickSearch = useCallback(() => {
+    setIsQuickSearchOpen(true);
+    if (typeof window !== 'undefined') {
+      window.history.pushState({ modal: 'quick_search', tab: activeTab }, '', window.location.hash);
+    }
+  }, [activeTab]);
+
+  const handleCloseQuickSearch = useCallback(() => {
+    setIsQuickSearchOpen(false);
+    if (typeof window !== 'undefined' && window.history.state?.modal === 'quick_search') {
+      window.history.back();
+    }
+  }, []);
+
   useEffect(() => {
     const handleLocationChange = () => {
+      // If mobile sidebar was open and popstate was triggered, close it
+      setIsMobileSidebarOpen((prev) => {
+        if (prev) return false;
+        return prev;
+      });
+      setIsQuickSearchOpen((prev) => {
+        if (prev) return false;
+        return prev;
+      });
+      setIsProfileModalOpen((prev) => {
+        if (prev) return false;
+        return prev;
+      });
+
       const p = resolveCurrentPath();
       setCurrentPath(p);
       setIsOnboarding(p === '/onboard');
+
+      if (p !== '/admin' && p !== '/onboard' && p !== '/suspended' && !p.startsWith('/statement/')) {
+        const tabFromUrl = getTabFromUrl();
+        setActiveTab((prev) => {
+          if (prev !== tabFromUrl) {
+            setIsPageLoading(true);
+            setTimeout(() => {
+              setIsPageLoading(false);
+            }, 200);
+            return tabFromUrl;
+          }
+          return prev;
+        });
+      }
     };
+
     window.addEventListener('popstate', handleLocationChange);
     window.addEventListener('hashchange', handleLocationChange);
     return () => {
@@ -127,9 +253,9 @@ export default function App() {
       showIntake: payload.action === 'stock_intake',
       showRecordExpense: payload.action === 'new_expense',
     });
-    setActiveTab(payload.tab);
+    handleNavigateTab(payload.tab);
     setIsQuickSearchOpen(false);
-  }, []);
+  }, [handleNavigateTab]);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     if (typeof window !== 'undefined') {
       return (localStorage.getItem('habeshabiz_theme') as 'light' | 'dark') || 'light';
@@ -210,30 +336,30 @@ export default function App() {
         };
         if (key === 'k' || key === 'K') {
           e.preventDefault();
-          setIsQuickSearchOpen((prev) => !prev);
+          handleOpenQuickSearch();
           return;
         }
 
         if (tabMap[key]) {
           e.preventDefault();
-          setActiveTab(tabMap[key]);
+          handleNavigateTab(tabMap[key]);
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [user]);
+  }, [user, handleNavigateTab, handleOpenQuickSearch]);
 
   // Fallback to overview if active tab is restricted for non-owner role
   useEffect(() => {
     if (user && user.role !== 'owner') {
       const ownerOnlyTabs: NavTab[] = ['partners', 'debts', 'treasury', 'expenses', 'reports', 'staff', 'logs', 'settings'];
       if (ownerOnlyTabs.includes(activeTab)) {
-        setActiveTab('overview');
+        handleNavigateTab('overview', true);
       }
     }
-  }, [user, activeTab]);
+  }, [user, activeTab, handleNavigateTab]);
 
   // Refresh dashboard whenever overview tab becomes active
   useEffect(() => {
@@ -261,6 +387,11 @@ export default function App() {
           const me = await api.getMe();
           setUser(me.user);
           setTenant(me.tenant);
+          const initialTab = getTabFromUrl();
+          setActiveTab(initialTab);
+          if (typeof window !== 'undefined' && window.history.replaceState && !window.history.state?.tab) {
+            window.history.replaceState({ tab: initialTab }, '', getHashForTab(initialTab));
+          }
           await refreshData();
           setLoading(false);
           return;
@@ -287,6 +418,11 @@ export default function App() {
       await refreshData();
       setUser(res.user);
       setTenant(res.tenant);
+      const initialTab = getTabFromUrl();
+      setActiveTab(initialTab);
+      if (typeof window !== 'undefined' && window.history.replaceState) {
+        window.history.replaceState({ tab: initialTab }, '', getHashForTab(initialTab));
+      }
       toast.success(`Welcome back, ${res.user.name}`);
     } catch (err: any) {
       setAuthError(err.message || 'Invalid credentials. Please try again.');
@@ -306,6 +442,9 @@ export default function App() {
       setUser(null);
       setTenant(null);
       setDashboardData(null);
+      if (typeof window !== 'undefined' && window.history.replaceState) {
+        window.history.replaceState({}, '', window.location.pathname);
+      }
       toast.info('Signed out');
     }
   };
@@ -528,9 +667,9 @@ export default function App() {
         openDebtsCount={openDebtsCount}
         onLogout={handleLogout}
         isOpenMobile={isMobileSidebarOpen}
-        onCloseMobile={() => setIsMobileSidebarOpen(false)}
-        onOpenProfile={() => setIsProfileModalOpen(true)}
-        onOpenQuickSearch={() => setIsQuickSearchOpen(true)}
+        onCloseMobile={handleCloseMobileSidebar}
+        onOpenProfile={handleOpenProfileModal}
+        onOpenQuickSearch={handleOpenQuickSearch}
         theme={theme}
         onToggleTheme={handleToggleTheme}
       />
@@ -545,9 +684,9 @@ export default function App() {
           onMonthChange={handleMonthChange}
           theme={theme}
           onToggleTheme={handleToggleTheme}
-          onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
+          onOpenMobileSidebar={handleOpenMobileSidebar}
           onQuickAction={() => handleNavigateTab('counter')}
-          onOpenProfile={() => setIsProfileModalOpen(true)}
+          onOpenProfile={handleOpenProfileModal}
         />
 
         {/* View Surface */}
@@ -663,7 +802,7 @@ export default function App() {
       {/* Profile & Password Management Modal */}
       <ProfileSettingsModal
         isOpen={isProfileModalOpen}
-        onClose={() => setIsProfileModalOpen(false)}
+        onClose={handleCloseProfileModal}
         user={user}
         onUserUpdated={(updatedUser) => {
           setUser((prev) => (prev ? { ...prev, ...updatedUser } : updatedUser));
@@ -673,7 +812,7 @@ export default function App() {
       {/* Global Quick Search & Command Palette (⌘K) */}
       <QuickSearchModal
         isOpen={isQuickSearchOpen}
-        onClose={() => setIsQuickSearchOpen(false)}
+        onClose={handleCloseQuickSearch}
         user={user}
         accounts={accounts}
         onNavigate={handleQuickSearchNavigate}
@@ -699,7 +838,7 @@ export default function App() {
       <MobileBottomNav
         activeTab={activeTab}
         onChangeTab={handleNavigateTab}
-        onOpenDrawer={() => setIsMobileSidebarOpen(true)}
+        onOpenDrawer={handleOpenMobileSidebar}
         openDebtsCount={openDebtsCount}
       />
     </div>
