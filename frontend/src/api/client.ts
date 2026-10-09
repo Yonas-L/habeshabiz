@@ -1510,6 +1510,37 @@ export const api = {
     return request<PartnerStatementData>(`/public/statement/${token}${qs ? `?${qs}` : ''}`);
   },
 
+  downloadPartnerStatementPdf: async (
+    id: string,
+    params?: { start_date?: string; end_date?: string; accounts?: string }
+  ): Promise<Blob> => {
+    const query = new URLSearchParams();
+    if (params?.start_date) query.set('start_date', params.start_date);
+    if (params?.end_date) query.set('end_date', params.end_date);
+    if (params?.accounts) query.set('accounts', params.accounts);
+    const qs = query.toString();
+    const token = getAuthToken();
+    const res = await fetch(`${API_BASE}/contacts/${id}/statement/pdf${qs ? `?${qs}` : ''}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new Error('Failed to download statement PDF');
+    return res.blob();
+  },
+
+  downloadPublicStatementPdf: async (
+    token: string,
+    params?: { start_date?: string; end_date?: string; accounts?: string }
+  ): Promise<Blob> => {
+    const query = new URLSearchParams();
+    if (params?.start_date) query.set('start_date', params.start_date);
+    if (params?.end_date) query.set('end_date', params.end_date);
+    if (params?.accounts) query.set('accounts', params.accounts);
+    const qs = query.toString();
+    const res = await fetch(`${API_BASE}/public/statement/${token}/pdf${qs ? `?${qs}` : ''}`);
+    if (!res.ok) throw new Error('Failed to download public statement PDF');
+    return res.blob();
+  },
+
   getExpenses: (params?: { is_owner_draw?: boolean; category?: string }) => {
     const query = new URLSearchParams();
     if (params?.is_owner_draw !== undefined) query.set('is_owner_draw', String(params.is_owner_draw));

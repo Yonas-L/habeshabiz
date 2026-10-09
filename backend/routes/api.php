@@ -32,6 +32,7 @@ Route::prefix('v1')->group(function () {
     Route::get('/onboard/business-types', [OnboardingController::class, 'businessTypes']);
     Route::post('/waitlist', [WaitlistController::class, 'store']);
     Route::get('/public/statement/{token}', [ContactController::class, 'publicStatement']);
+    Route::get('/public/statement/{token}/pdf', [ContactController::class, 'publicStatementPdf']);
 
     // Platform Superadmin Routes
     Route::prefix('admin')->group(function () {
@@ -161,6 +162,7 @@ Route::prefix('v1')->group(function () {
         Route::put('/contacts/{id}', [ContactController::class, 'update']);
         Route::delete('/contacts/{id}', [ContactController::class, 'destroy']);
         Route::get('/contacts/{id}/statement', [ContactController::class, 'statement']);
+        Route::get('/contacts/{id}/statement/pdf', [ContactController::class, 'statementPdf']);
 
         // Operational Expenses & Owner Draws
         Route::get('/expenses', [ExpenseController::class, 'index']);

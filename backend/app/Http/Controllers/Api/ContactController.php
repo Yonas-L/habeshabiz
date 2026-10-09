@@ -6,6 +6,7 @@ use App\Actions\GeneratePartnerStatementAction;
 use App\Http\Controllers\Controller;
 use App\Models\Contact;
 use App\Scopes\TenantScope;
+use App\Services\PdfGeneratorService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -178,5 +179,46 @@ class ContactController extends Controller
             'success' => true,
             'data' => $data,
         ]);
+    }
+
+    public function statementPdf(Request $request, string $id, PdfGeneratorService $pdfService): \Symfony\Component\HttpFoundation\Response
+    {
+        $contact = Contact::findOrFail($id);
+        $startDate = $request->query('start_date');
+        $endDate = $request->query('end_date');
+        $accountsParam = $request->query('accounts');
+        $selectedAccountIds = [];
+        if ($accountsParam && $accountsParam !== 'none') {
+            $selectedAccountIds = explode(',', $accountsParam);
+        }
+
+        $forceDownload = $request->query('download', '1') === '1';
+
+        return $pdfService->generateVendorStatement($contact, $startDate, $endDate, $selectedAccountIds, $forceDownload)->toResponse($request);
+    }
+
+    public function publicStatementPdf(Request $request, string $token, PdfGeneratorService $pdfService): \Symfony\Component\HttpFoundation\Response
+    {
+        $contact = Contact::withoutGlobalScopes()
+            ->where('statement_token', $token)
+            ->firstOrFail();
+
+        $startDate = $request->query('start_date');
+        $endDate = $request->query('end_date');
+        $accountsParam = $request->query('accounts');
+        $selectedAccountIds = [];
+        if ($accountsParam && $accountsParam !== 'none') {
+            $selectedAccountIds = explode(',', $accountsParam);
+        }
+
+        $forceDownload = $request->query('download', '1') === '1';
+
+        TenantScope::setForcedTenantId($contact->tenant_id);
+
+        try {
+            return $pdfService->generateVendorStatement($contact, $startDate, $endDate, $selectedAccountIds, $forceDownload)->toResponse($request);
+        } finally {
+            TenantScope::setForcedTenantId(null);
+        }
     }
 }

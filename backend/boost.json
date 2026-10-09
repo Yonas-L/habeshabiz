@@ -10,11 +10,15 @@
     "guidelines": true,
     "mcp": true,
     "nightwatch": false,
+    "packages": [
+        "spatie/laravel-pdf"
+    ],
     "sail": false,
     "skills": [
         "infer-conventions",
         "laravel-best-practices",
         "testing-best-practices",
-        "tailwindcss-development"
+        "tailwindcss-development",
+        "laravel-pdf"
     ]
 }

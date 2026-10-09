@@ -6,6 +6,8 @@ import {
   Printer,
   ShieldCheck,
   AlertCircle,
+  Download,
+  Loader2,
 } from 'lucide-react';
 
 interface PublicStatementViewProps {
@@ -39,6 +41,7 @@ export const PublicStatementView: React.FC<PublicStatementViewProps> = ({ token 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
 
   const loadStatement = async () => {
     try {
@@ -107,11 +110,47 @@ export const PublicStatementView: React.FC<PublicStatementViewProps> = ({ token 
   const today = new Date();
   const issuedDateSlash = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
 
+  const handleDownloadPdf = async () => {
+    try {
+      setIsDownloadingPdf(true);
+      const accountsParam =
+        selectedAccountIds.length === (business.bank_accounts || []).length
+          ? undefined
+          : selectedAccountIds.length === 0
+          ? 'none'
+          : selectedAccountIds.join(',');
+
+      const blob = await api.downloadPublicStatementPdf(token, {
+        start_date: range.start_date || undefined,
+        end_date: range.end_date || undefined,
+        accounts: accountsParam,
+      });
+
+      const sanitizedContact = (contact.name || 'Partner').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const sanitizedRange = (range.formatted_range || 'Statement').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const filename = `Statement_${sanitizedContact}_${sanitizedRange}.pdf`;
+
+      const downloadUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+    } catch (err: any) {
+      console.error('Failed to download public PDF statement:', err);
+      window.print();
+    } finally {
+      setIsDownloadingPdf(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-900 py-6 sm:py-10 px-4 sm:px-8 lg:px-14 print:p-0 print:bg-white print:text-slate-900">
       <div className="w-full max-w-7xl mx-auto space-y-8">
         {/* Floating Controls Bar (No-print) */}
-        <div className="no-print pb-4 border-b border-slate-200/90 flex items-center justify-between gap-4">
+        <div className="no-print pb-4 border-b border-slate-200/90 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shadow-xs" />
             <span className="text-xs font-bold text-slate-700 tracking-wide uppercase">
@@ -119,23 +158,44 @@ export const PublicStatementView: React.FC<PublicStatementViewProps> = ({ token 
             </span>
           </div>
 
-          <button
-            onClick={() => {
-              const orig = document.title;
-              const sanitizedContact = (contact.name || 'Partner').replace(/[^a-zA-Z0-9_-]/g, '_');
-              const sanitizedRange = (range.formatted_range || 'Statement').replace(/[^a-zA-Z0-9_-]/g, '_');
-              document.title = `Statement_${sanitizedContact}_${sanitizedRange}`;
-              window.print();
-              setTimeout(() => {
-                document.title = orig;
-              }, 1000);
-            }}
-            className="h-9 px-4 rounded-lg bg-slate-900 text-white hover:bg-slate-800 text-xs font-bold transition-all flex items-center gap-2 shadow-xs cursor-pointer active:scale-[0.98]"
-            title="Print document or download as PDF"
-          >
-            <Printer className="w-4 h-4" />
-            <span>Print or Download PDF</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleDownloadPdf}
+              disabled={isDownloadingPdf}
+              className="h-9 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all flex items-center gap-2 shadow-xs cursor-pointer active:scale-[0.98] disabled:opacity-60"
+              title="Download vector PDF document"
+            >
+              {isDownloadingPdf ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Generating PDF…</span>
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4" />
+                  <span>Download PDF</span>
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={() => {
+                const orig = document.title;
+                const sanitizedContact = (contact.name || 'Partner').replace(/[^a-zA-Z0-9_-]/g, '_');
+                const sanitizedRange = (range.formatted_range || 'Statement').replace(/[^a-zA-Z0-9_-]/g, '_');
+                document.title = `Statement_${sanitizedContact}_${sanitizedRange}`;
+                window.print();
+                setTimeout(() => {
+                  document.title = orig;
+                }, 1000);
+              }}
+              className="h-9 px-3.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800 text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs cursor-pointer active:scale-[0.98]"
+              title="Print document with system print dialog"
+            >
+              <Printer className="w-4 h-4" />
+              <span>Print</span>
+            </button>
+          </div>
         </div>
 
         {/* The Printable Uncontained Statement Document */}

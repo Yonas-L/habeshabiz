@@ -1,6 +1,6 @@
 import React from 'react';
 import type { PartnerStatementData } from '../../api/client';
-import { resolveImageUrl } from '../../api/client';
+import { api, resolveImageUrl } from '../../api/client';
 import { Printer, X, Link, Check, ShieldCheck } from 'lucide-react';
 import { LdrsSpinner } from '../loading/LdrsSpinner';
 import { toast } from 'sonner';
@@ -59,16 +59,48 @@ export const VendorStatementPrintModal: React.FC<VendorStatementPrintModalProps>
   const today = new Date();
   const issuedDateSlash = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
+    setIsDownloading(true);
     const sanitizedContact = (contact.name || 'Partner').replace(/[^a-zA-Z0-9_-]/g, '_');
     const sanitizedRange = (range.formatted_range || 'Statement').replace(/[^a-zA-Z0-9_-]/g, '_');
     const filename = `Statement_${sanitizedContact}_${sanitizedRange}`;
-    downloadPdf(
-      'printable-statement',
-      filename,
-      () => setIsDownloading(true),
-      () => setIsDownloading(false),
-    );
+
+    try {
+      const accountsParam =
+        selectedAccountIds.length === (business.bank_accounts || []).length
+          ? undefined
+          : selectedAccountIds.length === 0
+          ? 'none'
+          : selectedAccountIds.join(',');
+
+      const blob = await api.downloadPartnerStatementPdf(contact.id, {
+        start_date: range.start_date || undefined,
+        end_date: range.end_date || undefined,
+        accounts: accountsParam,
+      });
+
+      const downloadUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `${filename}.pdf`;
+      link.rel = 'noopener';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+      toast.success('Vector Statement PDF downloaded');
+    } catch (err) {
+      console.warn('Backend PDF download failed, falling back to client-side capture:', err);
+      // Seamless client-side fallback
+      await downloadPdf(
+        'printable-statement',
+        filename,
+        undefined,
+        undefined,
+      );
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   const handleCopyLink = () => {
