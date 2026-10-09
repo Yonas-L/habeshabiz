@@ -1,7 +1,23 @@
 FROM php:8.4-fpm-alpine
 
-# Install nginx, supervisor, and curl
-RUN apk add --no-cache nginx supervisor curl
+# Install nginx, supervisor, curl, chromium, and fonts for server-side PDF generation
+RUN apk add --no-cache \
+    nginx \
+    supervisor \
+    curl \
+    chromium \
+    nss \
+    freetype \
+    harfbuzz \
+    ca-certificates \
+    ttf-freefont \
+    font-noto
+
+# Chromium environment variables for container headless execution
+ENV CHROME_BIN=/usr/bin/chromium-browser \
+    CHROME_PATH=/usr/bin/chromium-browser \
+    LARAVEL_PDF_CHROME_BINARY=/usr/bin/chromium-browser \
+    LARAVEL_PDF_CHROME_NO_SANDBOX=true
 
 # Install PHP extensions using official binary extension installer
 ADD --chmod=0755 https://github.com/mlocati/docker-php-extension-installer/releases/latest/download/install-php-extensions /usr/local/bin/

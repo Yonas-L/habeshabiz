@@ -1541,6 +1541,15 @@ export const api = {
     return res.blob();
   },
 
+  downloadSalesInvoicePdf: async (orderId: string): Promise<Blob> => {
+    const token = getAuthToken();
+    const res = await fetch(`${API_BASE}/sales/${orderId}/invoice/pdf`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new Error('Failed to download invoice PDF');
+    return res.blob();
+  },
+
   getExpenses: (params?: { is_owner_draw?: boolean; category?: string }) => {
     const query = new URLSearchParams();
     if (params?.is_owner_draw !== undefined) query.set('is_owner_draw', String(params.is_owner_draw));

@@ -33,3 +33,7 @@ services:
         value: stderr
       - key: RUN_MIGRATIONS
         value: "true"
+      - key: LARAVEL_PDF_CHROME_NO_SANDBOX
+        value: "true"
+      - key: LARAVEL_PDF_CHROME_BINARY
+        value: /usr/bin/chromium-browser

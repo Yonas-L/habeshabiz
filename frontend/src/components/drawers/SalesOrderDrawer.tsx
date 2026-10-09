@@ -352,14 +352,36 @@ Thank you for choosing Habeshabiz Electronics!
     setTimeout(() => setCopiedReceipt(false), 2500);
   };
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
+    if (!order?.id) return;
     const filename = `Invoice_${order.order_number}`;
-    downloadPdf(
-      'printable-invoice',
-      filename,
-      () => setIsDownloadingPdf(true),
-      () => setIsDownloadingPdf(false),
-    );
+    try {
+      setIsDownloadingPdf(true);
+      const blob = await api.downloadSalesInvoicePdf(order.id);
+      const downloadUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `${filename}.pdf`;
+      link.rel = 'noopener';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+      toast.success('Vector Invoice PDF downloaded', {
+        description: `Official document for #${order.order_number} saved.`,
+      });
+    } catch (err) {
+      console.warn('Backend vector PDF download failed, falling back to client-side capture:', err);
+      // Seamless client-side fallback
+      await downloadPdf(
+        'printable-invoice',
+        filename,
+        undefined,
+        undefined,
+      );
+    } finally {
+      setIsDownloadingPdf(false);
+    }
   };
 
   return (

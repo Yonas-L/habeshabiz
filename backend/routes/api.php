@@ -139,6 +139,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/sales', [SaleController::class, 'store']);
         Route::post('/sales/vendor-direct', [SaleController::class, 'storeVendorDirect']);
         Route::post('/sales/{id}/collect', [SaleController::class, 'collectPayment']);
+        Route::get('/sales/{id}/invoice/pdf', [SaleController::class, 'invoicePdf']);
 
         // Debts: Receivables & Payables Ledger
         Route::get('/debts', [DebtController::class, 'index']);

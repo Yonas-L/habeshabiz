@@ -15,6 +15,7 @@ use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\SalesOrder;
 use App\Models\User;
+use App\Services\PdfGeneratorService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -644,5 +645,20 @@ class SaleController extends Controller
             'message' => 'Vendor direct sale completed successfully.',
             'data' => $order,
         ], 201);
+    }
+
+    public function invoicePdf(Request $request, string $id, PdfGeneratorService $pdfService): \Symfony\Component\HttpFoundation\Response
+    {
+        $order = SalesOrder::findOrFail($id);
+
+        /** @var User|null $user */
+        $user = $request->user();
+        if ($user && ! $user->isOwner() && ! $user->canManageInventory() && $order->salesperson_id !== $user->id) {
+            abort(403, 'Unauthorized access to this sales order invoice.');
+        }
+
+        $forceDownload = $request->query('download', '1') === '1';
+
+        return $pdfService->generateSalesInvoice($order, $forceDownload)->toResponse($request);
     }
 }

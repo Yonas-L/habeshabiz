@@ -167,7 +167,10 @@ return [
 
         'user_data_dir' => env('LARAVEL_PDF_CHROME_USER_DATA_DIR'),
 
-        'custom_flags' => [],
+        'custom_flags' => [
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+        ],
 
         'env_variables' => [],
     ],
