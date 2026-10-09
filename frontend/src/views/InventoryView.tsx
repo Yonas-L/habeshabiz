@@ -282,7 +282,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     try {
       setCurrentPage(1);
       const res = await api.getInventoryWithCounts({
-        status: statusFilter === 'all' ? undefined : statusFilter,
+        status: statusFilter,
         category_id: selectedCategoryId === 'all' ? undefined : selectedCategoryId,
         search: searchTerm.trim() || undefined,
       });
@@ -299,7 +299,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       setCurrentPage(1);
       const [res, p, cats, conts, accs] = await Promise.all([
         api.getInventoryWithCounts({
-          status: statusFilter === 'all' || statusFilter === 'archived' ? undefined : statusFilter,
+          status: statusFilter === 'archived' ? undefined : statusFilter,
           category_id: selectedCategoryId === 'all' ? undefined : selectedCategoryId,
           search: searchTerm.trim() || undefined,
         }),

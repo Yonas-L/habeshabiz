@@ -54,9 +54,11 @@ class InventoryController extends Controller
             $query->where('status', 'returned_to_vendor')->where('customer_waiting', false);
         } elseif ($request->status === 'returned') {
             $query->whereIn('status', ['returned', 'fixed']);
-        } elseif ($request->filled('status') && $request->status !== 'all') {
+        } elseif ($request->status === 'all') {
+            // No status filter: query all inventory records across all lifecycle states
+        } elseif ($request->filled('status')) {
             $query->where('status', $request->status);
-        } elseif (! $request->filled('status')) {
+        } elseif (! $request->filled('search')) {
             $query->where('status', 'in_stock');
         }
 
