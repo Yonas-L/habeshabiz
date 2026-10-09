@@ -19,7 +19,7 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            font-size: 10pt;
+            font-size: 9pt;
             line-height: 1.4;
             color: #0f172a;
             background-color: #ffffff;
@@ -32,7 +32,7 @@
             justify-content: space-between;
             align-items: flex-start;
             padding-bottom: 10px;
-            border-bottom: 2.5px solid #0f172a;
+            border-bottom: 2px solid #0f172a;
             margin-bottom: 12px;
         }
 
@@ -43,23 +43,23 @@
         }
 
         .brand-logo {
-            max-height: 64px;
-            max-width: 180px;
+            max-height: 60px;
+            max-width: 170px;
             object-fit: contain;
             border-radius: 8px;
         }
 
         .brand-logo-fallback {
-            width: 54px;
-            height: 54px;
+            width: 50px;
+            height: 50px;
             background-color: #0f172a;
             color: #ffffff;
-            border-radius: 12px;
+            border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 19pt;
-            font-weight: 900;
+            font-size: 17pt;
+            font-weight: 800;
             letter-spacing: -0.5px;
         }
 
@@ -70,22 +70,22 @@
         }
 
         .company-name {
-            font-size: 15pt;
-            font-weight: 900;
+            font-size: 13pt;
+            font-weight: 800;
             text-transform: uppercase;
-            letter-spacing: -0.3px;
+            letter-spacing: -0.2px;
             color: #0f172a;
             line-height: 1.2;
         }
 
         .company-meta {
-            font-size: 8pt;
+            font-size: 7.5pt;
             color: #64748b;
             display: flex;
             flex-direction: column;
             gap: 2px;
             margin-top: 3px;
-            font-weight: 500;
+            font-weight: 400;
             line-height: 1.35;
         }
 
@@ -98,24 +98,26 @@
 
         .doc-badge {
             display: inline-block;
-            font-size: 12pt;
-            font-weight: 900;
+            font-size: 11pt;
+            font-weight: 800;
             text-transform: uppercase;
-            letter-spacing: 0.8px;
+            letter-spacing: 0.6px;
             color: #0f172a;
         }
 
         .doc-range {
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-            font-size: 9pt;
-            font-weight: 700;
+            font-size: 8.5pt;
+            font-weight: 600;
             color: #475569;
+            font-feature-settings: "tnum";
+            font-variant-numeric: tabular-nums;
         }
 
         .doc-issued {
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-            font-size: 8pt;
+            font-size: 7.5pt;
             color: #94a3b8;
+            font-feature-settings: "tnum";
+            font-variant-numeric: tabular-nums;
         }
 
         /* ─── Financial Position Strip ─── */
@@ -139,33 +141,33 @@
         }
 
         .partner-label {
-            font-size: 7.5pt;
-            font-weight: 800;
+            font-size: 7pt;
+            font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 0.8px;
             color: #94a3b8;
         }
 
         .partner-name {
-            font-size: 14pt;
-            font-weight: 900;
+            font-size: 13pt;
+            font-weight: 800;
             color: #0f172a;
             letter-spacing: -0.2px;
         }
 
         .partner-meta {
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-            font-size: 8.5pt;
+            font-size: 8pt;
             color: #475569;
             display: flex;
             align-items: center;
             gap: 6px;
+            font-feature-settings: "tnum";
+            font-variant-numeric: tabular-nums;
         }
 
         .role-tag {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            font-size: 7pt;
-            font-weight: 800;
+            font-size: 6.5pt;
+            font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             padding: 2px 6px;
@@ -186,10 +188,10 @@
             align-items: center;
             justify-content: flex-end;
             gap: 5px;
-            font-size: 8pt;
-            font-weight: 800;
+            font-size: 7.5pt;
+            font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.6px;
+            letter-spacing: 0.5px;
         }
 
         .status-dot {
@@ -209,16 +211,16 @@
         .status-settled .status-dot { background-color: #94a3b8; }
 
         .balance-amount {
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-            font-size: 18pt;
-            font-weight: 900;
-            letter-spacing: -0.5px;
+            font-size: 16pt;
+            font-weight: 800;
+            letter-spacing: -0.3px;
+            font-feature-settings: "tnum";
+            font-variant-numeric: tabular-nums;
         }
 
         .currency-tag {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            font-size: 9pt;
-            font-weight: 700;
+            font-size: 8pt;
+            font-weight: 600;
             color: #94a3b8;
             margin-left: 4px;
         }
@@ -227,55 +229,52 @@
         .section-header {
             display: flex;
             justify-content: space-between;
-            align-items: baseline;
-            margin-bottom: 8px;
+            align-items: center;
+            margin-bottom: 12px;
         }
 
         .section-title {
-            font-size: 8.5pt;
+            font-size: 11px;
             font-weight: 900;
             text-transform: uppercase;
-            letter-spacing: 0.8px;
+            letter-spacing: 0.1em;
             color: #0f172a;
         }
 
         .section-count {
             font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-            font-size: 8pt;
-            color: #94a3b8;
+            font-size: 11px;
+            font-weight: 400;
+            color: #64748b;
+            text-transform: uppercase;
         }
 
         table.ledger-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 8.5pt;
+            font-size: 11px;
             table-layout: fixed;
-            margin-bottom: 22px;
+            margin-bottom: 24px;
         }
 
         table.ledger-table thead {
             display: table-header-group;
         }
 
-        table.ledger-table tfoot {
-            display: table-footer-group;
-        }
-
-        table.ledger-table tr {
-            break-inside: avoid;
-            page-break-inside: avoid;
+        table.ledger-table thead tr {
+            border-bottom: 2px solid #0f172a;
+            background-color: #f8fafc;
         }
 
         table.ledger-table th {
-            border-bottom: 2px solid #0f172a;
-            padding: 6px 6px;
-            font-size: 7.5pt;
-            font-weight: 900;
+            padding: 10px 8px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-size: 9px;
+            font-weight: 800;
             text-transform: uppercase;
-            letter-spacing: 0.4px;
+            letter-spacing: 0.03em;
             color: #0f172a;
             text-align: left;
-            background-color: #ffffff;
             white-space: nowrap;
         }
 
@@ -285,81 +284,143 @@
             text-align: right;
         }
 
+        table.ledger-table tbody tr {
+            background-color: #ffffff;
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+
         table.ledger-table td {
-            padding: 5.5px 6px;
+            padding: 11px 8px;
             border-bottom: 1px solid #f1f5f9;
-            vertical-align: top;
+            vertical-align: middle;
             word-wrap: break-word;
             overflow-wrap: break-word;
         }
 
-        table.ledger-table tbody tr:nth-child(even) {
-            background-color: #fafbfc;
-        }
-
-        .col-date { width: 11%; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; color: #475569; font-size: 8pt; white-space: nowrap; }
-        .col-type { width: 15%; padding-right: 8px; }
-        .col-desc { width: 32%; padding-left: 4px; }
-        .col-payable { width: 14%; text-align: right; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; white-space: nowrap; }
-        .col-receivable { width: 14%; text-align: right; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; white-space: nowrap; }
-        .col-balance { width: 14%; text-align: right; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-weight: 700; white-space: nowrap; }
-
-        .type-pill {
-            display: inline-block;
-            font-size: 7pt;
-            font-weight: 700;
-            padding: 2px 7px;
-            border-radius: 4px;
+        .col-date {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 11px;
+            color: #475569;
             white-space: nowrap;
         }
 
-        .type-consignment { background-color: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
-        .type-payment { background-color: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
-        .type-return { background-color: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
-        .type-default { background-color: #f1f5f9; color: #334155; border: 1px solid #e2e8f0; }
+        .col-type {
+            white-space: nowrap;
+            padding-right: 14px;
+        }
+
+        .col-desc {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            padding-left: 4px;
+        }
+
+        .type-pill {
+            display: inline-block;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2.5px 8px;
+            border-radius: 6px;
+            white-space: nowrap;
+            line-height: 1.3;
+        }
+
+        .type-amber { background-color: #fef3c7; color: #92400e; border: 1px solid rgba(253, 230, 138, 0.6); }
+        .type-emerald { background-color: #ecfdf5; color: #065f46; border: 1px solid rgba(167, 243, 208, 0.6); }
+        .type-blue { background-color: #eff6ff; color: #1e40af; border: 1px solid rgba(191, 219, 254, 0.6); }
+        .type-sky { background-color: #f0f9ff; color: #0369a1; border: 1px solid rgba(186, 230, 253, 0.6); }
+        .type-rose { background-color: #fff1f2; color: #9f1239; border: 1px solid rgba(254, 205, 211, 0.6); }
+        .type-purple { background-color: #faf5ff; color: #6b21a8; border: 1px solid rgba(233, 213, 255, 0.6); }
+        .type-indigo { background-color: #eef2ff; color: #3730a3; border: 1px solid rgba(199, 210, 254, 0.6); }
+        .type-slate { background-color: #f1f5f9; color: #334155; border: 1px solid #e2e8f0; }
+
+        .col-desc {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
 
         .desc-text {
-            color: #0f172a;
+            font-size: 11.5px;
             font-weight: 600;
+            color: #0f172a;
             line-height: 1.35;
         }
 
         .desc-sub {
-            color: #64748b;
-            font-size: 7.5pt;
-            margin-top: 1px;
             font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 10px;
+            color: #64748b;
+            font-weight: 400;
+            margin-top: 2px;
+        }
+
+        .col-payable,
+        .col-receivable,
+        .col-balance {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 11.5px;
+            font-variant-numeric: tabular-nums;
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        .dash-muted {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            color: #94a3b8;
+            font-size: 11px;
+            font-weight: 400;
         }
 
         /* ─── Table Footer Totals ─── */
+        table.ledger-table tfoot {
+            display: table-footer-group;
+        }
+
         table.ledger-table tfoot tr {
             border-top: 2px solid #0f172a;
-            border-bottom: 2px solid #0f172a;
             background-color: #f8fafc;
-            font-weight: 800;
+            break-inside: avoid;
+            page-break-inside: avoid;
         }
 
         table.ledger-table tfoot td {
-            padding: 8px 10px;
-            font-size: 8.5pt;
+            padding: 11px 10px;
+        }
+
+        .total-label {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #0f172a;
+        }
+
+        .total-num {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 11.5px;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            text-align: right;
+            white-space: nowrap;
         }
 
         /* ─── Minimal Remittance List (No nested borders) ─── */
         .remittance-section {
-            margin-top: 12px;
-            padding-top: 10px;
+            margin-top: 16px;
+            padding-top: 12px;
             border-top: 1px solid #e2e8f0;
             break-inside: avoid;
             page-break-inside: avoid;
         }
 
         .remittance-title {
-            font-size: 7.5pt;
+            font-size: 10px;
             font-weight: 900;
             text-transform: uppercase;
-            letter-spacing: 0.8px;
+            letter-spacing: 0.1em;
             color: #475569;
-            margin-bottom: 6px;
+            margin-bottom: 8px;
         }
 
         .remittance-grid {
@@ -374,16 +435,16 @@
             align-items: baseline;
             padding-bottom: 3px;
             border-bottom: 1px dashed #e2e8f0;
-            font-size: 8pt;
+            font-size: 11px;
         }
 
         .bank-name {
-            font-weight: 700;
+            font-weight: 600;
             color: #0f172a;
         }
 
         .bank-type {
-            font-size: 7pt;
+            font-size: 9px;
             color: #94a3b8;
             margin-left: 4px;
             text-transform: capitalize;
@@ -391,15 +452,15 @@
 
         .bank-number {
             font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-            font-weight: 800;
+            font-weight: 700;
             color: #1e293b;
             letter-spacing: 0.3px;
         }
 
         /* ─── Official Verification Seal & Minimal Signature Line ─── */
         .official-seal-footer {
-            margin-top: 14px;
-            padding-top: 10px;
+            margin-top: 32px;
+            padding-top: 20px;
             border-top: 2px solid #0f172a;
             display: flex;
             justify-content: space-between;
@@ -413,41 +474,42 @@
             display: flex;
             flex-direction: column;
             gap: 4px;
-            max-width: 380px;
+            max-width: 400px;
         }
 
         .seal-badge {
-            display: inline-flex;
+            display: flex;
             align-items: center;
-            gap: 5px;
-            font-size: 7.5pt;
-            font-weight: 900;
+            gap: 6px;
+            font-size: 11px;
+            font-weight: 800;
             text-transform: uppercase;
-            letter-spacing: 0.6px;
+            letter-spacing: 0.02em;
             color: #0f172a;
         }
 
         .seal-note {
-            font-size: 7pt;
+            font-size: 10px;
             color: #64748b;
-            line-height: 1.35;
+            line-height: 1.4;
+            margin-top: 2px;
         }
 
         .signature-box {
             text-align: right;
-            min-width: 200px;
+            width: 220px;
         }
 
         .signature-line {
-            border-top: 1.5px solid #0f172a;
-            padding-top: 4px;
+            border-bottom: 2px solid #0f172a;
+            padding-bottom: 4px;
             text-align: center;
             font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-            font-size: 7.5pt;
+            font-size: 10px;
             font-weight: 700;
             color: #334155;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.08em;
         }
     </style>
 </head>
@@ -529,18 +591,26 @@
     <!-- ═══ 3. TRANSACTION ACTIVITY BREAKDOWN ═══ -->
     <div class="section-header">
         <div class="section-title">Transaction Activity Breakdown</div>
-        <div class="section-count">{{ count($ledger) }} {{ count($ledger) === 1 ? 'entry' : 'entries' }}</div>
+        <div class="section-count">{{ count($ledger) }} {{ count($ledger) === 1 ? 'ENTRY' : 'ENTRIES' }}</div>
     </div>
 
     <table class="ledger-table">
+        <colgroup>
+            <col style="width: 11%;">
+            <col style="width: 18%;">
+            <col style="width: 29%;">
+            <col style="width: 14%;">
+            <col style="width: 14%;">
+            <col style="width: 14%;">
+        </colgroup>
         <thead>
             <tr>
                 <th class="col-date">Date</th>
                 <th class="col-type">Type</th>
                 <th class="col-desc">Description</th>
-                <th class="col-payable">Payable(ETB)</th>
-                <th class="col-receivable">Receivable(ETB)</th>
-                <th class="col-balance">Balance(ETB)</th>
+                <th class="col-payable">Payable (ETB)</th>
+                <th class="col-receivable">Receivable (ETB)</th>
+                <th class="col-balance">Balance (ETB)</th>
             </tr>
         </thead>
         <tbody>
@@ -548,10 +618,14 @@
                 @php
                     $rowType = $row['type'] ?? '';
                     $pillClass = match(true) {
-                        str_contains($rowType, 'payment') || str_contains($rowType, 'settlement') => 'type-payment',
-                        str_contains($rowType, 'consignment') || str_contains($rowType, 'sourcing') => 'type-consignment',
-                        str_contains($rowType, 'return') || str_contains($rowType, 'refund') => 'type-return',
-                        default => 'type-default',
+                        $rowType === 'consignment_sale' || $rowType === 'brokered_sourcing' || $rowType === 'manual_payable' => 'type-amber',
+                        $rowType === 'device_offset' || $rowType === 'bilateral_offset' || $rowType === 'payment_received' => 'type-emerald',
+                        $rowType === 'payment_sent' => 'type-blue',
+                        $rowType === 'repair_offset' => 'type-sky',
+                        $rowType === 'repair_claim' || str_contains($rowType, 'return') || str_contains($rowType, 'refund') => 'type-rose',
+                        $rowType === 'sales_credit' || $rowType === 'handover_holding' || $rowType === 'manual_receivable' || $rowType === 'customer_purchase' => 'type-purple',
+                        $rowType === 'payout_advance' => 'type-indigo',
+                        default => 'type-slate',
                     };
                     $dateFormatted = !empty($row['date']) ? \Carbon\Carbon::parse($row['date'])->format('d/m/Y') : '—';
                 @endphp
@@ -562,42 +636,39 @@
                     </td>
                     <td class="col-desc">
                         <div class="desc-text">{{ $row['context'] ?? 'Transaction entry' }}</div>
-                        @if(!empty($row['reference_number']) || !empty($row['account_name']))
-                            <div class="desc-sub">
-                                @if(!empty($row['account_name']))
-                                    <span>via {{ $row['account_name'] }}</span>
-                                @endif
-                                @if(!empty($row['reference_number']))
-                                    <span>· Ref: {{ $row['reference_number'] }}</span>
-                                @endif
-                            </div>
+                        @if(!empty($row['reference_number']) && !str_starts_with($row['reference_number'], 'ORD-'))
+                            <div class="desc-sub">Ref: {{ $row['reference_number'] }}</div>
+                        @elseif(!empty($row['account_name']))
+                            <div class="desc-sub">via {{ $row['account_name'] }}</div>
                         @endif
                     </td>
                     <td class="col-payable">
                         @if(!empty($row['payable']) && $row['payable'] != 0)
-                            <span style="{{ $row['payable'] < 0 ? 'color: #2563eb; font-weight: 700;' : '' }}">
+                            <span style="{{ $row['payable'] < 0 ? 'color: #1d4ed8; font-weight: 700;' : 'color: #0f172a; font-weight: 500;' }}">
                                 {{ $row['payable'] < 0 ? '−' : '' }}{{ number_format(abs($row['payable']), 2) }}
                             </span>
                         @else
-                            <span style="color: #cbd5e1;">—</span>
+                            <span class="dash-muted">—</span>
                         @endif
                     </td>
                     <td class="col-receivable">
                         @if(!empty($row['receivable']) && $row['receivable'] != 0)
-                            <span style="{{ $row['receivable'] < 0 ? 'color: #047857; font-weight: 700;' : '' }}">
+                            <span style="{{ $row['receivable'] < 0 ? 'color: #047857; font-weight: 700;' : 'color: #0f172a; font-weight: 500;' }}">
                                 {{ $row['receivable'] < 0 ? '−' : '' }}{{ number_format(abs($row['receivable']), 2) }}
                             </span>
                         @else
-                            <span style="color: #cbd5e1;">—</span>
+                            <span class="dash-muted">—</span>
                         @endif
                     </td>
-                    <td class="col-balance" style="color: {{ ($row['running_balance'] ?? 0) > 0 ? '#047857' : (($row['running_balance'] ?? 0) < 0 ? '#b91c1c' : '#0f172a') }};">
-                        {{ ($row['running_balance'] ?? 0) > 0 ? '+' : '' }}{{ number_format($row['running_balance'] ?? 0, 2) }}
+                    <td class="col-balance">
+                        <span style="{{ ($row['running_balance'] ?? 0) > 0 ? 'color: #047857; font-weight: 800;' : ((($row['running_balance'] ?? 0) < 0) ? 'color: #be123c; font-weight: 800;' : 'color: #475569; font-weight: 700;') }}">
+                            {{ ($row['running_balance'] ?? 0) > 0 ? '+' : '' }}{{ number_format($row['running_balance'] ?? 0, 2) }}
+                        </span>
                     </td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="6" style="text-align: center; padding: 24px; color: #94a3b8; font-style: italic;">
+                    <td colspan="6" style="text-align: center; padding: 28px; color: #94a3b8; font-style: italic; font-size: 12px;">
                         No transactions recorded for this partner within the selected period.
                     </td>
                 </tr>
@@ -609,16 +680,16 @@
                 $totalReceivable = array_sum(array_column($ledger, 'receivable'));
             @endphp
             <tr>
-                <td colspan="3" style="text-transform: uppercase; letter-spacing: 0.5px; font-size: 8pt; font-weight: 900;">
+                <td colspan="3" class="total-label">
                     Statement Period Totals
                 </td>
-                <td class="col-payable" style="font-weight: 900; color: {{ $totalPayable < 0 ? '#2563eb' : '#b91c1c' }};">
-                    {{ $totalPayable < 0 ? '−' : '' }}{{ number_format(abs($totalPayable), 2) }}
+                <td class="total-num" style="color: #0f172a;">
+                    {{ number_format(abs($totalPayable), 2) }}
                 </td>
-                <td class="col-receivable" style="font-weight: 900; color: #047857;">
-                    {{ $totalReceivable < 0 ? '−' : '' }}{{ number_format(abs($totalReceivable), 2) }}
+                <td class="total-num" style="color: #0f172a;">
+                    {{ number_format(abs($totalReceivable), 2) }}
                 </td>
-                <td class="col-balance" style="font-weight: 900; color: {{ $netBalance > 0 ? '#047857' : ($netBalance < 0 ? '#b91c1c' : '#0f172a') }};">
+                <td class="total-num" style="color: {{ $netBalance > 0 ? '#047857' : ($netBalance < 0 ? '#be123c' : '#0f172a') }}; font-weight: 800;">
                     {{ $netBalance > 0 ? '+' : '' }}{{ number_format($netBalance, 2) }}
                 </td>
             </tr>
@@ -647,14 +718,14 @@
     <div class="official-seal-footer">
         <div class="seal-info">
             <div class="seal-badge">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
                     <path d="m9 12 2 2 4-4"/>
                 </svg>
                 <span>OFFICIAL FINANCIAL STATEMENT</span>
             </div>
             <p class="seal-note">
-                {{ !empty($business['footer_note']) ? $business['footer_note'] : "Official accounting statement generated by {$business['name']}. All ledger entries are verified and preserved." }}
+                {{ !empty($business['footer_note']) ? $business['footer_note'] : "Thank you for your business. Defect coverage valid for 7 days with intact warranty and receipt." }}
             </p>
         </div>
 
