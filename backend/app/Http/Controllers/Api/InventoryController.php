@@ -49,9 +49,11 @@ class InventoryController extends Controller
         } elseif ($request->status === 'exchange_stock') {
             $query->where('status', 'in_stock')->where('source_type', 'exchange');
         } elseif ($request->status === 'returned_to_vendor') {
-            $query->where('status', 'returned_to_vendor');
+            $query->where('status', 'returned_to_vendor')->where('customer_waiting', true);
+        } elseif ($request->status === 'closed_returns') {
+            $query->where('status', 'returned_to_vendor')->where('customer_waiting', false);
         } elseif ($request->status === 'returned') {
-            $query->whereIn('status', ['returned', 'fixed', 'returned_to_vendor']);
+            $query->whereIn('status', ['returned', 'fixed']);
         } elseif ($request->filled('status') && $request->status !== 'all') {
             $query->where('status', $request->status);
         } elseif (! $request->filled('status')) {
@@ -108,8 +110,9 @@ class InventoryController extends Controller
             'exchange_stock' => InventoryUnit::where('status', 'in_stock')->where('source_type', 'exchange')->count(),
             'out' => InventoryUnit::where('status', 'out')->count(),
             'sold' => InventoryUnit::where('status', 'sold')->count(),
-            'returned' => InventoryUnit::whereIn('status', ['returned', 'fixed', 'returned_to_vendor'])->count(),
-            'returned_to_vendor' => InventoryUnit::where('status', 'returned_to_vendor')->count(),
+            'returned' => InventoryUnit::whereIn('status', ['returned', 'fixed'])->count(),
+            'returned_to_vendor' => InventoryUnit::where('status', 'returned_to_vendor')->where('customer_waiting', true)->count(),
+            'closed_returns' => InventoryUnit::where('status', 'returned_to_vendor')->where('customer_waiting', false)->count(),
             'all' => InventoryUnit::count() + $nonSerializedInStock,
         ];
 
@@ -2090,8 +2093,10 @@ class InventoryController extends Controller
                 'returned_at' => now(),
                 'return_reason' => $validated['return_reason'] ?? 'Returned unsold to vendor within agreed terms',
                 'location' => $unit->supplier ? "Returned to {$unit->supplier->name}" : 'Returned to Vendor',
-                'handover_to' => $unit->customer_waiting ? $unit->handover_to : null,
-                'handed_out_at' => $unit->customer_waiting ? $unit->handed_out_at : null,
+                'customer_waiting' => false,
+                'customer_waiting_at' => null,
+                'handover_to' => null,
+                'handed_out_at' => null,
             ]);
 
             // Decrement active stock if it was previously in_stock or out

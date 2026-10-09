@@ -1068,7 +1068,7 @@ export const api = {
     if (!res.ok) throw new Error(json.message || 'API request failed');
     return {
       units: (json.data || []) as InventoryUnit[],
-      counts: (json.counts || { in_stock: 0, vendor_stock: 0, exchange_stock: 0, out: 0, sold: 0, returned: 0, returned_to_vendor: 0, all: 0 }) as {
+      counts: (json.counts || { in_stock: 0, vendor_stock: 0, exchange_stock: 0, out: 0, sold: 0, returned: 0, returned_to_vendor: 0, closed_returns: 0, all: 0 }) as {
         in_stock: number;
         vendor_stock: number;
         exchange_stock?: number;
@@ -1076,6 +1076,7 @@ export const api = {
         sold: number;
         returned: number;
         returned_to_vendor: number;
+        closed_returns?: number;
         all: number;
       },
     };

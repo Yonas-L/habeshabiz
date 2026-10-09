@@ -52,7 +52,7 @@ interface InventoryViewProps {
   onClearInitialContext?: () => void;
 }
 
-type TabType = 'in_stock' | 'vendor_stock' | 'exchange_stock' | 'out' | 'sold' | 'returned' | 'returned_to_vendor' | 'all' | 'archived';
+type TabType = 'in_stock' | 'vendor_stock' | 'exchange_stock' | 'out' | 'sold' | 'returned' | 'returned_to_vendor' | 'closed_returns' | 'all' | 'archived';
 
 export const InventoryView: React.FC<InventoryViewProps> = ({
   user,
@@ -82,6 +82,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     vendor_stock: number;
     exchange_stock?: number;
     returned_to_vendor: number;
+    closed_returns?: number;
     out: number;
     sold: number;
     returned: number;
@@ -91,6 +92,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     vendor_stock: 0,
     exchange_stock: 0,
     returned_to_vendor: 0,
+    closed_returns: 0,
     out: 0,
     sold: 0,
     returned: 0,
@@ -885,8 +887,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               <option value="exchange_stock">Exchange ({counts.exchange_stock ?? 0})</option>
               <option value="out">Out ({counts.out})</option>
               <option value="sold">Sold ({counts.sold})</option>
-              <option value="returned">Returns ({counts.returned})</option>
+              <option value="returned">Repairs ({counts.returned})</option>
               <option value="returned_to_vendor">With Vendor ({counts.returned_to_vendor ?? 0})</option>
+              {(counts.closed_returns ?? 0) > 0 && (
+                <option value="closed_returns">Closed Returns ({counts.closed_returns ?? 0})</option>
+              )}
               <option value="all">All ({counts.all})</option>
               {isOwner && (
                 <option value="archived">Archived ({archivedProducts.length})</option>
@@ -936,8 +941,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               <option value="exchange_stock">Exchanged Stock • {counts.exchange_stock ?? 0}</option>
               <option value="out">Out for Sale • {counts.out}</option>
               <option value="sold">Sold • {counts.sold}</option>
-              <option value="returned">Returns • {counts.returned}</option>
+              <option value="returned">Repairs • {counts.returned}</option>
               <option value="returned_to_vendor">With Vendor • {counts.returned_to_vendor ?? 0}</option>
+              {(counts.closed_returns ?? 0) > 0 && (
+                <option value="closed_returns">Closed Returns • {counts.closed_returns ?? 0}</option>
+              )}
               <option value="all">All Records • {counts.all}</option>
               {isOwner && (
                 <option value="archived">Archived Models • {archivedProducts.length}</option>
@@ -1543,6 +1551,10 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                         ? 'No sold items found.'
                         : statusFilter === 'returned'
                         ? 'No devices under return/repair inspection.'
+                        : statusFilter === 'returned_to_vendor'
+                        ? 'No devices currently with vendors for warranty repair.'
+                        : statusFilter === 'closed_returns'
+                        ? 'No closed vendor return records found.'
                         : 'No inventory units found in this category.'}
                     </td>
                   </tr>
@@ -1679,17 +1691,22 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
                           {unit.status === 'returned_to_vendor' && (
                             <div className="flex flex-col items-center">
-                              <span className={`inline-flex items-center gap-1 text-[10px] font-bold ${
-                                unit.customer_waiting
-                                  ? 'text-amber-600 dark:text-amber-400'
-                                  : 'text-slate-500 dark:text-slate-400'
-                              }`}>
-                                <RotateCcw className="w-3 h-3" />
-                                <span>{unit.customer_waiting ? 'With Vendor (Customer Waiting)' : 'With Vendor'}</span>
-                              </span>
-                              {unit.customer_waiting && unit.sales_order_item?.sales_order && (
-                                <span className="text-[9px] text-slate-400 font-mono">
-                                  #{unit.sales_order_item.sales_order.order_number}
+                              {unit.customer_waiting ? (
+                                <>
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-600 dark:text-amber-400">
+                                    <RotateCcw className="w-3 h-3" />
+                                    <span>With Vendor (Customer Waiting)</span>
+                                  </span>
+                                  {unit.sales_order_item?.sales_order && (
+                                    <span className="text-[9px] text-slate-400 font-mono">
+                                      #{unit.sales_order_item.sales_order.order_number}
+                                    </span>
+                                  )}
+                                </>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  <span>Returned to Vendor</span>
                                 </span>
                               )}
                             </div>
@@ -1826,44 +1843,50 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                               )}
 
                               {unit.status === 'returned_to_vendor' && (
-                                <div className="flex items-center gap-1">
-                                  <button
-                                    onClick={() => {
-                                      setReceiveFixedUnit(unit);
-                                      setReceiveFixedAction(unit.customer_waiting ? 'deliver_to_customer' : 'restock');
-                                      setReceiveFixedCondition('refurbished');
-                                      setReceiveFixedBattery(unit.battery_health ? String(unit.battery_health) : '');
-                                      setReceiveFixedCycle('');
-                                      setReceiveFixedNotes('');
-                                      const p = unit.selling_price || unit.variant?.default_selling_price;
-                                      setReceiveFixedPrice(p ? String(p) : '');
-                                    }}
-                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-teal-50 dark:bg-teal-950/50 border border-teal-200/60 dark:border-teal-800/60 text-teal-700 dark:text-teal-400 hover:bg-teal-100 transition-colors shadow-2xs active:scale-95 cursor-pointer"
-                                    title="Receive this device back fixed from vendor (same IMEI)"
-                                  >
-                                    <CheckCircle2 className="w-3 h-3" />
-                                    <span>Receive Fixed</span>
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      setVendorSwapUnit(unit);
-                                      setVendorSwapAction(unit.customer_waiting ? 'deliver_to_customer' : 'restock');
-                                      setVendorSwapImei('');
-                                      setVendorSwapCondition('new');
-                                      setVendorSwapBattery('100');
-                                      setVendorSwapCycle('');
-                                      setVendorSwapSimType(unit.sim_type || 'physical');
-                                      setVendorSwapNotes('');
-                                      const p = unit.selling_price || unit.variant?.default_selling_price;
-                                      setVendorSwapPrice(p ? String(p) : '');
-                                    }}
-                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200/60 dark:border-indigo-800/60 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-100 transition-colors shadow-2xs active:scale-95 cursor-pointer"
-                                    title="Vendor replaced with a different IMEI"
-                                  >
-                                    <ArrowLeftRight className="w-3 h-3" />
-                                    <span>Vendor Swap</span>
-                                  </button>
-                                </div>
+                                unit.customer_waiting ? (
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      onClick={() => {
+                                        setReceiveFixedUnit(unit);
+                                        setReceiveFixedAction('deliver_to_customer');
+                                        setReceiveFixedCondition('refurbished');
+                                        setReceiveFixedBattery(unit.battery_health ? String(unit.battery_health) : '');
+                                        setReceiveFixedCycle('');
+                                        setReceiveFixedNotes('');
+                                        const p = unit.selling_price || unit.variant?.default_selling_price;
+                                        setReceiveFixedPrice(p ? String(p) : '');
+                                      }}
+                                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-teal-50 dark:bg-teal-950/50 border border-teal-200/60 dark:border-teal-800/60 text-teal-700 dark:text-teal-400 hover:bg-teal-100 transition-colors shadow-2xs active:scale-95 cursor-pointer"
+                                      title="Receive this device back fixed from vendor (same IMEI)"
+                                    >
+                                      <CheckCircle2 className="w-3 h-3" />
+                                      <span>Receive Fixed</span>
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setVendorSwapUnit(unit);
+                                        setVendorSwapAction('deliver_to_customer');
+                                        setVendorSwapImei('');
+                                        setVendorSwapCondition('new');
+                                        setVendorSwapBattery('100');
+                                        setVendorSwapCycle('');
+                                        setVendorSwapSimType(unit.sim_type || 'physical');
+                                        setVendorSwapNotes('');
+                                        const p = unit.selling_price || unit.variant?.default_selling_price;
+                                        setVendorSwapPrice(p ? String(p) : '');
+                                      }}
+                                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200/60 dark:border-indigo-800/60 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-100 transition-colors shadow-2xs active:scale-95 cursor-pointer"
+                                      title="Vendor replaced with a different IMEI"
+                                    >
+                                      <ArrowLeftRight className="w-3 h-3" />
+                                      <span>Vendor Swap</span>
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500">
+                                    Closed
+                                  </span>
+                                )
                               )}
                             </div>
                           </td>
@@ -2093,6 +2116,10 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   ? 'No sold items found.'
                   : statusFilter === 'returned'
                   ? 'No devices under return/repair inspection.'
+                  : statusFilter === 'returned_to_vendor'
+                  ? 'No devices currently with vendors for warranty repair.'
+                  : statusFilter === 'closed_returns'
+                  ? 'No closed vendor return records found.'
                   : 'No inventory units found in this category.'}
               </div>
             ) : (
@@ -2134,7 +2161,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                           </div>
                         ) : null}
                         <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold capitalize mt-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                          {unit.status.replace(/_/g, ' ')}
+                          {unit.status === 'returned_to_vendor'
+                            ? unit.customer_waiting
+                              ? 'With Vendor (Waiting)'
+                              : 'Returned to Vendor'
+                            : unit.status.replace(/_/g, ' ')}
                         </span>
                       </div>
                     </div>

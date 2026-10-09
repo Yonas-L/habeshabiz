@@ -255,7 +255,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
             : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200/60 dark:border-slate-700/60'
         }`}>
           {currentUnit.customer_waiting ? <Clock className="w-3 h-3" /> : <RotateCcw className="w-3 h-3" />}
-          {currentUnit.customer_waiting ? 'WITH VENDOR • WAITING' : 'WITH VENDOR'}
+          {currentUnit.customer_waiting ? 'WITH VENDOR • WAITING' : 'RETURNED TO VENDOR • CLOSED'}
         </span>
       );
     }
@@ -536,7 +536,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
                 )}
 
                 {/* WITH VENDOR: Receive Fixed & Vendor Swap */}
-                {currentUnit.status === 'returned_to_vendor' && (isOwner || canManageInv) && (
+                {currentUnit.status === 'returned_to_vendor' && currentUnit.customer_waiting && (isOwner || canManageInv) && (
                   <>
                     {onOpenReceiveFixed && (
                       <button
@@ -630,7 +630,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
                 </button>
               )}
 
-              {currentUnit.status === 'returned_to_vendor' && (isOwner || canManageInv) && onOpenReceiveFixed && (
+              {currentUnit.status === 'returned_to_vendor' && currentUnit.customer_waiting && (isOwner || canManageInv) && onOpenReceiveFixed && (
                 <button
                   type="button"
                   onClick={() => {
@@ -723,7 +723,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
                   </button>
                 )}
 
-                {currentUnit.status === 'returned_to_vendor' && (isOwner || canManageInv) && onOpenVendorSwap && (
+                {currentUnit.status === 'returned_to_vendor' && currentUnit.customer_waiting && (isOwner || canManageInv) && onOpenVendorSwap && (
                   <button
                     type="button"
                     onClick={() => {
@@ -1081,12 +1081,12 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
                   {currentUnit.customer_waiting ? (
                     <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                   ) : (
-                    <RotateCcw className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+                    <CheckCircle2 className="w-4 h-4 text-slate-500 dark:text-slate-400" />
                   )}
                   <span>
                     {currentUnit.customer_waiting
                       ? 'With Vendor for Repair • Customer Waiting'
-                      : 'Returned to Vendor'}
+                      : 'Returned to Vendor • Custody Closed'}
                   </span>
                 </div>
                 {currentUnit.customer_waiting && currentUnit.sales_order_item?.sales_order?.order_number && (
@@ -1096,12 +1096,25 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
                 )}
               </div>
               <p className="text-[11px] leading-relaxed">
-                {currentUnit.return_reason ? (
-                  <>Issue: <strong className="font-semibold">{currentUnit.return_reason}</strong></>
+                {currentUnit.customer_waiting ? (
+                  <>
+                    {currentUnit.return_reason ? (
+                      <>Issue: <strong className="font-semibold">{currentUnit.return_reason}</strong></>
+                    ) : (
+                      'Device sent to vendor for resolution.'
+                    )}
+                    {currentUnit.customer_waiting_at && ` • Sent ${new Date(currentUnit.customer_waiting_at).toLocaleDateString()}`}
+                  </>
                 ) : (
-                  'Device sent to vendor for resolution.'
+                  <>
+                    This unit was returned directly to the vendor and removed from active shop custody.
+                    {currentUnit.return_reason && (
+                      <span className="block mt-1 text-slate-500 dark:text-slate-400">
+                        Reason: <strong className="font-medium text-slate-700 dark:text-slate-300">{currentUnit.return_reason}</strong>
+                      </span>
+                    )}
+                  </>
                 )}
-                {currentUnit.customer_waiting_at && ` • Sent ${new Date(currentUnit.customer_waiting_at).toLocaleDateString()}`}
               </p>
               {currentUnit.customer_waiting && currentUnit.sales_order_item?.sales_order?.customer && (
                 <div className="text-[11px] pt-1.5 border-t border-amber-200/60 dark:border-amber-800/40 flex items-center justify-between">
