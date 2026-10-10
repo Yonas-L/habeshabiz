@@ -199,15 +199,21 @@ class GeneratePartnerStatementAction
                         'reference_number' => null,
                     ];
                 } elseif ((float) $debt->original_amount > 0) {
+                    $isMutualSettled = $debt->payments->contains(fn ($p) => $p->reference_number === 'MUTUAL-OFFSET');
+                    if ($isMutualSettled && (float) $debt->remaining_amount <= 0) {
+                        continue;
+                    }
+
+                    $remAmount = $isMutualSettled ? (float) $debt->remaining_amount : (float) $debt->original_amount;
                     $rawEntries[] = [
                         'id' => "debt-{$debt->id}",
                         'date' => $debtCreatedDate,
                         'type' => 'manual_payable',
-                        'type_label' => 'Payable',
-                        'context' => $debt->notes ? $this->sanitizeContext($debt->notes) : 'Agreed payable balance',
-                        'payable' => (float) $debt->original_amount,
+                        'type_label' => $isMutualSettled ? 'Advance Debit' : 'Payable',
+                        'context' => $debt->notes ? $this->sanitizeContext($debt->notes) : ($isMutualSettled ? 'Advance debit balance' : 'Agreed payable balance'),
+                        'payable' => $remAmount,
                         'receivable' => 0.0,
-                        'balance_effect' => -(float) $debt->original_amount,
+                        'balance_effect' => -$remAmount,
                         'reference_number' => null,
                     ];
                 }
