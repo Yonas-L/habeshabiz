@@ -1007,4 +1007,59 @@ class VendorReturnAndSwapWorkflowTest extends TestCase
         $this->assertEquals('open', $brokeredDebt->status);
         $this->assertEquals(86000.0, (float) $brokeredDebt->remaining_amount);
     }
+
+    public function test_walk_in_customer_return_creates_refund_payable_debt(): void
+    {
+        $unit = InventoryUnit::create([
+            'tenant_id' => $this->tenant->id,
+            'variant_id' => $this->variant->id,
+            'imei_or_serial' => '112233445566778899',
+            'cost_basis' => 50000,
+            'status' => 'in_stock',
+            'location' => 'Shop Counter',
+        ]);
+
+        // Sale to walk-in customer (no customer_id)
+        $recordSaleAction = app(\App\Actions\RecordSaleAction::class);
+        $order = $recordSaleAction->execute([
+            'tenant_id' => $this->tenant->id,
+            'customer_id' => null,
+            'order_type' => 'retail',
+            'payment_method' => 'telebirr',
+            'payment_status' => 'paid',
+            'items' => [
+                [
+                    'variant_id' => $this->variant->id,
+                    'inventory_unit_id' => $unit->id,
+                    'quantity' => 1,
+                    'unit_price' => 75000,
+                    'sourcing_type' => 'internal_stock',
+                ],
+            ],
+            'paid_amount' => 75000,
+            'subtotal' => 75000,
+            'final_amount' => 75000,
+        ], $this->owner);
+
+        // Process customer return
+        $response = $this->actingAs($this->owner)
+            ->postJson("/api/v1/inventory/units/{$unit->id}/customer-return", [
+                'return_reason' => 'Customer changed mind',
+                'destination' => 'repair',
+                'customer_waiting' => true,
+            ]);
+
+        $response->assertOk();
+
+        // Assert customer refund debt was created for Walk-in Customer
+        $refundDebt = Debt::where('tenant_id', $this->tenant->id)
+            ->where('reference_type', 'customer_return_refund')
+            ->where('reference_id', $unit->id)
+            ->first();
+
+        $this->assertNotNull($refundDebt);
+        $this->assertEquals('open', $refundDebt->status);
+        $this->assertEquals(75000.0, (float) $refundDebt->remaining_amount);
+        $this->assertEquals('Walk-in Customer', $refundDebt->contact?->name);
+    }
 }

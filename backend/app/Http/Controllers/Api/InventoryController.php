@@ -1780,6 +1780,21 @@ class InventoryController extends Controller
                             ->where('name', 'ilike', $unit->handover_to)
                             ->first();
                     }
+                    if (! $returnCustomer) {
+                        $returnCustomer = Contact::firstOrCreate(
+                            [
+                                'tenant_id' => $user->tenant_id,
+                                'name' => 'Walk-in Customer',
+                            ],
+                            [
+                                'roles' => ['customer'],
+                                'is_active' => true,
+                            ]
+                        );
+                        if (! $salesOrder->customer_id) {
+                            $salesOrder->update(['customer_id' => $returnCustomer->id]);
+                        }
+                    }
 
                     $isDebtOffsetSale = $salesOrder->payment_method === 'debt_offset'
                         || str_contains(strtolower($salesOrder->notes ?? ''), 'offset settlement');

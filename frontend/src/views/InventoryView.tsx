@@ -1778,10 +1778,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                                 <div className="flex items-center gap-1.5">
                                   <button
                                     onClick={() => {
+                                      const isVendor = Boolean(unit.supplier_contact_id || unit.source_type === 'vendor_direct' || unit.source_type === 'consignment');
                                       setReturnTargetUnit(unit);
                                       setReturnReason('');
                                       setReturnCondition('inspection_needed');
-                                      setReturnDestination('repair');
+                                      setReturnDestination(isVendor ? 'vendor' : 'repair');
                                       setReturnNotes('');
                                     }}
                                     className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-rose-50 dark:bg-rose-950/50 border border-rose-200/60 dark:border-rose-800/60 text-rose-700 dark:text-rose-400 hover:bg-rose-100 transition-colors shadow-2xs active:scale-95 cursor-pointer"
@@ -2907,7 +2908,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 </select>
               </div>
 
-              {Boolean(returnTargetUnit.supplier_contact_id || returnTargetUnit.source_type === 'consignment') && (
+              {Boolean(returnTargetUnit.supplier_contact_id || returnTargetUnit.source_type === 'consignment' || returnTargetUnit.source_type === 'vendor_direct') && (
                 <div className="space-y-2">
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
@@ -3877,10 +3878,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         }}
         onOpenHandover={(unit) => openHandoverModal(unit)}
         onOpenCustomerReturn={(unit) => {
+          const isVendor = Boolean(unit.supplier_contact_id || unit.source_type === 'vendor_direct' || unit.source_type === 'consignment');
           setReturnTargetUnit(unit);
           setReturnReason('');
           setReturnCondition('inspection_needed');
-          setReturnDestination('repair');
+          setReturnDestination(isVendor ? 'vendor' : 'repair');
           setReturnNotes('');
         }}
         onOpenRepairExpense={(unit) => {

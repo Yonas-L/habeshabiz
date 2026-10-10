@@ -113,6 +113,7 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
           variant_id: u.variant_id || item.variant_id,
           variant: u.variant || item.variant,
           cost_basis: u.cost_basis ?? (item.unit_cost !== undefined ? item.unit_cost : undefined),
+          supplier_contact_id: u.supplier_contact_id || item.vendor_contact_id || undefined,
           sales_order_item: {
             ...item,
             sales_order: order,
@@ -124,7 +125,15 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
   const handleInitiateReturn = (order: SalesOrder) => {
     const returnable = getReturnableUnits(order);
     if (returnable.length === 1) {
-      setReturnTargetUnit(returnable[0]);
+      const u = returnable[0];
+      const isVendor = Boolean(
+        u.supplier_contact_id ||
+        u.source_type === 'vendor_direct' ||
+        u.source_type === 'consignment' ||
+        u.sales_order_item?.sourcing_type === 'brokered_neighbour'
+      );
+      setReturnTargetUnit(u);
+      setReturnDestination(isVendor ? 'vendor' : 'repair');
       setReturnReason('');
       setReturnCondition('inspection_needed');
       setReturnNotes('');
@@ -916,33 +925,45 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
                 </select>
               </div>
 
-              {Boolean(returnTargetUnit.supplier_contact_id || returnTargetUnit.source_type === 'consignment') && (
+              {Boolean(
+                returnTargetUnit.supplier_contact_id ||
+                returnTargetUnit.source_type === 'consignment' ||
+                returnTargetUnit.source_type === 'vendor_direct' ||
+                returnTargetUnit.sales_order_item?.sourcing_type === 'brokered_neighbour'
+              ) && (
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Return Destination
-                  </label>
-                  <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl text-xs font-semibold">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                      Return Destination
+                    </label>
+                    <span className="text-[10px] font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 px-2 py-0.5 rounded-md border border-amber-200/60 dark:border-amber-900/40">
+                      Vendor Sourced
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl text-xs font-semibold">
+                    <button
+                      type="button"
+                      onClick={() => setReturnDestination('vendor')}
+                      className={`py-2 px-3 rounded-lg transition-all cursor-pointer text-left ${
+                        returnDestination === 'vendor'
+                          ? 'bg-white dark:bg-[#131926] text-amber-600 dark:text-amber-400 shadow-xs font-bold ring-1 ring-amber-500/20'
+                          : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                    >
+                      <div>Return to Vendor</div>
+                      <div className="text-[10px] font-normal opacity-75 mt-0.5">Cancels vendor payable</div>
+                    </button>
                     <button
                       type="button"
                       onClick={() => setReturnDestination('repair')}
-                      className={`py-1.5 px-3 rounded-lg transition-all cursor-pointer ${
+                      className={`py-2 px-3 rounded-lg transition-all cursor-pointer text-left ${
                         returnDestination === 'repair'
                           ? 'bg-white dark:bg-[#131926] text-slate-900 dark:text-white shadow-xs font-bold'
                           : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                       }`}
                     >
-                      Repair Shelf
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setReturnDestination('vendor')}
-                      className={`py-1.5 px-3 rounded-lg transition-all cursor-pointer ${
-                        returnDestination === 'vendor'
-                          ? 'bg-white dark:bg-[#131926] text-amber-600 dark:text-amber-400 shadow-xs font-bold'
-                          : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                      }`}
-                    >
-                      Return to Vendor
+                      <div>Repair Shelf</div>
+                      <div className="text-[10px] font-normal opacity-75 mt-0.5">Keep in shop</div>
                     </button>
                   </div>
                 </div>
@@ -1020,7 +1041,14 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
                     key={unit.id}
                     type="button"
                     onClick={() => {
+                      const isVendor = Boolean(
+                        unit.supplier_contact_id ||
+                        unit.source_type === 'vendor_direct' ||
+                        unit.source_type === 'consignment' ||
+                        unit.sales_order_item?.sourcing_type === 'brokered_neighbour'
+                      );
                       setReturnTargetUnit(unit);
+                      setReturnDestination(isVendor ? 'vendor' : 'repair');
                       setReturnReason('');
                       setReturnCondition('inspection_needed');
                       setReturnNotes('');
