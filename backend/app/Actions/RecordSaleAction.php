@@ -293,6 +293,16 @@ class RecordSaleAction
                     }
                     $unitCost = $vendorCost;
 
+                    if (! empty($itemData['inventory_unit_id'])) {
+                        $unit = InventoryUnit::where('id', $itemData['inventory_unit_id'])->first();
+                        if ($unit) {
+                            $unit->update([
+                                'status' => 'sold',
+                                'sold_at' => now(),
+                            ]);
+                        }
+                    }
+
                     $payableAmount = $vendorCost * $qty;
                     $isPaidNow = ! empty($itemData['vendor_paid_now']);
                     $vendorAccountId = $itemData['vendor_payment_account_id'] ?? null;

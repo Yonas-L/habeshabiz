@@ -907,8 +907,104 @@ class VendorReturnAndSwapWorkflowTest extends TestCase
         $this->assertEquals(0.0, (float) $natiStmt2['kpis']['current_open_payable']);
         $this->assertEquals(0.0, (float) $natiStmt2['kpis']['current_net_balance']);
     }
+
+    public function test_customer_return_to_vendor_cancels_brokered_sourcing_debt_and_receive_restores_it(): void
+    {
+        $vendor = Contact::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Brokered Vendor Hale',
+            'type' => 'supplier',
+            'roles' => ['peer_vendor', 'supplier'],
+        ]);
+
+        $customer = Contact::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Buyer Yonas',
+            'type' => 'customer',
+            'roles' => ['customer'],
+        ]);
+
+        $unit = InventoryUnit::create([
+            'tenant_id' => $this->tenant->id,
+            'variant_id' => $this->variant->id,
+            'imei_or_serial' => '99887766554433221',
+            'cost_basis' => 86000,
+            'status' => 'in_stock',
+            'source_type' => 'vendor_direct',
+            'supplier_contact_id' => $vendor->id,
+            'location' => 'Shop Counter',
+        ]);
+
+        // Record sale with brokered sourcing
+        $recordSaleAction = app(\App\Actions\RecordSaleAction::class);
+        $order = $recordSaleAction->execute([
+            'tenant_id' => $this->tenant->id,
+            'customer_id' => $customer->id,
+            'order_type' => 'retail',
+            'payment_method' => 'cash',
+            'payment_status' => 'paid',
+            'items' => [
+                [
+                    'variant_id' => $this->variant->id,
+                    'inventory_unit_id' => $unit->id,
+                    'quantity' => 1,
+                    'unit_price' => 100000,
+                    'sourcing_type' => 'brokered_neighbour',
+                    'vendor_contact_id' => $vendor->id,
+                    'vendor_cost' => 86000,
+                ],
+            ],
+            'paid_amount' => 100000,
+            'subtotal' => 100000,
+            'final_amount' => 100000,
+        ], $this->owner);
+
+        // Verify brokered debt is created and open
+        $brokeredDebt = Debt::where('tenant_id', $this->tenant->id)
+            ->where('contact_id', $vendor->id)
+            ->where('reference_type', 'brokered_sourcing')
+            ->where('reference_id', $order->id)
+            ->first();
+
+        $this->assertNotNull($brokeredDebt);
+        $this->assertEquals('open', $brokeredDebt->status);
+        $this->assertEquals(86000.0, (float) $brokeredDebt->remaining_amount);
+
+        // Return device with destination: vendor
+        $response = $this->actingAs($this->owner)
+            ->postJson("/api/v1/inventory/units/{$unit->id}/customer-return", [
+                'return_reason' => 'Defective tablet',
+                'destination' => 'vendor',
+                'customer_waiting' => false,
+            ]);
+
+        $response->assertOk();
+
+        // 1. Unit should now be marked returned_to_vendor
+        $unit->refresh();
+        $this->assertEquals('returned_to_vendor', $unit->status);
+
+        // 2. Brokered sourcing payable to Hale should be cancelled via RETURN-TO-VENDOR
+        $brokeredDebt->refresh();
+        $this->assertEquals('settled', $brokeredDebt->status);
+        $this->assertEquals(0.0, (float) $brokeredDebt->remaining_amount);
+
+        $rtvPayment = $brokeredDebt->payments->where('reference_number', 'RETURN-TO-VENDOR')->first();
+        $this->assertNotNull($rtvPayment);
+        $this->assertEquals(86000.0, (float) $rtvPayment->amount);
+
+        // 3. Receiving it back from vendor should restore the obligation
+        $receiveRes = $this->actingAs($this->owner)
+            ->postJson("/api/v1/inventory/units/{$unit->id}/receive-from-vendor", [
+                'action' => 'restock',
+                'condition' => 'refurbished',
+                'notes' => 'Received repaired tablet from Hale',
+            ]);
+
+        $receiveRes->assertOk();
+
+        $brokeredDebt->refresh();
+        $this->assertEquals('open', $brokeredDebt->status);
+        $this->assertEquals(86000.0, (float) $brokeredDebt->remaining_amount);
+    }
 }
-
-
-
-

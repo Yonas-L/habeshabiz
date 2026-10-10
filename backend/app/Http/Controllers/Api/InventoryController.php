@@ -1702,25 +1702,7 @@ class InventoryController extends Controller
 
             // If destination is vendor, execute return-to-vendor cancellation on original supplier debt
             if ($destination === 'vendor') {
-                $supplierPayables = Debt::where('tenant_id', $user->tenant_id)
-                    ->where('type', 'payable')
-                    ->where('reference_type', '!=', 'customer_return_refund')
-                    ->where('reference_type', '!=', 'salesperson_bonus')
-                    ->where(function ($q) use ($unit) {
-                        if ($unit->supplier_contact_id) {
-                            $q->where('contact_id', $unit->supplier_contact_id)
-                                ->where(function ($sq) use ($unit) {
-                                    $sq->where('reference_id', $unit->id);
-                                    if (! empty($unit->imei_or_serial)) {
-                                        $sq->orWhere('notes', 'like', "%{$unit->imei_or_serial}%");
-                                    }
-                                });
-                        } else {
-                            $q->where('reference_id', $unit->id);
-                        }
-                    })
-                    ->with('payments')
-                    ->get();
+                $supplierPayables = $this->resolveUnitSupplierPayables($unit, $user->tenant_id);
 
                 $totalRefundOwed = 0.0;
                 foreach ($supplierPayables as $sDebt) {
@@ -1759,13 +1741,14 @@ class InventoryController extends Controller
                     }
                 }
 
-                if ($totalRefundOwed > 0 && $unit->supplier_contact_id) {
+                $refundVendorId = $unit->supplier_contact_id ?? $supplierPayables->first()?->contact_id;
+                if ($totalRefundOwed > 0 && $refundVendorId) {
                     $pName = $unit->variant?->product?->name ?? 'Device';
                     $sn = $unit->imei_or_serial ? " (SN: {$unit->imei_or_serial})" : '';
 
                     Debt::create([
                         'tenant_id' => $user->tenant_id,
-                        'contact_id' => $unit->supplier_contact_id,
+                        'contact_id' => $refundVendorId,
                         'type' => 'receivable',
                         'reference_type' => 'vendor_return_refund',
                         'reference_id' => $unit->id,
@@ -2113,25 +2096,7 @@ class InventoryController extends Controller
             // 1. Cancel any remaining unpaid payable obligations to the supplier
             // 2. If the store ALREADY paid real money/wire to the vendor for this unit,
             //    the vendor now owes us a REFUND (open receivable) for that paid amount!
-            $unitPayables = Debt::where('tenant_id', $unit->tenant_id)
-                ->where('type', 'payable')
-                ->where('reference_type', '!=', 'customer_return_refund')
-                ->where('reference_type', '!=', 'salesperson_bonus')
-                ->where(function ($q) use ($unit) {
-                    if ($unit->supplier_contact_id) {
-                        $q->where('contact_id', $unit->supplier_contact_id)
-                            ->where(function ($sq) use ($unit) {
-                                $sq->where('reference_id', $unit->id);
-                                if (! empty($unit->imei_or_serial)) {
-                                    $sq->orWhere('notes', 'like', "%{$unit->imei_or_serial}%");
-                                }
-                            });
-                    } else {
-                        $q->where('reference_id', $unit->id);
-                    }
-                })
-                ->with('payments')
-                ->get();
+            $unitPayables = $this->resolveUnitSupplierPayables($unit, $unit->tenant_id);
 
             $totalRefundOwed = 0.0;
 
@@ -2175,13 +2140,14 @@ class InventoryController extends Controller
                 $debt->recalculateSettlement();
             }
 
-            if ($totalRefundOwed > 0 && $unit->supplier_contact_id) {
+            $refundVendorId = $unit->supplier_contact_id ?? $unitPayables->first()?->contact_id;
+            if ($totalRefundOwed > 0 && $refundVendorId) {
                 $pName = $unit->variant?->product?->name ?? 'Device';
                 $sn = $unit->imei_or_serial ? " (SN: {$unit->imei_or_serial})" : '';
 
                 Debt::create([
                     'tenant_id' => $unit->tenant_id,
-                    'contact_id' => $unit->supplier_contact_id,
+                    'contact_id' => $refundVendorId,
                     'type' => 'receivable',
                     'reference_type' => 'vendor_return_refund',
                     'reference_id' => $unit->id,
@@ -2295,25 +2261,7 @@ class InventoryController extends Controller
             $vendorName = $unit->supplier?->name ?? 'Vendor';
 
             // 1. Re-instate / restore the payable debt obligation to the original vendor (Yenus)
-            $vendorPayables = Debt::where('tenant_id', $user->tenant_id)
-                ->where('type', 'payable')
-                ->where('reference_type', '!=', 'customer_return_refund')
-                ->where('reference_type', '!=', 'salesperson_bonus')
-                ->where(function ($q) use ($unit) {
-                    if ($unit->supplier_contact_id) {
-                        $q->where('contact_id', $unit->supplier_contact_id)
-                            ->where(function ($sq) use ($unit) {
-                                $sq->where('reference_id', $unit->id);
-                                if (! empty($unit->imei_or_serial)) {
-                                    $sq->orWhere('notes', 'like', "%{$unit->imei_or_serial}%");
-                                }
-                            });
-                    } else {
-                        $q->where('reference_id', $unit->id);
-                    }
-                })
-                ->with('payments')
-                ->get();
+            $vendorPayables = $this->resolveUnitSupplierPayables($unit, $user->tenant_id);
 
             foreach ($vendorPayables as $debt) {
                 $totalReturnAmount = (float) $debt->payments
@@ -2971,5 +2919,70 @@ class InventoryController extends Controller
                 'quantity_cost_total' => $canViewCost ? $quantityStocks->sum(fn ($s) => $s->quantity_on_hand * (float) $s->average_cost) : null,
             ],
         ]);
+    }
+
+    /**
+     * Resolve all supplier/vendor payable debts associated with an inventory unit.
+     * Accurately matches intake debts (by unit ID / IMEI) as well as brokered sourcing
+     * and consignment sales (linked via SalesOrder ID or order number).
+     */
+    private function resolveUnitSupplierPayables(InventoryUnit $unit, string $tenantId): \Illuminate\Database\Eloquent\Collection
+    {
+        $orderItems = SalesOrderItem::where('inventory_unit_id', $unit->id)->with('salesOrder')->get();
+        $orderIds = $orderItems->pluck('sales_order_id')->filter()->unique();
+        $orderNumbers = $orderItems->pluck('salesOrder.order_number')->filter()->unique();
+        $vendorIds = collect([$unit->supplier_contact_id])
+            ->concat($orderItems->pluck('vendor_contact_id'))
+            ->concat($orderItems->pluck('salesOrder.vendor_contact_id'))
+            ->filter()
+            ->unique();
+
+        return Debt::where('tenant_id', $tenantId)
+            ->where('type', 'payable')
+            ->where('reference_type', '!=', 'customer_return_refund')
+            ->where('reference_type', '!=', 'salesperson_bonus')
+            ->where(function ($q) use ($unit, $orderIds, $orderNumbers, $vendorIds) {
+                // 1. Direct unit ID match
+                $q->where(function ($sq) use ($unit, $vendorIds) {
+                    $sq->where('reference_id', $unit->id);
+                    if ($vendorIds->isNotEmpty()) {
+                        $sq->whereIn('contact_id', $vendorIds);
+                    }
+                });
+
+                // 2. Direct serial / IMEI in notes
+                if (! empty($unit->imei_or_serial)) {
+                    $q->orWhere(function ($sq) use ($unit, $vendorIds) {
+                        $sq->where('notes', 'like', "%{$unit->imei_or_serial}%");
+                        if ($vendorIds->isNotEmpty()) {
+                            $sq->whereIn('contact_id', $vendorIds);
+                        }
+                    });
+                }
+
+                // 3. Sales order brokered sourcing / consignment payables
+                if ($orderIds->isNotEmpty()) {
+                    $q->orWhere(function ($sq) use ($orderIds, $vendorIds) {
+                        $sq->whereIn('reference_id', $orderIds)
+                            ->whereIn('reference_type', ['brokered_sourcing', 'consignment_sale']);
+                        if ($vendorIds->isNotEmpty()) {
+                            $sq->whereIn('contact_id', $vendorIds);
+                        }
+                    });
+                }
+
+                // 4. Sales order number in notes
+                foreach ($orderNumbers as $num) {
+                    $q->orWhere(function ($sq) use ($num, $vendorIds) {
+                        $sq->where('notes', 'like', "%{$num}%")
+                            ->whereIn('reference_type', ['brokered_sourcing', 'consignment_sale']);
+                        if ($vendorIds->isNotEmpty()) {
+                            $sq->whereIn('contact_id', $vendorIds);
+                        }
+                    });
+                }
+            })
+            ->with('payments')
+            ->get();
     }
 }
