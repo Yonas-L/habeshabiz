@@ -616,5 +616,65 @@ test('can intake vendor stock with immediate temporary handout to staff', functi
         ->and((float) $holdingDebt->original_amount)->toBe(58000.00);
 });
 
+test('marking handover device as sold with paid settlement creates exactly one sales order and clean partner statement', function () {
+    // 1. Create a unit handed out to partnerA (as broker/handover partner)
+    $unit = InventoryUnit::create([
+        'tenant_id' => $this->tenant->id,
+        'variant_id' => $this->variantA->id,
+        'imei_or_serial' => 'HANDOVER-SINGLE-SO-001',
+        'status' => 'out',
+        'cost_basis' => 70000.00,
+        'selling_price' => 90000.00,
+        'handover_payout' => 90000.00,
+        'handover_to' => $this->partnerA->name,
+        'supplier_contact_id' => null,
+    ]);
+
+    Debt::create([
+        'tenant_id' => $this->tenant->id,
+        'contact_id' => $this->partnerA->id,
+        'type' => 'receivable',
+        'reference_type' => 'handover_holding',
+        'reference_id' => $unit->id,
+        'original_amount' => 90000.00,
+        'paid_amount' => 0.0,
+        'remaining_amount' => 90000.00,
+        'due_date' => now()->addDays(7),
+        'status' => 'open',
+    ]);
+
+    // 2. Mark handover sold via API with settlement_type: paid
+    $res = $this->actingAs($this->user, 'sanctum')->postJson("/api/v1/inventory/units/{$unit->id}/mark-sold", [
+        'settlement_type' => 'paid',
+        'selling_price' => 90000.00,
+        'financial_account_id' => $this->cbe->id,
+        'notes' => 'Settled in full by partner',
+    ]);
+
+    $res->assertOk();
+
+    // 3. Verify exactly ONE SalesOrder exists for this unit
+    $items = \App\Models\SalesOrderItem::where('inventory_unit_id', $unit->id)->get();
+    expect($items)->toHaveCount(1);
+
+    $salesOrders = SalesOrder::where('id', $items->first()->sales_order_id)->get();
+    expect($salesOrders)->toHaveCount(1);
+    expect((float) $salesOrders->first()->total_amount)->toBe(90000.00);
+    expect((float) $salesOrders->first()->paid_amount)->toBe(90000.00);
+
+    // 4. Verify partner statement has exactly one handover and one payment, not duplicated customer purchases
+    $statementAction = new \App\Actions\GeneratePartnerStatementAction();
+    $statement = $statementAction->execute($this->partnerA);
+
+    $handoverEntries = collect($statement['ledger'])->filter(fn ($e) => $e['type'] === 'handover_holding');
+    $customerPurchases = collect($statement['ledger'])->filter(fn ($e) => $e['type'] === 'customer_purchase');
+
+    expect($handoverEntries)->toHaveCount(1);
+    expect($customerPurchases)->toHaveCount(0);
+    expect((float) $statement['kpis']['current_net_balance'])->toBe(0.00);
+    expect((float) $statement['kpis']['range_closing_balance'])->toBe(0.00);
+});
+
+
 
 

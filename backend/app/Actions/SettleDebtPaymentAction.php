@@ -14,6 +14,7 @@ use App\Models\SalesOrder;
 use App\Models\SalesOrderItem;
 use App\Models\User;
 use App\Scopes\TenantScope;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -187,6 +188,22 @@ class SettleDebtPaymentAction
 
                         $salespersonId = auth()->id() ?? User::where('tenant_id', $tenantId)->first()?->id;
 
+                        $payDate = now();
+                        if (! empty($data['payment_date'])) {
+                            $parsed = Carbon::parse($data['payment_date']);
+                            $payDate = $parsed->isSameDay(now()) ? now() : $parsed->setTime(now()->hour, now()->minute, now()->second);
+                        }
+
+                        $payMethod = 'bank_transfer';
+                        if (! empty($data['financial_account_id'])) {
+                            $acc = FinancialAccount::find($data['financial_account_id']);
+                            $payMethod = match ($acc?->type) {
+                                'cash' => 'cash',
+                                'mobile_money' => 'mobile_money',
+                                default => 'bank_transfer',
+                            };
+                        }
+
                         $orderNumber = 'SO-'.strtoupper(Str::random(8));
                         $order = SalesOrder::create([
                             'tenant_id' => $tenantId,
@@ -195,10 +212,10 @@ class SettleDebtPaymentAction
                             'salesperson_id' => $salespersonId,
                             'total_amount' => $finalPrice,
                             'paid_amount' => $orderPaid,
-                            'payment_method' => 'bank_transfer',
+                            'payment_method' => $payMethod,
                             'payment_status' => $paymentStatus,
                             'credit_sale' => $debt->status !== 'settled',
-                            'order_date' => $data['payment_date'] ?? now(),
+                            'order_date' => $payDate,
                             'notes' => "Handover sale to {$vendorName} collected via debt payment [unit_id:{$unit->id}]",
                         ]);
 

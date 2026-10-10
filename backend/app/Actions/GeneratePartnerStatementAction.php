@@ -527,10 +527,19 @@ class GeneratePartnerStatementAction
 
         // Customer purchases (sales orders where this contact is the buyer and no credit debt exists)
         // Orders settled via debt_offset are already reflected via their DebtPayment ledger entry.
+        // Handover device sales are already tracked in full via their handover_holding debt and debt payments.
         $creditOrderIds = $debts->where('reference_type', 'sales_order')->pluck('reference_id')->filter()->all();
+        $handoverUnitIds = $debts->where('reference_type', 'handover_holding')->pluck('reference_id')->filter()->all();
+
         $customerOrders = SalesOrder::where('customer_id', $contact->id)
             ->whereNotIn('id', $creditOrderIds)
             ->where('payment_method', '!=', 'debt_offset')
+            ->where('notes', 'not like', '%Handover sale%')
+            ->whereDoesntHave('items', function ($q) use ($handoverUnitIds) {
+                if (! empty($handoverUnitIds)) {
+                    $q->whereIn('inventory_unit_id', $handoverUnitIds);
+                }
+            })
             ->with(['items.variant.product', 'items.inventoryUnit', 'financialAccount', 'exchangeUnit.variant.product'])
             ->get();
 

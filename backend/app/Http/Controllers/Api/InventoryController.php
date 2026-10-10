@@ -1497,32 +1497,75 @@ class InventoryController extends Controller
                     ->first();
             }
 
-            $orderNumber = 'SO-'.strtoupper(Str::random(8));
-            $order = SalesOrder::create([
-                'tenant_id' => $user->tenant_id,
-                'order_number' => $orderNumber,
-                'customer_id' => $saleContact?->id,
-                'salesperson_id' => $user->id,
-                'total_amount' => $finalPrice,
-                'paid_amount' => $settlementType === 'credit' ? 0.0 : $finalPrice,
-                'payment_method' => $settlementType === 'offset' ? 'debt_offset' : ($settlementType === 'paid' ? 'bank_transfer' : 'cash'),
-                'payment_status' => $settlementType === 'credit' ? 'partial' : 'paid',
-                'credit_sale' => $settlementType === 'credit',
-                'order_date' => $validated['payment_date'] ?? $now,
-                'notes' => "Handover sale to {$vendorName} ({$settlementType} settlement) [unit_id:{$unit->id}]",
-            ]);
+            $orderDate = $now;
+            if (! empty($validated['payment_date'])) {
+                $parsedDate = Carbon::parse($validated['payment_date']);
+                $orderDate = $parsedDate->isSameDay($now) ? $now : $parsedDate->setTime($now->hour, $now->minute, $now->second);
+            }
 
-            SalesOrderItem::create([
-                'tenant_id' => $user->tenant_id,
-                'sales_order_id' => $order->id,
-                'variant_id' => $unit->variant_id,
-                'inventory_unit_id' => $unit->id,
-                'quantity' => 1,
-                'unit_price' => $finalPrice,
-                'unit_cost' => (float) $unit->cost_basis,
-                'profit' => max(0, $finalPrice - (float) $unit->cost_basis),
-                'sourcing_type' => 'internal_stock',
-            ]);
+            $paymentMethod = $settlementType === 'offset' ? 'debt_offset' : 'cash';
+            if ($settlementType === 'paid') {
+                if (! empty($validated['financial_account_id'])) {
+                    $acc = FinancialAccount::find($validated['financial_account_id']);
+                    $paymentMethod = match ($acc?->type) {
+                        'cash' => 'cash',
+                        'mobile_money' => 'mobile_money',
+                        default => 'bank_transfer',
+                    };
+                } else {
+                    $paymentMethod = 'bank_transfer';
+                }
+            }
+
+            $existingOrderItem = SalesOrderItem::where('inventory_unit_id', $unit->id)->first();
+
+            if ($existingOrderItem) {
+                $order = $existingOrderItem->salesOrder;
+                if ($order) {
+                    $order->update([
+                        'customer_id' => $saleContact?->id ?? $order->customer_id,
+                        'total_amount' => $finalPrice > 0 ? $finalPrice : $order->total_amount,
+                        'paid_amount' => $settlementType === 'credit' ? 0.0 : ($finalPrice > 0 ? $finalPrice : $order->paid_amount),
+                        'payment_method' => $paymentMethod,
+                        'payment_status' => $settlementType === 'credit' ? 'partial' : 'paid',
+                        'credit_sale' => $settlementType === 'credit',
+                        'order_date' => $orderDate,
+                        'notes' => "Handover sale to {$vendorName} ({$settlementType} settlement) [unit_id:{$unit->id}]",
+                    ]);
+                }
+
+                $existingOrderItem->update([
+                    'unit_price' => $finalPrice > 0 ? $finalPrice : $existingOrderItem->unit_price,
+                    'profit' => max(0, ($finalPrice > 0 ? $finalPrice : (float) $existingOrderItem->unit_price) - (float) $unit->cost_basis),
+                ]);
+            } else {
+                $orderNumber = 'SO-'.strtoupper(Str::random(8));
+                $order = SalesOrder::create([
+                    'tenant_id' => $user->tenant_id,
+                    'order_number' => $orderNumber,
+                    'customer_id' => $saleContact?->id,
+                    'salesperson_id' => $user->id,
+                    'total_amount' => $finalPrice,
+                    'paid_amount' => $settlementType === 'credit' ? 0.0 : $finalPrice,
+                    'payment_method' => $paymentMethod,
+                    'payment_status' => $settlementType === 'credit' ? 'partial' : 'paid',
+                    'credit_sale' => $settlementType === 'credit',
+                    'order_date' => $orderDate,
+                    'notes' => "Handover sale to {$vendorName} ({$settlementType} settlement) [unit_id:{$unit->id}]",
+                ]);
+
+                SalesOrderItem::create([
+                    'tenant_id' => $user->tenant_id,
+                    'sales_order_id' => $order->id,
+                    'variant_id' => $unit->variant_id,
+                    'inventory_unit_id' => $unit->id,
+                    'quantity' => 1,
+                    'unit_price' => $finalPrice,
+                    'unit_cost' => (float) $unit->cost_basis,
+                    'profit' => max(0, $finalPrice - (float) $unit->cost_basis),
+                    'sourcing_type' => 'internal_stock',
+                ]);
+            }
 
             // Permanently update unit status to 'sold'
             $notesAppend = "Sold by {$vendorName} on ".$now->format('M d, Y')." ({$settlementType} settlement).";
