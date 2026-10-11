@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { DashboardData, FinancialAccount, Debt } from '../../api/client';
 import { api } from '../../api/client';
 import { toast } from 'sonner';
@@ -6,6 +6,7 @@ import { SlideOverDrawer } from './SlideOverDrawer';
 import { ProgressiveSection } from './ProgressiveSection';
 import { AnimatedNumber } from '../AnimatedNumber';
 import { ManageAccountModal } from '../treasury/ManageAccountModal';
+import { PartySettleModal } from '../debts/PartySettleModal';
 import {
   Landmark,
   CreditCard,
@@ -17,6 +18,8 @@ import {
   Pencil,
   Trash2,
   Loader2,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import { AccountLogo } from '../../utils/bankLogos';
 
@@ -117,6 +120,68 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
   const [accountDefaultType, setAccountDefaultType] = useState('bank');
   const [deletingAccount, setDeletingAccount] = useState<FinancialAccount | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  const [expandedParties, setExpandedParties] = useState<Record<string, boolean>>({});
+  const [settlingParty, setSettlingParty] = useState<{
+    id: string;
+    name: string;
+    phone?: string | null;
+    totalRemaining: number;
+    debtCount: number;
+  } | null>(null);
+
+  const toggleParty = (partyId: string) => {
+    setExpandedParties((prev) => ({
+      ...prev,
+      [partyId]: !prev[partyId],
+    }));
+  };
+
+  const groupedReceivables = useMemo(() => {
+    const map = new Map<string, { contactId: string; name: string; phone: string | null; totalRemaining: number; debts: Debt[] }>();
+    top_receivables.forEach((debt) => {
+      const cid = debt.contact?.id || debt.contact?.name || 'unassigned';
+      if (!map.has(cid)) {
+        map.set(cid, {
+          contactId: cid,
+          name: debt.contact?.name || 'Unassigned',
+          phone: debt.contact?.phone || null,
+          totalRemaining: 0,
+          debts: [],
+        });
+      }
+      const g = map.get(cid)!;
+      g.debts.push(debt);
+      g.totalRemaining += parseFloat(String(debt.remaining_amount)) || 0;
+    });
+    map.forEach((g) => {
+      g.debts.sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
+    });
+    return Array.from(map.values()).sort((a, b) => b.totalRemaining - a.totalRemaining);
+  }, [top_receivables]);
+
+  const groupedPayables = useMemo(() => {
+    const map = new Map<string, { contactId: string; name: string; phone: string | null; totalRemaining: number; debts: Debt[] }>();
+    top_payables.forEach((debt) => {
+      const cid = debt.contact?.id || debt.contact?.name || 'unassigned';
+      if (!map.has(cid)) {
+        map.set(cid, {
+          contactId: cid,
+          name: debt.contact?.name || 'Unassigned',
+          phone: debt.contact?.phone || null,
+          totalRemaining: 0,
+          debts: [],
+        });
+      }
+      const g = map.get(cid)!;
+      g.debts.push(debt);
+      g.totalRemaining += parseFloat(String(debt.remaining_amount)) || 0;
+    });
+    map.forEach((g) => {
+      g.debts.sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
+    });
+    return Array.from(map.values()).sort((a, b) => b.totalRemaining - a.totalRemaining);
+  }, [top_payables]);
 
   const handleOpenCreate = (type = 'bank') => {
     setEditingAccount(null);
@@ -310,62 +375,109 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
           defaultOpen={true}
         >
           <div className="space-y-2">
-            {top_receivables.length === 0 ? (
+            {groupedReceivables.length === 0 ? (
               <div className="p-6 text-center text-xs text-slate-400 bg-white dark:bg-[#131926] rounded-xl border border-slate-200/70 dark:border-slate-800/90">
                 <div className="font-semibold text-slate-700 dark:text-slate-300 mb-0.5">No Open Receivables</div>
                 <div className="text-[11px]">All customer and partner receivables are settled.</div>
               </div>
             ) : (
-              top_receivables.map((debt) => (
-                <div
-                  key={debt.id}
-                  onClick={() => {
-                    if (onSelectDebt) {
-                      onClose();
-                      onSelectDebt(debt);
-                    }
-                  }}
-                  className="p-3.5 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/70 dark:border-slate-800/90 flex items-center justify-between text-xs cursor-pointer hover:border-slate-300 dark:hover:border-slate-700 transition-colors"
-                >
-                  <div>
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="font-bold text-slate-900 dark:text-white">{debt.contact?.name}</span>
-                      {debt.reference_type === 'handover_holding' && (
-                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300">
-                          Handover
-                        </span>
-                      )}
-                      {debt.reference_type === 'vendor_return_refund' && (
-                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-teal-100 dark:bg-teal-900/60 text-teal-800 dark:text-teal-300">
-                          Return Refund
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-[11px] text-slate-400 mt-0.5">
-                      {debt.reference_type === 'handover_holding'
-                        ? 'Vendor holding · Owes upon sale or returns device'
-                        : debt.reference_type === 'vendor_return_refund'
-                        ? 'Refund owed by vendor for returned device'
-                        : (debt.notes || 'Customer credit balance')}
-                    </div>
-                  </div>
-
-                  <div className="text-right shrink-0 pl-2">
-                    <div className="font-mono font-bold text-emerald-700 dark:text-emerald-400 text-sm">
-                      +{Number(debt.remaining_amount).toLocaleString()} ETB
-                    </div>
-                    {debt.contact && (debt.contact.open_payable ?? 0) > 0 ? (
-                      <div className="text-[10px] text-slate-400 font-mono">
-                        Net: <span className="font-bold text-emerald-600 dark:text-emerald-400">+{(debt.contact.net_balance ?? 0).toLocaleString()} ETB</span>
+              groupedReceivables.map((group) => {
+                const isExpanded = !!expandedParties[group.contactId];
+                return (
+                  <div
+                    key={group.contactId}
+                    className="rounded-xl bg-white dark:bg-[#131926] border border-slate-200/70 dark:border-slate-800/90 overflow-hidden transition-all text-xs"
+                  >
+                    {/* Collapsed Header */}
+                    <div
+                      onClick={() => toggleParty(group.contactId)}
+                      className="p-3.5 flex items-center justify-between cursor-pointer hover:bg-slate-50/70 dark:hover:bg-slate-800/30 transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                        <button
+                          type="button"
+                          className="w-5 h-5 rounded flex items-center justify-center text-slate-400"
+                        >
+                          {isExpanded ? (
+                            <ChevronDown className="w-3.5 h-3.5" />
+                          ) : (
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                        <div className="min-w-0">
+                          <div className="font-bold text-slate-900 dark:text-white truncate">
+                            {group.name}
+                          </div>
+                          <div className="text-[11px] text-slate-400 mt-0.5">
+                            {group.debts.length} {group.debts.length === 1 ? 'obligation' : 'obligations'}
+                          </div>
+                        </div>
                       </div>
-                    ) : (
-                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
-                        Click to collect &rarr;
-                      </span>
+
+                      <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <div className="text-right">
+                          <div className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-sm">
+                            +{group.totalRemaining.toLocaleString()} ETB
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setSettlingParty({
+                            id: group.contactId,
+                            name: group.name,
+                            phone: group.phone,
+                            totalRemaining: group.totalRemaining,
+                            debtCount: group.debts.length,
+                          })}
+                          className="h-7 px-2.5 rounded-lg text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs active:scale-95 cursor-pointer ml-1"
+                        >
+                          Collect
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Expanded Inside List */}
+                    {isExpanded && (
+                      <div className="border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/40 dark:bg-slate-900/30 p-2.5 space-y-1.5 max-h-52 overflow-y-auto">
+                        {group.debts.map((debt, idx) => (
+                          <div
+                            key={debt.id}
+                            onClick={() => {
+                              if (onSelectDebt) {
+                                onClose();
+                                onSelectDebt(debt);
+                              }
+                            }}
+                            className="p-2.5 rounded-lg bg-white dark:bg-[#131926] border border-slate-200/60 dark:border-slate-800/80 flex items-center justify-between text-xs cursor-pointer hover:border-slate-300 dark:hover:border-slate-700"
+                          >
+                            <div className="min-w-0 pr-2">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-mono text-[10px] text-slate-400">#{idx + 1}</span>
+                                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                                  {debt.reference_type === 'handover_holding' ? 'Handover' : debt.reference_type === 'vendor_return_refund' ? 'Refund' : 'Credit'}
+                                </span>
+                                {debt.created_at && (
+                                  <span className="text-[10px] text-slate-400">
+                                    {new Date(debt.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                                {debt.notes || 'Obligation balance'}
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <div className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-xs">
+                                +{Number(debt.remaining_amount).toLocaleString()} ETB
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </ProgressiveSection>
@@ -378,63 +490,109 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
           defaultOpen={true}
         >
           <div className="space-y-2">
-            {top_payables.length === 0 ? (
+            {groupedPayables.length === 0 ? (
               <div className="p-6 text-center text-xs text-slate-400 bg-white dark:bg-[#131926] rounded-xl border border-slate-200/70 dark:border-slate-800/90">
                 <div className="font-semibold text-slate-700 dark:text-slate-300 mb-0.5">No Outstanding Payables Due</div>
                 <div className="text-[11px]">All vendor debts are fully settled or offset by handovers & receivables.</div>
               </div>
             ) : (
-              top_payables.map((debt) => (
-                <div
-                  key={debt.id}
-                  onClick={() => {
-                    if (onSelectDebt) {
-                      onClose();
-                      onSelectDebt(debt);
-                    }
-                  }}
-                  className="p-3.5 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/70 dark:border-slate-800/90 flex items-center justify-between text-xs cursor-pointer hover:border-slate-300 dark:hover:border-slate-700 transition-colors"
-                >
-                  <div>
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="font-bold text-slate-900 dark:text-white">{debt.contact?.name}</span>
-                      {debt.reference_type === 'salesperson_bonus' && (
-                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-purple-100 dark:bg-purple-900/60 text-purple-800 dark:text-purple-300">
-                          Sales Bonus
-                        </span>
-                      )}
-                      {debt.reference_type === 'consignment_sale' && (
-                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300">
-                          Consignment Cut
-                        </span>
-                      )}
-                      {debt.reference_type === 'brokered_sourcing' && (
-                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-300">
-                          Peer Sourcing
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-[11px] text-slate-400 mt-0.5">
-                      {debt.reference_type === 'salesperson_bonus'
-                        ? 'Earned agent bonus for selling above set price'
-                        : debt.reference_type === 'consignment_sale'
-                        ? 'Agreed vendor payout for sold consignment device'
-                        : debt.reference_type === 'brokered_sourcing'
-                        ? 'Peer shop sourced phone balance'
-                        : (debt.notes || 'Supplier payable obligation')}
-                    </div>
-                  </div>
+              groupedPayables.map((group) => {
+                const isExpanded = !!expandedParties[group.contactId];
+                return (
+                  <div
+                    key={group.contactId}
+                    className="rounded-xl bg-white dark:bg-[#131926] border border-slate-200/70 dark:border-slate-800/90 overflow-hidden transition-all text-xs"
+                  >
+                    {/* Collapsed Header */}
+                    <div
+                      onClick={() => toggleParty(group.contactId)}
+                      className="p-3.5 flex items-center justify-between cursor-pointer hover:bg-slate-50/70 dark:hover:bg-slate-800/30 transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                        <button
+                          type="button"
+                          className="w-5 h-5 rounded flex items-center justify-center text-slate-400"
+                        >
+                          {isExpanded ? (
+                            <ChevronDown className="w-3.5 h-3.5" />
+                          ) : (
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                        <div className="min-w-0">
+                          <div className="font-bold text-slate-900 dark:text-white truncate">
+                            {group.name}
+                          </div>
+                          <div className="text-[11px] text-slate-400 mt-0.5">
+                            {group.debts.length} {group.debts.length === 1 ? 'obligation' : 'obligations'}
+                          </div>
+                        </div>
+                      </div>
 
-                  <div className="text-right shrink-0 pl-2">
-                    <div className="font-mono font-bold text-rose-600 dark:text-rose-400 text-sm">
-                      −{Number(debt.remaining_amount).toLocaleString()} ETB
+                      <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <div className="text-right">
+                          <div className="font-mono font-bold text-rose-600 dark:text-rose-400 text-sm">
+                            −{group.totalRemaining.toLocaleString()} ETB
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setSettlingParty({
+                            id: group.contactId,
+                            name: group.name,
+                            phone: group.phone,
+                            totalRemaining: group.totalRemaining,
+                            debtCount: group.debts.length,
+                          })}
+                          className="h-7 px-2.5 rounded-lg text-[11px] font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-2xs active:scale-95 cursor-pointer ml-1"
+                        >
+                          Pay
+                        </button>
+                      </div>
                     </div>
-                    <span className="text-[10px] text-rose-600 dark:text-rose-400 font-semibold">
-                      Click to settle &rarr;
-                    </span>
+
+                    {/* Expanded Inside List */}
+                    {isExpanded && (
+                      <div className="border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/40 dark:bg-slate-900/30 p-2.5 space-y-1.5 max-h-52 overflow-y-auto">
+                        {group.debts.map((debt, idx) => (
+                          <div
+                            key={debt.id}
+                            onClick={() => {
+                              if (onSelectDebt) {
+                                onClose();
+                                onSelectDebt(debt);
+                              }
+                            }}
+                            className="p-2.5 rounded-lg bg-white dark:bg-[#131926] border border-slate-200/60 dark:border-slate-800/80 flex items-center justify-between text-xs cursor-pointer hover:border-slate-300 dark:hover:border-slate-700"
+                          >
+                            <div className="min-w-0 pr-2">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-mono text-[10px] text-slate-400">#{idx + 1}</span>
+                                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                                  {debt.reference_type === 'consignment_sale' ? 'Consignment' : debt.reference_type === 'brokered_sourcing' ? 'Sourcing' : debt.reference_type === 'salesperson_bonus' ? 'Bonus' : 'Payable'}
+                                </span>
+                                {debt.created_at && (
+                                  <span className="text-[10px] text-slate-400">
+                                    {new Date(debt.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                                {debt.notes || 'Supplier payable'}
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <div className="font-mono font-bold text-rose-600 dark:text-rose-400 text-xs">
+                                −{Number(debt.remaining_amount).toLocaleString()} ETB
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </ProgressiveSection>
@@ -656,6 +814,18 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
       }}
       editAccount={editingAccount}
       defaultType={accountDefaultType}
+    />
+
+    {/* Party Waterfall Settlement Modal */}
+    <PartySettleModal
+      isOpen={settlingParty !== null}
+      onClose={() => setSettlingParty(null)}
+      party={settlingParty}
+      type={vitalType === 'receivables' ? 'receivable' : 'payable'}
+      accounts={accounts}
+      onSuccess={() => {
+        if (onRefreshData) onRefreshData();
+      }}
     />
 
     {/* Delete Confirmation Modal */}

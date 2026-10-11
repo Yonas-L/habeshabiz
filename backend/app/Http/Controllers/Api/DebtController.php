@@ -627,4 +627,33 @@ class DebtController extends Controller
             ],
         ]);
     }
+
+    public function settlePartyWaterfall(Request $request, SettleDebtPaymentAction $action): JsonResponse
+    {
+        $validated = $request->validate([
+            'contact_id' => ['required', 'exists:contacts,id'],
+            'type' => ['required', 'in:receivable,payable'],
+            'amount' => ['required', 'numeric', 'min:0.01'],
+            'financial_account_id' => ['nullable', 'required_without:payment_splits', 'exists:financial_accounts,id'],
+            'payment_splits' => ['nullable', 'array', 'min:1'],
+            'payment_splits.*.financial_account_id' => ['required', 'exists:financial_accounts,id'],
+            'payment_splits.*.amount' => ['required', 'numeric', 'min:0.01'],
+            'payment_splits.*.reference_number' => ['nullable', 'string', 'max:100'],
+            'payment_date' => ['nullable', 'date'],
+            'reference_number' => ['nullable', 'string', 'max:100'],
+            'notes' => ['nullable', 'string'],
+        ]);
+
+        $contact = Contact::findOrFail($validated['contact_id']);
+        $result = $action->executeWaterfall($contact, $validated['type'], $validated);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Payment settled across party obligations using waterfall allocation.',
+            'data' => [
+                'debts' => $result['debts'],
+                'payments' => $result['payments'],
+            ],
+        ]);
+    }
 }

@@ -1353,6 +1353,22 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
+  settlePartyWaterfall: (
+    data: {
+      contact_id: string;
+      type: 'receivable' | 'payable';
+      amount: number;
+      financial_account_id?: string;
+      payment_splits?: PaymentSplit[];
+      reference_number?: string;
+      notes?: string;
+    }
+  ) =>
+    request<{ debts: Debt[]; payments: DebtPayment[] }>('/debts/settle-party', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
   createDebt: (data: {
     type: 'receivable' | 'payable';
     contact_id?: string;
