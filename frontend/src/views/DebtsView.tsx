@@ -32,6 +32,8 @@ interface PartyDebtGroup {
   totalOriginal: number;
   totalPaid: number;
   totalRemaining: number;
+  netRemaining?: number;
+  offsetAmount?: number;
   openCount: number;
   settledCount: number;
   percentSettled: number;
@@ -207,23 +209,38 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
     map.forEach((g) => {
       g.debts.sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
       g.percentSettled = g.totalOriginal > 0 ? Math.min(100, Math.round((g.totalPaid / g.totalOriginal) * 100)) : 0;
+      if (g.contact && g.contact.net_balance !== undefined) {
+        const netBal = Number(g.contact.net_balance);
+        if (debtType === 'receivable') {
+          g.netRemaining = Math.max(0, netBal);
+          g.offsetAmount = Math.max(0, g.totalRemaining - g.netRemaining);
+        } else {
+          g.netRemaining = Math.max(0, -netBal);
+          g.offsetAmount = Math.max(0, g.totalRemaining - g.netRemaining);
+        }
+      } else {
+        g.netRemaining = g.totalRemaining;
+        g.offsetAmount = 0;
+      }
     });
 
     let list = Array.from(map.values());
 
     if (statusFilter === 'active') {
-      list = list.filter((g) => g.totalRemaining > 0.001);
+      list = list.filter((g) => (g.netRemaining ?? g.totalRemaining) > 0.001);
     } else if (statusFilter === 'settled') {
-      list = list.filter((g) => g.totalRemaining <= 0.001);
+      list = list.filter((g) => (g.netRemaining ?? g.totalRemaining) <= 0.001);
     }
 
     // Sort: parties with open balance first (highest balance descending), then settled
     return list.sort((a, b) => {
-      if (a.totalRemaining > 0 && b.totalRemaining <= 0) return -1;
-      if (b.totalRemaining > 0 && a.totalRemaining <= 0) return 1;
-      return b.totalRemaining - a.totalRemaining;
+      const remA = a.netRemaining ?? a.totalRemaining;
+      const remB = b.netRemaining ?? b.totalRemaining;
+      if (remA > 0 && remB <= 0) return -1;
+      if (remB > 0 && remA <= 0) return 1;
+      return remB - remA;
     });
-  }, [debts, statusFilter]);
+  }, [debts, statusFilter, debtType]);
 
   // Overall Totals
   const grossTotal = debts.reduce((sum, d) => sum + parseFloat(String(d.remaining_amount)), 0);
@@ -414,7 +431,8 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
               ) : (
                 paginatedParties.map((group) => {
                   const isExpanded = expandedPartyIds.has(group.contactId);
-                  const isSettled = group.totalRemaining <= 0.001;
+                  const displayRemaining = group.netRemaining ?? group.totalRemaining;
+                  const isSettled = displayRemaining <= 0.001;
 
                   return (
                     <React.Fragment key={group.contactId}>
@@ -485,8 +503,13 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
                         {/* Col 5: Remaining Balance */}
                         <td className="py-2.5 px-3.5 text-right whitespace-nowrap font-mono font-bold text-xs">
                           <span className={isSettled ? 'text-slate-400' : debtType === 'receivable' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}>
-                            {Number(group.totalRemaining).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            {Number(displayRemaining).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                           </span>
+                          {(group.offsetAmount ?? 0) > 0.01 && (
+                            <div className="text-[10px] text-slate-400 font-normal">
+                              Offset −{Number(group.offsetAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            </div>
+                          )}
                         </td>
 
                         {/* Col 6: Action */}
@@ -647,6 +670,24 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
                           </tr>
                         );
                       })}
+                      {isExpanded && (group.offsetAmount ?? 0) > 0.01 && (
+                        <tr className="bg-amber-50/40 dark:bg-amber-950/20 text-xs">
+                          <td className="py-2.5 px-3.5 pl-8" colSpan={4}>
+                            <div className="flex items-center gap-2">
+                              <span className="text-amber-500 font-mono text-xs select-none">↳</span>
+                              <span className="font-semibold text-slate-800 dark:text-slate-200">
+                                {debtType === 'receivable'
+                                  ? 'Mutual Offset (Payables owed to partner)'
+                                  : 'Mutual Offset (Handovers & receivables held by partner)'}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="py-2.5 px-3.5 text-right whitespace-nowrap font-mono font-bold text-xs text-amber-600 dark:text-amber-400">
+                            −{Number(group.offsetAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          </td>
+                          <td colSpan={2}></td>
+                        </tr>
+                      )}
                     </React.Fragment>
                   );
                 })
@@ -669,7 +710,8 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
           ) : (
             paginatedParties.map((group) => {
               const isExpanded = expandedPartyIds.has(group.contactId);
-              const isSettled = group.totalRemaining <= 0.001;
+              const displayRemaining = group.netRemaining ?? group.totalRemaining;
+              const isSettled = displayRemaining <= 0.001;
 
               return (
                 <div key={group.contactId} className="p-4 space-y-3">
@@ -707,8 +749,13 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
                           isSettled ? 'text-slate-400' : debtType === 'receivable' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
                         }`}
                       >
-                        {Number(group.totalRemaining).toLocaleString()} ETB
+                        {Number(displayRemaining).toLocaleString()} ETB
                       </div>
+                      {(group.offsetAmount ?? 0) > 0.01 && (
+                        <div className="text-[10px] text-slate-400 font-mono">
+                          Offset −{Number(group.offsetAmount).toLocaleString()}
+                        </div>
+                      )}
                       <div className="flex items-center justify-end gap-1 text-[11px] text-slate-400 mt-1">
                         <span>{isExpanded ? 'Hide' : 'Records'}</span>
                         {isExpanded ? (
@@ -816,6 +863,23 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
                           </div>
                         );
                       })}
+                      {group.offsetAmount !== undefined && group.offsetAmount > 0.01 && (
+                        <div className="flex items-center justify-between p-2.5 rounded-xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-800/40 text-xs">
+                          <div>
+                            <div className="font-semibold text-slate-700 dark:text-slate-300">
+                              Mutual Offset
+                            </div>
+                            <div className="text-[10px] text-slate-400">
+                              {debtType === 'receivable'
+                                ? 'Offsetting open payables'
+                                : 'Offsetting handovers & receivables'}
+                            </div>
+                          </div>
+                          <div className="font-mono font-bold text-amber-600 dark:text-amber-400 text-xs">
+                            −{Number(group.offsetAmount).toLocaleString()} ETB
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -866,7 +930,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
                 id: settlingParty.contactId,
                 name: settlingParty.name,
                 phone: settlingParty.phone,
-                totalRemaining: settlingParty.totalRemaining,
+                totalRemaining: settlingParty.netRemaining ?? settlingParty.totalRemaining,
                 debtCount: settlingParty.openCount,
               }
             : null

@@ -138,7 +138,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
   };
 
   const groupedReceivables = useMemo(() => {
-    const map = new Map<string, { contactId: string; name: string; phone: string | null; totalRemaining: number; debts: Debt[] }>();
+    const map = new Map<string, { contactId: string; name: string; phone: string | null; totalRemaining: number; netRemaining: number; offsetAmount: number; debts: Debt[] }>();
     top_receivables.forEach((debt) => {
       const cid = debt.contact?.id || debt.contact?.name || 'unassigned';
       if (!map.has(cid)) {
@@ -147,21 +147,33 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
           name: debt.contact?.name || 'Unassigned',
           phone: debt.contact?.phone || null,
           totalRemaining: 0,
+          netRemaining: 0,
+          offsetAmount: 0,
           debts: [],
         });
       }
       const g = map.get(cid)!;
       g.debts.push(debt);
       g.totalRemaining += parseFloat(String(debt.remaining_amount)) || 0;
+      if (debt.contact && debt.contact.net_balance !== undefined) {
+        const netBal = Number(debt.contact.net_balance);
+        g.netRemaining = Math.max(0, netBal);
+        g.offsetAmount = Math.max(0, g.totalRemaining - g.netRemaining);
+      } else {
+        g.netRemaining = g.totalRemaining;
+        g.offsetAmount = 0;
+      }
     });
     map.forEach((g) => {
       g.debts.sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
     });
-    return Array.from(map.values()).sort((a, b) => b.totalRemaining - a.totalRemaining);
+    return Array.from(map.values())
+      .filter((g) => g.netRemaining > 0.001)
+      .sort((a, b) => b.netRemaining - a.netRemaining);
   }, [top_receivables]);
 
   const groupedPayables = useMemo(() => {
-    const map = new Map<string, { contactId: string; name: string; phone: string | null; totalRemaining: number; debts: Debt[] }>();
+    const map = new Map<string, { contactId: string; name: string; phone: string | null; totalRemaining: number; netRemaining: number; offsetAmount: number; debts: Debt[] }>();
     top_payables.forEach((debt) => {
       const cid = debt.contact?.id || debt.contact?.name || 'unassigned';
       if (!map.has(cid)) {
@@ -170,17 +182,29 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
           name: debt.contact?.name || 'Unassigned',
           phone: debt.contact?.phone || null,
           totalRemaining: 0,
+          netRemaining: 0,
+          offsetAmount: 0,
           debts: [],
         });
       }
       const g = map.get(cid)!;
       g.debts.push(debt);
       g.totalRemaining += parseFloat(String(debt.remaining_amount)) || 0;
+      if (debt.contact && debt.contact.net_balance !== undefined) {
+        const netBal = Number(debt.contact.net_balance);
+        g.netRemaining = Math.max(0, -netBal);
+        g.offsetAmount = Math.max(0, g.totalRemaining - g.netRemaining);
+      } else {
+        g.netRemaining = g.totalRemaining;
+        g.offsetAmount = 0;
+      }
     });
     map.forEach((g) => {
       g.debts.sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
     });
-    return Array.from(map.values()).sort((a, b) => b.totalRemaining - a.totalRemaining);
+    return Array.from(map.values())
+      .filter((g) => g.netRemaining > 0.001)
+      .sort((a, b) => b.netRemaining - a.netRemaining);
   }, [top_payables]);
 
   const handleOpenCreate = (type = 'bank') => {
@@ -417,8 +441,13 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                       <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
                         <div className="text-right">
                           <div className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-sm">
-                            +{group.totalRemaining.toLocaleString()} ETB
+                            +{group.netRemaining.toLocaleString()} ETB
                           </div>
+                          {group.offsetAmount > 0.01 && (
+                            <div className="text-[10px] text-slate-400 font-mono">
+                              Offset −{group.offsetAmount.toLocaleString()}
+                            </div>
+                          )}
                         </div>
                         <div
                           className={`transition-all duration-300 ease-in-out transform ${
@@ -433,7 +462,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                               id: group.contactId,
                               name: group.name,
                               phone: group.phone,
-                              totalRemaining: group.totalRemaining,
+                              totalRemaining: group.netRemaining,
                               debtCount: group.debts.length,
                             })}
                             className="h-7 px-2.5 rounded-lg text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs active:scale-95 cursor-pointer ml-1 whitespace-nowrap"
@@ -492,6 +521,21 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                             </div>
                           </div>
                         ))}
+                        {group.offsetAmount > 0.01 && (
+                          <div className="flex items-center justify-between p-2 rounded-xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-800/40 text-xs">
+                            <div>
+                              <div className="font-semibold text-slate-700 dark:text-slate-300">
+                                Mutual Offset
+                              </div>
+                              <div className="text-[10px] text-slate-400">
+                                Offsetting open payables
+                              </div>
+                            </div>
+                            <div className="font-mono font-bold text-amber-600 dark:text-amber-400 text-xs">
+                              −{Number(group.offsetAmount).toLocaleString()} ETB
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -551,8 +595,13 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                       <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
                         <div className="text-right">
                           <div className="font-mono font-bold text-rose-600 dark:text-rose-400 text-sm">
-                            −{group.totalRemaining.toLocaleString()} ETB
+                            −{group.netRemaining.toLocaleString()} ETB
                           </div>
+                          {group.offsetAmount > 0.01 && (
+                            <div className="text-[10px] text-slate-400 font-mono">
+                              Offset −{group.offsetAmount.toLocaleString()}
+                            </div>
+                          )}
                         </div>
                         <div
                           className={`transition-all duration-300 ease-in-out transform ${
@@ -567,7 +616,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                               id: group.contactId,
                               name: group.name,
                               phone: group.phone,
-                              totalRemaining: group.totalRemaining,
+                              totalRemaining: group.netRemaining,
                               debtCount: group.debts.length,
                             })}
                             className="h-7 px-2.5 rounded-lg text-[11px] font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-2xs active:scale-95 cursor-pointer ml-1 whitespace-nowrap"
@@ -626,6 +675,21 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                             </div>
                           </div>
                         ))}
+                        {group.offsetAmount > 0.01 && (
+                          <div className="flex items-center justify-between p-2 rounded-xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-800/40 text-xs">
+                            <div>
+                              <div className="font-semibold text-slate-700 dark:text-slate-300">
+                                Mutual Handover Offset
+                              </div>
+                              <div className="text-[10px] text-slate-400">
+                                Offsetting receivables & handovers
+                              </div>
+                            </div>
+                            <div className="font-mono font-bold text-amber-600 dark:text-amber-400 text-xs">
+                              +{Number(group.offsetAmount).toLocaleString()} ETB
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
