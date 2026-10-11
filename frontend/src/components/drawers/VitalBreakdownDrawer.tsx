@@ -420,25 +420,33 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                             +{group.totalRemaining.toLocaleString()} ETB
                           </div>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => setSettlingParty({
-                            id: group.contactId,
-                            name: group.name,
-                            phone: group.phone,
-                            totalRemaining: group.totalRemaining,
-                            debtCount: group.debts.length,
-                          })}
-                          className="h-7 px-2.5 rounded-lg text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs active:scale-95 cursor-pointer ml-1"
+                        <div
+                          className={`transition-all duration-300 ease-in-out transform ${
+                            isExpanded
+                              ? 'opacity-0 scale-90 pointer-events-none invisible w-0 overflow-hidden'
+                              : 'opacity-100 scale-100 pointer-events-auto visible w-auto'
+                          }`}
                         >
-                          Collect
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() => setSettlingParty({
+                              id: group.contactId,
+                              name: group.name,
+                              phone: group.phone,
+                              totalRemaining: group.totalRemaining,
+                              debtCount: group.debts.length,
+                            })}
+                            className="h-7 px-2.5 rounded-lg text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs active:scale-95 cursor-pointer ml-1 whitespace-nowrap"
+                          >
+                            Collect
+                          </button>
+                        </div>
                       </div>
                     </div>
 
                     {/* Expanded Inside List */}
                     {isExpanded && (
-                      <div className="border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/40 dark:bg-slate-900/30 p-2.5 space-y-1.5 max-h-52 overflow-y-auto">
+                      <div className="border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/40 dark:bg-slate-900/30 p-2.5 space-y-1.5 max-h-52 overflow-y-auto animate-in fade-in duration-200">
                         {group.debts.map((debt) => (
                           <div
                             key={debt.id}
@@ -462,10 +470,22 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                                 )}
                               </div>
                             </div>
-                            <div className="text-right shrink-0">
+                            <div className="text-right shrink-0 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                               <div className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-xs">
                                 +{Number(debt.remaining_amount).toLocaleString()} ETB
                               </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (onSelectDebt) {
+                                    onClose();
+                                    onSelectDebt(debt);
+                                  }
+                                }}
+                                className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs active:scale-95 cursor-pointer"
+                              >
+                                Collect
+                              </button>
                             </div>
                           </div>
                         ))}
@@ -531,25 +551,33 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                             −{group.totalRemaining.toLocaleString()} ETB
                           </div>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => setSettlingParty({
-                            id: group.contactId,
-                            name: group.name,
-                            phone: group.phone,
-                            totalRemaining: group.totalRemaining,
-                            debtCount: group.debts.length,
-                          })}
-                          className="h-7 px-2.5 rounded-lg text-[11px] font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-2xs active:scale-95 cursor-pointer ml-1"
+                        <div
+                          className={`transition-all duration-300 ease-in-out transform ${
+                            isExpanded
+                              ? 'opacity-0 scale-90 pointer-events-none invisible w-0 overflow-hidden'
+                              : 'opacity-100 scale-100 pointer-events-auto visible w-auto'
+                          }`}
                         >
-                          Pay
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() => setSettlingParty({
+                              id: group.contactId,
+                              name: group.name,
+                              phone: group.phone,
+                              totalRemaining: group.totalRemaining,
+                              debtCount: group.debts.length,
+                            })}
+                            className="h-7 px-2.5 rounded-lg text-[11px] font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-2xs active:scale-95 cursor-pointer ml-1 whitespace-nowrap"
+                          >
+                            Pay
+                          </button>
+                        </div>
                       </div>
                     </div>
 
                     {/* Expanded Inside List */}
                     {isExpanded && (
-                      <div className="border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/40 dark:bg-slate-900/30 p-2.5 space-y-1.5 max-h-52 overflow-y-auto">
+                      <div className="border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/40 dark:bg-slate-900/30 p-2.5 space-y-1.5 max-h-52 overflow-y-auto animate-in fade-in duration-200">
                         {group.debts.map((debt) => (
                           <div
                             key={debt.id}
@@ -573,10 +601,22 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                                 )}
                               </div>
                             </div>
-                            <div className="text-right shrink-0">
+                            <div className="text-right shrink-0 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                               <div className="font-mono font-bold text-rose-600 dark:text-rose-400 text-xs">
                                 −{Number(debt.remaining_amount).toLocaleString()} ETB
                               </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (onSelectDebt) {
+                                    onClose();
+                                    onSelectDebt(debt);
+                                  }
+                                }}
+                                className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-2xs active:scale-95 cursor-pointer"
+                              >
+                                Pay
+                              </button>
                             </div>
                           </div>
                         ))}

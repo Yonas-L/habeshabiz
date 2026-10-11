@@ -491,19 +491,27 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
 
                         {/* Col 6: Action */}
                         <td className="py-2.5 px-3.5 text-right">
-                          <div className="inline-flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                          <div className="inline-flex items-center justify-end min-h-[28px]" onClick={(e) => e.stopPropagation()}>
                             {!isSettled ? (
-                              <button
-                                type="button"
-                                onClick={() => setSettlingParty(group)}
-                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-white transition-colors shadow-2xs active:scale-95 cursor-pointer ${
-                                  debtType === 'receivable'
-                                    ? 'bg-emerald-600 hover:bg-emerald-700'
-                                    : 'bg-rose-600 hover:bg-rose-700'
+                              <div
+                                className={`transition-all duration-300 ease-in-out transform ${
+                                  isExpanded
+                                    ? 'opacity-0 scale-90 pointer-events-none invisible w-0 overflow-hidden'
+                                    : 'opacity-100 scale-100 pointer-events-auto visible w-auto'
                                 }`}
                               >
-                                {debtType === 'receivable' ? 'Collect' : 'Pay'}
-                              </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setSettlingParty(group)}
+                                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-white transition-all shadow-2xs active:scale-95 cursor-pointer whitespace-nowrap ${
+                                    debtType === 'receivable'
+                                      ? 'bg-emerald-600 hover:bg-emerald-700'
+                                      : 'bg-rose-600 hover:bg-rose-700'
+                                  }`}
+                                >
+                                  {debtType === 'receivable' ? 'Collect' : 'Pay'}
+                                </button>
+                              </div>
                             ) : (
                               <span className="text-[11px] font-medium text-slate-400 px-2.5 py-1">
                                 Complete
@@ -712,29 +720,37 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
                     </div>
                   </div>
 
-                  {/* Quick Action Header */}
+                  {/* Quick Action Header (smoothly hidden when expanded) */}
                   {!isSettled && (
-                    <div className="flex items-center justify-between pt-1 border-t border-slate-100/80 dark:border-slate-800/50">
-                      <span className="text-[11px] text-slate-400 font-mono">
-                        Paid: {Number(group.totalPaid).toLocaleString()}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setSettlingParty(group)}
-                        className={`inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-bold text-white shadow-2xs active:scale-95 cursor-pointer ${
-                          debtType === 'receivable'
-                            ? 'bg-emerald-600 hover:bg-emerald-700'
-                            : 'bg-rose-600 hover:bg-rose-700'
-                        }`}
-                      >
-                        {debtType === 'receivable' ? 'Collect' : 'Pay'}
-                      </button>
+                    <div
+                      className={`overflow-hidden transition-all duration-300 ease-in-out transform ${
+                        isExpanded
+                          ? 'max-h-0 opacity-0 pointer-events-none -translate-y-1'
+                          : 'max-h-16 opacity-100 pointer-events-auto translate-y-0 pt-1 border-t border-slate-100/80 dark:border-slate-800/50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] text-slate-400 font-mono">
+                          Paid: {Number(group.totalPaid).toLocaleString()}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setSettlingParty(group)}
+                          className={`inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-bold text-white shadow-2xs active:scale-95 cursor-pointer ${
+                            debtType === 'receivable'
+                              ? 'bg-emerald-600 hover:bg-emerald-700'
+                              : 'bg-rose-600 hover:bg-rose-700'
+                          }`}
+                        >
+                          {debtType === 'receivable' ? 'Collect' : 'Pay'}
+                        </button>
+                      </div>
                     </div>
                   )}
 
                   {/* Expanded Obligations Sub-List */}
                   {isExpanded && (
-                    <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5">
+                    <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5 animate-in fade-in duration-200">
                       {group.debts.map((debt) => {
                         const rem = parseFloat(String(debt.remaining_amount)) || 0;
                         const isDebtSettled = rem <= 0.001;
@@ -772,7 +788,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-2 shrink-0">
+                            <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
                               <div
                                 className={`font-mono font-bold text-xs ${
                                   isDebtSettled ? 'text-slate-400' : debtType === 'receivable' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
@@ -780,6 +796,21 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
                               >
                                 {rem.toLocaleString()} ETB
                               </div>
+                              {!isDebtSettled ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setDrawerDebt(debt)}
+                                  className={`px-2 py-0.5 rounded-lg text-[10px] font-bold text-white shadow-2xs active:scale-95 cursor-pointer ${
+                                    debtType === 'receivable'
+                                      ? 'bg-emerald-600 hover:bg-emerald-700'
+                                      : 'bg-rose-600 hover:bg-rose-700'
+                                  }`}
+                                >
+                                  {debtType === 'receivable' ? 'Collect' : 'Pay'}
+                                </button>
+                              ) : (
+                                <span className="text-[10px] text-slate-400">Complete</span>
+                              )}
                               <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
                             </div>
                           </div>
