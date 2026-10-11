@@ -6,6 +6,7 @@ use App\Models\Contact;
 use App\Models\Debt;
 use App\Models\DebtPayment;
 use App\Models\FinancialAccount;
+use App\Models\FinancialTransaction;
 use App\Models\InventoryStock;
 use App\Models\InventoryUnit;
 use App\Models\Product;
@@ -827,7 +828,8 @@ test('partner statement renders chronological ledger with mutual credit offset h
     $statement = $statementAction->execute($partner);
 
     $ledger = $statement['ledger'];
-    expect($ledger)->toHaveCount(3);
+    // Redundant internal mutual clearing offset rows with 0 balance effect are suppressed
+    expect($ledger)->toHaveCount(2);
 
     // Row 1: Advance Credit starts at original amount (+310,000)
     expect($ledger[0]['type'])->toBe('manual_receivable')
@@ -841,16 +843,65 @@ test('partner statement renders chronological ledger with mutual credit offset h
         ->and((float) $ledger[1]['balance_effect'])->toBe(-52000.00)
         ->and((float) $ledger[1]['running_balance'])->toBe(258000.00);
 
-    // Row 3: Mutual Debt Offset shows clearing of both sides with zero balance effect
-    expect($ledger[2]['type'])->toBe('debt_offset')
-        ->and((float) $ledger[2]['payable'])->toBe(-52000.00)
-        ->and((float) $ledger[2]['receivable'])->toBe(-52000.00)
-        ->and((float) $ledger[2]['balance_effect'])->toBe(0.00)
-        ->and((float) $ledger[2]['running_balance'])->toBe(258000.00);
-
     // Final balance matches current net balance exactly
     expect((float) $statement['kpis']['current_net_balance'])->toBe(258000.00)
         ->and((float) $statement['kpis']['range_closing_balance'])->toBe(258000.00);
+});
+
+test('partner statement formats incoming cash linked to payable debt as Payment Received', function () {
+    $partner = Contact::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Cash Deposit Partner',
+        'roles' => ['vendor', 'supplier'],
+        'is_active' => true,
+    ]);
+
+    $bankAccount = FinancialAccount::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Zemen Bank',
+        'type' => 'bank',
+        'currency' => 'ETB',
+        'current_balance' => 0.0,
+        'is_active' => true,
+    ]);
+
+    $debt = Debt::create([
+        'tenant_id' => $this->tenant->id,
+        'contact_id' => $partner->id,
+        'type' => 'payable',
+        'reference_type' => 'direct_credit',
+        'original_amount' => 50000.00,
+        'paid_amount' => 0.0,
+        'remaining_amount' => 50000.00,
+        'status' => 'open',
+        'notes' => 'Offset 50000 ETB against open receivable obligations',
+    ]);
+
+    FinancialTransaction::create([
+        'tenant_id' => $this->tenant->id,
+        'transaction_number' => 'TXN-TEST1234',
+        'destination_account_id' => $bankAccount->id,
+        'type' => 'borrowed_funds',
+        'amount' => 50000.00,
+        'contact_id' => $partner->id,
+        'reference_number' => "DEBT-{$debt->id}",
+        'description' => 'Borrowed cash received from partner',
+        'date' => now(),
+        'created_by' => $this->user->id,
+    ]);
+
+    $statementAction = new \App\Actions\GeneratePartnerStatementAction();
+    $statement = $statementAction->execute($partner);
+
+    $ledger = $statement['ledger'];
+    expect($ledger)->toHaveCount(1);
+    expect($ledger[0]['type'])->toBe('payment_received')
+        ->and($ledger[0]['type_label'])->toBe('Payment Received')
+        ->and($ledger[0]['context'])->toBe('Payment received (Zemen Bank)')
+        ->and((float) $ledger[0]['payable'])->toBe(50000.00)
+        ->and((float) $ledger[0]['balance_effect'])->toBe(-50000.00)
+        ->and((float) $ledger[0]['running_balance'])->toBe(-50000.00)
+        ->and($ledger[0]['reference_number'])->toBe('TXN-TEST1234');
 });
 
 

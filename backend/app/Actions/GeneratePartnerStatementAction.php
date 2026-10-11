@@ -6,6 +6,7 @@ use App\Models\Contact;
 use App\Models\Debt;
 use App\Models\Expense;
 use App\Models\FinancialAccount;
+use App\Models\FinancialTransaction;
 use App\Models\InventoryUnit;
 use App\Models\SalesOrder;
 use App\Models\SalesOrderItem;
@@ -77,6 +78,16 @@ class GeneratePartnerStatementAction
             ->with(['variant.product'])
             ->get()
             ->keyBy('id');
+
+        $debtIds = $debts->pluck('id')->all();
+        $debtRefs = array_merge(
+            array_map(fn ($id) => "DEBT-{$id}", $debtIds),
+            $debtIds
+        );
+        $financialTransactions = FinancialTransaction::whereIn('reference_number', $debtRefs)
+            ->with(['destinationAccount', 'sourceAccount'])
+            ->get()
+            ->keyBy(fn ($ft) => str_starts_with($ft->reference_number, 'DEBT-') ? substr($ft->reference_number, 5) : $ft->reference_number);
 
         $rawEntries = [];
 
@@ -199,20 +210,40 @@ class GeneratePartnerStatementAction
                         'reference_number' => null,
                     ];
                 } elseif ((float) $debt->original_amount > 0) {
-                    $isAdvance = $debt->reference_type === 'vendor_advance_payout'
-                        || str_contains(strtolower($debt->notes ?? ''), 'advance')
-                        || (float) $debt->original_amount >= 10000;
-                    $rawEntries[] = [
-                        'id' => "debt-{$debt->id}",
-                        'date' => $debtCreatedDate,
-                        'type' => 'manual_payable',
-                        'type_label' => $isAdvance ? 'Advance Debit' : 'Payable',
-                        'context' => $debt->notes ? $this->sanitizeContext($debt->notes) : ($isAdvance ? 'Advance debit balance' : 'Agreed payable balance'),
-                        'payable' => (float) $debt->original_amount,
-                        'receivable' => 0.0,
-                        'balance_effect' => -(float) $debt->original_amount,
-                        'reference_number' => null,
-                    ];
+                    $linkedFt = $financialTransactions->get($debt->id);
+                    if ($linkedFt && ($linkedFt->destinationAccount || $linkedFt->type === 'borrowed_funds')) {
+                        $accName = $linkedFt->destinationAccount?->name ?? 'Bank';
+                        $accText = ($accName && $accName !== 'Wire') ? " ({$accName})" : '';
+                        $userNotes = trim(preg_replace('/\|?\s*Offset\s+[0-9.]+\s+ETB\s+against\s+open\s+receivable\s+obligations/i', '', $debt->notes ?? ''));
+                        $context = ! empty($userNotes) ? "Payment received{$accText} · {$this->sanitizeContext($userNotes)}" : "Payment received{$accText}";
+
+                        $rawEntries[] = [
+                            'id' => "debt-{$debt->id}",
+                            'date' => $debtCreatedDate,
+                            'type' => 'payment_received',
+                            'type_label' => 'Payment Received',
+                            'context' => $context,
+                            'payable' => (float) $debt->original_amount,
+                            'receivable' => 0.0,
+                            'balance_effect' => -(float) $debt->original_amount,
+                            'reference_number' => $linkedFt->transaction_number,
+                        ];
+                    } else {
+                        $isAdvance = $debt->reference_type === 'vendor_advance_payout'
+                            || str_contains(strtolower($debt->notes ?? ''), 'advance')
+                            || (float) $debt->original_amount >= 10000;
+                        $rawEntries[] = [
+                            'id' => "debt-{$debt->id}",
+                            'date' => $debtCreatedDate,
+                            'type' => 'manual_payable',
+                            'type_label' => $isAdvance ? 'Advance Debit' : 'Payable',
+                            'context' => $debt->notes ? $this->sanitizeContext($debt->notes) : ($isAdvance ? 'Advance debit balance' : 'Agreed payable balance'),
+                            'payable' => (float) $debt->original_amount,
+                            'receivable' => 0.0,
+                            'balance_effect' => -(float) $debt->original_amount,
+                            'reference_number' => null,
+                        ];
+                    }
                 }
             } else {
                 // Receivable
@@ -318,28 +349,51 @@ class GeneratePartnerStatementAction
                         'reference_number' => 'RETURN-REFUND',
                     ];
                 } else {
-                    $isAdvance = $debt->reference_type === 'direct_credit'
-                        || $debt->reference_type === 'vendor_advance_payout'
-                        || str_contains(strtolower($debt->notes ?? ''), 'advance')
-                        || (float) $debt->original_amount >= 10000;
-                    $rawEntries[] = [
-                        'id' => "debt-{$debt->id}",
-                        'date' => $debtCreatedDate,
-                        'type' => 'manual_receivable',
-                        'type_label' => $isAdvance ? 'Advance Credit' : 'Receivable',
-                        'context' => $debt->notes ?: ($isAdvance ? 'Advance credit balance' : 'Agreed credit receivable'),
-                        'payable' => 0.0,
-                        'receivable' => (float) $debt->original_amount,
-                        'balance_effect' => (float) $debt->original_amount,
-                        'reference_number' => null,
-                    ];
+                    $linkedFt = $financialTransactions->get($debt->id);
+                    if ($linkedFt && ($linkedFt->sourceAccount || $linkedFt->type === 'customer_payment' || $linkedFt->type === 'loaned_funds')) {
+                        $accName = $linkedFt->sourceAccount?->name ?? 'Bank';
+                        $accText = ($accName && $accName !== 'Wire') ? " ({$accName})" : '';
+                        $userNotes = trim(preg_replace('/\|?\s*Offset\s+[0-9.]+\s+ETB\s+against\s+open\s+receivable\s+obligations/i', '', $debt->notes ?? ''));
+                        $context = ! empty($userNotes) ? "Payment sent{$accText} · {$this->sanitizeContext($userNotes)}" : "Payment sent{$accText}";
+
+                        $rawEntries[] = [
+                            'id' => "debt-{$debt->id}",
+                            'date' => $debtCreatedDate,
+                            'type' => 'payment_sent',
+                            'type_label' => 'Payment Sent',
+                            'context' => $context,
+                            'payable' => 0.0,
+                            'receivable' => (float) $debt->original_amount,
+                            'balance_effect' => (float) $debt->original_amount,
+                            'reference_number' => $linkedFt->transaction_number,
+                        ];
+                    } else {
+                        $isAdvance = $debt->reference_type === 'direct_credit'
+                            || $debt->reference_type === 'vendor_advance_payout'
+                            || str_contains(strtolower($debt->notes ?? ''), 'advance')
+                            || (float) $debt->original_amount >= 10000;
+                        $rawEntries[] = [
+                            'id' => "debt-{$debt->id}",
+                            'date' => $debtCreatedDate,
+                            'type' => 'manual_receivable',
+                            'type_label' => $isAdvance ? 'Advance Credit' : 'Receivable',
+                            'context' => $debt->notes ?: ($isAdvance ? 'Advance credit balance' : 'Agreed credit receivable'),
+                            'payable' => 0.0,
+                            'receivable' => (float) $debt->original_amount,
+                            'balance_effect' => (float) $debt->original_amount,
+                            'reference_number' => null,
+                        ];
+                    }
                 }
             }
 
             // Downstream payments for this debt
             foreach ($debt->payments as $payment) {
-                if ($payment->reference_number === 'MUTUAL-OFFSET') {
-                    // Clearing leg of mutual offset; the authoritative deduction on the target debt already accounts for this
+                if ($payment->reference_number === 'MUTUAL-OFFSET'
+                    || (str_starts_with($payment->reference_number ?? '', 'OFFSET-') && $payment->reference_number !== 'OFFSET-INTAKE')
+                    || str_contains(strtolower($payment->notes ?? ''), 'mutual credit offset')
+                ) {
+                    // Internal mutual clearing offset; both underlying debts are already listed as distinct entries in the ledger
                     continue;
                 }
 
@@ -467,18 +521,6 @@ class GeneratePartnerStatementAction
                         'receivable' => $debt->type === 'receivable' ? -(float) $payment->amount : 0.0,
                         'balance_effect' => $debt->type === 'payable' ? (float) $payment->amount : -(float) $payment->amount,
                         'reference_number' => 'DEVICE-OFFSET',
-                    ];
-                } elseif (str_starts_with($payment->reference_number ?? '', 'OFFSET-')) {
-                    $rawEntries[] = [
-                        'id' => "pay-{$payment->id}",
-                        'date' => $payDate,
-                        'type' => 'debt_offset',
-                        'type_label' => 'Debt Offset',
-                        'context' => 'Mutual credit offset',
-                        'payable' => -(float) $payment->amount,
-                        'receivable' => -(float) $payment->amount,
-                        'balance_effect' => 0.0,
-                        'reference_number' => $payment->reference_number,
                     ];
                 } elseif (in_array($payment->reference_number, ['REPAIR-REDELIVERY', 'VENDOR-SWAP-DELIVERY', 'WARRANTY-SWAP'], true)) {
                     $context = $payment->notes ? $this->sanitizeContext($payment->notes) : 'Device redelivered / swapped';
@@ -786,12 +828,20 @@ class GeneratePartnerStatementAction
             if ($entry['type'] === 'consignment_sale' || $entry['type'] === 'brokered_sourcing' || $entry['type'] === 'stock_intake' || $entry['type'] === 'manual_payable' || $entry['type'] === 'handover_return') {
                 $rangePayableSum += $entry['payable'];
             } elseif ($entry['type'] === 'payment_sent' || $entry['type'] === 'repair_offset' || $entry['type'] === 'vendor_return') {
-                $rangePaidSentSum += abs($entry['payable']);
+                if ($entry['payable'] < 0) {
+                    $rangePaidSentSum += abs($entry['payable']);
+                }
+                if ($entry['receivable'] > 0) {
+                    $rangePaidSentSum += $entry['receivable'];
+                }
             } elseif ($entry['type'] === 'sales_credit' || $entry['type'] === 'handover_holding' || $entry['type'] === 'repair_claim' || $entry['type'] === 'payout_advance' || $entry['type'] === 'manual_receivable' || $entry['type'] === 'customer_purchase') {
                 $rangeReceivableSum += $entry['receivable'];
             } elseif ($entry['type'] === 'payment_received' || $entry['type'] === 'device_offset' || $entry['type'] === 'bilateral_offset') {
                 if ($entry['receivable'] < 0) {
                     $rangeReceivedSum += abs($entry['receivable']);
+                }
+                if ($entry['payable'] > 0) {
+                    $rangeReceivedSum += $entry['payable'];
                 }
                 if ($entry['payable'] < 0) {
                     $rangePaidSentSum += abs($entry['payable']);
