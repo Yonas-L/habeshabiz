@@ -335,6 +335,7 @@ export interface DebtPayment {
   reference_number: string | null;
   split_group_id?: string | null;
   financial_account?: FinancialAccount;
+  notes?: string | null;
 }
 
 export interface Debt {
@@ -346,7 +347,7 @@ export interface Debt {
   original_amount: string | number;
   paid_amount: string | number;
   remaining_amount: string | number;
-  status: 'open' | 'partially_paid' | 'settled' | 'disputed_loss';
+  status: 'open' | 'partially_paid' | 'settled' | 'disputed_loss' | 'cancelled';
   due_date: string | null;
   notes: string | null;
   created_at: string;

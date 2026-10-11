@@ -31,9 +31,9 @@ class DebtController extends Controller
             $query->where('type', $request->type);
         }
 
-        if ($request->filled('status')) {
+        if ($request->filled('status') && $request->status !== 'all') {
             $query->where('status', $request->status);
-        } else {
+        } elseif (! $request->filled('status')) {
             // Default show open and partially paid debts
             $query->whereIn('status', ['open', 'partially_paid']);
         }

@@ -95,7 +95,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
   const loadDebts = async () => {
     try {
       setLoading(true);
-      const res = await api.getDebts({ type: debtType, search });
+      const res = await api.getDebts({ type: debtType, status: 'all', search });
       setDebts(res);
     } catch (err: any) {
       toast.error('Failed to load obligations', { description: err.message });
@@ -570,13 +570,17 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
                           <tr
                             key={debt.id}
                             onClick={() => setDrawerDebt(debt)}
-                            className="bg-slate-50/40 dark:bg-slate-900/25 hover:bg-slate-100/60 dark:hover:bg-slate-800/40 transition-colors cursor-pointer group"
+                            className={`transition-colors cursor-pointer group ${
+                              isDebtSettled
+                                ? 'bg-slate-100/40 dark:bg-slate-900/15 opacity-60 hover:opacity-85'
+                                : 'bg-slate-50/40 dark:bg-slate-900/25 hover:bg-slate-100/60 dark:hover:bg-slate-800/40'
+                            }`}
                           >
                             {/* Col 1: Indented tree symbol + Origin Tag + Date */}
                             <td className="py-2.5 px-3.5 pl-8">
                               <div className="flex items-center gap-2 min-w-0">
                                 <span className="text-slate-400 dark:text-slate-600 font-mono text-xs select-none">↳</span>
-                                <span className="font-semibold text-slate-800 dark:text-slate-200 text-xs shrink-0">
+                                <span className={`font-semibold text-xs shrink-0 ${isDebtSettled ? 'text-slate-500 dark:text-slate-400' : 'text-slate-800 dark:text-slate-200'}`}>
                                   {originLabel}
                                 </span>
                                 <span className="text-slate-300 dark:text-slate-600 text-xs">•</span>
@@ -589,8 +593,8 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
                                   </span>
                                 )}
                                 {isDebtSettled && (
-                                  <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-400 shrink-0">
-                                    Complete
+                                  <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold bg-slate-200/60 dark:bg-slate-800 text-slate-500 dark:text-slate-400 shrink-0">
+                                    Covered
                                   </span>
                                 )}
                               </div>
@@ -613,7 +617,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
 
                             {/* Col 5: Remaining Amount */}
                             <td className="py-2.5 px-3.5 text-right whitespace-nowrap font-mono font-bold text-xs">
-                              <span className={isDebtSettled ? 'text-slate-400' : debtType === 'receivable' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}>
+                              <span className={isDebtSettled ? 'text-slate-400 line-through' : debtType === 'receivable' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}>
                                 {rem.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                               </span>
                             </td>
@@ -811,11 +815,15 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
                           <div
                             key={debt.id}
                             onClick={() => setDrawerDebt(debt)}
-                            className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-700/60 text-xs active:bg-slate-100 dark:active:bg-slate-800 cursor-pointer"
+                            className={`flex items-center justify-between p-2.5 rounded-xl border text-xs cursor-pointer transition-all ${
+                              isDebtSettled
+                                ? 'bg-slate-100/40 dark:bg-slate-900/20 border-slate-200/40 dark:border-slate-800/40 opacity-60'
+                                : 'bg-slate-50/80 dark:bg-slate-800/40 border-slate-200/60 dark:border-slate-700/60 active:bg-slate-100 dark:active:bg-slate-800'
+                            }`}
                           >
                             <div className="min-w-0 pr-2">
                               <div className="flex items-center gap-1.5 font-medium">
-                                <span className="font-semibold text-slate-800 dark:text-slate-200 text-xs">
+                                <span className={`font-semibold text-xs ${isDebtSettled ? 'text-slate-500 dark:text-slate-400' : 'text-slate-800 dark:text-slate-200'}`}>
                                   {originLabel}
                                 </span>
                                 <span className="text-slate-300 dark:text-slate-600 text-xs">•</span>
@@ -828,8 +836,8 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
                                   </span>
                                 )}
                                 {isDebtSettled && (
-                                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-400">
-                                    Complete
+                                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-200/60 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                                    Covered
                                   </span>
                                 )}
                               </div>
@@ -838,7 +846,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
                             <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
                               <div
                                 className={`font-mono font-bold text-xs ${
-                                  isDebtSettled ? 'text-slate-400' : debtType === 'receivable' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+                                  isDebtSettled ? 'text-slate-400 line-through' : debtType === 'receivable' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
                                 }`}
                               >
                                 {rem.toLocaleString()} ETB

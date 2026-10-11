@@ -476,51 +476,81 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                     {/* Expanded Inside List */}
                     {isExpanded && (
                       <div className="border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/40 dark:bg-slate-900/30 p-2.5 space-y-1.5 max-h-52 overflow-y-auto animate-in fade-in duration-200">
-                        {group.debts.map((debt) => (
-                          <div
-                            key={debt.id}
-                            onClick={() => {
-                              if (onSelectDebt) {
-                                onClose();
-                                onSelectDebt(debt);
-                              }
-                            }}
-                            className="p-2.5 rounded-lg bg-white dark:bg-[#131926] border border-slate-200/60 dark:border-slate-800/80 flex items-center justify-between text-xs cursor-pointer hover:border-slate-300 dark:hover:border-slate-700"
-                          >
-                            <div className="min-w-0 pr-2">
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                                  {debt.reference_type === 'handover_holding' ? 'Handover' : debt.reference_type === 'vendor_return_refund' ? 'Refund' : 'Credit'}
-                                </span>
-                                {debt.created_at && (
-                                  <span className="text-[10px] text-slate-400 font-mono">
-                                    {new Date(debt.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+                        {group.debts.map((debt) => {
+                          const rem = Number(debt.remaining_amount) || 0;
+                          const isSettled = rem <= 0.001;
+                          const isPartial = !isSettled && Number(debt.paid_amount) > 0;
+                          return (
+                            <div
+                              key={debt.id}
+                              onClick={() => {
+                                if (onSelectDebt) {
+                                  onClose();
+                                  onSelectDebt(debt);
+                                }
+                              }}
+                              className={`p-2.5 rounded-lg border flex items-center justify-between text-xs cursor-pointer transition-all ${
+                                isSettled
+                                  ? 'bg-slate-100/50 dark:bg-slate-900/20 border-slate-200/40 dark:border-slate-800/40 opacity-60'
+                                  : 'bg-white dark:bg-[#131926] border-slate-200/60 dark:border-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700'
+                              }`}
+                            >
+                              <div className="min-w-0 pr-2">
+                                <div className="flex items-center gap-1.5">
+                                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                                    isSettled
+                                      ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                                      : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                                  }`}>
+                                    {debt.reference_type === 'handover_holding' ? 'Handover' : debt.reference_type === 'vendor_return_refund' ? 'Refund' : 'Credit'}
+                                  </span>
+                                  {debt.created_at && (
+                                    <span className="text-[10px] text-slate-400 font-mono">
+                                      {new Date(debt.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+                                    </span>
+                                  )}
+                                  {isSettled ? (
+                                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-200/60 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                                      Covered
+                                    </span>
+                                  ) : isPartial ? (
+                                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400">
+                                      Partial
+                                    </span>
+                                  ) : null}
+                                </div>
+                              </div>
+                              <div className="text-right shrink-0 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                <div className={`font-mono font-bold text-xs ${
+                                  isSettled ? 'text-slate-400 line-through' : 'text-emerald-600 dark:text-emerald-400'
+                                }`}>
+                                  +{rem.toLocaleString()} ETB
+                                </div>
+                                {!isSettled ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSettlingParty({
+                                        id: group.contactId,
+                                        name: group.name,
+                                        phone: group.phone,
+                                        totalRemaining: rem,
+                                        debtCount: 1,
+                                      });
+                                    }}
+                                    className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs active:scale-95 cursor-pointer"
+                                  >
+                                    Collect
+                                  </button>
+                                ) : (
+                                  <span className="text-[10px] font-medium text-slate-400 px-1 py-0.5">
+                                    Complete
                                   </span>
                                 )}
                               </div>
                             </div>
-                            <div className="text-right shrink-0 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                              <div className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-xs">
-                                +{Number(debt.remaining_amount).toLocaleString()} ETB
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSettlingParty({
-                                    id: group.contactId,
-                                    name: group.name,
-                                    phone: group.phone,
-                                    totalRemaining: Number(debt.remaining_amount),
-                                    debtCount: 1,
-                                  });
-                                }}
-                                className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs active:scale-95 cursor-pointer"
-                              >
-                                Collect
-                              </button>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                         {group.offsetAmount > 0.01 && (
                           <div className="flex items-center justify-between p-2 rounded-xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-800/40 text-xs">
                             <div>
@@ -630,51 +660,81 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                     {/* Expanded Inside List */}
                     {isExpanded && (
                       <div className="border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/40 dark:bg-slate-900/30 p-2.5 space-y-1.5 max-h-52 overflow-y-auto animate-in fade-in duration-200">
-                        {group.debts.map((debt) => (
-                          <div
-                            key={debt.id}
-                            onClick={() => {
-                              if (onSelectDebt) {
-                                onClose();
-                                onSelectDebt(debt);
-                              }
-                            }}
-                            className="p-2.5 rounded-lg bg-white dark:bg-[#131926] border border-slate-200/60 dark:border-slate-800/80 flex items-center justify-between text-xs cursor-pointer hover:border-slate-300 dark:hover:border-slate-700"
-                          >
-                            <div className="min-w-0 pr-2">
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                                  {debt.reference_type === 'consignment_sale' ? 'Consignment' : debt.reference_type === 'brokered_sourcing' ? 'Sourcing' : debt.reference_type === 'salesperson_bonus' ? 'Bonus' : 'Payable'}
-                                </span>
-                                {debt.created_at && (
-                                  <span className="text-[10px] text-slate-400 font-mono">
-                                    {new Date(debt.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+                        {group.debts.map((debt) => {
+                          const rem = Number(debt.remaining_amount) || 0;
+                          const isSettled = rem <= 0.001;
+                          const isPartial = !isSettled && Number(debt.paid_amount) > 0;
+                          return (
+                            <div
+                              key={debt.id}
+                              onClick={() => {
+                                if (onSelectDebt) {
+                                  onClose();
+                                  onSelectDebt(debt);
+                                }
+                              }}
+                              className={`p-2.5 rounded-lg border flex items-center justify-between text-xs cursor-pointer transition-all ${
+                                isSettled
+                                  ? 'bg-slate-100/50 dark:bg-slate-900/20 border-slate-200/40 dark:border-slate-800/40 opacity-60'
+                                  : 'bg-white dark:bg-[#131926] border-slate-200/60 dark:border-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700'
+                              }`}
+                            >
+                              <div className="min-w-0 pr-2">
+                                <div className="flex items-center gap-1.5">
+                                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                                    isSettled
+                                      ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                                      : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                                  }`}>
+                                    {debt.reference_type === 'consignment_sale' ? 'Consignment' : debt.reference_type === 'brokered_sourcing' ? 'Sourcing' : debt.reference_type === 'salesperson_bonus' ? 'Bonus' : 'Payable'}
+                                  </span>
+                                  {debt.created_at && (
+                                    <span className="text-[10px] text-slate-400 font-mono">
+                                      {new Date(debt.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+                                    </span>
+                                  )}
+                                  {isSettled ? (
+                                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-200/60 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                                      Covered
+                                    </span>
+                                  ) : isPartial ? (
+                                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400">
+                                      Partial
+                                    </span>
+                                  ) : null}
+                                </div>
+                              </div>
+                              <div className="text-right shrink-0 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                <div className={`font-mono font-bold text-xs ${
+                                  isSettled ? 'text-slate-400 line-through' : 'text-rose-600 dark:text-rose-400'
+                                }`}>
+                                  −{rem.toLocaleString()} ETB
+                                </div>
+                                {!isSettled ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSettlingParty({
+                                        id: group.contactId,
+                                        name: group.name,
+                                        phone: group.phone,
+                                        totalRemaining: rem,
+                                        debtCount: 1,
+                                      });
+                                    }}
+                                    className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-2xs active:scale-95 cursor-pointer"
+                                  >
+                                    Pay
+                                  </button>
+                                ) : (
+                                  <span className="text-[10px] font-medium text-slate-400 px-1 py-0.5">
+                                    Complete
                                   </span>
                                 )}
                               </div>
                             </div>
-                            <div className="text-right shrink-0 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                              <div className="font-mono font-bold text-rose-600 dark:text-rose-400 text-xs">
-                                −{Number(debt.remaining_amount).toLocaleString()} ETB
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSettlingParty({
-                                    id: group.contactId,
-                                    name: group.name,
-                                    phone: group.phone,
-                                    totalRemaining: Number(debt.remaining_amount),
-                                    debtCount: 1,
-                                  });
-                                }}
-                                className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-2xs active:scale-95 cursor-pointer"
-                              >
-                                Pay
-                              </button>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                         {group.offsetAmount > 0.01 && (
                           <div className="flex items-center justify-between p-2 rounded-xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-800/40 text-xs">
                             <div>

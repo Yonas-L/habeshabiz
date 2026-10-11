@@ -168,23 +168,25 @@ class DashboardController extends Controller
             ->get();
 
         // 7. Top Receivables (Parties who owe the shop money net)
-        $topReceivables = Debt::with('contact')
+        $topReceivables = Debt::with(['contact', 'payments.financialAccount'])
             ->where('type', 'receivable')
             ->where('created_at', '<=', $endOfMonth)
             ->whereIn('contact_id', $netReceivableContactIds)
-            ->whereIn('status', ['open', 'partially_paid'])
-            ->orderByDesc('remaining_amount')
-            ->take(50)
+            ->whereIn('status', ['open', 'partially_paid', 'settled'])
+            ->orderByRaw("CASE WHEN status IN ('open', 'partially_paid') THEN 0 ELSE 1 END")
+            ->orderBy('created_at')
+            ->take(60)
             ->get();
 
         // 8. Top Payables (Parties whom the shop owes money net)
-        $topPayables = Debt::with('contact')
+        $topPayables = Debt::with(['contact', 'payments.financialAccount'])
             ->where('type', 'payable')
             ->where('created_at', '<=', $endOfMonth)
             ->whereIn('contact_id', $netPayableContactIds)
-            ->whereIn('status', ['open', 'partially_paid'])
-            ->orderByDesc('remaining_amount')
-            ->take(50)
+            ->whereIn('status', ['open', 'partially_paid', 'settled'])
+            ->orderByRaw("CASE WHEN status IN ('open', 'partially_paid') THEN 0 ELSE 1 END")
+            ->orderBy('created_at')
+            ->take(60)
             ->get();
 
         // 9. Daily sales chart points for the selected month

@@ -465,6 +465,46 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
             </p>
           </div>
 
+          {/* Settlement / Cancellation Resolution Details */}
+          {debt.status === 'settled' || remaining <= 0.009 ? (
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 block">
+                Settlement Resolution
+              </span>
+              <p className="text-slate-700 dark:text-slate-300 font-medium mt-0.5 text-xs leading-relaxed">
+                {debt.payments && debt.payments.length > 0 ? (
+                  debt.payments.length === 1 ? (
+                    `Fully settled on ${new Date(debt.payments[0].payment_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} via ${debt.payments[0].financial_account?.name || debt.payments[0].reference_number || 'Cash'}${debt.payments[0].notes ? ` (${debt.payments[0].notes})` : ''}`
+                  ) : (
+                    `Fully settled across ${debt.payments.length} payments (${Number(debt.paid_amount).toLocaleString()} ETB total), final payment on ${new Date(debt.payments[debt.payments.length - 1].payment_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} via ${debt.payments[debt.payments.length - 1].financial_account?.name || 'Cash'}`
+                  )
+                ) : (
+                  'Fully covered via mutual counterparty offset against opposing obligations'
+                )}
+              </p>
+            </div>
+          ) : debt.status === 'cancelled' ? (
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 block">
+                Cancellation Resolution
+              </span>
+              <p className="text-slate-700 dark:text-slate-300 font-medium mt-0.5 text-xs">
+                {debt.reference_type === 'handover_holding'
+                  ? 'Cancelled via device return back to inventory shelf'
+                  : 'Obligation cancelled and voided without cash movement'}
+              </p>
+            </div>
+          ) : debt.status === 'partially_paid' || paid > 0 ? (
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 block">
+                Settlement Progress
+              </span>
+              <p className="text-slate-700 dark:text-slate-300 font-medium mt-0.5 text-xs">
+                {Number(debt.paid_amount).toLocaleString()} ETB settled ({percentPaid}% covered). Remaining obligation: {Number(debt.remaining_amount).toLocaleString()} ETB
+              </p>
+            </div>
+          ) : null}
+
           <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5 text-[11px] text-slate-400">
             <div className="flex justify-between">
               <span>Reference: {debt.reference_type === 'salesperson_bonus' ? 'Salesperson Upsell Bonus' : debt.reference_type}</span>
