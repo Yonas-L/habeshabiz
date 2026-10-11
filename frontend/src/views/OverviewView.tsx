@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { DashboardData, User, FinancialAccount, Debt, LeaderboardItem } from '../api/client';
 import { api } from '../api/client';
 import {
@@ -89,6 +89,95 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
   const { capital_overview, monthly_performance, counts, top_receivables, top_payables } = data;
   const canViewCost = user?.can_view_costs ?? false;
+
+  const groupedReceivables = useMemo(() => {
+    const map = new Map<string, {
+      contactId: string;
+      name: string;
+      phone: string | null;
+      totalRemaining: number;
+      netRemaining: number;
+      offsetAmount: number;
+      debts: Debt[];
+      hasHandover: boolean;
+    }>();
+
+    (top_receivables || []).forEach((debt) => {
+      const cid = debt.contact?.id || debt.contact?.name || 'unassigned';
+      if (!map.has(cid)) {
+        map.set(cid, {
+          contactId: cid,
+          name: debt.contact?.name || 'Unassigned',
+          phone: debt.contact?.phone || null,
+          totalRemaining: 0,
+          netRemaining: 0,
+          offsetAmount: 0,
+          debts: [],
+          hasHandover: false,
+        });
+      }
+      const g = map.get(cid)!;
+      g.debts.push(debt);
+      if (debt.reference_type === 'handover_holding') {
+        g.hasHandover = true;
+      }
+      g.totalRemaining += parseFloat(String(debt.remaining_amount)) || 0;
+      if (debt.contact && debt.contact.net_balance !== undefined) {
+        const netBal = Number(debt.contact.net_balance);
+        g.netRemaining = Math.max(0, netBal);
+        g.offsetAmount = Math.max(0, g.totalRemaining - g.netRemaining);
+      } else {
+        g.netRemaining = g.totalRemaining;
+        g.offsetAmount = 0;
+      }
+    });
+
+    return Array.from(map.values())
+      .filter((g) => g.netRemaining > 0.001)
+      .sort((a, b) => b.netRemaining - a.netRemaining);
+  }, [top_receivables]);
+
+  const groupedPayables = useMemo(() => {
+    const map = new Map<string, {
+      contactId: string;
+      name: string;
+      phone: string | null;
+      totalRemaining: number;
+      netRemaining: number;
+      offsetAmount: number;
+      debts: Debt[];
+    }>();
+
+    (top_payables || []).forEach((debt) => {
+      const cid = debt.contact?.id || debt.contact?.name || 'unassigned';
+      if (!map.has(cid)) {
+        map.set(cid, {
+          contactId: cid,
+          name: debt.contact?.name || 'Unassigned',
+          phone: debt.contact?.phone || null,
+          totalRemaining: 0,
+          netRemaining: 0,
+          offsetAmount: 0,
+          debts: [],
+        });
+      }
+      const g = map.get(cid)!;
+      g.debts.push(debt);
+      g.totalRemaining += parseFloat(String(debt.remaining_amount)) || 0;
+      if (debt.contact && debt.contact.net_balance !== undefined) {
+        const netBal = Number(debt.contact.net_balance);
+        g.netRemaining = Math.max(0, -netBal);
+        g.offsetAmount = Math.max(0, g.totalRemaining - g.netRemaining);
+      } else {
+        g.netRemaining = g.totalRemaining;
+        g.offsetAmount = 0;
+      }
+    });
+
+    return Array.from(map.values())
+      .filter((g) => g.netRemaining > 0.001)
+      .sort((a, b) => b.netRemaining - a.netRemaining);
+  }, [top_payables]);
 
   /* ─── Gross assets and proportional breakdown for mobile visual bar ─── */
   const liquidVal = capital_overview.liquid_finance ?? capital_overview.cash_and_banks ?? 0;
@@ -666,8 +755,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       {/* ── 5. Debt Ledgers — compact side-by-side tables ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5 sm:gap-4 animate-stagger-5">
         {/* Receivables */}
-        <div className="bg-white dark:bg-[#131926] rounded-2xl sm:rounded-xl border border-slate-200/80 dark:border-slate-800/80 p-3.5 sm:p-4 shadow-xs">
-          <div className="flex items-center justify-between mb-2.5 pb-2.5 border-b border-slate-100 dark:border-slate-800/60">
+        <div className="bg-white dark:bg-[#131926] rounded-2xl sm:rounded-xl border border-slate-200/80 dark:border-slate-800/80 p-3.5 sm:p-4 shadow-xs flex flex-col h-[285px]">
+          <div className="flex items-center justify-between mb-2.5 pb-2.5 border-b border-slate-100 dark:border-slate-800/60 shrink-0">
             <div className="flex items-center gap-2">
               <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">Owed to You</span>
             </div>
@@ -693,47 +782,52 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             </div>
           </div>
 
-          {top_receivables.length === 0 ? (
-            <div className="py-6 text-center text-xs text-slate-400 dark:text-slate-500 bg-slate-50/50 dark:bg-[#0c1017]/40 sm:bg-transparent rounded-xl border border-dashed border-slate-200/60 dark:border-slate-800/60 sm:border-0">
+          {groupedReceivables.length === 0 ? (
+            <div className="flex-1 flex items-center justify-center text-center text-xs text-slate-400 dark:text-slate-500 bg-slate-50/50 dark:bg-[#0c1017]/40 sm:bg-transparent rounded-xl border border-dashed border-slate-200/60 dark:border-slate-800/60 sm:border-0">
               No outstanding receivables
             </div>
           ) : (
-            <div className="space-y-1.5 sm:space-y-1">
-              {top_receivables.map((debt) => (
+            <div className="flex-1 overflow-y-auto space-y-1.5 sm:space-y-1 pr-1">
+              {groupedReceivables.map((group) => (
                 <button
-                  key={debt.id}
-                  onClick={() => setSelectedDebt(debt)}
+                  key={group.contactId}
+                  onClick={() => {
+                    if (group.debts.length === 1) {
+                      setSelectedDebt(group.debts[0]);
+                    } else {
+                      setSelectedVital('receivables');
+                    }
+                  }}
                   className="w-full flex items-center justify-between min-h-[46px] p-2.5 sm:py-2 sm:px-2 rounded-xl sm:rounded-lg text-xs bg-slate-50/70 dark:bg-[#0c1017]/70 sm:bg-transparent border border-slate-100/90 dark:border-slate-800/70 sm:border-0 hover:bg-slate-100/80 dark:hover:bg-slate-800/60 sm:hover:bg-slate-50 sm:dark:hover:bg-slate-800/40 active:scale-[0.99] sm:active:scale-100 transition-all group text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 cursor-pointer"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div className={`w-8 h-8 sm:w-7 sm:h-7 rounded-xl sm:rounded-lg font-semibold flex items-center justify-center text-[10px] uppercase shrink-0 border ${
-                      debt.reference_type === 'handover_holding'
+                      group.hasHandover
                         ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border-amber-200/60 dark:border-amber-800/50'
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200/60 dark:border-slate-700/60'
+                        : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-200/60 dark:border-emerald-800/50'
                     }`}>
-                      {debt.reference_type === 'handover_holding' ? 'HH' : (debt.contact?.name?.slice(0, 2) || 'CU')}
+                      {group.name.slice(0, 2).toUpperCase()}
                     </div>
                     <div className="truncate">
                       <div className="flex items-center gap-1.5">
                         <span className="font-semibold text-slate-900 dark:text-white truncate">
-                          {debt.contact?.name}
+                          {group.name}
                         </span>
-                        {debt.reference_type === 'handover_holding' && (
+                        {group.hasHandover && (
                           <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300">
                             Handover
                           </span>
                         )}
                       </div>
                       <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
-                        {debt.reference_type === 'handover_holding'
-                          ? 'Vendor holding · Owes upon sale or returns device'
-                          : (debt.notes || 'Customer credit balance')}
+                        {group.debts.length} {group.debts.length === 1 ? 'obligation' : 'obligations'}
+                        {group.offsetAmount > 0.01 && ` · Offset −${group.offsetAmount.toLocaleString()} ETB`}
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0 pl-2">
                     <span className="font-semibold text-emerald-600 dark:text-emerald-400 font-mono tracking-tight">
-                      +{Number(debt.remaining_amount).toLocaleString()}
+                      +{group.netRemaining.toLocaleString()}
                     </span>
                     <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0" />
                   </div>
@@ -744,8 +838,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         </div>
 
         {/* Payables */}
-        <div className="bg-white dark:bg-[#131926] rounded-2xl sm:rounded-xl border border-slate-200/80 dark:border-slate-800/80 p-3.5 sm:p-4 shadow-xs">
-          <div className="flex items-center justify-between mb-2.5 pb-2.5 border-b border-slate-100 dark:border-slate-800/60">
+        <div className="bg-white dark:bg-[#131926] rounded-2xl sm:rounded-xl border border-slate-200/80 dark:border-slate-800/80 p-3.5 sm:p-4 shadow-xs flex flex-col h-[285px]">
+          <div className="flex items-center justify-between mb-2.5 pb-2.5 border-b border-slate-100 dark:border-slate-800/60 shrink-0">
             <div className="flex items-center gap-2">
               <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">You Owe</span>
             </div>
@@ -771,34 +865,41 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             </div>
           </div>
 
-          {top_payables.length === 0 ? (
-            <div className="py-6 text-center text-xs text-slate-400 dark:text-slate-500 bg-slate-50/50 dark:bg-[#0c1017]/40 sm:bg-transparent rounded-xl border border-dashed border-slate-200/60 dark:border-slate-800/60 sm:border-0">
+          {groupedPayables.length === 0 ? (
+            <div className="flex-1 flex items-center justify-center text-center text-xs text-slate-400 dark:text-slate-500 bg-slate-50/50 dark:bg-[#0c1017]/40 sm:bg-transparent rounded-xl border border-dashed border-slate-200/60 dark:border-slate-800/60 sm:border-0">
               No outstanding payables
             </div>
           ) : (
-            <div className="space-y-1.5 sm:space-y-1">
-              {top_payables.map((debt) => (
+            <div className="flex-1 overflow-y-auto space-y-1.5 sm:space-y-1 pr-1">
+              {groupedPayables.map((group) => (
                 <button
-                  key={debt.id}
-                  onClick={() => setSelectedDebt(debt)}
+                  key={group.contactId}
+                  onClick={() => {
+                    if (group.debts.length === 1) {
+                      setSelectedDebt(group.debts[0]);
+                    } else {
+                      setSelectedVital('payables');
+                    }
+                  }}
                   className="w-full flex items-center justify-between min-h-[46px] p-2.5 sm:py-2 sm:px-2 rounded-xl sm:rounded-lg text-xs bg-slate-50/70 dark:bg-[#0c1017]/70 sm:bg-transparent border border-slate-100/90 dark:border-slate-800/70 sm:border-0 hover:bg-slate-100/80 dark:hover:bg-slate-800/60 sm:hover:bg-slate-50 sm:dark:hover:bg-slate-800/40 active:scale-[0.99] sm:active:scale-100 transition-all group text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/40 cursor-pointer"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-8 h-8 sm:w-7 sm:h-7 rounded-xl sm:rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold flex items-center justify-center text-[10px] uppercase shrink-0 border border-slate-200/60 dark:border-slate-700/60">
-                      {debt.contact?.name?.slice(0, 2) || 'SP'}
+                    <div className="w-8 h-8 sm:w-7 sm:h-7 rounded-xl sm:rounded-lg bg-rose-500/10 text-rose-700 dark:text-rose-400 font-semibold flex items-center justify-center text-[10px] uppercase shrink-0 border border-rose-200/60 dark:border-rose-800/50">
+                      {group.name.slice(0, 2).toUpperCase()}
                     </div>
                     <div className="truncate">
                       <span className="font-semibold text-slate-900 dark:text-white truncate block">
-                        {debt.contact?.name}
+                        {group.name}
                       </span>
                       <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
-                        {debt.notes || 'Supplier payable balance'}
+                        {group.debts.length} {group.debts.length === 1 ? 'obligation' : 'obligations'}
+                        {group.offsetAmount > 0.01 && ` · Offset −${group.offsetAmount.toLocaleString()} ETB`}
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0 pl-2">
                     <span className="font-semibold text-rose-600 dark:text-rose-400 font-mono tracking-tight">
-                      −{Number(debt.remaining_amount).toLocaleString()}
+                      −{group.netRemaining.toLocaleString()}
                     </span>
                     <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0" />
                   </div>

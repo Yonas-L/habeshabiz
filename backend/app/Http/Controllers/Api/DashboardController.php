@@ -174,7 +174,7 @@ class DashboardController extends Controller
             ->whereIn('contact_id', $netReceivableContactIds)
             ->whereIn('status', ['open', 'partially_paid'])
             ->orderByDesc('remaining_amount')
-            ->take(10)
+            ->take(50)
             ->get();
 
         // 8. Top Payables (Parties whom the shop owes money net)
@@ -184,7 +184,7 @@ class DashboardController extends Controller
             ->whereIn('contact_id', $netPayableContactIds)
             ->whereIn('status', ['open', 'partially_paid'])
             ->orderByDesc('remaining_amount')
-            ->take(10)
+            ->take(50)
             ->get();
 
         // 9. Daily sales chart points for the selected month
