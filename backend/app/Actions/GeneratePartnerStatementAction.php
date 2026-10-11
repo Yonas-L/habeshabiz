@@ -199,21 +199,18 @@ class GeneratePartnerStatementAction
                         'reference_number' => null,
                     ];
                 } elseif ((float) $debt->original_amount > 0) {
-                    $isMutualSettled = $debt->payments->contains(fn ($p) => $p->reference_number === 'MUTUAL-OFFSET');
-                    if ($isMutualSettled && (float) $debt->remaining_amount <= 0) {
-                        continue;
-                    }
-
-                    $remAmount = $isMutualSettled ? (float) $debt->remaining_amount : (float) $debt->original_amount;
+                    $isAdvance = $debt->reference_type === 'vendor_advance_payout'
+                        || str_contains(strtolower($debt->notes ?? ''), 'advance')
+                        || (float) $debt->original_amount >= 10000;
                     $rawEntries[] = [
                         'id' => "debt-{$debt->id}",
                         'date' => $debtCreatedDate,
                         'type' => 'manual_payable',
-                        'type_label' => $isMutualSettled ? 'Advance Debit' : 'Payable',
-                        'context' => $debt->notes ? $this->sanitizeContext($debt->notes) : ($isMutualSettled ? 'Advance debit balance' : 'Agreed payable balance'),
-                        'payable' => $remAmount,
+                        'type_label' => $isAdvance ? 'Advance Debit' : 'Payable',
+                        'context' => $debt->notes ? $this->sanitizeContext($debt->notes) : ($isAdvance ? 'Advance debit balance' : 'Agreed payable balance'),
+                        'payable' => (float) $debt->original_amount,
                         'receivable' => 0.0,
-                        'balance_effect' => -$remAmount,
+                        'balance_effect' => -(float) $debt->original_amount,
                         'reference_number' => null,
                     ];
                 }
@@ -321,21 +318,19 @@ class GeneratePartnerStatementAction
                         'reference_number' => 'RETURN-REFUND',
                     ];
                 } else {
-                    $isMutualSettled = $debt->payments->contains(fn ($p) => $p->reference_number === 'MUTUAL-OFFSET');
-                    if ($isMutualSettled && (float) $debt->remaining_amount <= 0) {
-                        continue;
-                    }
-
-                    $remAmount = $isMutualSettled ? (float) $debt->remaining_amount : (float) $debt->original_amount;
+                    $isAdvance = $debt->reference_type === 'direct_credit'
+                        || $debt->reference_type === 'vendor_advance_payout'
+                        || str_contains(strtolower($debt->notes ?? ''), 'advance')
+                        || (float) $debt->original_amount >= 10000;
                     $rawEntries[] = [
                         'id' => "debt-{$debt->id}",
                         'date' => $debtCreatedDate,
                         'type' => 'manual_receivable',
-                        'type_label' => $isMutualSettled ? 'Advance Credit' : 'Receivable',
-                        'context' => $debt->notes ?: ($isMutualSettled ? 'Advance credit balance' : 'Agreed credit receivable'),
+                        'type_label' => $isAdvance ? 'Advance Credit' : 'Receivable',
+                        'context' => $debt->notes ?: ($isAdvance ? 'Advance credit balance' : 'Agreed credit receivable'),
                         'payable' => 0.0,
-                        'receivable' => $remAmount,
-                        'balance_effect' => $remAmount,
+                        'receivable' => (float) $debt->original_amount,
+                        'balance_effect' => (float) $debt->original_amount,
                         'reference_number' => null,
                     ];
                 }
@@ -475,15 +470,16 @@ class GeneratePartnerStatementAction
                     ];
                 } elseif (str_starts_with($payment->reference_number ?? '', 'OFFSET-')) {
                     $accText = ($accountName && $accountName !== 'Wire') ? " ({$accountName})" : '';
+                    $isMutualOffset = empty($payment->financial_account_id);
                     $rawEntries[] = [
                         'id' => "pay-{$payment->id}",
                         'date' => $payDate,
-                        'type' => $payment->financial_account_id ? 'payment_sent' : 'debt_offset',
-                        'type_label' => $payment->financial_account_id ? 'Payment Sent' : 'Debt Offset',
-                        'context' => $payment->financial_account_id ? "Transferred{$accText}" : 'Mutual credit offset',
-                        'payable' => $debt->type === 'payable' ? -(float) $payment->amount : 0.0,
-                        'receivable' => $debt->type === 'receivable' ? -(float) $payment->amount : 0.0,
-                        'balance_effect' => $debt->type === 'payable' ? (float) $payment->amount : -(float) $payment->amount,
+                        'type' => $isMutualOffset ? 'debt_offset' : ($debt->type === 'payable' ? 'payment_sent' : 'payment_received'),
+                        'type_label' => $isMutualOffset ? 'Debt Offset' : ($debt->type === 'payable' ? 'Payment Sent' : 'Payment Received'),
+                        'context' => $isMutualOffset ? 'Mutual credit offset' : "Transferred{$accText}",
+                        'payable' => ($isMutualOffset || $debt->type === 'payable') ? -(float) $payment->amount : 0.0,
+                        'receivable' => ($isMutualOffset || $debt->type === 'receivable') ? -(float) $payment->amount : 0.0,
+                        'balance_effect' => $isMutualOffset ? 0.0 : ($debt->type === 'payable' ? (float) $payment->amount : -(float) $payment->amount),
                         'reference_number' => $payment->reference_number,
                     ];
                 } elseif (in_array($payment->reference_number, ['REPAIR-REDELIVERY', 'VENDOR-SWAP-DELIVERY', 'WARRANTY-SWAP'], true)) {

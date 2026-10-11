@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Contact;
 use App\Models\Debt;
+use App\Models\DebtPayment;
 use App\Models\FinancialAccount;
 use App\Models\InventoryStock;
 use App\Models\InventoryUnit;
@@ -752,6 +753,103 @@ test('cannot handover unit as debt offset if payout exceeds open payables', func
 
     // Unit must remain in_stock
     expect($unit->fresh()->status)->toBe('in_stock');
+});
+
+test('partner statement renders chronological ledger with mutual credit offset having zero balance effect', function () {
+    $partner = Contact::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Bilateral Test Partner',
+        'roles' => ['vendor', 'customer'],
+        'is_active' => true,
+    ]);
+
+    // 1. Advance credit debt of 310,000 ETB
+    $advanceDebt = Debt::create([
+        'tenant_id' => $this->tenant->id,
+        'contact_id' => $partner->id,
+        'type' => 'receivable',
+        'reference_type' => 'direct_credit',
+        'original_amount' => 310000.00,
+        'paid_amount' => 0.00,
+        'remaining_amount' => 310000.00,
+        'status' => 'open',
+    ]);
+    $advanceDebt->forceFill(['created_at' => now()->subDays(4)])->save();
+
+    // 2. Payable debt of 52,000 ETB for brokered sourcing
+    $payableDebt = Debt::create([
+        'tenant_id' => $this->tenant->id,
+        'contact_id' => $partner->id,
+        'type' => 'payable',
+        'reference_type' => 'brokered_sourcing',
+        'original_amount' => 52000.00,
+        'paid_amount' => 0.00,
+        'remaining_amount' => 52000.00,
+        'status' => 'open',
+        'notes' => 'Brokered sourcing iPhone 13',
+    ]);
+    $payableDebt->forceFill(['created_at' => now()->subMinutes(10)])->save();
+
+    // 3. Mutual offset applied: 52,000 ETB
+    DebtPayment::create([
+        'tenant_id' => $this->tenant->id,
+        'debt_id' => $payableDebt->id,
+        'amount' => 52000.00,
+        'payment_date' => now()->subMinutes(5),
+        'reference_number' => "OFFSET-{$advanceDebt->id}",
+        'notes' => 'Mutual credit offset against receivable obligation',
+        'created_by' => $this->user->id,
+    ]);
+    $payableDebt->update([
+        'paid_amount' => 52000.00,
+        'remaining_amount' => 0.00,
+        'status' => 'settled',
+    ]);
+
+    DebtPayment::create([
+        'tenant_id' => $this->tenant->id,
+        'debt_id' => $advanceDebt->id,
+        'amount' => 52000.00,
+        'payment_date' => now()->subMinutes(5),
+        'reference_number' => 'MUTUAL-OFFSET',
+        'notes' => 'Applied against open payable debt',
+        'created_by' => $this->user->id,
+    ]);
+    $advanceDebt->update([
+        'paid_amount' => 52000.00,
+        'remaining_amount' => 258000.00,
+        'status' => 'partially_paid',
+    ]);
+
+    // 4. Generate statement
+    $statementAction = new \App\Actions\GeneratePartnerStatementAction();
+    $statement = $statementAction->execute($partner);
+
+    $ledger = $statement['ledger'];
+    expect($ledger)->toHaveCount(3);
+
+    // Row 1: Advance Credit starts at original amount (+310,000)
+    expect($ledger[0]['type'])->toBe('manual_receivable')
+        ->and((float) $ledger[0]['receivable'])->toBe(310000.00)
+        ->and((float) $ledger[0]['balance_effect'])->toBe(310000.00)
+        ->and((float) $ledger[0]['running_balance'])->toBe(310000.00);
+
+    // Row 2: Item Received reduces net balance by 52,000 to +258,000
+    expect($ledger[1]['type'])->toBe('brokered_sourcing')
+        ->and((float) $ledger[1]['payable'])->toBe(52000.00)
+        ->and((float) $ledger[1]['balance_effect'])->toBe(-52000.00)
+        ->and((float) $ledger[1]['running_balance'])->toBe(258000.00);
+
+    // Row 3: Mutual Debt Offset shows clearing of both sides with zero balance effect
+    expect($ledger[2]['type'])->toBe('debt_offset')
+        ->and((float) $ledger[2]['payable'])->toBe(-52000.00)
+        ->and((float) $ledger[2]['receivable'])->toBe(-52000.00)
+        ->and((float) $ledger[2]['balance_effect'])->toBe(0.00)
+        ->and((float) $ledger[2]['running_balance'])->toBe(258000.00);
+
+    // Final balance matches current net balance exactly
+    expect((float) $statement['kpis']['current_net_balance'])->toBe(258000.00)
+        ->and((float) $statement['kpis']['range_closing_balance'])->toBe(258000.00);
 });
 
 
