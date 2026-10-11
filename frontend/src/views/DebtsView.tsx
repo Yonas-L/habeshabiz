@@ -10,8 +10,7 @@ import {
   Plus,
   Pencil,
   Trash2,
-  AlertTriangle,
-  Check,
+  Users,
 } from 'lucide-react';
 import { AnimatedNumber } from '../components/AnimatedNumber';
 import { DebtDrawer } from '../components/drawers/DebtDrawer';
@@ -59,28 +58,17 @@ const getOriginLabel = (refType?: string) => {
   }
 };
 
-const formatDueDate = (dateStr: string | null) => {
-  if (!dateStr) return null;
-  const d = new Date(dateStr);
-  const now = new Date();
-  const isOverdue = d < now && d.toDateString() !== now.toDateString();
-  return {
-    label: d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-    isOverdue,
-  };
-};
-
 export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
   const [debts, setDebts] = useState<Debt[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 8;
+  const pageSize = 10;
   const [debtType, setDebtType] = useState<'receivable' | 'payable'>('receivable');
   const [statusFilter, setStatusFilter] = useState<'active' | 'all' | 'settled'>('active');
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
-  // Expanded party cards state
-  const [expandedParties, setExpandedParties] = useState<Record<string, boolean>>({});
+  // Expanded party rows state
+  const [expandedPartyIds, setExpandedPartyIds] = useState<Set<string>>(new Set());
 
   // Drawer / Modals State
   const [drawerDebt, setDrawerDebt] = useState<Debt | null>(null);
@@ -119,11 +107,16 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
     loadDebts();
   };
 
-  const toggleParty = (partyId: string) => {
-    setExpandedParties((prev) => ({
-      ...prev,
-      [partyId]: !prev[partyId],
-    }));
+  const toggleExpand = (partyId: string) => {
+    setExpandedPartyIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(partyId)) {
+        next.delete(partyId);
+      } else {
+        next.add(partyId);
+      }
+      return next;
+    });
   };
 
   const openEdit = (debt: Debt, e: React.MouseEvent) => {
@@ -174,7 +167,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
     }
   };
 
-  // Group debts by party (contact)
+  // Group debts by contact (party)
   const partyGroups = useMemo(() => {
     const map = new Map<string, PartyDebtGroup>();
 
@@ -210,7 +203,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
       }
     });
 
-    // Sort debts inside each party by created_at ASC (FIFO chronological order)
+    // Sort debts inside each party by created_at ASC (chronological FIFO)
     map.forEach((g) => {
       g.debts.sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
       g.percentSettled = g.totalOriginal > 0 ? Math.min(100, Math.round((g.totalPaid / g.totalOriginal) * 100)) : 0;
@@ -218,14 +211,13 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
 
     let list = Array.from(map.values());
 
-    // Apply status filter
     if (statusFilter === 'active') {
       list = list.filter((g) => g.totalRemaining > 0.001);
     } else if (statusFilter === 'settled') {
       list = list.filter((g) => g.totalRemaining <= 0.001);
     }
 
-    // Sort: open obligations first (highest balance), then settled
+    // Sort: parties with open balance first (highest balance descending), then settled
     return list.sort((a, b) => {
       if (a.totalRemaining > 0 && b.totalRemaining <= 0) return -1;
       if (b.totalRemaining > 0 && a.totalRemaining <= 0) return 1;
@@ -293,7 +285,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
           </button>
         </div>
 
-        {/* Filter Pills & Search */}
+        {/* Filter Pills, Search & Record */}
         <div className="flex items-center gap-2 flex-wrap">
           <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl text-[11px] font-semibold">
             <button
@@ -359,7 +351,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
       </div>
 
       {/* Summary KPI Banner */}
-      <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+      <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-100 dark:border-slate-800/80 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-2xs">
         <div>
           <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
             {debtType === 'receivable' ? 'Total Collectible Balance' : 'Total Payable Balance'}
@@ -384,227 +376,225 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
           <div className="font-bold text-slate-800 dark:text-slate-200 text-sm">
             {partyGroups.length} {partyGroups.length === 1 ? 'party' : 'parties'} · {debts.length} total records
           </div>
-          <div className="text-[11px] text-slate-400 mt-0.5">Click any party to expand individual obligations</div>
+          <div className="text-[11px] text-slate-400 mt-0.5">Click any row to view individual obligations</div>
         </div>
       </div>
 
-      {/* Party Collapsible Accordion List */}
-      <div className="space-y-3">
-        {loading ? (
-          <div className="py-12 text-center bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800">
-            <CustomPageLoader mode="app" fullScreen={false} />
-          </div>
-        ) : paginatedParties.length === 0 ? (
-          <div className="py-16 text-center text-slate-400 text-xs italic bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800">
-            No {debtType} records found.
-          </div>
-        ) : (
-          paginatedParties.map((group) => {
-            const isExpanded = !!expandedParties[group.contactId];
-            const isSettled = group.totalRemaining <= 0.001;
+      {/* Main Single Card Container (Matching Inventory View design - NO nested border on border) */}
+      <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-100 dark:border-slate-800/80 overflow-hidden shadow-2xs">
+        {/* Desktop Table (md and up) */}
+        <div className="hidden md:block overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-slate-50/70 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+              <tr>
+                <th className="py-2.5 px-3.5 whitespace-nowrap">Contact</th>
+                <th className="py-2.5 px-3.5 whitespace-nowrap font-mono">Obligations</th>
+                <th className="py-2.5 px-3.5 text-right whitespace-nowrap font-mono">Original ETB</th>
+                <th className="py-2.5 px-3.5 text-right whitespace-nowrap font-mono">Paid ETB</th>
+                <th className="py-2.5 px-3.5 text-right whitespace-nowrap font-mono">Remaining ETB</th>
+                <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Action</th>
+                <th className="py-2.5 px-2"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-slate-700 dark:text-slate-300">
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="py-8 text-center">
+                    <CustomPageLoader mode="app" fullScreen={false} />
+                  </td>
+                </tr>
+              ) : paginatedParties.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-16 text-center text-slate-400">
+                    <Users className="w-8 h-8 mx-auto mb-2 text-slate-300 dark:text-slate-600" />
+                    <p className="font-semibold text-slate-600 dark:text-slate-400">No {debtType} records found</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Use "Record Entry" to record a new receivable or payable obligation.</p>
+                  </td>
+                </tr>
+              ) : (
+                paginatedParties.map((group) => {
+                  const isExpanded = expandedPartyIds.has(group.contactId);
+                  const isSettled = group.totalRemaining <= 0.001;
 
-            return (
-              <div
-                key={group.contactId}
-                className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-2xs transition-all"
-              >
-                {/* Collapsed Header Row */}
-                <div
-                  onClick={() => toggleParty(group.contactId)}
-                  className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:bg-slate-50/70 dark:hover:bg-slate-800/30 transition-colors select-none"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <button
-                      type="button"
-                      aria-label="Toggle party obligations"
-                      className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0"
-                    >
-                      {isExpanded ? (
-                        <ChevronDown className="w-4 h-4 text-slate-600 dark:text-slate-300" />
-                      ) : (
-                        <ChevronRight className="w-4 h-4 text-slate-400" />
-                      )}
-                    </button>
-
-                    <div
-                      className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 ${
-                        debtType === 'receivable'
-                          ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
-                          : 'bg-rose-500/10 text-rose-700 dark:text-rose-400'
-                      }`}
-                    >
-                      {group.name.slice(0, 2).toUpperCase()}
-                    </div>
-
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-900 dark:text-white text-sm truncate">
-                          {group.name}
-                        </span>
-                        {isSettled ? (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
-                            Complete
-                          </span>
-                        ) : group.percentSettled > 0 ? (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400">
-                            {group.percentSettled}% Settled
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                            Open
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-[11px] text-slate-400 font-mono mt-0.5 flex items-center gap-2">
-                        <span>{group.phone || 'No phone'}</span>
-                        <span>·</span>
-                        <span>{group.openCount} open of {group.debts.length} records</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Right Balance and Primary Action Button */}
-                  <div className="flex items-center justify-between sm:justify-end gap-4 pl-10 sm:pl-0" onClick={(e) => e.stopPropagation()}>
-                    <div className="text-left sm:text-right">
-                      <div
-                        className={`font-mono font-bold text-base tabular-nums ${
-                          isSettled
-                            ? 'text-slate-400 dark:text-slate-500'
-                            : debtType === 'receivable'
-                            ? 'text-emerald-600 dark:text-emerald-400'
-                            : 'text-rose-600 dark:text-rose-400'
+                  return (
+                    <React.Fragment key={group.contactId}>
+                      {/* Parent Contact Row (Collapsible) */}
+                      <tr
+                        onClick={() => toggleExpand(group.contactId)}
+                        className={`hover:bg-slate-50/90 dark:hover:bg-slate-800/40 transition-colors cursor-pointer group select-none ${
+                          isExpanded ? 'bg-slate-50/60 dark:bg-slate-900/40' : ''
                         }`}
                       >
-                        {group.totalRemaining.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                        <span className="text-[11px] font-sans font-normal text-slate-400 ml-1">ETB</span>
-                      </div>
-                      <div className="text-[10px] text-slate-400 font-mono">
-                        Paid: {group.totalPaid.toLocaleString()} of {group.totalOriginal.toLocaleString()}
-                      </div>
-                    </div>
+                        {/* Col 1: Chevron + Initials Icon + Name & Phone */}
+                        <td className="py-2.5 px-3.5">
+                          <div className="flex items-center gap-2">
+                            <div className="w-5 h-5 rounded flex items-center justify-center text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors shrink-0">
+                              {isExpanded ? (
+                                <ChevronDown className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                              ) : (
+                                <ChevronRight className="w-4 h-4" />
+                              )}
+                            </div>
+                            <div
+                              className={`w-7 h-7 rounded-lg border border-slate-100 dark:border-slate-700/60 flex items-center justify-center shrink-0 font-bold text-[10px] ${
+                                debtType === 'receivable'
+                                  ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+                                  : 'bg-rose-500/10 text-rose-700 dark:text-rose-400'
+                              }`}
+                            >
+                              {group.name.slice(0, 2).toUpperCase()}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="font-bold text-slate-900 dark:text-white text-xs leading-tight group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors flex items-center gap-1.5 min-w-0">
+                                <span className="truncate">{group.name}</span>
+                                {isSettled ? (
+                                  <span className="text-[10px] font-medium text-slate-400 shrink-0">
+                                    Complete
+                                  </span>
+                                ) : group.percentSettled > 0 ? (
+                                  <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 shrink-0">
+                                    {group.percentSettled}% settled
+                                  </span>
+                                ) : null}
+                              </div>
+                              <div className="text-[10px] text-slate-400 truncate">
+                                {group.phone || 'No phone'}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
 
-                    {/* Waterfall Action Button */}
-                    {!isSettled ? (
-                      <button
-                        type="button"
-                        onClick={() => setSettlingParty(group)}
-                        className={`h-8 px-4 rounded-xl text-xs font-bold text-white transition-all shadow-2xs active:scale-95 cursor-pointer whitespace-nowrap ${
-                          debtType === 'receivable'
-                            ? 'bg-emerald-600 hover:bg-emerald-700'
-                            : 'bg-rose-600 hover:bg-rose-700'
-                        }`}
-                      >
-                        {debtType === 'receivable' ? 'Collect' : 'Pay'}
-                      </button>
-                    ) : (
-                      <span className="h-8 px-3 rounded-xl text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-400 inline-flex items-center gap-1">
-                        <Check className="w-3.5 h-3.5" />
-                        Complete
-                      </span>
-                    )}
-                  </div>
-                </div>
+                        {/* Col 2: Obligations Count */}
+                        <td className="py-2.5 px-3.5 font-mono font-bold text-xs whitespace-nowrap">
+                          <span className={isSettled ? 'text-slate-400' : debtType === 'receivable' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}>
+                            {group.openCount}
+                          </span>
+                          <span className="text-slate-400 font-normal ml-1">of {group.debts.length}</span>
+                        </td>
 
-                {/* Expanded Inside List (Fixed height scrollable) */}
-                {isExpanded && (
-                  <div className="border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/40 dark:bg-slate-900/40 p-3 sm:p-4 animate-in fade-in duration-150">
-                    <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2 pb-2 flex items-center justify-between">
-                      <span>Hierarchical obligations (Oldest settled first)</span>
-                      <span>{group.debts.length} entries</span>
-                    </div>
+                        {/* Col 3: Original Amount */}
+                        <td className="py-2.5 px-3.5 text-right whitespace-nowrap font-mono font-bold text-slate-900 dark:text-white text-xs">
+                          {Number(group.totalOriginal).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </td>
 
-                    <div className="max-h-72 overflow-y-auto space-y-2 pr-1 divide-y-0">
-                      {group.debts.map((debt, index) => {
-                        const due = formatDueDate(debt.due_date);
-                        const isManual = debt.reference_type === 'direct_credit';
+                        {/* Col 4: Paid Amount */}
+                        <td className="py-2.5 px-3.5 text-right whitespace-nowrap font-mono text-xs text-slate-400 dark:text-slate-500">
+                          {Number(group.totalPaid).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </td>
+
+                        {/* Col 5: Remaining Balance */}
+                        <td className="py-2.5 px-3.5 text-right whitespace-nowrap font-mono font-bold text-xs">
+                          <span className={isSettled ? 'text-slate-400' : debtType === 'receivable' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}>
+                            {Number(group.totalRemaining).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          </span>
+                        </td>
+
+                        {/* Col 6: Action */}
+                        <td className="py-2.5 px-3.5 text-right">
+                          <div className="inline-flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                            {!isSettled ? (
+                              <button
+                                type="button"
+                                onClick={() => setSettlingParty(group)}
+                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-white transition-colors shadow-2xs active:scale-95 cursor-pointer ${
+                                  debtType === 'receivable'
+                                    ? 'bg-emerald-600 hover:bg-emerald-700'
+                                    : 'bg-rose-600 hover:bg-rose-700'
+                                }`}
+                              >
+                                {debtType === 'receivable' ? 'Collect' : 'Pay'}
+                              </button>
+                            ) : (
+                              <span className="text-[11px] font-medium text-slate-400 px-2.5 py-1">
+                                Complete
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Col 7: Chevron */}
+                        <td className="py-2.5 px-2 text-right">
+                          {isExpanded ? (
+                            <ChevronDown className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                          ) : (
+                            <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:text-slate-700 dark:group-hover:text-slate-300 group-hover:translate-x-0.5 transition-all" />
+                          )}
+                        </td>
+                      </tr>
+
+                      {/* Child Obligation Rows (When expanded) */}
+                      {isExpanded && group.debts.map((debt) => {
                         const orig = parseFloat(String(debt.original_amount)) || 0;
                         const paid = parseFloat(String(debt.paid_amount)) || 0;
                         const rem = parseFloat(String(debt.remaining_amount)) || 0;
-                        const pct = orig > 0 ? Math.min(100, Math.round((paid / orig) * 100)) : 0;
                         const isDebtSettled = rem <= 0.001;
-                        const isPartial = paid > 0 && rem > 0.001;
-
+                        const isPartial = paid > 0 && !isDebtSettled;
+                        const isManual = debt.reference_type === 'direct_credit';
                         const originLabel = getOriginLabel(debt.reference_type);
+                        const dateFormatted = debt.created_at
+                          ? new Date(debt.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                          : '—';
 
                         return (
-                          <div
+                          <tr
                             key={debt.id}
                             onClick={() => setDrawerDebt(debt)}
-                            className="p-3 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/70 dark:border-slate-800/90 hover:border-slate-300 dark:hover:border-slate-700 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs cursor-pointer group"
+                            className="bg-slate-50/40 dark:bg-slate-900/25 hover:bg-slate-100/60 dark:hover:bg-slate-800/40 transition-colors cursor-pointer group"
                           >
-                            {/* Left Meta */}
-                            <div className="min-w-0 space-y-1">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-mono text-[11px] text-slate-400">
-                                  #{index + 1}
-                                </span>
-                                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                            {/* Col 1: Indented tree symbol + Origin Tag + Date */}
+                            <td className="py-2.5 px-3.5 pl-8">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="text-slate-400 dark:text-slate-600 font-mono text-xs select-none">↳</span>
+                                <span className="font-semibold text-slate-800 dark:text-slate-200 text-xs shrink-0">
                                   {originLabel}
                                 </span>
-                                {debt.created_at && (
-                                  <span className="text-[11px] text-slate-400">
-                                    {new Date(debt.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                                  </span>
-                                )}
-                                {due && (
-                                  <span
-                                    className={`inline-flex items-center gap-1 text-[10px] font-medium ${
-                                      due.isOverdue ? 'text-rose-600 dark:text-rose-400' : 'text-slate-400'
-                                    }`}
-                                  >
-                                    {due.isOverdue && <AlertTriangle className="w-3 h-3 text-rose-500" />}
-                                    <span>Due {due.label}</span>
-                                  </span>
-                                )}
-                              </div>
-
-                              <div className="text-[11px] text-slate-600 dark:text-slate-300 truncate max-w-md">
-                                {debt.notes || 'Recorded obligation'}
-                              </div>
-
-                              <div className="flex items-center gap-2 text-[10px] font-mono text-slate-400">
-                                <span>Orig: {orig.toLocaleString()}</span>
-                                <span>·</span>
-                                <span>Paid: {paid.toLocaleString()} ({pct}% settled)</span>
-                              </div>
-                            </div>
-
-                            {/* Right Status & Actions */}
-                            <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0" onClick={(e) => e.stopPropagation()}>
-                              <div className="text-left sm:text-right">
-                                <div
-                                  className={`font-mono font-bold text-sm tabular-nums ${
-                                    isDebtSettled
-                                      ? 'text-slate-400'
-                                      : debtType === 'receivable'
-                                      ? 'text-emerald-600 dark:text-emerald-400'
-                                      : 'text-rose-600 dark:text-rose-400'
-                                  }`}
-                                >
-                                  {rem.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                  <span className="text-[10px] font-sans font-normal text-slate-400 ml-1">ETB</span>
-                                </div>
-                                <span
-                                  className={`inline-block text-[9px] font-bold px-2 py-0.5 rounded-full mt-0.5 ${
-                                    isDebtSettled
-                                      ? 'bg-slate-100 dark:bg-slate-800 text-slate-400'
-                                      : isPartial
-                                      ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
-                                      : debtType === 'receivable'
-                                      ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
-                                      : 'bg-rose-500/10 text-rose-700 dark:text-rose-400'
-                                  }`}
-                                >
-                                  {isDebtSettled ? 'Complete' : isPartial ? 'Partial' : 'Open'}
+                                <span className="text-slate-300 dark:text-slate-600 text-xs">•</span>
+                                <span className="font-mono text-slate-400 text-[11px] shrink-0">
+                                  {dateFormatted}
                                 </span>
+                                {isPartial && (
+                                  <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 shrink-0">
+                                    Partial
+                                  </span>
+                                )}
+                                {isDebtSettled && (
+                                  <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-400 shrink-0">
+                                    Complete
+                                  </span>
+                                )}
                               </div>
+                            </td>
 
-                              <div className="flex items-center gap-1.5">
+                            {/* Col 2: Obligation Unit Indicator */}
+                            <td className="py-2.5 px-3.5 whitespace-nowrap font-mono text-xs text-slate-400 font-bold">
+                              1
+                            </td>
+
+                            {/* Col 3: Original Amount */}
+                            <td className="py-2.5 px-3.5 text-right whitespace-nowrap font-mono text-xs text-slate-400 dark:text-slate-500">
+                              {orig.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            </td>
+
+                            {/* Col 4: Paid Amount */}
+                            <td className="py-2.5 px-3.5 text-right whitespace-nowrap font-mono text-xs text-slate-400 dark:text-slate-500">
+                              {paid.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            </td>
+
+                            {/* Col 5: Remaining Amount */}
+                            <td className="py-2.5 px-3.5 text-right whitespace-nowrap font-mono font-bold text-xs">
+                              <span className={isDebtSettled ? 'text-slate-400' : debtType === 'receivable' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}>
+                                {rem.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                              </span>
+                            </td>
+
+                            {/* Col 6: Action */}
+                            <td className="py-2.5 px-3.5 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                              <div className="flex items-center justify-end gap-1.5">
                                 {!isDebtSettled ? (
                                   <button
                                     type="button"
                                     onClick={() => setDrawerDebt(debt)}
-                                    className={`h-7 px-3 rounded-lg text-[11px] font-bold text-white transition-all shadow-2xs active:scale-95 cursor-pointer ${
+                                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-white transition-colors shadow-2xs active:scale-95 cursor-pointer ${
                                       debtType === 'receivable'
                                         ? 'bg-emerald-600 hover:bg-emerald-700'
                                         : 'bg-rose-600 hover:bg-rose-700'
@@ -640,21 +630,172 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
                                   </button>
                                 )}
                               </div>
+                            </td>
+
+                            {/* Col 7: Chevron */}
+                            <td className="py-2.5 px-2 text-right">
+                              <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-700 dark:group-hover:text-slate-300 group-hover:translate-x-0.5 transition-all" />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </React.Fragment>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Mobile Native Cards (< md) */}
+        <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800/80">
+          {loading ? (
+            <div className="py-6 text-center">
+              <CustomPageLoader mode="app" fullScreen={false} />
+            </div>
+          ) : paginatedParties.length === 0 ? (
+            <div className="py-12 text-center text-slate-400 text-xs">
+              <Users className="w-8 h-8 mx-auto mb-2 text-slate-300 dark:text-slate-600" />
+              <p className="font-semibold text-slate-600 dark:text-slate-400">No {debtType} records found</p>
+            </div>
+          ) : (
+            paginatedParties.map((group) => {
+              const isExpanded = expandedPartyIds.has(group.contactId);
+              const isSettled = group.totalRemaining <= 0.001;
+
+              return (
+                <div key={group.contactId} className="p-4 space-y-3">
+                  {/* Top Row: Click to toggle expand */}
+                  <div
+                    onClick={() => toggleExpand(group.contactId)}
+                    className="flex items-start justify-between gap-3 cursor-pointer active:opacity-70 select-none"
+                  >
+                    <div className="flex items-start gap-2.5 min-w-0">
+                      <div
+                        className={`w-8 h-8 rounded-xl border border-slate-100 dark:border-slate-700/60 flex items-center justify-center shrink-0 mt-0.5 font-bold text-xs ${
+                          debtType === 'receivable'
+                            ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+                            : 'bg-rose-500/10 text-rose-700 dark:text-rose-400'
+                        }`}
+                      >
+                        {group.name.slice(0, 2).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-bold text-slate-900 dark:text-white text-sm truncate">
+                          {group.name}
+                        </div>
+                        <div className="text-[11px] text-slate-400 mt-0.5">
+                          <span className={isSettled ? 'text-slate-400' : debtType === 'receivable' ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-rose-600 dark:text-rose-400 font-semibold'}>
+                            {group.openCount} open
+                          </span>
+                          <span className="text-slate-400 ml-1">of {group.debts.length} records</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <div
+                        className={`font-mono font-bold text-sm ${
+                          isSettled ? 'text-slate-400' : debtType === 'receivable' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+                        }`}
+                      >
+                        {Number(group.totalRemaining).toLocaleString()} ETB
+                      </div>
+                      <div className="flex items-center justify-end gap-1 text-[11px] text-slate-400 mt-1">
+                        <span>{isExpanded ? 'Hide' : 'Records'}</span>
+                        {isExpanded ? (
+                          <ChevronDown className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                        ) : (
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Quick Action Header */}
+                  {!isSettled && (
+                    <div className="flex items-center justify-between pt-1 border-t border-slate-100/80 dark:border-slate-800/50">
+                      <span className="text-[11px] text-slate-400 font-mono">
+                        Paid: {Number(group.totalPaid).toLocaleString()}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setSettlingParty(group)}
+                        className={`inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-bold text-white shadow-2xs active:scale-95 cursor-pointer ${
+                          debtType === 'receivable'
+                            ? 'bg-emerald-600 hover:bg-emerald-700'
+                            : 'bg-rose-600 hover:bg-rose-700'
+                        }`}
+                      >
+                        {debtType === 'receivable' ? 'Collect' : 'Pay'}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Expanded Obligations Sub-List */}
+                  {isExpanded && (
+                    <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5">
+                      {group.debts.map((debt) => {
+                        const rem = parseFloat(String(debt.remaining_amount)) || 0;
+                        const isDebtSettled = rem <= 0.001;
+                        const isPartial = parseFloat(String(debt.paid_amount)) > 0 && !isDebtSettled;
+                        const originLabel = getOriginLabel(debt.reference_type);
+                        const dateFormatted = debt.created_at
+                          ? new Date(debt.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
+                          : '—';
+
+                        return (
+                          <div
+                            key={debt.id}
+                            onClick={() => setDrawerDebt(debt)}
+                            className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-700/60 text-xs active:bg-slate-100 dark:active:bg-slate-800 cursor-pointer"
+                          >
+                            <div className="min-w-0 pr-2">
+                              <div className="flex items-center gap-1.5 font-medium">
+                                <span className="font-semibold text-slate-800 dark:text-slate-200 text-xs">
+                                  {originLabel}
+                                </span>
+                                <span className="text-slate-300 dark:text-slate-600 text-xs">•</span>
+                                <span className="font-mono text-slate-400 text-[11px]">
+                                  {dateFormatted}
+                                </span>
+                                {isPartial && (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400">
+                                    Partial
+                                  </span>
+                                )}
+                                {isDebtSettled && (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-400">
+                                    Complete
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              <div
+                                className={`font-mono font-bold text-xs ${
+                                  isDebtSettled ? 'text-slate-400' : debtType === 'receivable' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+                                }`}
+                              >
+                                {rem.toLocaleString()} ETB
+                              </div>
+                              <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
                             </div>
                           </div>
                         );
                       })}
                     </div>
-                  </div>
-                )}
-              </div>
-            );
-          })
-        )}
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
 
         {/* Pagination */}
         {partyGroups.length > pageSize && (
-          <div className="pt-2">
+          <div className="px-4 py-3 border-t border-slate-100 dark:border-slate-800/80">
             <Pagination
               currentPage={currentPage}
               totalItems={partyGroups.length}

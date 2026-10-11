@@ -439,7 +439,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                     {/* Expanded Inside List */}
                     {isExpanded && (
                       <div className="border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/40 dark:bg-slate-900/30 p-2.5 space-y-1.5 max-h-52 overflow-y-auto">
-                        {group.debts.map((debt, idx) => (
+                        {group.debts.map((debt) => (
                           <div
                             key={debt.id}
                             onClick={() => {
@@ -452,18 +452,14 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                           >
                             <div className="min-w-0 pr-2">
                               <div className="flex items-center gap-1.5">
-                                <span className="font-mono text-[10px] text-slate-400">#{idx + 1}</span>
                                 <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
                                   {debt.reference_type === 'handover_holding' ? 'Handover' : debt.reference_type === 'vendor_return_refund' ? 'Refund' : 'Credit'}
                                 </span>
                                 {debt.created_at && (
-                                  <span className="text-[10px] text-slate-400">
+                                  <span className="text-[10px] text-slate-400 font-mono">
                                     {new Date(debt.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
                                   </span>
                                 )}
-                              </div>
-                              <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                                {debt.notes || 'Obligation balance'}
                               </div>
                             </div>
                             <div className="text-right shrink-0">
@@ -554,7 +550,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                     {/* Expanded Inside List */}
                     {isExpanded && (
                       <div className="border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/40 dark:bg-slate-900/30 p-2.5 space-y-1.5 max-h-52 overflow-y-auto">
-                        {group.debts.map((debt, idx) => (
+                        {group.debts.map((debt) => (
                           <div
                             key={debt.id}
                             onClick={() => {
@@ -567,18 +563,14 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                           >
                             <div className="min-w-0 pr-2">
                               <div className="flex items-center gap-1.5">
-                                <span className="font-mono text-[10px] text-slate-400">#{idx + 1}</span>
                                 <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
                                   {debt.reference_type === 'consignment_sale' ? 'Consignment' : debt.reference_type === 'brokered_sourcing' ? 'Sourcing' : debt.reference_type === 'salesperson_bonus' ? 'Bonus' : 'Payable'}
                                 </span>
                                 {debt.created_at && (
-                                  <span className="text-[10px] text-slate-400">
+                                  <span className="text-[10px] text-slate-400 font-mono">
                                     {new Date(debt.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
                                   </span>
                                 )}
-                              </div>
-                              <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                                {debt.notes || 'Supplier payable'}
                               </div>
                             </div>
                             <div className="text-right shrink-0">
