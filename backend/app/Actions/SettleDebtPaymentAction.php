@@ -261,15 +261,7 @@ class SettleDebtPaymentAction
 
             // If linked to a sales order, keep sales order paid_amount and payment_status in sync
             if ($debt->reference_type === 'sales_order' && ! empty($debt->reference_id)) {
-                $order = \App\Models\SalesOrder::find($debt->reference_id);
-                if ($order) {
-                    $orderPaid = (float) $order->paid_amount + $amount;
-                    $orderRemaining = max(0, (float) $order->total_amount - $orderPaid);
-                    $order->update([
-                        'paid_amount' => $orderPaid,
-                        'payment_status' => $orderRemaining <= 0 ? 'paid' : 'partial',
-                    ]);
-                }
+                $debt->syncLinkedSalesOrder();
             }
 
             return $createdPayments[0] ?? $payment;

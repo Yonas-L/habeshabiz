@@ -32,6 +32,17 @@ class DebtPayment extends Model
         ];
     }
 
+    protected static function booted(): void
+    {
+        static::saved(function (DebtPayment $payment) {
+            $payment->debt?->recalculateSettlement();
+        });
+
+        static::deleted(function (DebtPayment $payment) {
+            $payment->debt?->recalculateSettlement();
+        });
+    }
+
     public function debt(): BelongsTo
     {
         return $this->belongsTo(Debt::class);

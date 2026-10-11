@@ -675,6 +675,86 @@ test('marking handover device as sold with paid settlement creates exactly one s
     expect((float) $statement['kpis']['range_closing_balance'])->toBe(0.00);
 });
 
+test('cannot handover unit as debt offset if partner has no open payables', function () {
+    // Partner with NO open payables
+    $partnerZero = Contact::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Zero Debt Partner',
+        'roles' => ['vendor', 'partner'],
+        'is_active' => true,
+    ]);
+
+    $unit = InventoryUnit::create([
+        'tenant_id' => $this->tenant->id,
+        'variant_id' => $this->variantA->id,
+        'imei_or_serial' => 'OFFSET-SAFEGUARD-001',
+        'status' => 'in_stock',
+        'cost_basis' => 50000.00,
+        'selling_price' => 50000.00,
+        'location' => 'Shop Counter',
+    ]);
+
+    $res = $this->actingAs($this->user, 'sanctum')->postJson("/api/v1/inventory/units/{$unit->id}/handover", [
+        'handover_to' => $partnerZero->name,
+        'handover_payout' => 50000.00,
+        'instant_offset' => true,
+    ]);
+
+    $res->assertStatus(422);
+    $res->assertJsonValidationErrors(['handover_to']);
+    expect($res->json('errors.handover_to.0'))->toContain('Cannot offset debt: You do not owe');
+
+    // Unit must remain in_stock
+    expect($unit->fresh()->status)->toBe('in_stock');
+});
+
+test('cannot handover unit as debt offset if payout exceeds open payables', function () {
+    // Partner with only 20,000 ETB payable debt
+    $partnerSmall = Contact::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Small Debt Partner',
+        'roles' => ['vendor', 'partner'],
+        'is_active' => true,
+    ]);
+
+    Debt::create([
+        'tenant_id' => $this->tenant->id,
+        'contact_id' => $partnerSmall->id,
+        'type' => 'payable',
+        'reference_type' => 'stock_intake',
+        'original_amount' => 20000.00,
+        'paid_amount' => 0.00,
+        'remaining_amount' => 20000.00,
+        'status' => 'open',
+        'due_date' => now()->addDays(30),
+    ]);
+
+    $unit = InventoryUnit::create([
+        'tenant_id' => $this->tenant->id,
+        'variant_id' => $this->variantA->id,
+        'imei_or_serial' => 'OFFSET-SAFEGUARD-002',
+        'status' => 'in_stock',
+        'cost_basis' => 50000.00,
+        'selling_price' => 50000.00,
+        'location' => 'Shop Counter',
+    ]);
+
+    // Attempting to offset 50,000 ETB when we only owe 20,000 ETB
+    $res = $this->actingAs($this->user, 'sanctum')->postJson("/api/v1/inventory/units/{$unit->id}/handover", [
+        'handover_to' => $partnerSmall->name,
+        'handover_payout' => 50000.00,
+        'instant_offset' => true,
+    ]);
+
+    $res->assertStatus(422);
+    $res->assertJsonValidationErrors(['handover_payout']);
+    expect($res->json('errors.handover_payout.0'))->toContain('exceeds your total open payables');
+
+    // Unit must remain in_stock
+    expect($unit->fresh()->status)->toBe('in_stock');
+});
+
+
 
 
 

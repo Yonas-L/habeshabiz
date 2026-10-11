@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import type { SalesOrder, User, FinancialAccount, InventoryUnit, Tenant } from '../../api/client';
 import { api } from '../../api/client';
 import { SlideOverDrawer } from './SlideOverDrawer';
@@ -14,9 +15,7 @@ import {
   ChevronUp,
   Lock,
   ArrowRightLeft,
-  DollarSign,
   Loader2,
-  X,
   Repeat,
   Undo2,
   ArrowLeftRight,
@@ -504,17 +503,6 @@ Thank you for choosing Habeshabiz Electronics!
                   </button>
                 )}
 
-                {!isPaid && (
-                  <button
-                    type="button"
-                    onClick={handleOpenCollect}
-                    className="h-9 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95 cursor-pointer shrink-0 whitespace-nowrap"
-                  >
-                    <DollarSign className="w-3.5 h-3.5 shrink-0" />
-                    <span>Collect Balance</span>
-                  </button>
-                )}
-
                 <button
                   type="button"
                   onClick={handlePrint}
@@ -530,26 +518,15 @@ Thank you for choosing Habeshabiz Electronics!
             {/* Mobile Action Rows (< sm): High contrast full-width primary + secondary */}
             <div className="flex sm:hidden flex-col gap-2 w-full">
               {/* Row 1: Primary Action */}
-              {!isPaid ? (
-                <button
-                  type="button"
-                  onClick={handleOpenCollect}
-                  className="w-full h-10 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer whitespace-nowrap"
-                >
-                  <DollarSign className="w-3.5 h-3.5 shrink-0" />
-                  <span>Collect Balance ({remainingDebt.toLocaleString()} ETB)</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handlePrint}
-                  disabled={isDownloadingPdf}
-                  className="w-full h-10 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer whitespace-nowrap disabled:opacity-60"
-                >
-                  {isDownloadingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" /> : <Printer className="w-3.5 h-3.5 shrink-0" />}
-                  <span>{isDownloadingPdf ? 'Generating PDF…' : 'Download Invoice PDF'}</span>
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={handlePrint}
+                disabled={isDownloadingPdf}
+                className="w-full h-10 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer whitespace-nowrap disabled:opacity-60"
+              >
+                {isDownloadingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" /> : <Printer className="w-3.5 h-3.5 shrink-0" />}
+                <span>{isDownloadingPdf ? 'Generating PDF…' : 'Download Invoice PDF'}</span>
+              </button>
 
               {/* Row 2: Secondary Contextual Actions */}
               <div className="flex items-center gap-2 w-full">
@@ -989,9 +966,18 @@ Thank you for choosing Habeshabiz Electronics!
             </div>
 
             {remainingDebt > 0 ? (
-              <div className="flex justify-between font-bold text-amber-600 dark:text-amber-400 pt-1 border-t border-amber-200/60 dark:border-amber-800/40 bg-amber-50/50 dark:bg-amber-950/20 p-2 rounded-xl">
-                <span>Balance Due</span>
-                <span className="font-mono tabular-nums">{remainingDebt.toLocaleString()} ETB</span>
+              <div className="flex items-center justify-between font-bold text-amber-600 dark:text-amber-400 pt-1.5 border-t border-amber-200/60 dark:border-amber-800/40 bg-amber-50/50 dark:bg-amber-950/20 px-3 py-2 rounded-xl">
+                <div>
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300 block">Balance Due</span>
+                  <span className="font-mono tabular-nums text-sm font-bold">{remainingDebt.toLocaleString()} ETB</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleOpenCollect}
+                  className="h-7 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-semibold transition-all shadow-2xs cursor-pointer whitespace-nowrap"
+                >
+                  Collect Balance
+                </button>
               </div>
             ) : (
               <div className="flex justify-between font-semibold text-emerald-600 dark:text-emerald-400 pt-1">
@@ -1092,8 +1078,8 @@ Thank you for choosing Habeshabiz Electronics!
       </SlideOverDrawer>
 
       {/* Collect Balance Modal */}
-      {showCollectModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+      {showCollectModal && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in">
           <div
             className="relative w-full max-w-md bg-white dark:bg-[#131926] rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden"
             role="dialog"
@@ -1101,26 +1087,21 @@ Thank you for choosing Habeshabiz Electronics!
           >
             {/* Header */}
             <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400">
-                  <DollarSign className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                    Collect Balance
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    Order #{order.order_number} • {order.customer?.name || 'Walk-in Customer'}
-                  </p>
-                </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                  Collect Balance
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Order #{order.order_number} • {order.customer?.name || 'Walk-in Customer'}
+                </p>
               </div>
               <button
                 type="button"
                 onClick={() => setShowCollectModal(false)}
                 disabled={submittingPayment}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                className="text-xs font-semibold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 px-2 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
               >
-                <X className="w-4 h-4" />
+                Close
               </button>
             </div>
 
@@ -1217,31 +1198,22 @@ Thank you for choosing Habeshabiz Electronics!
                   type="button"
                   onClick={() => setShowCollectModal(false)}
                   disabled={submittingPayment}
-                  className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                  className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submittingPayment}
-                  className="h-9 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                  className="h-9 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs disabled:opacity-50 cursor-pointer"
                 >
-                  {submittingPayment ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>Recording...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Check className="w-3.5 h-3.5" />
-                      <span>Confirm Collection</span>
-                    </>
-                  )}
+                  {submittingPayment ? 'Recording...' : 'Confirm Collection'}
                 </button>
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Warranty Swap Modal */}
@@ -1268,29 +1240,24 @@ Thank you for choosing Habeshabiz Electronics!
       />
 
       {/* Multi-Device Swap Picker Modal (if order contains multiple sold serialized units) */}
-      {showMultiSwapPicker && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+      {showMultiSwapPicker && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in">
           <div className="relative w-full max-w-md bg-white dark:bg-[#131926] rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden p-5 space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400">
-                <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200/60 dark:border-indigo-800/60 flex items-center justify-center">
-                  <ArrowLeftRight className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-slate-900 dark:text-white text-sm">
-                    Select Device to Swap
-                  </h3>
-                  <p className="text-[11px] text-slate-400">
-                    Order #{order.order_number} contains multiple devices
-                  </p>
-                </div>
+              <div>
+                <h3 className="font-bold text-slate-900 dark:text-white text-sm">
+                  Select Device to Swap
+                </h3>
+                <p className="text-[11px] text-slate-400">
+                  Order #{order.order_number} contains multiple devices
+                </p>
               </div>
               <button
                 type="button"
                 onClick={() => setShowMultiSwapPicker(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                className="text-xs font-semibold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 px-2 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
               >
-                <X className="w-4 h-4" />
+                Close
               </button>
             </div>
 
@@ -1319,7 +1286,6 @@ Thank you for choosing Habeshabiz Electronics!
                     </div>
                     <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1">
                       <span>Select</span>
-                      <ArrowLeftRight className="w-3.5 h-3.5" />
                     </span>
                   </button>
                 ))}
@@ -1336,7 +1302,8 @@ Thank you for choosing Habeshabiz Electronics!
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

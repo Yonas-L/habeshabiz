@@ -288,6 +288,15 @@ class SaleController extends Controller
                 ->where('reference_id', $order->id)
                 ->first();
 
+            if (! $debt) {
+                $unitIds = $order->items()->pluck('inventory_unit_id')->filter()->all();
+                if (! empty($unitIds)) {
+                    $debt = Debt::where('reference_type', 'handover_holding')
+                        ->whereIn('reference_id', $unitIds)
+                        ->first();
+                }
+            }
+
             if ($debt) {
                 $debtPaid = (float) $debt->paid_amount + $amount;
                 $debtRemaining = max(0, (float) $debt->original_amount - $debtPaid);

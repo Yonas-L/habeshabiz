@@ -672,6 +672,30 @@ class InventoryController extends Controller
                         ]);
                     }
 
+                    // Strict validation: Verify partner actually has open payables to offset against
+                    $openPayables = Debt::where('tenant_id', $tenantId)
+                        ->where('contact_id', $partnerContact->id)
+                        ->where('type', 'payable')
+                        ->whereIn('status', ['open', 'partially_paid'])
+                        ->with('payments')
+                        ->orderBy('due_date', 'asc')
+                        ->orderBy('created_at', 'asc')
+                        ->get();
+
+                    $totalOpenPayables = (float) $openPayables->sum('remaining_amount');
+
+                    if ($totalOpenPayables <= 0) {
+                        throw ValidationException::withMessages([
+                            'handover_to' => ["Cannot offset debt: You do not owe {$partnerContact->name} any money (open payables: 0.00 ETB). To hand out devices for sale to this partner, choose 'Temporary Handout' instead."],
+                        ]);
+                    }
+
+                    if ($finalPrice > $totalOpenPayables) {
+                        throw ValidationException::withMessages([
+                            'handover_payout' => ["Agreed deduction amount (".number_format($finalPrice, 2)." ETB) exceeds your total open payables to {$partnerContact->name} (".number_format($totalOpenPayables, 2)." ETB). You can only offset up to the amount you owe. To hand out devices for {$partnerContact->name} to sell, choose 'Temporary Handout' instead."],
+                        ]);
+                    }
+
                     $now = now();
                     $unitNotes = ! empty($validated['handover_notes'])
                         ? ($unit->notes ? "{$unit->notes} | {$validated['handover_notes']}" : $validated['handover_notes'])
@@ -689,14 +713,6 @@ class InventoryController extends Controller
 
                     if ($finalPrice > 0) {
                         $remOffset = $finalPrice;
-                        $openPayables = Debt::where('tenant_id', $tenantId)
-                            ->where('contact_id', $partnerContact->id)
-                            ->where('type', 'payable')
-                            ->whereIn('status', ['open', 'partially_paid'])
-                            ->with('payments')
-                            ->orderBy('due_date', 'asc')
-                            ->orderBy('created_at', 'asc')
-                            ->get();
 
                         foreach ($openPayables as $op) {
                             if ($remOffset <= 0) {
@@ -1029,7 +1045,31 @@ class InventoryController extends Controller
                 ]);
             }
 
-            DB::transaction(function () use ($unit, $partnerContact, $finalPrice, $validated, $user) {
+            // Strict validation: Verify partner actually has open payables to offset against
+            $openPayables = Debt::where('tenant_id', $user->tenant_id)
+                ->where('contact_id', $partnerContact->id)
+                ->where('type', 'payable')
+                ->whereIn('status', ['open', 'partially_paid'])
+                ->with('payments')
+                ->orderBy('due_date', 'asc')
+                ->orderBy('created_at', 'asc')
+                ->get();
+
+            $totalOpenPayables = (float) $openPayables->sum('remaining_amount');
+
+            if ($totalOpenPayables <= 0) {
+                throw ValidationException::withMessages([
+                    'handover_to' => ["Cannot offset debt: You do not owe {$partnerContact->name} any money (open payables: 0.00 ETB). To hand out devices for sale to this partner, choose 'Temporary Handout' instead."],
+                ]);
+            }
+
+            if ($finalPrice > $totalOpenPayables) {
+                throw ValidationException::withMessages([
+                    'handover_payout' => ["Agreed deduction amount (".number_format($finalPrice, 2)." ETB) exceeds your total open payables to {$partnerContact->name} (".number_format($totalOpenPayables, 2)." ETB). You can only offset up to the amount you owe. To hand out devices for {$partnerContact->name} to sell, choose 'Temporary Handout' instead."],
+                ]);
+            }
+
+            DB::transaction(function () use ($unit, $partnerContact, $finalPrice, $validated, $user, $openPayables) {
                 $now = now();
 
                 // 1. Mark unit sold directly (never intermediate holding)
@@ -1048,14 +1088,6 @@ class InventoryController extends Controller
                 // 2. Deduct directly from partner's open payable debts
                 if ($finalPrice > 0) {
                     $remOffset = $finalPrice;
-                    $openPayables = Debt::where('tenant_id', $user->tenant_id)
-                        ->where('contact_id', $partnerContact->id)
-                        ->where('type', 'payable')
-                        ->whereIn('status', ['open', 'partially_paid'])
-                        ->with('payments')
-                        ->orderBy('due_date', 'asc')
-                        ->orderBy('created_at', 'asc')
-                        ->get();
 
                     foreach ($openPayables as $op) {
                         if ($remOffset <= 0) {

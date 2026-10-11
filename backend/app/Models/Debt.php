@@ -70,6 +70,51 @@ class Debt extends Model
         return $this->status === 'settled';
     }
 
+    protected static function booted(): void
+    {
+        static::saved(function (Debt $debt) {
+            if ($debt->type === 'receivable' && in_array($debt->reference_type, ['sales_order', 'handover_holding'], true)) {
+                $debt->syncLinkedSalesOrder();
+            }
+        });
+    }
+
+    /**
+     * Keep any linked sales order's paid_amount, payment_status, and credit_sale flag
+     * strictly synchronized with this receivable debt's settlement state.
+     */
+    public function syncLinkedSalesOrder(): void
+    {
+        if ($this->type !== 'receivable') {
+            return;
+        }
+
+        $order = null;
+        if ($this->reference_type === 'sales_order' && ! empty($this->reference_id)) {
+            $order = SalesOrder::find($this->reference_id);
+        } elseif ($this->reference_type === 'handover_holding' && ! empty($this->reference_id)) {
+            $orderItem = SalesOrderItem::where('inventory_unit_id', $this->reference_id)->first();
+            $order = $orderItem?->salesOrder;
+        }
+
+        if (! $order) {
+            return;
+        }
+
+        $netPayable = max(0.0, (float) $order->total_amount - (float) ($order->discount_amount ?? 0) - (float) ($order->exchange_allowance ?? 0));
+        $debtRemaining = (float) $this->remaining_amount;
+
+        $isSettled = $this->status === 'settled' || $debtRemaining <= 0.009;
+        $orderPaid = $isSettled ? $netPayable : max(0.0, min($netPayable, $netPayable - $debtRemaining));
+        $paymentStatus = $isSettled ? 'paid' : ($orderPaid > 0.009 ? 'partially_paid' : 'unpaid');
+
+        $order->update([
+            'paid_amount' => $orderPaid,
+            'payment_status' => $paymentStatus,
+            'credit_sale' => ! $isSettled,
+        ]);
+    }
+
     /**
      * Recalculate and synchronize paid_amount, remaining_amount, and status
      * directly from associated debt payments, ensuring zero discrepancy.
@@ -86,6 +131,8 @@ class Debt extends Model
             'remaining_amount' => $remainingAmount,
             'status' => $status,
         ]);
+
+        $this->syncLinkedSalesOrder();
     }
 
     public static function applyOpenAdvancesToPayable(self $payableDebt): void

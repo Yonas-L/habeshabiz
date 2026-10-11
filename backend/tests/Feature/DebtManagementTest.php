@@ -405,4 +405,133 @@ test('recording payable automatically cancels out existing receivable from the s
     expect($statementRes->json('data.kpis.current_net_balance'))->toEqual(5000);
 });
 
+test('mutual offset or payment on handover debt automatically synchronizes linked sales order', function () {
+    $contact = Contact::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Halle Partner',
+        'phone' => '+251911998877',
+        'roles' => ['supplier', 'customer'],
+    ]);
+
+    $category = \App\Models\Category::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Smartphones',
+        'slug' => 'smartphones',
+    ]);
+
+    $product = \App\Models\Product::create([
+        'tenant_id' => $this->tenant->id,
+        'category_id' => $category->id,
+        'name' => 'iPhone 16 Pro',
+        'has_serials' => true,
+    ]);
+
+    $variant = \App\Models\ProductVariant::create([
+        'tenant_id' => $this->tenant->id,
+        'product_id' => $product->id,
+        'name' => '256GB Black',
+    ]);
+
+    $unit = \App\Models\InventoryUnit::create([
+        'tenant_id' => $this->tenant->id,
+        'variant_id' => $variant->id,
+        'imei_or_serial' => 'SN-16PRO-TEST-99',
+        'cost_basis' => 100000.00,
+        'selling_price' => 120000.00,
+        'status' => 'sold',
+        'location' => 'Sold by Halle Partner',
+    ]);
+
+    // Create handover holding receivable debt
+    $debt = Debt::create([
+        'tenant_id' => $this->tenant->id,
+        'contact_id' => $contact->id,
+        'type' => 'receivable',
+        'reference_type' => 'handover_holding',
+        'reference_id' => $unit->id,
+        'original_amount' => 120000.00,
+        'paid_amount' => 110000.00,
+        'remaining_amount' => 10000.00,
+        'status' => 'partially_paid',
+    ]);
+
+    \App\Models\DebtPayment::create([
+        'tenant_id' => $this->tenant->id,
+        'debt_id' => $debt->id,
+        'financial_account_id' => $this->cashAccount->id,
+        'amount' => 110000.00,
+        'payment_date' => now(),
+        'notes' => 'Initial down payment',
+    ]);
+
+    // Create linked sales order
+    $order = \App\Models\SalesOrder::create([
+        'tenant_id' => $this->tenant->id,
+        'order_number' => 'SO-TEST-HANDOVER-1',
+        'customer_id' => $contact->id,
+        'total_amount' => 120000.00,
+        'paid_amount' => 110000.00,
+        'payment_status' => 'partially_paid',
+        'credit_sale' => true,
+        'payment_method' => 'cash',
+        'order_date' => now(),
+    ]);
+
+    \App\Models\SalesOrderItem::create([
+        'tenant_id' => $this->tenant->id,
+        'sales_order_id' => $order->id,
+        'variant_id' => $variant->id,
+        'inventory_unit_id' => $unit->id,
+        'quantity' => 1,
+        'unit_price' => 120000.00,
+        'unit_cost' => 100000.00,
+        'profit' => 20000.00,
+        'sourcing_type' => 'internal_stock',
+    ]);
+
+    // 1. Apply a 20 ETB mutual offset by creating a payable
+    $res = $this->actingAs($this->owner)->postJson('/api/v1/debts', [
+        'type' => 'payable',
+        'contact_id' => $contact->id,
+        'amount' => 20.00,
+        'notes' => 'Trade adjustment offset',
+    ]);
+
+    $res->assertStatus(201);
+
+    // Verify Debt was reduced
+    $debt->refresh();
+    expect((float) $debt->paid_amount)->toBe(110020.00);
+    expect((float) $debt->remaining_amount)->toBe(9980.00);
+    expect($debt->status)->toBe('partially_paid');
+
+    // Verify Sales Order was automatically synchronized!
+    $order->refresh();
+    expect((float) $order->paid_amount)->toBe(110020.00);
+    expect($order->payment_status)->toBe('partially_paid');
+    expect($order->credit_sale)->toBeTrue();
+
+    // 2. Now settle the remaining 9,980 ETB in full via debt payment
+    $settleRes = $this->actingAs($this->owner)->postJson("/api/v1/debts/{$debt->id}/payments", [
+        'amount' => 9980.00,
+        'financial_account_id' => $this->cashAccount->id,
+        'notes' => 'Final settlement cash payment',
+    ]);
+
+    $settleRes->assertStatus(200);
+
+    // Verify Debt is settled
+    $debt->refresh();
+    expect((float) $debt->paid_amount)->toBe(120000.00);
+    expect((float) $debt->remaining_amount)->toBe(0.00);
+    expect($debt->status)->toBe('settled');
+
+    // Verify Sales Order automatically transitioned to paid in full!
+    $order->refresh();
+    expect((float) $order->paid_amount)->toBe(120000.00);
+    expect($order->payment_status)->toBe('paid');
+    expect($order->credit_sale)->toBeFalse();
+});
+
+
 

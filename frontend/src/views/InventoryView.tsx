@@ -2321,8 +2321,14 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   {contacts
                     .filter((c) => c.is_active !== false)
                     .map((c) => {
+                      const payable = c.open_payable ?? 0;
                       const net = c.net_balance ?? 0;
-                      const debtHint = net < 0 ? ` (You owe ${Math.abs(net).toLocaleString()} ETB)` : net > 0 ? ` (Owes you ${net.toLocaleString()} ETB)` : '';
+                      let debtHint = '';
+                      if (handoverMode === 'offset') {
+                        debtHint = payable > 0 ? ` (You owe ${payable.toLocaleString()} ETB)` : ' (No debt to offset)';
+                      } else {
+                        debtHint = net < 0 ? ` (You owe ${Math.abs(net).toLocaleString()} ETB)` : net > 0 ? ` (Owes you ${net.toLocaleString()} ETB)` : '';
+                      }
                       return (
                         <option key={c.id} value={c.name}>
                           {c.name} {debtHint}
@@ -2397,42 +2403,59 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   {/* Clean Visual Breakdown */}
                   {(() => {
                     const selectedPartner = contacts.find((c) => c.name.toLowerCase() === handoverTo.trim().toLowerCase());
-                    const currentDebt = selectedPartner && typeof selectedPartner.net_balance === 'number' && selectedPartner.net_balance < 0
-                      ? Math.abs(selectedPartner.net_balance)
-                      : 0;
+                    const currentPayable = selectedPartner?.open_payable ?? (selectedPartner && typeof selectedPartner.net_balance === 'number' && selectedPartner.net_balance < 0 ? Math.abs(selectedPartner.net_balance) : 0);
                     const offsetVal = parseFloat(handoverPayout) || 0;
                     const unitCost = Number(handoverTargetUnit.cost_basis || 0);
                     const profit = offsetVal > 0 && unitCost > 0 ? offsetVal - unitCost : 0;
-                    const remainingDebt = Math.max(0, currentDebt - offsetVal);
+                    const remainingDebt = Math.max(0, currentPayable - offsetVal);
+                    const isOverOffset = selectedPartner && currentPayable > 0 && offsetVal > currentPayable;
+                    const hasNoDebt = selectedPartner && currentPayable <= 0;
 
                     return (
-                      <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 space-y-2 text-xs">
-                        <div className="flex justify-between text-slate-500 dark:text-slate-400">
-                          <span>Current Debt You Owe:</span>
-                          <span className="font-mono font-semibold text-rose-600 dark:text-rose-400">
-                            {currentDebt > 0 ? `${currentDebt.toLocaleString()} ETB` : 'No open debt detected'}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-slate-700 dark:text-slate-200 font-medium">
-                          <span>Deducted by this Handover:</span>
-                          <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                            -{offsetVal.toLocaleString()} ETB
-                          </span>
-                        </div>
-                        <div className="flex justify-between pt-1.5 border-t border-slate-200/60 dark:border-slate-800 font-semibold">
-                          <span className="text-slate-900 dark:text-white">Remaining Debt After Handover:</span>
-                          <span className="font-mono text-slate-900 dark:text-white">
-                            {remainingDebt.toLocaleString()} ETB
-                          </span>
-                        </div>
-                        {profit > 0 && (
-                          <div className="flex justify-between items-center pt-1.5 border-t border-emerald-200/50 dark:border-emerald-900/50 text-emerald-700 dark:text-emerald-400 font-semibold">
-                            <span>Your Profit from Handover:</span>
-                            <span className="font-mono text-xs bg-emerald-100 dark:bg-emerald-950 px-2 py-0.5 rounded-md">
-                              +{profit.toLocaleString()} ETB
-                            </span>
+                      <div className="space-y-2">
+                        {hasNoDebt && (
+                          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 text-xs space-y-1">
+                            <p className="font-semibold">⚠️ You do not owe {selectedPartner.name} any money</p>
+                            <p className="text-[11px] text-amber-700/90 dark:text-amber-400/90">
+                              Open payables: 0 ETB. To hand out this device for {selectedPartner.name} to sell, please switch to <strong>Temporary Handout</strong> above.
+                            </p>
                           </div>
                         )}
+
+                        {isOverOffset && (
+                          <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-700 dark:text-rose-400 text-xs">
+                            Deduction value ({offsetVal.toLocaleString()} ETB) exceeds what you owe ({currentPayable.toLocaleString()} ETB max).
+                          </div>
+                        )}
+
+                        <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 space-y-2 text-xs">
+                          <div className="flex justify-between text-slate-500 dark:text-slate-400">
+                            <span>Current Debt You Owe:</span>
+                            <span className={`font-mono font-semibold ${currentPayable > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-500'}`}>
+                              {currentPayable > 0 ? `${currentPayable.toLocaleString()} ETB` : '0 ETB (No debt to offset)'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-slate-700 dark:text-slate-200 font-medium">
+                            <span>Deducted by this Handover:</span>
+                            <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                              -{offsetVal.toLocaleString()} ETB
+                            </span>
+                          </div>
+                          <div className="flex justify-between pt-1.5 border-t border-slate-200/60 dark:border-slate-800 font-semibold">
+                            <span className="text-slate-900 dark:text-white">Remaining Debt After Handover:</span>
+                            <span className="font-mono text-slate-900 dark:text-white">
+                              {remainingDebt.toLocaleString()} ETB
+                            </span>
+                          </div>
+                          {profit > 0 && (
+                            <div className="flex justify-between items-center pt-1.5 border-t border-emerald-200/50 dark:border-emerald-900/50 text-emerald-700 dark:text-emerald-400 font-semibold">
+                              <span>Your Profit from Handover:</span>
+                              <span className="font-mono text-xs bg-emerald-100 dark:bg-emerald-950 px-2 py-0.5 rounded-md">
+                                +{profit.toLocaleString()} ETB
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     );
                   })()}
@@ -2506,24 +2529,36 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 >
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  disabled={handoverSubmitting || !handoverTo.trim() || (handoverMode === 'offset' && (!handoverPayout || parseFloat(handoverPayout) <= 0))}
-                  className={`h-9 px-5 rounded-xl text-white text-xs font-bold transition-all shadow-xs disabled:opacity-50 flex items-center gap-1.5 cursor-pointer ${
-                    handoverMode === 'offset'
-                      ? 'bg-emerald-600 hover:bg-emerald-700'
-                      : 'bg-amber-600 hover:bg-amber-700'
-                  }`}
-                >
-                  {handoverSubmitting ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : handoverMode === 'offset' ? (
-                    <ArrowLeftRight className="w-3.5 h-3.5" />
-                  ) : (
-                    <UserCheck className="w-3.5 h-3.5" />
-                  )}
-                  <span>{handoverMode === 'offset' ? 'Confirm & Deduct Debt' : 'Confirm Handover Out'}</span>
-                </button>
+                {(() => {
+                  const selPartner = contacts.find((c) => c.name.toLowerCase() === handoverTo.trim().toLowerCase());
+                  const payableDebt = selPartner?.open_payable ?? (selPartner && typeof selPartner.net_balance === 'number' && selPartner.net_balance < 0 ? Math.abs(selPartner.net_balance) : 0);
+                  const offsetAmt = parseFloat(handoverPayout) || 0;
+                  const isBlockedOffset = handoverMode === 'offset' && (
+                    offsetAmt <= 0 ||
+                    (selPartner && (payableDebt <= 0 || offsetAmt > payableDebt))
+                  );
+
+                  return (
+                    <button
+                      type="submit"
+                      disabled={handoverSubmitting || !handoverTo.trim() || isBlockedOffset}
+                      className={`h-9 px-5 rounded-xl text-white text-xs font-bold transition-all shadow-xs disabled:opacity-50 flex items-center gap-1.5 cursor-pointer ${
+                        handoverMode === 'offset'
+                          ? 'bg-emerald-600 hover:bg-emerald-700'
+                          : 'bg-amber-600 hover:bg-amber-700'
+                      }`}
+                    >
+                      {handoverSubmitting ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : handoverMode === 'offset' ? (
+                        <ArrowLeftRight className="w-3.5 h-3.5" />
+                      ) : (
+                        <UserCheck className="w-3.5 h-3.5" />
+                      )}
+                      <span>{handoverMode === 'offset' ? 'Confirm & Deduct Debt' : 'Confirm Handover Out'}</span>
+                    </button>
+                  );
+                })()}
               </div>
             </form>
           </div>
