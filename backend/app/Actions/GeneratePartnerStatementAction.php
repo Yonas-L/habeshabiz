@@ -469,17 +469,15 @@ class GeneratePartnerStatementAction
                         'reference_number' => 'DEVICE-OFFSET',
                     ];
                 } elseif (str_starts_with($payment->reference_number ?? '', 'OFFSET-')) {
-                    $accText = ($accountName && $accountName !== 'Wire') ? " ({$accountName})" : '';
-                    $isMutualOffset = empty($payment->financial_account_id);
                     $rawEntries[] = [
                         'id' => "pay-{$payment->id}",
                         'date' => $payDate,
-                        'type' => $isMutualOffset ? 'debt_offset' : ($debt->type === 'payable' ? 'payment_sent' : 'payment_received'),
-                        'type_label' => $isMutualOffset ? 'Debt Offset' : ($debt->type === 'payable' ? 'Payment Sent' : 'Payment Received'),
-                        'context' => $isMutualOffset ? 'Mutual credit offset' : "Transferred{$accText}",
-                        'payable' => ($isMutualOffset || $debt->type === 'payable') ? -(float) $payment->amount : 0.0,
-                        'receivable' => ($isMutualOffset || $debt->type === 'receivable') ? -(float) $payment->amount : 0.0,
-                        'balance_effect' => $isMutualOffset ? 0.0 : ($debt->type === 'payable' ? (float) $payment->amount : -(float) $payment->amount),
+                        'type' => 'debt_offset',
+                        'type_label' => 'Debt Offset',
+                        'context' => 'Mutual credit offset',
+                        'payable' => -(float) $payment->amount,
+                        'receivable' => -(float) $payment->amount,
+                        'balance_effect' => 0.0,
                         'reference_number' => $payment->reference_number,
                     ];
                 } elseif (in_array($payment->reference_number, ['REPAIR-REDELIVERY', 'VENDOR-SWAP-DELIVERY', 'WARRANTY-SWAP'], true)) {

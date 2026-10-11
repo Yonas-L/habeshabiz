@@ -351,7 +351,7 @@ class DebtController extends Controller
                             DebtPayment::create([
                                 'tenant_id' => $tenantId,
                                 'debt_id' => $openPayable->id,
-                                'financial_account_id' => $account?->id,
+                                'financial_account_id' => $hasCashMovement ? $account?->id : null,
                                 'amount' => $payAmount,
                                 'payment_date' => now(),
                                 'reference_number' => $hasCashMovement ? "PAYOUT-{$debt->id}" : "OFFSET-{$debt->id}",
@@ -387,7 +387,7 @@ class DebtController extends Controller
                             DebtPayment::create([
                                 'tenant_id' => $tenantId,
                                 'debt_id' => $debt->id,
-                                'financial_account_id' => $account?->id,
+                                'financial_account_id' => null,
                                 'amount' => $totalOffsetApplied,
                                 'payment_date' => now(),
                                 'reference_number' => 'MUTUAL-OFFSET',
@@ -427,7 +427,7 @@ class DebtController extends Controller
                                 DebtPayment::create([
                                     'tenant_id' => $tenantId,
                                     'debt_id' => $openReceivable->id,
-                                    'financial_account_id' => $account?->id,
+                                    'financial_account_id' => null,
                                     'amount' => $offsetAmount,
                                     'payment_date' => now(),
                                     'reference_number' => "OFFSET-{$debt->id}",
@@ -462,7 +462,7 @@ class DebtController extends Controller
                                 DebtPayment::create([
                                     'tenant_id' => $tenantId,
                                     'debt_id' => $debt->id,
-                                    'financial_account_id' => $account?->id,
+                                    'financial_account_id' => null,
                                     'amount' => $totalOffsetApplied,
                                     'payment_date' => now(),
                                     'reference_number' => 'MUTUAL-OFFSET',

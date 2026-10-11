@@ -790,10 +790,11 @@ test('partner statement renders chronological ledger with mutual credit offset h
     ]);
     $payableDebt->forceFill(['created_at' => now()->subMinutes(10)])->save();
 
-    // 3. Mutual offset applied: 52,000 ETB
+    // 3. Mutual offset applied: 52,000 ETB (even if financial_account_id is attached from loan creation)
     DebtPayment::create([
         'tenant_id' => $this->tenant->id,
         'debt_id' => $payableDebt->id,
+        'financial_account_id' => $this->cbe->id,
         'amount' => 52000.00,
         'payment_date' => now()->subMinutes(5),
         'reference_number' => "OFFSET-{$advanceDebt->id}",
