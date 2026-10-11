@@ -477,10 +477,13 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                               <button
                                 type="button"
                                 onClick={() => {
-                                  if (onSelectDebt) {
-                                    onClose();
-                                    onSelectDebt(debt);
-                                  }
+                                  setSettlingParty({
+                                    id: group.contactId,
+                                    name: group.name,
+                                    phone: group.phone,
+                                    totalRemaining: Number(debt.remaining_amount),
+                                    debtCount: 1,
+                                  });
                                 }}
                                 className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs active:scale-95 cursor-pointer"
                               >
@@ -608,10 +611,13 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                               <button
                                 type="button"
                                 onClick={() => {
-                                  if (onSelectDebt) {
-                                    onClose();
-                                    onSelectDebt(debt);
-                                  }
+                                  setSettlingParty({
+                                    id: group.contactId,
+                                    name: group.name,
+                                    phone: group.phone,
+                                    totalRemaining: Number(debt.remaining_amount),
+                                    debtCount: 1,
+                                  });
                                 }}
                                 className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-2xs active:scale-95 cursor-pointer"
                               >
@@ -862,7 +868,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
 
     {/* Delete Confirmation Modal */}
     {deletingAccount && (
-      <div className="fixed inset-0 z-[60] flex items-center justify-center">
+      <div className="fixed inset-0 z-[120] flex items-center justify-center">
         <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDeletingAccount(null)} />
         <div className="relative w-full max-w-sm mx-4 bg-white dark:bg-[#0f1522] rounded-2xl shadow-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden animate-page-enter p-6 space-y-4">
           <div className="flex items-center gap-3">

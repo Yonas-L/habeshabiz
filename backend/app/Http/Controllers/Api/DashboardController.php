@@ -53,16 +53,20 @@ class DashboardController extends Controller
         $totalStockValue = $shopOwnedSerializedStockValue + $quantityStockValue;
         $totalShelfStockValue = $totalStockValue + $vendorConsignmentStockValue;
 
-        // 2. Debts: Receivables vs Payables — bilaterally netted per contact
-        // If a contact owes us 100k AND we owe them 100k, the net is 0
-        // and neither figure should inflate the dashboard.
+        // 2. Debts: Receivables vs Payables
+        // Gross totals reflect the actual outstanding legal debt obligations.
+        // Bilateral net calculations reflect the merchant netted position per partner.
         $openDebts = Debt::where('created_at', '<=', $endOfMonth)
             ->whereIn('status', ['open', 'partially_paid'])
             ->get();
+
+        $grossReceivables = (float) $openDebts->where('type', 'receivable')->sum('remaining_amount');
+        $grossPayables = (float) $openDebts->where('type', 'payable')->sum('remaining_amount');
+
         $debtsByContact = $openDebts->groupBy('contact_id');
 
-        $totalReceivables = 0.0;
-        $totalPayables = 0.0;
+        $totalReceivablesNetted = 0.0;
+        $totalPayablesNetted = 0.0;
         $netReceivableParties = 0;
         $netPayableParties = 0;
         $netReceivableContactIds = [];
@@ -74,11 +78,11 @@ class DashboardController extends Controller
             $bilateralNet = $contactRec - $contactPay;
 
             if ($bilateralNet > 0.009) {
-                $totalReceivables += $bilateralNet;
+                $totalReceivablesNetted += $bilateralNet;
                 $netReceivableParties++;
                 $netReceivableContactIds[] = $contactId;
             } elseif ($bilateralNet < -0.009) {
-                $totalPayables += abs($bilateralNet);
+                $totalPayablesNetted += abs($bilateralNet);
                 $netPayableParties++;
                 $netPayableContactIds[] = $contactId;
             }
@@ -115,7 +119,7 @@ class DashboardController extends Controller
 
         // 4. Net Capital (The Ethiopian Merchant Formula from Excel)
         // Net Capital = Owned Stock + Consignment Stock (covering consignment debt) + Receivables + Cash/Banks + Assets - Payables
-        $netCapital = $totalStockValue + $vendorConsignmentStockValue + $totalReceivables + $cashAndBankBalance + $customAssetsBalance - $totalPayables;
+        $netCapital = $totalStockValue + $vendorConsignmentStockValue + $grossReceivables + $cashAndBankBalance + $customAssetsBalance - $grossPayables;
 
         // 5. Monthly Performance (selected month or current calendar month)
 
@@ -163,24 +167,22 @@ class DashboardController extends Controller
             ->take(5)
             ->get();
 
-        // 7. Top Receivables (Parties who actually owe the shop money net)
+        // 7. Top Receivables (Active open receivables ordered by remaining amount)
         $topReceivables = Debt::with('contact')
             ->where('type', 'receivable')
             ->where('created_at', '<=', $endOfMonth)
-            ->whereIn('contact_id', $netReceivableContactIds)
             ->whereIn('status', ['open', 'partially_paid'])
             ->orderByDesc('remaining_amount')
-            ->take(5)
+            ->take(10)
             ->get();
 
-        // 8. Top Payables (Parties whom the shop actually owes money net)
+        // 8. Top Payables (Active open payables ordered by remaining amount)
         $topPayables = Debt::with('contact')
             ->where('type', 'payable')
             ->where('created_at', '<=', $endOfMonth)
-            ->whereIn('contact_id', $netPayableContactIds)
             ->whereIn('status', ['open', 'partially_paid'])
             ->orderByDesc('remaining_amount')
-            ->take(5)
+            ->take(10)
             ->get();
 
         // 9. Daily sales chart points for the selected month
@@ -303,14 +305,16 @@ class DashboardController extends Controller
                     'stock_value' => $totalStockValue,
                     'vendor_stock_value' => $vendorConsignmentStockValue,
                     'total_shelf_stock_value' => $totalShelfStockValue,
-                    'receivables' => $totalReceivables,
+                    'receivables' => $grossReceivables,
                     'cash_and_banks' => $cashAndBankBalance,
                     'custom_assets' => $customAssetsBalance,
                     'liquid_finance' => $cashAndBankBalance,
                     'forex_assets' => $forexBalance,
                     'gold_assets' => $goldBalance,
                     'other_assets' => $otherAssetsBalance,
-                    'payables' => $totalPayables,
+                    'payables' => $grossPayables,
+                    'net_receivables' => $totalReceivablesNetted,
+                    'net_payables' => $totalPayablesNetted,
                 ],
                 'monthly_performance' => [
                     'selected_month' => $startOfMonth->format('Y-m'),
@@ -339,9 +343,11 @@ class DashboardController extends Controller
                         ->whereNotIn('source_type', ['vendor_direct'])
                         ->count(),
                     'open_receivables' => Debt::where('created_at', '<=', $endOfMonth)->where('type', 'receivable')->whereIn('status', ['open', 'partially_paid'])->count(),
-                    'open_receivable_parties' => $netReceivableParties,
+                    'open_receivable_parties' => Debt::where('created_at', '<=', $endOfMonth)->where('type', 'receivable')->whereIn('status', ['open', 'partially_paid'])->distinct('contact_id')->count('contact_id'),
                     'open_payables' => Debt::where('created_at', '<=', $endOfMonth)->where('type', 'payable')->whereIn('status', ['open', 'partially_paid'])->count(),
-                    'open_payable_parties' => $netPayableParties,
+                    'open_payable_parties' => Debt::where('created_at', '<=', $endOfMonth)->where('type', 'payable')->whereIn('status', ['open', 'partially_paid'])->distinct('contact_id')->count('contact_id'),
+                    'net_receivable_parties' => $netReceivableParties,
+                    'net_payable_parties' => $netPayableParties,
                     'uncollected_staff_bonuses' => (float) Debt::where('created_at', '<=', $endOfMonth)->where('type', 'payable')->where('reference_type', 'salesperson_bonus')->whereIn('status', ['open', 'partially_paid'])->sum('remaining_amount'),
                     'pending_bonus_staff_count' => Debt::where('created_at', '<=', $endOfMonth)->where('type', 'payable')->where('reference_type', 'salesperson_bonus')->whereIn('status', ['open', 'partially_paid'])->distinct('salesperson_id')->count('salesperson_id'),
                 ],

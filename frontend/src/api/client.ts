@@ -465,6 +465,8 @@ export interface DashboardData {
     gold_assets?: number;
     other_assets?: number;
     payables: number;
+    net_receivables?: number;
+    net_payables?: number;
   };
   monthly_performance: {
     selected_month?: string;
@@ -484,6 +486,8 @@ export interface DashboardData {
     open_receivable_parties?: number;
     open_payables: number;
     open_payable_parties?: number;
+    net_receivable_parties?: number;
+    net_payable_parties?: number;
     uncollected_staff_bonuses?: number;
     pending_bonus_staff_count?: number;
   };
