@@ -138,7 +138,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
   };
 
   const groupedReceivables = useMemo(() => {
-    const map = new Map<string, { contactId: string; name: string; phone: string | null; totalRemaining: number; netRemaining: number; offsetAmount: number; debts: Debt[] }>();
+    const map = new Map<string, { contactId: string; name: string; phone: string | null; totalRemaining: number; netRemaining: number; offsetAmount: number; debts: Debt[]; openCount: number }>();
     top_receivables.forEach((debt) => {
       const cid = debt.contact?.id || debt.contact?.name || 'unassigned';
       if (!map.has(cid)) {
@@ -150,11 +150,16 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
           netRemaining: 0,
           offsetAmount: 0,
           debts: [],
+          openCount: 0,
         });
       }
       const g = map.get(cid)!;
       g.debts.push(debt);
-      g.totalRemaining += parseFloat(String(debt.remaining_amount)) || 0;
+      const rem = parseFloat(String(debt.remaining_amount)) || 0;
+      g.totalRemaining += rem;
+      if (rem > 0.001) {
+        g.openCount += 1;
+      }
       if (debt.contact && debt.contact.net_balance !== undefined) {
         const netBal = Number(debt.contact.net_balance);
         g.netRemaining = Math.max(0, netBal);
@@ -165,7 +170,12 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
       }
     });
     map.forEach((g) => {
-      g.debts.sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
+      const openDebts = g.debts.filter((d) => (Number(d.remaining_amount) || 0) > 0.001)
+        .sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
+      const settledDebts = g.debts.filter((d) => (Number(d.remaining_amount) || 0) <= 0.001)
+        .sort((a, b) => new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime())
+        .slice(0, 2);
+      g.debts = [...openDebts, ...settledDebts];
     });
     return Array.from(map.values())
       .filter((g) => g.netRemaining > 0.001)
@@ -173,7 +183,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
   }, [top_receivables]);
 
   const groupedPayables = useMemo(() => {
-    const map = new Map<string, { contactId: string; name: string; phone: string | null; totalRemaining: number; netRemaining: number; offsetAmount: number; debts: Debt[] }>();
+    const map = new Map<string, { contactId: string; name: string; phone: string | null; totalRemaining: number; netRemaining: number; offsetAmount: number; debts: Debt[]; openCount: number }>();
     top_payables.forEach((debt) => {
       const cid = debt.contact?.id || debt.contact?.name || 'unassigned';
       if (!map.has(cid)) {
@@ -185,11 +195,16 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
           netRemaining: 0,
           offsetAmount: 0,
           debts: [],
+          openCount: 0,
         });
       }
       const g = map.get(cid)!;
       g.debts.push(debt);
-      g.totalRemaining += parseFloat(String(debt.remaining_amount)) || 0;
+      const rem = parseFloat(String(debt.remaining_amount)) || 0;
+      g.totalRemaining += rem;
+      if (rem > 0.001) {
+        g.openCount += 1;
+      }
       if (debt.contact && debt.contact.net_balance !== undefined) {
         const netBal = Number(debt.contact.net_balance);
         g.netRemaining = Math.max(0, -netBal);
@@ -200,7 +215,12 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
       }
     });
     map.forEach((g) => {
-      g.debts.sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
+      const openDebts = g.debts.filter((d) => (Number(d.remaining_amount) || 0) > 0.001)
+        .sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
+      const settledDebts = g.debts.filter((d) => (Number(d.remaining_amount) || 0) <= 0.001)
+        .sort((a, b) => new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime())
+        .slice(0, 2);
+      g.debts = [...openDebts, ...settledDebts];
     });
     return Array.from(map.values())
       .filter((g) => g.netRemaining > 0.001)
@@ -433,7 +453,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                             {group.name}
                           </div>
                           <div className="text-[11px] text-slate-400 mt-0.5">
-                            {group.debts.length} {group.debts.length === 1 ? 'obligation' : 'obligations'}
+                            {group.openCount} {group.openCount === 1 ? 'obligation' : 'obligations'}
                           </div>
                         </div>
                       </div>
@@ -463,7 +483,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                               name: group.name,
                               phone: group.phone,
                               totalRemaining: group.netRemaining,
-                              debtCount: group.debts.length,
+                              debtCount: group.openCount,
                             })}
                             className="h-7 px-2.5 rounded-lg text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs active:scale-95 cursor-pointer ml-1 whitespace-nowrap"
                           >
@@ -477,9 +497,11 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                     {isExpanded && (
                       <div className="border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/40 dark:bg-slate-900/30 p-2.5 space-y-1.5 max-h-52 overflow-y-auto animate-in fade-in duration-200">
                         {group.debts.map((debt) => {
+                          const orig = Number(debt.original_amount) || 0;
                           const rem = Number(debt.remaining_amount) || 0;
                           const isSettled = rem <= 0.001;
                           const isPartial = !isSettled && Number(debt.paid_amount) > 0;
+                          const displayAmount = isSettled ? orig : rem;
                           return (
                             <div
                               key={debt.id}
@@ -524,7 +546,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                                 <div className={`font-mono font-bold text-xs ${
                                   isSettled ? 'text-slate-400 line-through' : 'text-emerald-600 dark:text-emerald-400'
                                 }`}>
-                                  +{rem.toLocaleString()} ETB
+                                  +{displayAmount.toLocaleString()} ETB
                                 </div>
                                 {!isSettled ? (
                                   <button
@@ -617,7 +639,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                             {group.name}
                           </div>
                           <div className="text-[11px] text-slate-400 mt-0.5">
-                            {group.debts.length} {group.debts.length === 1 ? 'obligation' : 'obligations'}
+                            {group.openCount} {group.openCount === 1 ? 'obligation' : 'obligations'}
                           </div>
                         </div>
                       </div>
@@ -647,7 +669,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                               name: group.name,
                               phone: group.phone,
                               totalRemaining: group.netRemaining,
-                              debtCount: group.debts.length,
+                              debtCount: group.openCount,
                             })}
                             className="h-7 px-2.5 rounded-lg text-[11px] font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-2xs active:scale-95 cursor-pointer ml-1 whitespace-nowrap"
                           >
@@ -661,9 +683,11 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                     {isExpanded && (
                       <div className="border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/40 dark:bg-slate-900/30 p-2.5 space-y-1.5 max-h-52 overflow-y-auto animate-in fade-in duration-200">
                         {group.debts.map((debt) => {
+                          const orig = Number(debt.original_amount) || 0;
                           const rem = Number(debt.remaining_amount) || 0;
                           const isSettled = rem <= 0.001;
                           const isPartial = !isSettled && Number(debt.paid_amount) > 0;
+                          const displayAmount = isSettled ? orig : rem;
                           return (
                             <div
                               key={debt.id}
@@ -708,7 +732,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                                 <div className={`font-mono font-bold text-xs ${
                                   isSettled ? 'text-slate-400 line-through' : 'text-rose-600 dark:text-rose-400'
                                 }`}>
-                                  −{rem.toLocaleString()} ETB
+                                  −{displayAmount.toLocaleString()} ETB
                                 </div>
                                 {!isSettled ? (
                                   <button

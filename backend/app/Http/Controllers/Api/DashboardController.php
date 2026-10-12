@@ -172,7 +172,13 @@ class DashboardController extends Controller
             ->where('type', 'receivable')
             ->where('created_at', '<=', $endOfMonth)
             ->whereIn('contact_id', $netReceivableContactIds)
-            ->whereIn('status', ['open', 'partially_paid', 'settled'])
+            ->where(function ($q) {
+                $q->whereIn('status', ['open', 'partially_paid'])
+                    ->orWhere(function ($sq) {
+                        $sq->where('status', 'settled')
+                            ->where('updated_at', '>=', now()->subHours(12));
+                    });
+            })
             ->orderByRaw("CASE WHEN status IN ('open', 'partially_paid') THEN 0 ELSE 1 END")
             ->orderBy('created_at')
             ->take(60)
@@ -183,7 +189,13 @@ class DashboardController extends Controller
             ->where('type', 'payable')
             ->where('created_at', '<=', $endOfMonth)
             ->whereIn('contact_id', $netPayableContactIds)
-            ->whereIn('status', ['open', 'partially_paid', 'settled'])
+            ->where(function ($q) {
+                $q->whereIn('status', ['open', 'partially_paid'])
+                    ->orWhere(function ($sq) {
+                        $sq->where('status', 'settled')
+                            ->where('updated_at', '>=', now()->subHours(12));
+                    });
+            })
             ->orderByRaw("CASE WHEN status IN ('open', 'partially_paid') THEN 0 ELSE 1 END")
             ->orderBy('created_at')
             ->take(60)

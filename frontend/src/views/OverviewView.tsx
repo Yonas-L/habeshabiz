@@ -100,6 +100,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       offsetAmount: number;
       debts: Debt[];
       hasHandover: boolean;
+      openCount: number;
     }>();
 
     (top_receivables || []).forEach((debt) => {
@@ -114,6 +115,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           offsetAmount: 0,
           debts: [],
           hasHandover: false,
+          openCount: 0,
         });
       }
       const g = map.get(cid)!;
@@ -121,7 +123,11 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       if (debt.reference_type === 'handover_holding') {
         g.hasHandover = true;
       }
-      g.totalRemaining += parseFloat(String(debt.remaining_amount)) || 0;
+      const rem = parseFloat(String(debt.remaining_amount)) || 0;
+      g.totalRemaining += rem;
+      if (rem > 0.001) {
+        g.openCount += 1;
+      }
       if (debt.contact && debt.contact.net_balance !== undefined) {
         const netBal = Number(debt.contact.net_balance);
         g.netRemaining = Math.max(0, netBal);
@@ -146,6 +152,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       netRemaining: number;
       offsetAmount: number;
       debts: Debt[];
+      openCount: number;
     }>();
 
     (top_payables || []).forEach((debt) => {
@@ -159,11 +166,16 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           netRemaining: 0,
           offsetAmount: 0,
           debts: [],
+          openCount: 0,
         });
       }
       const g = map.get(cid)!;
       g.debts.push(debt);
-      g.totalRemaining += parseFloat(String(debt.remaining_amount)) || 0;
+      const rem = parseFloat(String(debt.remaining_amount)) || 0;
+      g.totalRemaining += rem;
+      if (rem > 0.001) {
+        g.openCount += 1;
+      }
       if (debt.contact && debt.contact.net_balance !== undefined) {
         const netBal = Number(debt.contact.net_balance);
         g.netRemaining = Math.max(0, -netBal);
@@ -792,8 +804,9 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 <button
                   key={group.contactId}
                   onClick={() => {
-                    if (group.debts.length === 1) {
-                      setSelectedDebt(group.debts[0]);
+                    if (group.openCount === 1) {
+                      const singleOpenDebt = group.debts.find((d) => Number(d.remaining_amount) > 0.001) || group.debts[0];
+                      setSelectedDebt(singleOpenDebt);
                     } else {
                       setSelectedVital('receivables');
                     }
@@ -820,7 +833,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                         )}
                       </div>
                       <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
-                        {group.debts.length} {group.debts.length === 1 ? 'obligation' : 'obligations'}
+                        {group.openCount} {group.openCount === 1 ? 'obligation' : 'obligations'}
                         {group.offsetAmount > 0.01 && ` · Offset −${group.offsetAmount.toLocaleString()} ETB`}
                       </div>
                     </div>
@@ -875,8 +888,9 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 <button
                   key={group.contactId}
                   onClick={() => {
-                    if (group.debts.length === 1) {
-                      setSelectedDebt(group.debts[0]);
+                    if (group.openCount === 1) {
+                      const singleOpenDebt = group.debts.find((d) => Number(d.remaining_amount) > 0.001) || group.debts[0];
+                      setSelectedDebt(singleOpenDebt);
                     } else {
                       setSelectedVital('payables');
                     }
@@ -892,7 +906,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                         {group.name}
                       </span>
                       <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
-                        {group.debts.length} {group.debts.length === 1 ? 'obligation' : 'obligations'}
+                        {group.openCount} {group.openCount === 1 ? 'obligation' : 'obligations'}
                         {group.offsetAmount > 0.01 && ` · Offset −${group.offsetAmount.toLocaleString()} ETB`}
                       </div>
                     </div>

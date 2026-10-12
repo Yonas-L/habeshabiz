@@ -351,6 +351,7 @@ export interface Debt {
   due_date: string | null;
   notes: string | null;
   created_at: string;
+  updated_at?: string;
   payments?: DebtPayment[];
   payment_splits?: { financial_account_id: string; account_name?: string; amount: number; fee?: number }[];
 }

@@ -205,9 +205,22 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
       }
     });
 
-    // Sort debts inside each party by created_at ASC (chronological FIFO)
+    // Sort debts inside each party
     map.forEach((g) => {
-      g.debts.sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
+      const openDebts = g.debts.filter((d) => (Number(d.remaining_amount) || 0) > 0.001)
+        .sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
+      const settledDebts = g.debts.filter((d) => (Number(d.remaining_amount) || 0) <= 0.001)
+        .sort((a, b) => new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime());
+
+      if (statusFilter === 'active') {
+        // Show open debts plus up to 2 most recently covered debts in active view
+        g.debts = [...openDebts, ...settledDebts.slice(0, 2)];
+      } else if (statusFilter === 'settled') {
+        g.debts = settledDebts;
+      } else {
+        g.debts = [...openDebts, ...settledDebts];
+      }
+
       g.percentSettled = g.totalOriginal > 0 ? Math.min(100, Math.round((g.totalPaid / g.totalOriginal) * 100)) : 0;
       if (g.contact && g.contact.net_balance !== undefined) {
         const netBal = Number(g.contact.net_balance);
@@ -487,7 +500,11 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
                           <span className={isSettled ? 'text-slate-400' : debtType === 'receivable' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}>
                             {group.openCount}
                           </span>
-                          <span className="text-slate-400 font-normal ml-1">of {group.debts.length}</span>
+                          <span className="text-slate-400 font-normal ml-1">
+                            {statusFilter === 'all' && group.debts.length !== group.openCount
+                              ? `of ${group.debts.length}`
+                              : group.openCount === 1 ? 'obligation' : 'obligations'}
+                          </span>
                         </td>
 
                         {/* Col 3: Original Amount */}
@@ -618,7 +635,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
                             {/* Col 5: Remaining Amount */}
                             <td className="py-2.5 px-3.5 text-right whitespace-nowrap font-mono font-bold text-xs">
                               <span className={isDebtSettled ? 'text-slate-400 line-through' : debtType === 'receivable' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}>
-                                {rem.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                {(isDebtSettled ? orig : rem).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                               </span>
                             </td>
 
@@ -740,9 +757,11 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
                         </div>
                         <div className="text-[11px] text-slate-400 mt-0.5">
                           <span className={isSettled ? 'text-slate-400' : debtType === 'receivable' ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-rose-600 dark:text-rose-400 font-semibold'}>
-                            {group.openCount} open
+                            {group.openCount} {group.openCount === 1 ? 'obligation' : 'obligations'}
                           </span>
-                          <span className="text-slate-400 ml-1">of {group.debts.length} records</span>
+                          {statusFilter === 'all' && group.debts.length !== group.openCount && (
+                            <span className="text-slate-400 ml-1">({group.debts.length} total)</span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -803,9 +822,11 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
                   {isExpanded && (
                     <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5 animate-in fade-in duration-200">
                       {group.debts.map((debt) => {
+                        const orig = parseFloat(String(debt.original_amount)) || 0;
                         const rem = parseFloat(String(debt.remaining_amount)) || 0;
                         const isDebtSettled = rem <= 0.001;
                         const isPartial = parseFloat(String(debt.paid_amount)) > 0 && !isDebtSettled;
+                        const displayAmount = isDebtSettled ? orig : rem;
                         const originLabel = getOriginLabel(debt.reference_type);
                         const dateFormatted = debt.created_at
                           ? new Date(debt.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
@@ -849,7 +870,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
                                   isDebtSettled ? 'text-slate-400 line-through' : debtType === 'receivable' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
                                 }`}
                               >
-                                {rem.toLocaleString()} ETB
+                                {debtType === 'receivable' ? '+' : '−'}{displayAmount.toLocaleString()} ETB
                               </div>
                               {!isDebtSettled ? (
                                 <button
