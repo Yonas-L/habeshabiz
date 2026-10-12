@@ -64,7 +64,7 @@ class GeneratePartnerStatementAction
             ->values();
 
         $orders = SalesOrder::whereIn('id', $orderIds)
-            ->with(['items.variant.product', 'items.inventoryUnit'])
+            ->with(['items.variant.product', 'items.inventoryUnit.variant.product'])
             ->get()
             ->keyBy('id');
 
@@ -100,7 +100,7 @@ class GeneratePartnerStatementAction
                     $itemDesc = 'Consignment Device';
                     if ($order && $order->items->isNotEmpty()) {
                         $itemDesc = $order->items->map(function ($it) {
-                            $pName = $it->variant?->product?->name ?? 'Device';
+                            $pName = $it->inventoryUnit?->variant?->product?->name ?? $it->variant?->product?->name ?? 'Device';
                             $sn = $it->inventoryUnit?->imei_or_serial ? " (SN: {$it->inventoryUnit->imei_or_serial})" : '';
                             $qty = $it->quantity > 1 ? " x{$it->quantity}" : '';
 
@@ -127,7 +127,7 @@ class GeneratePartnerStatementAction
                     $itemDesc = 'Sold Product';
                     if ($order && $order->items->isNotEmpty()) {
                         $itemDesc = $order->items->map(function ($it) {
-                            $pName = $it->variant?->product?->name ?? 'Device';
+                            $pName = $it->inventoryUnit?->variant?->product?->name ?? $it->variant?->product?->name ?? 'Device';
                             $sn = $it->inventoryUnit?->imei_or_serial ? " (SN: {$it->inventoryUnit->imei_or_serial})" : '';
                             $qty = $it->quantity > 1 ? " x{$it->quantity}" : '';
 
@@ -154,7 +154,7 @@ class GeneratePartnerStatementAction
                     $itemDesc = 'Brokered Item';
                     if ($order && $order->items->isNotEmpty()) {
                         $itemDesc = $order->items->map(function ($it) {
-                            $pName = $it->variant?->product?->name ?? 'Device';
+                            $pName = $it->inventoryUnit?->variant?->product?->name ?? $it->variant?->product?->name ?? 'Device';
                             $sn = $it->inventoryUnit?->imei_or_serial ? " (SN: {$it->inventoryUnit->imei_or_serial})" : ' x1';
                             $qty = $it->quantity > 1 ? " x{$it->quantity}" : '';
 
@@ -251,7 +251,7 @@ class GeneratePartnerStatementAction
                     $itemDesc = 'Sales Credit';
                     if ($order && $order->items->isNotEmpty()) {
                         $itemDesc = $order->items->map(function ($it) {
-                            $pName = $it->variant?->product?->name ?? 'Device';
+                            $pName = $it->inventoryUnit?->variant?->product?->name ?? $it->variant?->product?->name ?? 'Device';
                             $sn = $it->inventoryUnit?->imei_or_serial ? " (SN: {$it->inventoryUnit->imei_or_serial})" : '';
                             $qty = $it->quantity > 1 ? " x{$it->quantity}" : ' x1';
 

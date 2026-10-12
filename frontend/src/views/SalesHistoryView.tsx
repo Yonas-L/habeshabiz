@@ -458,8 +458,8 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
                       <td className="py-2.5 px-3.5">
                         <div className="space-y-1 max-w-[240px]">
                           {order.items.map((item, idx) => {
-                            const pName = item.variant?.product?.name || 'Device';
-                            const spec = [item.variant?.storage, item.variant?.color].filter(Boolean).join(' • ');
+                            const pName = item.inventory_unit?.variant?.product?.name || item.variant?.product?.name || 'Device';
+                            const spec = [item.inventory_unit?.variant?.storage || item.variant?.storage, item.inventory_unit?.variant?.color || item.variant?.color].filter(Boolean).join(' • ');
                             const unit = item.inventory_unit;
                             const isReturned = unit?.status === 'returned';
                             const isSwapped = Boolean(unit?.swapped_from_unit_id || unit?.is_swapped);
@@ -733,8 +733,8 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
                   {/* Sold Items Summary */}
                   <div className="space-y-1.5 pt-2 border-t border-slate-100/80 dark:border-slate-800/50">
                     {order.items.map((item, idx) => {
-                      const pName = item.variant?.product?.name || 'Device';
-                      const spec = [item.variant?.storage, item.variant?.color].filter(Boolean).join(' • ');
+                      const pName = item.inventory_unit?.variant?.product?.name || item.variant?.product?.name || 'Device';
+                      const spec = [item.inventory_unit?.variant?.storage || item.variant?.storage, item.inventory_unit?.variant?.color || item.variant?.color].filter(Boolean).join(' • ');
                       const imei = item.inventory_unit?.imei_or_serial;
                       const isVendored = order.is_vendor_sourced || item.sourcing_type === 'brokered_neighbour' || item.inventory_unit?.source_type === 'vendor_direct';
 

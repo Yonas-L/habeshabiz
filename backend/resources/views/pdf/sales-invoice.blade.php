@@ -594,7 +594,8 @@
             @foreach($order->items as $idx => $item)
                 @php
                     $unit = $item->inventoryUnit;
-                    $spec = array_filter([$item->variant?->storage, $item->variant?->color]);
+                    $variant = $unit?->variant ?? $item->variant;
+                    $spec = array_filter([$variant?->storage, $variant?->color]);
                     $specStr = !empty($spec) ? implode(' · ', $spec) : '';
                     $lineUnitPrice = count($order->items) === 1
                         ? $settledSaleValue / max(1, (int) $item->quantity)
@@ -605,7 +606,7 @@
                     <td class="col-index">{{ $idx + 1 }}</td>
                     <td>
                         <div>
-                            <span class="item-name">{{ $item->variant?->product?->name ?? 'Hardware Device' }}</span>
+                            <span class="item-name">{{ $variant?->product?->name ?? $item->variant?->product?->name ?? 'Hardware Device' }}</span>
                             @if($specStr)
                                 <span class="item-spec">({{ $specStr }})</span>
                             @endif

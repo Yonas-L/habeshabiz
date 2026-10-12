@@ -954,12 +954,22 @@ class InventoryController extends Controller
 
         $currentVariant = $unit->variant;
         $currentProduct = $currentVariant?->product;
+        $oldProductName = $currentProduct?->name ?? 'Device';
+        $oldStorage = $currentVariant?->storage;
+        $oldColor = $currentVariant?->color;
+        $oldRam = $currentVariant?->ram;
+        $oldImei = $unit->imei_or_serial;
+        $oldCost = (float) $unit->cost_basis;
+        $oldPrice = (float) $unit->selling_price;
+        $oldCondition = $unit->condition;
+        $oldLocation = $unit->location;
+        $oldSupplierName = $unit->supplier?->name;
 
         // 1. Handle Product Name update if provided
         $targetProduct = $currentProduct;
         if (! empty($validated['product_name']) && $currentProduct) {
             $newProductName = trim($validated['product_name']);
-            if ($newProductName !== $currentProduct->name) {
+            if ($newProductName !== $oldProductName) {
                 $existingProduct = Product::where('tenant_id', $user->tenant_id)
                     ->where('name', $newProductName)
                     ->first();
@@ -1053,27 +1063,220 @@ class InventoryController extends Controller
         $validated['variant_id'] = $targetVariantId;
         unset($validated['product_name'], $validated['storage'], $validated['ram'], $validated['color']);
 
-        $oldValues = $unit->only([
-            'variant_id',
-            'imei_or_serial',
-            'condition',
-            'cost_basis',
-            'selling_price',
-            'battery_health',
-            'cycle_count',
-            'sim_type',
-            'location',
-            'notes',
-            'supplier_contact_id',
-        ]);
+        $newProductName = $targetProduct?->name ?? $oldProductName;
+        $newImei = array_key_exists('imei_or_serial', $validated) ? $validated['imei_or_serial'] : $oldImei;
+        $imeiChanged = array_key_exists('imei_or_serial', $validated) && $newImei !== $oldImei;
+        $productNameChanged = $newProductName !== $oldProductName;
+
+        $oldValues = [
+            'product_name' => $oldProductName,
+            'variant_specs' => trim(($oldStorage ?? '').' '.($oldColor ?? '')),
+            'imei_or_serial' => $oldImei,
+            'condition' => $oldCondition,
+            'cost_basis' => $oldCost,
+            'selling_price' => $oldPrice,
+            'location' => $oldLocation,
+            'status' => $unit->status,
+            'supplier_name' => $oldSupplierName,
+        ];
 
         $costBasisChanged = array_key_exists('cost_basis', $validated)
             && $validated['cost_basis'] !== null
-            && (float) $validated['cost_basis'] !== (float) $unit->cost_basis;
+            && (float) $validated['cost_basis'] !== $oldCost;
 
-        DB::transaction(function () use ($unit, $validated, $oldValues, $costBasisChanged, $user) {
+        DB::transaction(function () use (
+            $unit,
+            $validated,
+            $oldValues,
+            $costBasisChanged,
+            $user,
+            $oldImei,
+            $newImei,
+            $imeiChanged,
+            $oldProductName,
+            $newProductName,
+            $productNameChanged,
+            $oldStorage,
+            $newStorage,
+            $oldColor,
+            $newColor,
+            $oldCost,
+            $oldPrice,
+            $oldCondition,
+            $oldLocation
+        ) {
             $unit->update($validated);
 
+            // 1. Cascade update to sales_order_items (linking this unit to the new variant)
+            $soItems = SalesOrderItem::where('inventory_unit_id', $unit->id)->get();
+            $soItemsUpdated = 0;
+            foreach ($soItems as $soItem) {
+                $soItem->variant_id = $unit->variant_id;
+                if ($costBasisChanged) {
+                    $newCost = (float) $validated['cost_basis'];
+                    $soItem->unit_cost = $newCost;
+                    $soItem->profit = max(0, ((float) $soItem->unit_price - $newCost) * (int) $soItem->quantity);
+                }
+                $soItem->save();
+                $soItemsUpdated++;
+            }
+
+            // 2. Cascade update to Debts directly referencing this unit
+            $debtsUpdated = 0;
+            $directDebts = Debt::where('tenant_id', $user->tenant_id)
+                ->where('reference_id', $unit->id)
+                ->with('contact')
+                ->get();
+
+            foreach ($directDebts as $debt) {
+                $snText = $newImei ? " (SN: {$newImei})" : '';
+                if ($debt->reference_type === 'stock_intake') {
+                    $debt->notes = "Stock intake: {$newProductName}{$snText}";
+                } elseif ($debt->reference_type === 'handover_holding') {
+                    $partnerName = $debt->contact?->name ?? $unit->handover_to ?? 'partner';
+                    $debt->notes = "Handover payout for {$newImei} to {$partnerName}. Vendor must pay this amount on sale or return the device.";
+                } elseif ($debt->reference_type === 'vendor_return_refund') {
+                    $debt->notes = "Vendor return refund for {$newProductName}{$snText}";
+                } elseif ($debt->reference_type === 'customer_return_refund') {
+                    $debt->notes = "Customer return refund for {$newProductName}{$snText}";
+                } elseif (in_array($debt->reference_type, ['repair_reimbursement', 'vendor_repair_reimbursement'])) {
+                    $debt->notes = "Warranty repair claim for {$newProductName}{$snText}";
+                } else {
+                    if ($oldImei && $imeiChanged && str_contains($debt->notes ?? '', $oldImei)) {
+                        $debt->notes = str_replace($oldImei, (string) $newImei, $debt->notes);
+                    }
+                    if ($productNameChanged && str_contains($debt->notes ?? '', $oldProductName)) {
+                        $debt->notes = str_replace($oldProductName, $newProductName, $debt->notes);
+                    }
+                }
+                $debt->save();
+                $debtsUpdated++;
+            }
+
+            // Also check debts linked to sales orders of this unit (e.g. consignment sales)
+            $orderIds = $soItems->pluck('sales_order_id')->filter()->unique()->values();
+            if ($orderIds->isNotEmpty()) {
+                $orderDebts = Debt::where('tenant_id', $user->tenant_id)
+                    ->whereIn('reference_id', $orderIds)
+                    ->get();
+
+                foreach ($orderDebts as $odebt) {
+                    $odebtUpdated = false;
+                    if ($oldImei && $imeiChanged && str_contains($odebt->notes ?? '', $oldImei)) {
+                        $odebt->notes = str_replace($oldImei, (string) $newImei, $odebt->notes);
+                        $odebtUpdated = true;
+                    }
+                    if ($productNameChanged && str_contains($odebt->notes ?? '', $oldProductName)) {
+                        $odebt->notes = str_replace($oldProductName, $newProductName, $odebt->notes);
+                        $odebtUpdated = true;
+                    }
+                    if ($odebtUpdated) {
+                        $odebt->save();
+                        $debtsUpdated++;
+                    }
+                }
+            }
+
+            // And any other debts across the tenant containing the old IMEI
+            if ($oldImei && $imeiChanged) {
+                $otherDebts = Debt::where('tenant_id', $user->tenant_id)
+                    ->where('reference_id', '!=', $unit->id)
+                    ->where('notes', 'like', "%{$oldImei}%")
+                    ->get();
+
+                foreach ($otherDebts as $odebt) {
+                    $odebt->notes = str_replace($oldImei, (string) $newImei, $odebt->notes);
+                    if ($productNameChanged && str_contains($odebt->notes, $oldProductName)) {
+                        $odebt->notes = str_replace($oldProductName, $newProductName, $odebt->notes);
+                    }
+                    $odebt->save();
+                    $debtsUpdated++;
+                }
+            }
+
+            // 3. Cascade update to DebtPayments
+            $debtPaymentsUpdated = 0;
+            $debtPayments = DebtPayment::where('tenant_id', $user->tenant_id)
+                ->where(function ($q) use ($unit, $oldImei) {
+                    $q->where('notes', 'like', "%[unit_id:{$unit->id}]%");
+                    if (! empty($oldImei)) {
+                        $q->orWhere('notes', 'like', "%{$oldImei}%");
+                    }
+                })
+                ->get();
+
+            foreach ($debtPayments as $dp) {
+                $dpUpdated = false;
+                if ($oldImei && $imeiChanged && str_contains($dp->notes ?? '', $oldImei)) {
+                    $dp->notes = str_replace($oldImei, (string) $newImei, $dp->notes);
+                    $dpUpdated = true;
+                }
+                if ($productNameChanged && str_contains($dp->notes ?? '', $oldProductName)) {
+                    $dp->notes = str_replace($oldProductName, $newProductName, $dp->notes);
+                    $dpUpdated = true;
+                }
+                if ($dpUpdated) {
+                    $dp->save();
+                    $debtPaymentsUpdated++;
+                }
+            }
+
+            // 4. Cascade update to SalesOrders
+            $salesOrders = SalesOrder::where('tenant_id', $user->tenant_id)
+                ->where(function ($q) use ($unit, $oldImei, $orderIds) {
+                    $q->where('notes', 'like', "%[unit_id:{$unit->id}]%");
+                    if ($orderIds->isNotEmpty()) {
+                        $q->orWhereIn('id', $orderIds);
+                    }
+                    if (! empty($oldImei)) {
+                        $q->orWhere('notes', 'like', "%{$oldImei}%");
+                    }
+                })
+                ->get();
+
+            foreach ($salesOrders as $so) {
+                $soUpdated = false;
+                if ($oldImei && $imeiChanged && str_contains($so->notes ?? '', $oldImei)) {
+                    $so->notes = str_replace($oldImei, (string) $newImei, $so->notes);
+                    $soUpdated = true;
+                }
+                if ($productNameChanged && str_contains($so->notes ?? '', $oldProductName)) {
+                    $so->notes = str_replace($oldProductName, $newProductName, $so->notes);
+                    $soUpdated = true;
+                }
+                if ($soUpdated) {
+                    $so->save();
+                }
+            }
+
+            // 5. Cascade update to FinancialTransactions
+            $financialTxnsUpdated = 0;
+            $financialTxns = FinancialTransaction::where('tenant_id', $user->tenant_id)
+                ->where(function ($q) use ($unit, $oldImei) {
+                    $q->where('description', 'like', "%[unit_id:{$unit->id}]%");
+                    if (! empty($oldImei)) {
+                        $q->orWhere('description', 'like', "%{$oldImei}%");
+                    }
+                })
+                ->get();
+
+            foreach ($financialTxns as $ft) {
+                $ftUpdated = false;
+                if ($oldImei && $imeiChanged && str_contains($ft->description ?? '', $oldImei)) {
+                    $ft->description = str_replace($oldImei, (string) $newImei, $ft->description);
+                    $ftUpdated = true;
+                }
+                if ($productNameChanged && str_contains($ft->description ?? '', $oldProductName)) {
+                    $ft->description = str_replace($oldProductName, $newProductName, $ft->description);
+                    $ftUpdated = true;
+                }
+                if ($ftUpdated) {
+                    $ft->save();
+                    $financialTxnsUpdated++;
+                }
+            }
+
+            // 6. Update unpaid stock intake debt if cost changed
             if ($costBasisChanged) {
                 $unpaidIntakeDebt = Debt::where('tenant_id', $user->tenant_id)
                     ->where('reference_type', 'stock_intake')
@@ -1093,12 +1296,67 @@ class InventoryController extends Controller
 
             (new SynchronizeInventoryStockAction)->execute();
 
+            // 7. Human-readable audit log for owner
+            $changesList = [];
+            if ($productNameChanged) {
+                $changesList[] = "Product name: '{$oldProductName}' → '{$newProductName}'";
+            }
+            if ($imeiChanged) {
+                $changesList[] = "IMEI/Serial: '{$oldImei}' → '{$newImei}'";
+            }
+            if (($newStorage ?? null) !== $oldStorage) {
+                $changesList[] = "Storage: '".($oldStorage ?: 'N/A')."' → '".($newStorage ?: 'N/A')."'";
+            }
+            if (($newColor ?? null) !== $oldColor) {
+                $changesList[] = "Color: '".($oldColor ?: 'N/A')."' → '".($newColor ?: 'N/A')."'";
+            }
+            if ($costBasisChanged) {
+                $changesList[] = 'Cost: '.number_format($oldCost, 2).' ETB → '.number_format((float) $validated['cost_basis'], 2).' ETB';
+            }
+            if (array_key_exists('selling_price', $validated) && (float) $validated['selling_price'] !== $oldPrice) {
+                $changesList[] = 'Price: '.number_format($oldPrice, 2).' ETB → '.number_format((float) $validated['selling_price'], 2).' ETB';
+            }
+            if (array_key_exists('condition', $validated) && $validated['condition'] !== $oldCondition) {
+                $changesList[] = "Condition: '{$oldCondition}' → '{$validated['condition']}'";
+            }
+            if (array_key_exists('location', $validated) && $validated['location'] !== $oldLocation) {
+                $changesList[] = "Location: '{$oldLocation}' → '{$validated['location']}'";
+            }
+
+            $summary = count($changesList) > 0
+                ? "Edited device {$newProductName} (".($newImei ?: 'no IMEI').'): '.implode(', ', $changesList)
+                : "Updated device {$newProductName} (".($newImei ?: 'no IMEI').') details';
+
             AuditLog::record(
                 action: 'updated_unit',
                 entityType: 'InventoryUnit',
                 entityId: (string) $unit->id,
                 oldValues: $oldValues,
-                newValues: $validated
+                newValues: [
+                    'product_name' => $newProductName,
+                    'variant_specs' => trim(($newStorage ?? '').' '.($newColor ?? '')),
+                    'imei_or_serial' => $newImei,
+                    'condition' => $unit->condition,
+                    'cost_basis' => (float) $unit->cost_basis,
+                    'selling_price' => (float) $unit->selling_price,
+                    'location' => $unit->location,
+                    'status' => $unit->status,
+                    'supplier_name' => $unit->supplier?->name,
+                    'summary' => $summary,
+                    'changes' => $changesList,
+                    'propagated_updates' => [
+                        'sales_order_items' => $soItemsUpdated,
+                        'debts' => $debtsUpdated,
+                        'debt_payments' => $debtPaymentsUpdated,
+                        'financial_transactions' => $financialTxnsUpdated,
+                    ],
+                    'updated_by' => [
+                        'id' => $user->id,
+                        'name' => $user->name,
+                        'email' => $user->email,
+                        'role' => $user->role,
+                    ],
+                ]
             );
         });
 

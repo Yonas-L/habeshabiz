@@ -889,6 +889,217 @@ test('deleting a unit funded via shop bank account automatically refunds the ban
     expect($log->new_values['reason'])->toBe('Duplicate intake mistake');
 });
 
+test('editing a sold unit cascades product name and imei across sales order items, debts, debt payments, and logs human-readable audit trail', function () {
+    $contact = \App\Models\Contact::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Halle Vendor',
+        'roles' => ['vendor', 'customer'],
+        'is_active' => true,
+    ]);
+
+    // Create sales order and item for this unit
+    $order = \App\Models\SalesOrder::create([
+        'tenant_id' => $this->tenant->id,
+        'order_number' => 'SO-TEST1234',
+        'customer_id' => $contact->id,
+        'salesperson_id' => $this->user->id,
+        'total_amount' => 185000.00,
+        'paid_amount' => 185000.00,
+        'payment_status' => 'paid',
+        'order_date' => now(),
+        'notes' => "Handover sale to halle [unit_id:{$this->unit->id}] for 359871109988776",
+    ]);
+
+    $soItem = \App\Models\SalesOrderItem::create([
+        'tenant_id' => $this->tenant->id,
+        'sales_order_id' => $order->id,
+        'variant_id' => $this->variant->id,
+        'inventory_unit_id' => $this->unit->id,
+        'quantity' => 1,
+        'unit_price' => 185000.00,
+        'unit_cost' => 160000.00,
+        'profit' => 25000.00,
+    ]);
+
+    $this->unit->update([
+        'status' => 'sold',
+        'sold_at' => now(),
+        'selling_price' => 185000.00,
+    ]);
+
+    // Create handover debt and debt payment referencing this unit
+    $debt = \App\Models\Debt::create([
+        'tenant_id' => $this->tenant->id,
+        'contact_id' => $contact->id,
+        'type' => 'receivable',
+        'reference_type' => 'handover_holding',
+        'reference_id' => $this->unit->id,
+        'original_amount' => 185000.00,
+        'paid_amount' => 185000.00,
+        'remaining_amount' => 0.0,
+        'status' => 'settled',
+        'notes' => "Handover payout for 359871109988776 to Halle Vendor. Vendor must pay this amount on sale or return the device.",
+    ]);
+
+    $debtPayment = \App\Models\DebtPayment::create([
+        'tenant_id' => $this->tenant->id,
+        'debt_id' => $debt->id,
+        'amount' => 185000.00,
+        'payment_date' => now(),
+        'reference_number' => 'BILATERAL-OFFSET',
+        'notes' => "Handover device: iPhone 16 Pro Max (SN: 359871109988776) [unit_id:{$this->unit->id}]",
+        'created_by' => $this->user->id,
+    ]);
+
+    $ft = \App\Models\FinancialTransaction::create([
+        'tenant_id' => $this->tenant->id,
+        'transaction_number' => 'TXN-OFFSET-1',
+        'type' => 'customer_payment',
+        'amount' => 185000.00,
+        'date' => now(),
+        'description' => "Handover payout from Halle Vendor for SN 359871109988776 [unit_id:{$this->unit->id}]",
+        'created_by' => $this->user->id,
+    ]);
+
+    $consignmentDebt = \App\Models\Debt::create([
+        'tenant_id' => $this->tenant->id,
+        'contact_id' => $contact->id,
+        'type' => 'payable',
+        'reference_type' => 'consignment_sale',
+        'reference_id' => $order->id,
+        'original_amount' => 185000.00,
+        'paid_amount' => 0.0,
+        'remaining_amount' => 185000.00,
+        'status' => 'open',
+        'notes' => 'Consignment sale payout for 359871109988776',
+    ]);
+
+    // Now edit unit: rename product and change IMEI
+    $response = $this->actingAs($this->user)
+        ->putJson("/api/v1/inventory/units/{$this->unit->id}", [
+            'product_name' => 'iPhone yonas',
+            'imei_or_serial' => '111111111',
+            'storage' => '512GB',
+            'color' => 'Black Titanium',
+        ]);
+
+    $response->assertStatus(200)
+        ->assertJsonPath('success', true);
+
+    // 1. Inventory unit is updated
+    $freshUnit = $this->unit->fresh()->load('variant.product');
+    expect($freshUnit->imei_or_serial)->toBe('111111111');
+    expect($freshUnit->variant->product->name)->toBe('iPhone yonas');
+    expect($freshUnit->variant->storage)->toBe('512GB');
+
+    // 2. Sales order item variant is synchronized
+    $freshSoItem = $soItem->fresh()->load('variant.product');
+    expect($freshSoItem->variant_id)->toBe($freshUnit->variant_id);
+    expect($freshSoItem->variant->product->name)->toBe('iPhone yonas');
+
+    // 3. Debt notes are synchronized
+    $freshDebt = $debt->fresh();
+    expect($freshDebt->notes)->toContain('111111111');
+    expect($freshDebt->notes)->not->toContain('359871109988776');
+
+    $freshConsignmentDebt = $consignmentDebt->fresh();
+    expect($freshConsignmentDebt->notes)->toContain('111111111');
+    expect($freshConsignmentDebt->notes)->not->toContain('359871109988776');
+
+    // 4. Debt payment notes are synchronized
+    $freshPayment = $debtPayment->fresh();
+    expect($freshPayment->notes)->toContain('iPhone yonas');
+    expect($freshPayment->notes)->toContain('111111111');
+    expect($freshPayment->notes)->not->toContain('359871109988776');
+
+    // 5. Sales order notes are synchronized
+    $freshOrder = $order->fresh();
+    expect($freshOrder->notes)->toContain('111111111');
+    expect($freshOrder->notes)->not->toContain('359871109988776');
+
+    // 6. Financial transaction description is synchronized
+    $freshFt = $ft->fresh();
+    expect($freshFt->description)->toContain('111111111');
+    expect($freshFt->description)->not->toContain('359871109988776');
+
+    // 7. Audit log contains human-readable diff and summary
+    $log = \App\Models\AuditLog::where('action', 'updated_unit')
+        ->where('entity_id', $this->unit->id)
+        ->latest('created_at')
+        ->first();
+
+    expect($log)->not->toBeNull();
+    expect($log->user_id)->toBe($this->user->id);
+    expect($log->old_values['product_name'])->toBe('iPhone 16 Pro Max');
+    expect($log->old_values['imei_or_serial'])->toBe('359871109988776');
+    expect($log->new_values['product_name'])->toBe('iPhone yonas');
+    expect($log->new_values['imei_or_serial'])->toBe('111111111');
+    expect($log->new_values['summary'])->toContain('iPhone yonas');
+    expect($log->new_values['summary'])->toContain('111111111');
+    expect($log->new_values['changes'])->toBeArray();
+    expect($log->new_values['changes'])->toContain("Product name: 'iPhone 16 Pro Max' → 'iPhone yonas'");
+    expect($log->new_values['changes'])->toContain("IMEI/Serial: '359871109988776' → '111111111'");
+    expect($log->new_values['updated_by']['name'])->toBe('Yoni Owner');
+
+    // 8. Partner Statement immediately reflects the renamed device and IMEI
+    $statementAction = new \App\Actions\GeneratePartnerStatementAction();
+    $statement = $statementAction->execute($contact);
+    $entries = collect($statement['ledger']);
+    $consignmentEntry = $entries->firstWhere('type', 'consignment_sale');
+    expect($consignmentEntry)->not->toBeNull();
+    expect($consignmentEntry['context'])->toContain('iPhone yonas');
+    expect($consignmentEntry['context'])->toContain('111111111');
+});
+
+test('editing an in-stock unit updates stock intake debt and debt notes across vendor statements', function () {
+    $supplier = \App\Models\Contact::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Addis Supplier',
+        'roles' => ['supplier', 'vendor'],
+        'is_active' => true,
+    ]);
+
+    $this->unit->update([
+        'supplier_contact_id' => $supplier->id,
+    ]);
+
+    $intakeDebt = \App\Models\Debt::create([
+        'tenant_id' => $this->tenant->id,
+        'contact_id' => $supplier->id,
+        'type' => 'payable',
+        'reference_type' => 'stock_intake',
+        'reference_id' => $this->unit->id,
+        'original_amount' => 160000.00,
+        'paid_amount' => 0.0,
+        'remaining_amount' => 160000.00,
+        'status' => 'open',
+        'notes' => 'Stock intake: iPhone 16 Pro Max (SN: 359871109988776)',
+    ]);
+
+    $response = $this->actingAs($this->user)
+        ->putJson("/api/v1/inventory/units/{$this->unit->id}", [
+            'product_name' => 'iPhone 16 Pro Max Ultra',
+            'imei_or_serial' => '999888777',
+            'cost_basis' => 165000.00,
+        ]);
+
+    $response->assertStatus(200);
+
+    $freshDebt = $intakeDebt->fresh();
+    expect($freshDebt->notes)->toBe('Stock intake: iPhone 16 Pro Max Ultra (SN: 999888777)');
+    expect((float) $freshDebt->original_amount)->toBe(165000.00);
+    expect((float) $freshDebt->remaining_amount)->toBe(165000.00);
+
+    $statementAction = new \App\Actions\GeneratePartnerStatementAction();
+    $statement = $statementAction->execute($supplier);
+    $entry = collect($statement['ledger'])->firstWhere('id', "debt-{$freshDebt->id}");
+    expect($entry)->not->toBeNull();
+    expect($entry['context'])->toContain('iPhone 16 Pro Max Ultra');
+    expect($entry['context'])->toContain('999888777');
+});
+
+
+
 
 
 
