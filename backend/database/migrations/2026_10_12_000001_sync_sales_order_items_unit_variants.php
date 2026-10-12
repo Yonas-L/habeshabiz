@@ -12,13 +12,13 @@ return new class extends Migration
     {
         // Synchronize historical sales_order_items variant_id where the underlying inventory unit
         // was updated but the sales order item still referenced the old variant.
-        DB::statement("
+        DB::statement('
             UPDATE sales_order_items soi
             SET variant_id = iu.variant_id
             FROM inventory_units iu
             WHERE soi.inventory_unit_id = iu.id
               AND soi.variant_id != iu.variant_id
-        ");
+        ');
     }
 
     /**

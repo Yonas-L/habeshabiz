@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\Response;
 
 class SaleController extends Controller
 {
@@ -254,7 +255,7 @@ class SaleController extends Controller
             if (abs($splitSum - $amount) > 0.01) {
                 return response()->json([
                     'success' => false,
-                    'message' => "Split allocation total (".number_format($splitSum, 2)." ETB) does not match payment amount (".number_format($amount, 2)." ETB).",
+                    'message' => 'Split allocation total ('.number_format($splitSum, 2).' ETB) does not match payment amount ('.number_format($amount, 2).' ETB).',
                 ], 422);
             }
         } else {
@@ -456,7 +457,7 @@ class SaleController extends Controller
                 $splitSum = (float) collect($rawVendorSplits)->sum(fn ($s) => (float) ($s['amount'] ?? 0));
                 if (abs($splitSum - $vendorCost) > 0.01) {
                     throw ValidationException::withMessages([
-                        'vendor_payment_splits' => ["Split allocation total (".number_format($splitSum, 2)." ETB) does not match vendor cost (".number_format($vendorCost, 2)." ETB)."],
+                        'vendor_payment_splits' => ['Split allocation total ('.number_format($splitSum, 2).' ETB) does not match vendor cost ('.number_format($vendorCost, 2).' ETB).'],
                     ]);
                 }
 
@@ -657,7 +658,7 @@ class SaleController extends Controller
         ], 201);
     }
 
-    public function invoicePdf(Request $request, string $id, PdfGeneratorService $pdfService): \Symfony\Component\HttpFoundation\Response
+    public function invoicePdf(Request $request, string $id, PdfGeneratorService $pdfService): Response
     {
         $order = SalesOrder::findOrFail($id);
 

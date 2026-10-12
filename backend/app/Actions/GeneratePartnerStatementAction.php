@@ -415,7 +415,7 @@ class GeneratePartnerStatementAction
                 if ($payment->reference_number === 'RETURN-TO-VENDOR') {
                     $context = 'Returned to vendor';
                     if ($debt->notes) {
-                        $context = 'Returned: ' . str_ireplace('Stock intake: ', '', $this->sanitizeContext($debt->notes));
+                        $context = 'Returned: '.str_ireplace('Stock intake: ', '', $this->sanitizeContext($debt->notes));
                     } elseif ($payment->notes && ! str_contains($payment->notes, 'canceling payable obligation')) {
                         $context = $this->sanitizeContext($payment->notes);
                     }
@@ -925,11 +925,11 @@ class GeneratePartnerStatementAction
 
         // Units out on handover with this partner (including recently returned units for full audit visibility)
         $handedOutUnits = InventoryUnit::where(function ($q) use ($contact, $handoverUnitIds) {
-                $q->where('handover_to', $contact->name);
-                if (! empty($handoverUnitIds)) {
-                    $q->orWhereIn('id', $handoverUnitIds);
-                }
-            })
+            $q->where('handover_to', $contact->name);
+            if (! empty($handoverUnitIds)) {
+                $q->orWhereIn('id', $handoverUnitIds);
+            }
+        })
             ->with(['variant.product'])
             ->get()
             ->map(function ($u) {
@@ -952,28 +952,28 @@ class GeneratePartnerStatementAction
 
         // Units with vendor for repair/warranty or returned by partner
         $vendorReturnUnits = InventoryUnit::where(function ($q) use ($contact, $handoverUnitIds) {
-                $q->where(function ($sub) use ($contact) {
-                    $sub->where('supplier_contact_id', $contact->id)
-                        ->where(function ($s) {
-                            $s->whereIn('status', ['returned_to_vendor', 'fixed'])
-                                ->orWhere('is_repaired', true)
+            $q->where(function ($sub) use ($contact) {
+                $sub->where('supplier_contact_id', $contact->id)
+                    ->where(function ($s) {
+                        $s->whereIn('status', ['returned_to_vendor', 'fixed'])
+                            ->orWhere('is_repaired', true)
+                            ->orWhereNotNull('returned_at');
+                    });
+            });
+            if (! empty($handoverUnitIds)) {
+                $q->orWhere(function ($sub) use ($handoverUnitIds) {
+                    $sub->whereIn('id', $handoverUnitIds)
+                        ->where(function ($s2) {
+                            $s2->whereIn('status', ['returned', 'returned_to_vendor'])
                                 ->orWhereNotNull('returned_at');
                         });
                 });
-                if (! empty($handoverUnitIds)) {
-                    $q->orWhere(function ($sub) use ($handoverUnitIds) {
-                        $sub->whereIn('id', $handoverUnitIds)
-                            ->where(function ($s2) {
-                                $s2->whereIn('status', ['returned', 'returned_to_vendor'])
-                                    ->orWhereNotNull('returned_at');
-                            });
-                    });
-                }
-                $q->orWhere(function ($sub) use ($contact) {
-                    $sub->where('handover_to', $contact->name)
-                        ->whereIn('status', ['returned', 'returned_to_vendor']);
-                });
-            })
+            }
+            $q->orWhere(function ($sub) use ($contact) {
+                $sub->where('handover_to', $contact->name)
+                    ->whereIn('status', ['returned', 'returned_to_vendor']);
+            });
+        })
             ->with(['variant.product', 'maintenanceRecords'])
             ->get()
             ->map(function ($u) {

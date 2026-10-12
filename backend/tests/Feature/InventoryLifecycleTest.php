@@ -1,8 +1,20 @@
 <?php
 
+use App\Actions\GeneratePartnerStatementAction;
+use App\Models\AuditLog;
+use App\Models\Category;
+use App\Models\Contact;
+use App\Models\Debt;
+use App\Models\DebtPayment;
+use App\Models\FinancialAccount;
+use App\Models\FinancialTransaction;
+use App\Models\InventoryStock;
 use App\Models\InventoryUnit;
+use App\Models\MaintenanceRecord;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\SalesOrder;
+use App\Models\SalesOrderItem;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Scopes\TenantScope;
@@ -189,7 +201,7 @@ test('owner can intake stock and audit log is recorded', function () {
         ->assertJsonPath('success', true)
         ->assertJsonPath('data.status', 'in_stock');
 
-    expect(\App\Models\AuditLog::where('action', 'stock_intake')->exists())->toBeTrue();
+    expect(AuditLog::where('action', 'stock_intake')->exists())->toBeTrue();
 });
 
 test('salesperson is forbidden from handover and stock flow actions (403)', function () {
@@ -242,7 +254,7 @@ test('owner can handover device with agreed return deadline and vendor payout, c
     expect($freshUnit->return_deadline)->not->toBeNull();
 
     // Check receivable debt holding
-    $debt = \App\Models\Debt::where('reference_type', 'handover_holding')
+    $debt = Debt::where('reference_type', 'handover_holding')
         ->where('reference_id', $this->unit->id)
         ->first();
 
@@ -263,7 +275,7 @@ test('restocking an unsold handed-over unit cancels the open handover holding de
             'handover_payout' => 165000.00,
         ]);
 
-    $debt = \App\Models\Debt::where('reference_type', 'handover_holding')
+    $debt = Debt::where('reference_type', 'handover_holding')
         ->where('reference_id', $this->unit->id)
         ->first();
     expect($debt->status)->toBe('open');
@@ -295,11 +307,11 @@ test('settling handover holding debt via Debt Collector marks unit as sold', fun
             'handover_payout' => 175000.00,
         ]);
 
-    $debt = \App\Models\Debt::where('reference_type', 'handover_holding')
+    $debt = Debt::where('reference_type', 'handover_holding')
         ->where('reference_id', $this->unit->id)
         ->first();
 
-    $account = \App\Models\FinancialAccount::create([
+    $account = FinancialAccount::create([
         'tenant_id' => $this->tenant->id,
         'name' => 'Main Cash Drawer',
         'type' => 'cash',
@@ -376,7 +388,7 @@ test('a previously sold unit IMEI can be re-intaken if traded back in', function
 
 test('recording maintenance expense marks returned unit as fixed and restock capitalizes cost and adjusts sale value', function () {
     // 1. Setup account with balance and mark unit as returned
-    $account = \App\Models\FinancialAccount::create([
+    $account = FinancialAccount::create([
         'tenant_id' => $this->tenant->id,
         'name' => 'CBE Main Ops',
         'type' => 'bank',
@@ -396,7 +408,7 @@ test('recording maintenance expense marks returned unit as fixed and restock cap
     ]);
 
     // Create another unit under the same variant to verify isolation
-    $otherUnit = \App\Models\InventoryUnit::create([
+    $otherUnit = InventoryUnit::create([
         'tenant_id' => $this->tenant->id,
         'variant_id' => $this->variant->id,
         'imei_or_serial' => '359871109988000',
@@ -424,7 +436,7 @@ test('recording maintenance expense marks returned unit as fixed and restock cap
     expect($freshUnit->status)->toBe('fixed');
 
     // Verify maintenance record created as uncapitalized
-    $maintenanceRecord = \App\Models\MaintenanceRecord::where('inventory_unit_id', $this->unit->id)->first();
+    $maintenanceRecord = MaintenanceRecord::where('inventory_unit_id', $this->unit->id)->first();
     expect($maintenanceRecord)->not->toBeNull();
     expect((float) $maintenanceRecord->cost)->toBe(5000.00);
     expect($maintenanceRecord->is_capitalized)->toBeFalse();
@@ -460,7 +472,7 @@ test('recording maintenance expense marks returned unit as fixed and restock cap
     expect($maintenanceRecord->fresh()->is_capitalized)->toBeTrue();
 
     // Stock quantity on hand is 2 (restocked unit + other unit)
-    $stock = \App\Models\InventoryStock::where('variant_id', $this->variant->id)->first();
+    $stock = InventoryStock::where('variant_id', $this->variant->id)->first();
     expect($stock->quantity_on_hand)->toBe(2);
     // Average cost is (55,000 + 50,000) / 2 = 52,500
     expect((float) $stock->average_cost)->toBe(52500.00);
@@ -468,7 +480,7 @@ test('recording maintenance expense marks returned unit as fixed and restock cap
 
 test('sold unit records sold_at timestamp and loads salesOrderItem with customer details in units API', function () {
     // Record a sale for the unit
-    $customer = \App\Models\Contact::create([
+    $customer = Contact::create([
         'tenant_id' => $this->tenant->id,
         'name' => 'Dawit Sold Tester',
         'roles' => ['customer'],
@@ -603,13 +615,13 @@ test('owner can mark a handed-out device as sold with cash payment, crediting ac
             'handover_payout' => 120000.00,
         ]);
 
-    $debt = \App\Models\Debt::where('reference_type', 'handover_holding')
+    $debt = Debt::where('reference_type', 'handover_holding')
         ->where('reference_id', $this->unit->id)
         ->first();
     expect($debt)->not->toBeNull();
     expect($debt->status)->toBe('open');
 
-    $account = \App\Models\FinancialAccount::create([
+    $account = FinancialAccount::create([
         'tenant_id' => $this->tenant->id,
         'name' => 'Abay Bank',
         'type' => 'bank',
@@ -657,7 +669,7 @@ test('owner can mark a handed-out device as sold via bilateral offset against mu
             'handover_payout' => 100000.00,
         ]);
 
-    $debt = \App\Models\Debt::where('reference_type', 'handover_holding')
+    $debt = Debt::where('reference_type', 'handover_holding')
         ->where('reference_id', $this->unit->id)
         ->first();
 
@@ -694,7 +706,7 @@ test('owner can mark a handed-out device as sold on credit keeping receivable op
             'handover_payout' => 110000.00,
         ]);
 
-    $debt = \App\Models\Debt::where('reference_type', 'handover_holding')
+    $debt = Debt::where('reference_type', 'handover_holding')
         ->where('reference_id', $this->unit->id)
         ->first();
 
@@ -746,14 +758,14 @@ test('staff can update full product details including name, variants, cost basis
 });
 
 test('can safely delete an in-stock unit and cancel its unpaid intake debt', function () {
-    $contact = \App\Models\Contact::create([
+    $contact = Contact::create([
         'tenant_id' => $this->tenant->id,
         'name' => 'Abebe Supplier',
         'type' => 'supplier',
         'roles' => ['supplier'],
     ]);
 
-    $unpaidDebt = \App\Models\Debt::create([
+    $unpaidDebt = Debt::create([
         'tenant_id' => $this->tenant->id,
         'contact_id' => $contact->id,
         'type' => 'payable',
@@ -814,14 +826,14 @@ test('cannot delete a unit currently out for handover', function () {
 });
 
 test('cannot delete a unit with partially or fully paid intake debt', function () {
-    $contact = \App\Models\Contact::create([
+    $contact = Contact::create([
         'tenant_id' => $this->tenant->id,
         'name' => 'Paid Supplier',
         'type' => 'supplier',
         'roles' => ['supplier'],
     ]);
 
-    \App\Models\Debt::create([
+    Debt::create([
         'tenant_id' => $this->tenant->id,
         'contact_id' => $contact->id,
         'type' => 'payable',
@@ -843,7 +855,7 @@ test('cannot delete a unit with partially or fully paid intake debt', function (
 });
 
 test('deleting a unit funded via shop bank account automatically refunds the bank balance and logs audit trail with deleted_by info', function () {
-    $account = \App\Models\FinancialAccount::create([
+    $account = FinancialAccount::create([
         'tenant_id' => $this->tenant->id,
         'name' => 'Commercial Bank of Ethiopia (CBE)',
         'type' => 'bank',
@@ -869,7 +881,7 @@ test('deleting a unit funded via shop bank account automatically refunds the ban
     expect((float) $account->fresh()->current_balance)->toBe(660000.00);
 
     // 2. FinancialTransaction is created
-    $txn = \App\Models\FinancialTransaction::where('destination_account_id', $account->id)
+    $txn = FinancialTransaction::where('destination_account_id', $account->id)
         ->where('type', 'supplier_refund')
         ->first();
     expect($txn)->not->toBeNull();
@@ -877,7 +889,7 @@ test('deleting a unit funded via shop bank account automatically refunds the ban
     expect($txn->description)->toContain('Unit deleted / intake reversed');
 
     // 3. AuditLog is recorded with who deleted it and what was deleted
-    $log = \App\Models\AuditLog::where('action', 'deleted_unit')
+    $log = AuditLog::where('action', 'deleted_unit')
         ->where('entity_id', $this->unit->id)
         ->first();
     expect($log)->not->toBeNull();
@@ -890,7 +902,7 @@ test('deleting a unit funded via shop bank account automatically refunds the ban
 });
 
 test('editing a sold unit cascades product name and imei across sales order items, debts, debt payments, and logs human-readable audit trail', function () {
-    $contact = \App\Models\Contact::create([
+    $contact = Contact::create([
         'tenant_id' => $this->tenant->id,
         'name' => 'Halle Vendor',
         'roles' => ['vendor', 'customer'],
@@ -898,7 +910,7 @@ test('editing a sold unit cascades product name and imei across sales order item
     ]);
 
     // Create sales order and item for this unit
-    $order = \App\Models\SalesOrder::create([
+    $order = SalesOrder::create([
         'tenant_id' => $this->tenant->id,
         'order_number' => 'SO-TEST1234',
         'customer_id' => $contact->id,
@@ -910,7 +922,7 @@ test('editing a sold unit cascades product name and imei across sales order item
         'notes' => "Handover sale to halle [unit_id:{$this->unit->id}] for 359871109988776",
     ]);
 
-    $soItem = \App\Models\SalesOrderItem::create([
+    $soItem = SalesOrderItem::create([
         'tenant_id' => $this->tenant->id,
         'sales_order_id' => $order->id,
         'variant_id' => $this->variant->id,
@@ -928,7 +940,7 @@ test('editing a sold unit cascades product name and imei across sales order item
     ]);
 
     // Create handover debt and debt payment referencing this unit
-    $debt = \App\Models\Debt::create([
+    $debt = Debt::create([
         'tenant_id' => $this->tenant->id,
         'contact_id' => $contact->id,
         'type' => 'receivable',
@@ -938,10 +950,10 @@ test('editing a sold unit cascades product name and imei across sales order item
         'paid_amount' => 185000.00,
         'remaining_amount' => 0.0,
         'status' => 'settled',
-        'notes' => "Handover payout for 359871109988776 to Halle Vendor. Vendor must pay this amount on sale or return the device.",
+        'notes' => 'Handover payout for 359871109988776 to Halle Vendor. Vendor must pay this amount on sale or return the device.',
     ]);
 
-    $debtPayment = \App\Models\DebtPayment::create([
+    $debtPayment = DebtPayment::create([
         'tenant_id' => $this->tenant->id,
         'debt_id' => $debt->id,
         'amount' => 185000.00,
@@ -951,7 +963,7 @@ test('editing a sold unit cascades product name and imei across sales order item
         'created_by' => $this->user->id,
     ]);
 
-    $ft = \App\Models\FinancialTransaction::create([
+    $ft = FinancialTransaction::create([
         'tenant_id' => $this->tenant->id,
         'transaction_number' => 'TXN-OFFSET-1',
         'type' => 'customer_payment',
@@ -961,7 +973,7 @@ test('editing a sold unit cascades product name and imei across sales order item
         'created_by' => $this->user->id,
     ]);
 
-    $consignmentDebt = \App\Models\Debt::create([
+    $consignmentDebt = Debt::create([
         'tenant_id' => $this->tenant->id,
         'contact_id' => $contact->id,
         'type' => 'payable',
@@ -1023,7 +1035,7 @@ test('editing a sold unit cascades product name and imei across sales order item
     expect($freshFt->description)->not->toContain('359871109988776');
 
     // 7. Audit log contains human-readable diff and summary
-    $log = \App\Models\AuditLog::where('action', 'updated_unit')
+    $log = AuditLog::where('action', 'updated_unit')
         ->where('entity_id', $this->unit->id)
         ->latest('created_at')
         ->first();
@@ -1042,7 +1054,7 @@ test('editing a sold unit cascades product name and imei across sales order item
     expect($log->new_values['updated_by']['name'])->toBe('Yoni Owner');
 
     // 8. Partner Statement immediately reflects the renamed device and IMEI
-    $statementAction = new \App\Actions\GeneratePartnerStatementAction();
+    $statementAction = new GeneratePartnerStatementAction;
     $statement = $statementAction->execute($contact);
     $entries = collect($statement['ledger']);
     $consignmentEntry = $entries->firstWhere('type', 'consignment_sale');
@@ -1052,7 +1064,7 @@ test('editing a sold unit cascades product name and imei across sales order item
 });
 
 test('editing an in-stock unit updates stock intake debt and debt notes across vendor statements', function () {
-    $supplier = \App\Models\Contact::create([
+    $supplier = Contact::create([
         'tenant_id' => $this->tenant->id,
         'name' => 'Addis Supplier',
         'roles' => ['supplier', 'vendor'],
@@ -1063,7 +1075,7 @@ test('editing an in-stock unit updates stock intake debt and debt notes across v
         'supplier_contact_id' => $supplier->id,
     ]);
 
-    $intakeDebt = \App\Models\Debt::create([
+    $intakeDebt = Debt::create([
         'tenant_id' => $this->tenant->id,
         'contact_id' => $supplier->id,
         'type' => 'payable',
@@ -1090,7 +1102,7 @@ test('editing an in-stock unit updates stock intake debt and debt notes across v
     expect((float) $freshDebt->original_amount)->toBe(165000.00);
     expect((float) $freshDebt->remaining_amount)->toBe(165000.00);
 
-    $statementAction = new \App\Actions\GeneratePartnerStatementAction();
+    $statementAction = new GeneratePartnerStatementAction;
     $statement = $statementAction->execute($supplier);
     $entry = collect($statement['ledger'])->firstWhere('id', "debt-{$freshDebt->id}");
     expect($entry)->not->toBeNull();
@@ -1099,39 +1111,39 @@ test('editing an in-stock unit updates stock intake debt and debt notes across v
 });
 
 test('sync sales order items unit variants migration heals mismatched historical order items', function () {
-    $category = \App\Models\Category::create([
+    $category = Category::create([
         'tenant_id' => $this->tenant->id,
         'name' => 'Laptops',
         'slug' => 'laptops-'.uniqid(),
     ]);
 
-    $prod1 = \App\Models\Product::create([
+    $prod1 = Product::create([
         'tenant_id' => $this->tenant->id,
         'category_id' => $category->id,
         'name' => 'MacBook Air M1',
         'brand' => 'Apple',
     ]);
-    $var1 = \App\Models\ProductVariant::create([
+    $var1 = ProductVariant::create([
         'tenant_id' => $this->tenant->id,
         'product_id' => $prod1->id,
         'storage' => '256GB',
         'default_selling_price' => 50000.00,
     ]);
 
-    $prod2 = \App\Models\Product::create([
+    $prod2 = Product::create([
         'tenant_id' => $this->tenant->id,
         'category_id' => $category->id,
         'name' => 'MacBook Pro M3',
         'brand' => 'Apple',
     ]);
-    $var2 = \App\Models\ProductVariant::create([
+    $var2 = ProductVariant::create([
         'tenant_id' => $this->tenant->id,
         'product_id' => $prod2->id,
         'storage' => '512GB',
         'default_selling_price' => 95000.00,
     ]);
 
-    $unit = \App\Models\InventoryUnit::create([
+    $unit = InventoryUnit::create([
         'tenant_id' => $this->tenant->id,
         'variant_id' => $var2->id,
         'imei_or_serial' => 'MBP-998877',
@@ -1140,7 +1152,7 @@ test('sync sales order items unit variants migration heals mismatched historical
         'selling_price' => 95000.00,
     ]);
 
-    $order = \App\Models\SalesOrder::create([
+    $order = SalesOrder::create([
         'tenant_id' => $this->tenant->id,
         'order_number' => 'ORD-SYNC-TEST-001',
         'salesperson_id' => $this->user->id,
@@ -1150,7 +1162,7 @@ test('sync sales order items unit variants migration heals mismatched historical
         'order_date' => now(),
     ]);
 
-    $soItem = \App\Models\SalesOrderItem::create([
+    $soItem = SalesOrderItem::create([
         'tenant_id' => $this->tenant->id,
         'sales_order_id' => $order->id,
         'variant_id' => $var1->id,
@@ -1170,9 +1182,3 @@ test('sync sales order items unit variants migration heals mismatched historical
     $soItem->refresh();
     expect($soItem->variant_id)->toBe($var2->id);
 });
-
-
-
-
-
-
