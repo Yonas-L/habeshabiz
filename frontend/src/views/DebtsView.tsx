@@ -213,12 +213,12 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
         .sort((a, b) => new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime());
 
       if (statusFilter === 'active') {
-        // Show open debts plus up to 2 most recently covered debts in active view
-        g.debts = [...openDebts, ...settledDebts.slice(0, 2)];
+        // Show up to 2 most recently covered debts on top, followed by open debts
+        g.debts = [...settledDebts.slice(0, 2), ...openDebts];
       } else if (statusFilter === 'settled') {
         g.debts = settledDebts;
       } else {
-        g.debts = [...openDebts, ...settledDebts];
+        g.debts = [...settledDebts, ...openDebts];
       }
 
       g.percentSettled = g.totalOriginal > 0 ? Math.min(100, Math.round((g.totalPaid / g.totalOriginal) * 100)) : 0;

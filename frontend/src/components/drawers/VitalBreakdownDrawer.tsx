@@ -175,7 +175,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
       const settledDebts = g.debts.filter((d) => (Number(d.remaining_amount) || 0) <= 0.001)
         .sort((a, b) => new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime())
         .slice(0, 2);
-      g.debts = [...openDebts, ...settledDebts];
+      g.debts = [...settledDebts, ...openDebts];
     });
     return Array.from(map.values())
       .filter((g) => g.netRemaining > 0.001)
@@ -220,7 +220,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
       const settledDebts = g.debts.filter((d) => (Number(d.remaining_amount) || 0) <= 0.001)
         .sort((a, b) => new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime())
         .slice(0, 2);
-      g.debts = [...openDebts, ...settledDebts];
+      g.debts = [...settledDebts, ...openDebts];
     });
     return Array.from(map.values())
       .filter((g) => g.netRemaining > 0.001)
