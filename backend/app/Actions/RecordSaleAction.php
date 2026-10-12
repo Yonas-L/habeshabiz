@@ -184,6 +184,24 @@ class RecordSaleAction
                 $paymentStatus = 'partially_paid';
             }
 
+            $rawSplits = $data['payment_splits'] ?? null;
+            $enrichedSplits = null;
+            if (is_array($rawSplits) && count($rawSplits) > 0) {
+                $accIds = collect($rawSplits)->pluck('financial_account_id')->filter()->all();
+                $accMap = FinancialAccount::whereIn('id', $accIds)->pluck('name', 'id');
+                $enrichedSplits = array_map(function ($s) use ($accMap) {
+                    $aid = $s['financial_account_id'] ?? null;
+
+                    return [
+                        'financial_account_id' => $aid,
+                        'account_name' => $s['account_name'] ?? ($accMap[$aid] ?? 'Account'),
+                        'amount' => (float) ($s['amount'] ?? 0),
+                        'reference_number' => $s['reference_number'] ?? null,
+                    ];
+                }, $rawSplits);
+            }
+            $primaryAccountId = $data['financial_account_id'] ?? ($enrichedSplits ? ($enrichedSplits[0]['financial_account_id'] ?? null) : null);
+
             $order = SalesOrder::create([
                 'tenant_id' => $tenantId,
                 'order_number' => $orderNumber,
@@ -198,8 +216,8 @@ class RecordSaleAction
                 'payment_status' => $paymentStatus,
                 'credit_sale' => $creditSale,
                 'payment_method' => $data['payment_method'] ?? 'cash',
-                'financial_account_id' => $data['financial_account_id'] ?? null,
-                'payment_splits' => ! empty($data['payment_splits']) ? $data['payment_splits'] : null,
+                'financial_account_id' => $primaryAccountId,
+                'payment_splits' => $enrichedSplits,
                 'notes' => $data['notes'] ?? null,
                 'order_date' => now(),
             ]);
@@ -631,13 +649,12 @@ class RecordSaleAction
 
             // Credit financial account(s) if initial payment was made
             if ($paidAmount > 0 && ($data['payment_method'] ?? '') !== 'debt_offset') {
-                $rawSplits = $data['payment_splits'] ?? null;
-                if (is_array($rawSplits) && count($rawSplits) > 0) {
-                    $splits = $rawSplits;
-                } elseif (! empty($data['financial_account_id'])) {
+                if ($enrichedSplits) {
+                    $splits = $enrichedSplits;
+                } elseif (! empty($primaryAccountId)) {
                     $splits = [
                         [
-                            'financial_account_id' => $data['financial_account_id'],
+                            'financial_account_id' => $primaryAccountId,
                             'amount' => $paidAmount,
                         ],
                     ];

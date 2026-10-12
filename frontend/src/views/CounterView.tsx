@@ -15,8 +15,6 @@ import {
   Smartphone,
   Package,
   Battery,
-  CreditCard,
-  Wallet,
   Banknote,
   Receipt,
   User as UserIcon,
@@ -85,7 +83,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
   const [discountType, setDiscountType] = useState<'percent' | 'fixed'>('percent');
   const [discountValue, setDiscountValue] = useState<string>('');
   const [paidAmount, setPaidAmount] = useState<string>('');
-  const [paymentMethod, setPaymentMethod] = useState<string>('telebirr');
+  const [paymentMethod, setPaymentMethod] = useState<string>('cash');
   const [isCreditSale, setIsCreditSale] = useState(false);
   const [isWriteOff, setIsWriteOff] = useState(false);
   const [financialAccountId, setFinancialAccountId] = useState<string>('');
@@ -445,6 +443,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
     setPaidAmount('');
     setIsCreditSale(false);
     setIsWriteOff(false);
+    setPaymentMethod('cash');
     setIsSplitPayment(false);
     setPaymentSplits([]);
     setCustomerId('');
@@ -577,7 +576,9 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
         customer_phone: customerMode === 'new' && customerPhone.trim() ? customerPhone.trim() : null,
         discount_amount: calculatedDiscountAmount,
         paid_amount: paidNum,
-        payment_method: isSplitPayment && paidNum > 0 ? 'split' : paymentMethod,
+        payment_method: isCreditSale
+          ? 'credit'
+          : (isSplitPayment && paidNum > 0 ? 'split' : (paymentMethod || 'cash')),
         credit_sale: isCreditSale,
         intentional_shortfall: isWriteOff,
         financial_account_id: paidNum > 0 && paymentMethod !== 'debt_offset' && !isSplitPayment ? financialAccountId : null,
@@ -1246,11 +1247,8 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                 </label>
                 <div className="flex flex-wrap gap-2">
                   {[
-                    { value: 'telebirr', label: 'TeleBirr', icon: Smartphone },
-                    { value: 'cash', label: 'Cash', icon: Banknote },
-                    { value: 'cbe', label: 'CBE Transfer', icon: CreditCard },
-                    { value: 'bank_transfer', label: 'Other Bank', icon: Wallet },
-                    { value: 'debt_offset', label: 'Debt Offset', icon: ArrowLeftRight },
+                    { value: 'cash', label: 'Cash transfer', icon: Banknote },
+                    { value: 'debt_offset', label: 'Debt offset', icon: ArrowLeftRight },
                     { value: 'credit', label: 'Credit sale', icon: Clock3 },
                     { value: 'writeoff', label: 'Price concession', icon: Flag },
                   ].map((m) => {
@@ -1285,13 +1283,15 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                           isSelected
                             ? m.value === 'credit'
                               ? 'border-slate-800 bg-slate-900 dark:bg-slate-900 text-amber-400 dark:text-amber-400 shadow-xs font-bold ring-1 ring-amber-500/20'
+                              : m.value === 'writeoff'
+                              ? 'border-slate-800 bg-slate-900 dark:bg-slate-900 text-rose-400 dark:text-rose-400 shadow-xs font-bold ring-1 ring-rose-500/20'
                               : m.value === 'debt_offset'
                               ? 'border-slate-800 bg-slate-900 dark:bg-slate-900 text-indigo-400 dark:text-indigo-400 shadow-xs font-bold ring-1 ring-indigo-500/20'
                               : 'border-slate-800 bg-slate-900 dark:bg-slate-900 text-emerald-400 dark:text-emerald-400 shadow-xs font-bold ring-1 ring-emerald-500/20'
                             : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700 bg-white dark:bg-slate-900'
                         }`}
                       >
-                        <Icon className={`w-3.5 h-3.5 ${isSelected ? (m.value === 'credit' ? 'text-amber-400' : m.value === 'debt_offset' ? 'text-indigo-400' : 'text-emerald-400') : 'text-slate-400 dark:text-slate-500'}`} />
+                        <Icon className={`w-3.5 h-3.5 ${isSelected ? (m.value === 'credit' ? 'text-amber-400' : m.value === 'writeoff' ? 'text-rose-400' : m.value === 'debt_offset' ? 'text-indigo-400' : 'text-emerald-400') : 'text-slate-400 dark:text-slate-500'}`} />
                         {m.label}
                       </button>
                     );

@@ -1328,7 +1328,7 @@ export const api = {
     vendor_payment_splits?: { financial_account_id: string; amount: number; reference_number?: string }[];
     selling_price: number;
     paid_amount: number;
-    payment_method: 'cash' | 'telebirr' | 'cbe' | 'bank_transfer' | 'credit';
+    payment_method: 'cash' | 'telebirr' | 'cbe' | 'bank_transfer' | 'cash_transfer' | 'credit' | 'debt_offset' | 'split';
     financial_account_id?: string | null;
     payment_splits?: { financial_account_id: string; amount: number; reference_number?: string }[];
     customer_id?: string | null;

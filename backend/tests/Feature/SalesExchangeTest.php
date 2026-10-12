@@ -272,10 +272,113 @@ test('subsequent sale of an exchanged unit preserves exchange source_type in sal
     $listResponse = $this->actingAs($this->user)->getJson('/api/v1/sales?source_type=exchange');
     $listResponse->assertOk();
     $orders = $listResponse->json('data');
-    
+
     // Both the original exchange order and the resale order match source_type=exchange filter
     expect(count($orders))->toBe(2);
     $resaleOrderInList = collect($orders)->firstWhere('order_number', $resaleData['order_number']);
     expect($resaleOrderInList)->not->toBeNull();
     expect($resaleOrderInList['items'][0]['inventory_unit']['source_type'])->toBe('exchange');
+});
+
+test('exchange device sale where cash difference is paid via split accounts records successfully', function () {
+    $cbeAccount = FinancialAccount::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Commercial Bank of Ethiopia (CBE)',
+        'type' => 'bank',
+        'currency' => 'ETB',
+        'current_balance' => 200000.00,
+    ]);
+
+    $telebirrInitial = (float) $this->account->current_balance;
+    $cbeInitial = (float) $cbeAccount->current_balance;
+
+    // Outgoing phone is 100,000 ETB.
+    // Exchange trade-in covers 50,000 ETB.
+    // Remaining 50,000 ETB is split: 30,000 via CBE, 20,000 via Telebirr.
+    $response = $this->actingAs($this->user)->postJson('/api/v1/sales', [
+        'customer_id' => $this->customer->id,
+        'paid_amount' => 50000.00,
+        'payment_method' => 'split',
+        'payment_splits' => [
+            ['financial_account_id' => $cbeAccount->id, 'amount' => 30000.00],
+            ['financial_account_id' => $this->account->id, 'amount' => 20000.00],
+        ],
+        'items' => [
+            [
+                'variant_id' => $this->outgoingVariant->id,
+                'inventory_unit_id' => $this->outgoingUnit->id,
+                'quantity' => 1,
+                'unit_price' => 100000.00,
+            ],
+        ],
+        'exchange' => [
+            'variant_id' => $this->incomingVariant->id,
+            'trade_in_value' => 50000.00,
+            'imei_or_serial' => 'SPLIT-EXCHANGE-IMEI-123',
+            'condition' => 'used_clean',
+            'battery_health' => 95,
+            'sim_type' => 'physical',
+        ],
+    ]);
+
+    $response->assertCreated();
+    $data = $response->json('data');
+
+    expect((float) $data['total_amount'])->toBe(100000.00);
+    expect((float) $data['exchange_allowance'])->toBe(50000.00);
+    expect((float) $data['paid_amount'])->toBe(50000.00);
+    expect($data['payment_status'])->toBe('paid');
+    expect($data['payment_method'])->toBe('split');
+    expect($data['payment_splits'])->toHaveCount(2);
+    expect($data['payment_splits'][0]['account_name'])->toBe('Commercial Bank of Ethiopia (CBE)');
+
+    // Verify both bank accounts credited
+    expect((float) $cbeAccount->fresh()->current_balance)->toBe($cbeInitial + 30000.00);
+    expect((float) $this->account->fresh()->current_balance)->toBe($telebirrInitial + 20000.00);
+
+    // Verify incoming exchange unit created in stock
+    $incoming = InventoryUnit::find($data['exchange_unit_id']);
+    expect($incoming)->not->toBeNull();
+    expect($incoming->imei_or_serial)->toBe('SPLIT-EXCHANGE-IMEI-123');
+    expect($incoming->source_type)->toBe('exchange');
+    expect($incoming->status)->toBe('in_stock');
+});
+
+test('exchange device sale where cash difference is paid via cash transfer single account records successfully', function () {
+    $initialBalance = (float) $this->account->fresh()->current_balance;
+
+    $response = $this->actingAs($this->user)->postJson('/api/v1/sales', [
+        'customer_id' => $this->customer->id,
+        'paid_amount' => 50000.00,
+        'payment_method' => 'cash',
+        'financial_account_id' => $this->account->id,
+        'items' => [
+            [
+                'variant_id' => $this->outgoingVariant->id,
+                'inventory_unit_id' => $this->outgoingUnit->id,
+                'quantity' => 1,
+                'unit_price' => 100000.00,
+            ],
+        ],
+        'exchange' => [
+            'variant_id' => $this->incomingVariant->id,
+            'trade_in_value' => 50000.00,
+            'imei_or_serial' => 'CASH-EXCHANGE-IMEI-456',
+            'condition' => 'used_clean',
+            'battery_health' => 91,
+            'sim_type' => 'physical',
+        ],
+    ]);
+
+    $response->assertCreated();
+    $data = $response->json('data');
+
+    expect((float) $data['total_amount'])->toBe(100000.00);
+    expect((float) $data['exchange_allowance'])->toBe(50000.00);
+    expect((float) $data['paid_amount'])->toBe(50000.00);
+    expect($data['payment_status'])->toBe('paid');
+    expect($data['payment_method'])->toBe('cash');
+
+    // Account credited
+    expect((float) $this->account->fresh()->current_balance)->toBe($initialBalance + 50000.00);
 });

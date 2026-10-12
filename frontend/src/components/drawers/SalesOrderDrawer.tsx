@@ -167,16 +167,21 @@ export const SalesOrderDrawer: React.FC<SalesOrderDrawerProps> = ({
       })
     : '';
 
-  const formatPaymentMethod = (method: string) => {
+  const formatPaymentMethod = (method?: string) => {
+    if (!method) return 'Cash Transfer';
     const map: Record<string, string> = {
       telebirr: 'Telebirr',
       cbe_birr: 'CBE Birr',
-      cash: 'Cash on Hand',
+      cbe: 'CBE',
+      cash: 'Cash Transfer',
+      cash_transfer: 'Cash Transfer',
       bank_transfer: 'Bank Transfer',
+      split: 'Split Payment',
       amole: 'Amole',
       credit: 'Customer Credit',
+      debt_offset: 'Debt Offset',
     };
-    return map[method.toLowerCase()] || method.replace(/_/g, ' ').toUpperCase();
+    return map[method.toLowerCase()] || method.replace(/_/g, ' ');
   };
 
   const formatCondition = (cond?: string) => {

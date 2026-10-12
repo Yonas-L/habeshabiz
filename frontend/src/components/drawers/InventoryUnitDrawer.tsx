@@ -51,15 +51,18 @@ interface InventoryUnitDrawerProps {
 }
 
 const formatPaymentMethod = (method?: string) => {
-  if (!method) return 'Cash';
+  if (!method) return 'Cash Transfer';
   const map: Record<string, string> = {
     telebirr: 'Telebirr',
     cbe_birr: 'CBE Birr',
     cbe: 'Commercial Bank of Ethiopia (CBE)',
-    cash: 'Cash on Hand',
+    cash: 'Cash Transfer',
+    cash_transfer: 'Cash Transfer',
     bank_transfer: 'Bank Transfer',
+    split: 'Split Payment',
     amole: 'Amole',
     credit: 'Customer Credit',
+    debt_offset: 'Debt Offset',
   };
   return map[method.toLowerCase()] || method.replace(/_/g, ' ');
 };
