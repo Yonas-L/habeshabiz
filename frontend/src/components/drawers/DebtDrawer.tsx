@@ -64,7 +64,8 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
   // Initialize payment form when opened
   React.useEffect(() => {
     if (debt) {
-      setPaymentAmount(String(debt.remaining_amount));
+      const effective = (debt as any).effectiveRemaining !== undefined ? (debt as any).effectiveRemaining : debt.remaining_amount;
+      setPaymentAmount(String(effective));
       const defaultAcc = accounts.find((a) => a.type === 'bank' || a.type === 'mobile_money') || accounts[0];
       setPaymentAccountId(defaultAcc ? defaultAcc.id : '');
       setIsSplit(false);
@@ -81,7 +82,9 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
   const original = parseFloat(String(debt.original_amount)) || 1;
   const paid = parseFloat(String(debt.paid_amount)) || 0;
   const remaining = parseFloat(String(debt.remaining_amount)) || 0;
-  const percentPaid = Math.min(100, Math.round((paid / original) * 100));
+  const allocOffset = (debt as any).allocatedOffset || 0;
+  const effectiveRemaining = (debt as any).effectiveRemaining !== undefined ? (debt as any).effectiveRemaining : remaining;
+  const percentPaid = Math.min(100, Math.round(((paid + allocOffset) / original) * 100));
 
   const handleSettle = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -206,7 +209,7 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
                 </button>
               )}
 
-              {remaining > 0 && !showPayForm && (
+              {effectiveRemaining > 0 && !showPayForm && (
                 <button
                   type="button"
                   onClick={() => setShowPayForm(true)}
@@ -227,7 +230,7 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
 
           {/* Mobile Action Row (< sm) */}
           <div className="flex sm:hidden flex-col gap-2 w-full">
-            {remaining > 0 && !showPayForm && (
+            {effectiveRemaining > 0 && !showPayForm && (
               <button
                 type="button"
                 onClick={() => setShowPayForm(true)}
@@ -283,9 +286,15 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
             isReceivable ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400'
           }`}
         >
-          <AnimatedNumber value={remaining} />{' '}
+          <AnimatedNumber value={effectiveRemaining} />{' '}
           <span className="text-sm font-bold text-slate-400 font-sans">ETB</span>
         </div>
+
+        {allocOffset > 0.01 && (
+          <div className="text-xs font-semibold text-amber-600 dark:text-amber-400 font-mono">
+            Trade credit applied: −{allocOffset.toLocaleString()} ETB (Gross remaining: {remaining.toLocaleString()} ETB)
+          </div>
+        )}
 
         {/* Progress bar */}
         <div className="w-full h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
@@ -345,7 +354,7 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
             <input
               type="number"
               step="0.01"
-              max={remaining}
+              max={effectiveRemaining}
               value={paymentAmount}
               onChange={(e) => setPaymentAmount(e.target.value)}
               className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs font-mono font-bold text-slate-900 dark:text-white"
@@ -494,13 +503,13 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
                   : 'Obligation cancelled and voided without cash movement'}
               </p>
             </div>
-          ) : debt.status === 'partially_paid' || paid > 0 ? (
+          ) : debt.status === 'partially_paid' || paid > 0 || allocOffset > 0.01 ? (
             <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
               <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 block">
                 Settlement Progress
               </span>
               <p className="text-slate-700 dark:text-slate-300 font-medium mt-0.5 text-xs">
-                {Number(debt.paid_amount).toLocaleString()} ETB settled ({percentPaid}% covered). Remaining obligation: {Number(debt.remaining_amount).toLocaleString()} ETB
+                {Number(debt.paid_amount).toLocaleString()} ETB settled {allocOffset > 0.01 ? `+ ${allocOffset.toLocaleString()} ETB trade credit ` : ''}({percentPaid}% covered). Net remaining: {Number(effectiveRemaining).toLocaleString()} ETB
               </p>
             </div>
           ) : null}

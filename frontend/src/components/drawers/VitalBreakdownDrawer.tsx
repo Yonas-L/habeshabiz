@@ -175,7 +175,27 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
       const settledDebts = g.debts.filter((d) => (Number(d.remaining_amount) || 0) <= 0.001)
         .sort((a, b) => new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime())
         .slice(0, 2);
-      g.debts = [...settledDebts, ...openDebts];
+
+      let remainingOffset = g.offsetAmount;
+      const enhancedOpenDebts = openDebts.map((d) => {
+        const rem = Number(d.remaining_amount) || 0;
+        const alloc = Math.min(rem, remainingOffset);
+        const netRem = Math.max(0, rem - alloc);
+        remainingOffset = Math.max(0, remainingOffset - alloc);
+        return {
+          ...d,
+          allocatedOffset: alloc,
+          effectiveRemaining: netRem,
+        } as Debt;
+      });
+
+      const enhancedSettledDebts = settledDebts.map((d) => ({
+        ...d,
+        allocatedOffset: 0,
+        effectiveRemaining: 0,
+      } as Debt));
+
+      g.debts = [...enhancedSettledDebts, ...enhancedOpenDebts];
     });
     return Array.from(map.values())
       .filter((g) => g.netRemaining > 0.001)
@@ -220,7 +240,27 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
       const settledDebts = g.debts.filter((d) => (Number(d.remaining_amount) || 0) <= 0.001)
         .sort((a, b) => new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime())
         .slice(0, 2);
-      g.debts = [...settledDebts, ...openDebts];
+
+      let remainingOffset = g.offsetAmount;
+      const enhancedOpenDebts = openDebts.map((d) => {
+        const rem = Number(d.remaining_amount) || 0;
+        const alloc = Math.min(rem, remainingOffset);
+        const netRem = Math.max(0, rem - alloc);
+        remainingOffset = Math.max(0, remainingOffset - alloc);
+        return {
+          ...d,
+          allocatedOffset: alloc,
+          effectiveRemaining: netRem,
+        } as Debt;
+      });
+
+      const enhancedSettledDebts = settledDebts.map((d) => ({
+        ...d,
+        allocatedOffset: 0,
+        effectiveRemaining: 0,
+      } as Debt));
+
+      g.debts = [...enhancedSettledDebts, ...enhancedOpenDebts];
     });
     return Array.from(map.values())
       .filter((g) => g.netRemaining > 0.001)
@@ -499,9 +539,15 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                         {group.debts.map((debt) => {
                           const orig = Number(debt.original_amount) || 0;
                           const rem = Number(debt.remaining_amount) || 0;
-                          const isSettled = rem <= 0.001;
-                          const isPartial = !isSettled && Number(debt.paid_amount) > 0;
-                          const displayAmount = isSettled ? orig : rem;
+                          const allocOffset = (debt as any).allocatedOffset || 0;
+                          const effectiveRem = (debt as any).effectiveRemaining !== undefined ? (debt as any).effectiveRemaining : rem;
+
+                          const isDbSettled = rem <= 0.001;
+                          const isOffsetCovered = !isDbSettled && effectiveRem <= 0.001 && allocOffset > 0.01;
+                          const isSettled = isDbSettled || isOffsetCovered;
+                          const isPartial = !isSettled && (Number(debt.paid_amount) > 0 || allocOffset > 0.01);
+                          const displayAmount = isSettled ? (isDbSettled ? orig : rem) : effectiveRem;
+
                           return (
                             <div
                               key={debt.id}
@@ -518,7 +564,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                               }`}
                             >
                               <div className="min-w-0 pr-2">
-                                <div className="flex items-center gap-1.5">
+                                <div className="flex items-center gap-1.5 flex-wrap">
                                   <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
                                     isSettled
                                       ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
@@ -541,6 +587,11 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                                     </span>
                                   ) : null}
                                 </div>
+                                {!isSettled && allocOffset > 0.01 && (
+                                  <div className="text-[10px] text-amber-600 dark:text-amber-400 font-mono mt-0.5">
+                                    Gross {rem.toLocaleString()} · −{allocOffset.toLocaleString()} Trade Credit
+                                  </div>
+                                )}
                               </div>
                               <div className="text-right shrink-0 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                                 <div className={`font-mono font-bold text-xs ${
@@ -556,7 +607,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                                         id: group.contactId,
                                         name: group.name,
                                         phone: group.phone,
-                                        totalRemaining: rem,
+                                        totalRemaining: effectiveRem,
                                         debtCount: 1,
                                       });
                                     }}
@@ -577,18 +628,18 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                           <div className="flex items-center justify-between p-2.5 rounded-xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40 text-xs">
                             <div>
                               <div className="font-semibold text-slate-800 dark:text-slate-200">
-                                Mutual Trade Offset
+                                Trade Credit Applied
                               </div>
                               <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                                Deducted for product received from {group.name}
+                                −{Number(group.offsetAmount).toLocaleString()} ETB absorbed by product received from {group.name}
                               </div>
                             </div>
                             <div className="text-right">
-                              <div className="font-mono font-bold text-amber-600 dark:text-amber-400 text-xs">
-                                −{Number(group.offsetAmount).toLocaleString()} ETB
+                              <div className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">
+                                Net Collectable
                               </div>
-                              <div className="text-[10px] text-slate-400 mt-0.5 font-mono">
-                                Net: +{group.netRemaining.toLocaleString()} ETB
+                              <div className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-xs mt-0.5">
+                                +{group.netRemaining.toLocaleString()} ETB
                               </div>
                             </div>
                           </div>
@@ -690,9 +741,15 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                         {group.debts.map((debt) => {
                           const orig = Number(debt.original_amount) || 0;
                           const rem = Number(debt.remaining_amount) || 0;
-                          const isSettled = rem <= 0.001;
-                          const isPartial = !isSettled && Number(debt.paid_amount) > 0;
-                          const displayAmount = isSettled ? orig : rem;
+                          const allocOffset = (debt as any).allocatedOffset || 0;
+                          const effectiveRem = (debt as any).effectiveRemaining !== undefined ? (debt as any).effectiveRemaining : rem;
+
+                          const isDbSettled = rem <= 0.001;
+                          const isOffsetCovered = !isDbSettled && effectiveRem <= 0.001 && allocOffset > 0.01;
+                          const isSettled = isDbSettled || isOffsetCovered;
+                          const isPartial = !isSettled && (Number(debt.paid_amount) > 0 || allocOffset > 0.01);
+                          const displayAmount = isSettled ? (isDbSettled ? orig : rem) : effectiveRem;
+
                           return (
                             <div
                               key={debt.id}
@@ -709,7 +766,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                               }`}
                             >
                               <div className="min-w-0 pr-2">
-                                <div className="flex items-center gap-1.5">
+                                <div className="flex items-center gap-1.5 flex-wrap">
                                   <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
                                     isSettled
                                       ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
@@ -732,6 +789,11 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                                     </span>
                                   ) : null}
                                 </div>
+                                {!isSettled && allocOffset > 0.01 && (
+                                  <div className="text-[10px] text-amber-600 dark:text-amber-400 font-mono mt-0.5">
+                                    Gross {rem.toLocaleString()} · +{allocOffset.toLocaleString()} Offset
+                                  </div>
+                                )}
                               </div>
                               <div className="text-right shrink-0 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                                 <div className={`font-mono font-bold text-xs ${
@@ -747,7 +809,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                                         id: group.contactId,
                                         name: group.name,
                                         phone: group.phone,
-                                        totalRemaining: rem,
+                                        totalRemaining: effectiveRem,
                                         debtCount: 1,
                                       });
                                     }}
@@ -768,18 +830,18 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                           <div className="flex items-center justify-between p-2.5 rounded-xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40 text-xs">
                             <div>
                               <div className="font-semibold text-slate-800 dark:text-slate-200">
-                                Mutual Trade Offset
+                                Trade Credit Applied
                               </div>
                               <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                                Deducted for devices held or owed by {group.name}
+                                +{Number(group.offsetAmount).toLocaleString()} ETB deducted for devices held by {group.name}
                               </div>
                             </div>
                             <div className="text-right">
-                              <div className="font-mono font-bold text-amber-600 dark:text-amber-400 text-xs">
-                                +{Number(group.offsetAmount).toLocaleString()} ETB
+                              <div className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">
+                                Net to Pay
                               </div>
-                              <div className="text-[10px] text-slate-400 mt-0.5 font-mono">
-                                Net: −{group.netRemaining.toLocaleString()} ETB
+                              <div className="font-mono font-bold text-rose-600 dark:text-rose-400 text-xs mt-0.5">
+                                −{group.netRemaining.toLocaleString()} ETB
                               </div>
                             </div>
                           </div>

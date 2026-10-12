@@ -235,6 +235,22 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
         g.netRemaining = g.totalRemaining;
         g.offsetAmount = 0;
       }
+
+      let remainingOffset = g.offsetAmount;
+      g.debts = g.debts.map((d) => {
+        const rem = Number(d.remaining_amount) || 0;
+        if (rem <= 0.001) {
+          return { ...d, allocatedOffset: 0, effectiveRemaining: 0 } as Debt;
+        }
+        const alloc = Math.min(rem, remainingOffset);
+        const netRem = Math.max(0, rem - alloc);
+        remainingOffset = Math.max(0, remainingOffset - alloc);
+        return {
+          ...d,
+          allocatedOffset: alloc,
+          effectiveRemaining: netRem,
+        } as Debt;
+      });
     });
 
     let list = Array.from(map.values());
@@ -575,13 +591,19 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
                         const orig = parseFloat(String(debt.original_amount)) || 0;
                         const paid = parseFloat(String(debt.paid_amount)) || 0;
                         const rem = parseFloat(String(debt.remaining_amount)) || 0;
-                        const isDebtSettled = rem <= 0.001;
-                        const isPartial = paid > 0 && !isDebtSettled;
+                        const allocOffset = (debt as any).allocatedOffset || 0;
+                        const effectiveRem = (debt as any).effectiveRemaining !== undefined ? (debt as any).effectiveRemaining : rem;
+
+                        const isDbSettled = rem <= 0.001;
+                        const isOffsetCovered = !isDbSettled && effectiveRem <= 0.001 && allocOffset > 0.01;
+                        const isDebtSettled = isDbSettled || isOffsetCovered;
+                        const isPartial = !isDebtSettled && (paid > 0 || allocOffset > 0.01);
                         const isManual = debt.reference_type === 'direct_credit';
                         const originLabel = getOriginLabel(debt.reference_type);
                         const dateFormatted = debt.created_at
                           ? new Date(debt.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
                           : '—';
+                        const displayRemaining = isDebtSettled ? (isDbSettled ? orig : rem) : effectiveRem;
 
                         return (
                           <tr
@@ -635,8 +657,13 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
                             {/* Col 5: Remaining Amount */}
                             <td className="py-2.5 px-3.5 text-right whitespace-nowrap font-mono font-bold text-xs">
                               <span className={isDebtSettled ? 'text-slate-400 line-through' : debtType === 'receivable' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}>
-                                {(isDebtSettled ? orig : rem).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                {displayRemaining.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                               </span>
+                              {!isDebtSettled && allocOffset > 0.01 && (
+                                <div className="text-[10px] text-amber-600 dark:text-amber-400 font-mono font-normal">
+                                  Gross {rem.toLocaleString(undefined, { minimumFractionDigits: 2 })} · −{allocOffset.toLocaleString(undefined, { minimumFractionDigits: 2 })} Credit
+                                </div>
+                              )}
                             </td>
 
                             {/* Col 6: Action */}
@@ -696,15 +723,21 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
                           <td className="py-2.5 px-3.5 pl-8" colSpan={4}>
                             <div className="flex items-center gap-2">
                               <span className="text-amber-500 font-mono text-xs select-none">↳</span>
-                              <span className="font-semibold text-slate-800 dark:text-slate-200">
-                                {debtType === 'receivable'
-                                  ? 'Mutual Offset (Payables owed to partner)'
-                                  : 'Mutual Offset (Handovers & receivables held by partner)'}
-                              </span>
+                              <div>
+                                <span className="font-semibold text-slate-800 dark:text-slate-200">
+                                  Trade Credit Applied
+                                </span>
+                                <span className="text-slate-500 dark:text-slate-400 text-[11px] block">
+                                  {debtType === 'receivable'
+                                    ? `−${Number(group.offsetAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })} ETB absorbed by product received from ${group.name}`
+                                    : `+${Number(group.offsetAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })} ETB deducted for devices held by ${group.name}`}
+                                </span>
+                              </div>
                             </div>
                           </td>
                           <td className="py-2.5 px-3.5 text-right whitespace-nowrap font-mono font-bold text-xs text-amber-600 dark:text-amber-400">
-                            −{Number(group.offsetAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            <div>−{Number(group.offsetAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                            <div className="text-[10px] text-slate-500 font-normal">Net: {Number(group.netRemaining).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
                           </td>
                           <td colSpan={2}></td>
                         </tr>
@@ -823,10 +856,16 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
                     <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5 animate-in fade-in duration-200">
                       {group.debts.map((debt) => {
                         const orig = parseFloat(String(debt.original_amount)) || 0;
+                        const paid = parseFloat(String(debt.paid_amount)) || 0;
                         const rem = parseFloat(String(debt.remaining_amount)) || 0;
-                        const isDebtSettled = rem <= 0.001;
-                        const isPartial = parseFloat(String(debt.paid_amount)) > 0 && !isDebtSettled;
-                        const displayAmount = isDebtSettled ? orig : rem;
+                        const allocOffset = (debt as any).allocatedOffset || 0;
+                        const effectiveRem = (debt as any).effectiveRemaining !== undefined ? (debt as any).effectiveRemaining : rem;
+
+                        const isDbSettled = rem <= 0.001;
+                        const isOffsetCovered = !isDbSettled && effectiveRem <= 0.001 && allocOffset > 0.01;
+                        const isDebtSettled = isDbSettled || isOffsetCovered;
+                        const isPartial = !isDebtSettled && (paid > 0 || allocOffset > 0.01);
+                        const displayAmount = isDebtSettled ? (isDbSettled ? orig : rem) : effectiveRem;
                         const originLabel = getOriginLabel(debt.reference_type);
                         const dateFormatted = debt.created_at
                           ? new Date(debt.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
@@ -843,7 +882,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
                             }`}
                           >
                             <div className="min-w-0 pr-2">
-                              <div className="flex items-center gap-1.5 font-medium">
+                              <div className="flex items-center gap-1.5 font-medium flex-wrap">
                                 <span className={`font-semibold text-xs ${isDebtSettled ? 'text-slate-500 dark:text-slate-400' : 'text-slate-800 dark:text-slate-200'}`}>
                                   {originLabel}
                                 </span>
@@ -862,6 +901,11 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
                                   </span>
                                 )}
                               </div>
+                              {!isDebtSettled && allocOffset > 0.01 && (
+                                <div className="text-[10px] text-amber-600 dark:text-amber-400 font-mono mt-0.5">
+                                  Gross {rem.toLocaleString()} · −{allocOffset.toLocaleString()} Credit
+                                </div>
+                              )}
                             </div>
 
                             <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
@@ -893,19 +937,24 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
                         );
                       })}
                       {group.offsetAmount !== undefined && group.offsetAmount > 0.01 && (
-                        <div className="flex items-center justify-between p-2.5 rounded-xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-800/40 text-xs">
+                        <div className="flex items-center justify-between p-2.5 rounded-xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40 text-xs">
                           <div>
-                            <div className="font-semibold text-slate-700 dark:text-slate-300">
-                              Mutual Offset
+                            <div className="font-semibold text-slate-800 dark:text-slate-200">
+                              Trade Credit Applied
                             </div>
-                            <div className="text-[10px] text-slate-400">
+                            <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
                               {debtType === 'receivable'
-                                ? 'Offsetting open payables'
-                                : 'Offsetting handovers & receivables'}
+                                ? `−${Number(group.offsetAmount).toLocaleString()} ETB absorbed by product received from ${group.name}`
+                                : `+${Number(group.offsetAmount).toLocaleString()} ETB deducted for devices held by ${group.name}`}
                             </div>
                           </div>
-                          <div className="font-mono font-bold text-amber-600 dark:text-amber-400 text-xs">
-                            −{Number(group.offsetAmount).toLocaleString()} ETB
+                          <div className="text-right">
+                            <div className="font-mono font-bold text-amber-600 dark:text-amber-400 text-xs">
+                              −{Number(group.offsetAmount).toLocaleString()} ETB
+                            </div>
+                            <div className="text-[10px] text-slate-500 font-mono">
+                              Net: {Number(group.netRemaining).toLocaleString()} ETB
+                            </div>
                           </div>
                         </div>
                       )}
