@@ -27,6 +27,7 @@ import {
   Repeat,
   Receipt,
   ExternalLink,
+  Trash2,
 } from 'lucide-react';
 
 interface InventoryUnitDrawerProps {
@@ -35,6 +36,7 @@ interface InventoryUnitDrawerProps {
   onClose: () => void;
   user: User | null;
   onRestockSuccess?: () => void;
+  onUnitDeleted?: (unitId: string) => void;
   onSelectForSale?: (unit: InventoryUnit) => void;
   onOpenHandover?: (unit: InventoryUnit) => void;
   onOpenCustomerReturn?: (unit: InventoryUnit) => void;
@@ -68,6 +70,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
   onClose,
   user,
   onRestockSuccess,
+  onUnitDeleted,
   onSelectForSale,
   onOpenHandover,
   onOpenCustomerReturn,
@@ -86,8 +89,14 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Editable form fields
+  const [productModelName, setProductModelName] = useState('');
+  const [variantStorage, setVariantStorage] = useState('');
+  const [variantRam, setVariantRam] = useState('');
+  const [variantColor, setVariantColor] = useState('');
   const [imei, setImei] = useState('');
   const [condition, setCondition] = useState('new');
   const [costBasis, setCostBasis] = useState('');
@@ -105,6 +114,10 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
   const canManageInv = isOwner || !!user?.can_manage_inventory || !!user?.permissions?.can_manage_inventory;
 
   const initForm = (u: InventoryUnit) => {
+    setProductModelName(u.variant?.product?.name || '');
+    setVariantStorage(u.variant?.storage || '');
+    setVariantRam(u.variant?.ram || '');
+    setVariantColor(u.variant?.color || '');
     setImei(u.imei_or_serial || '');
     setCondition(u.condition || 'new');
     setCostBasis(u.cost_basis !== undefined && u.cost_basis !== null ? formatCurrencyInput(u.cost_basis) : '');
@@ -181,6 +194,10 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
     try {
       setSaving(true);
       const payload: any = {
+        product_name: productModelName.trim() || null,
+        storage: variantStorage.trim() || null,
+        ram: variantRam.trim() || null,
+        color: variantColor.trim() || null,
         imei_or_serial: imei.trim() || null,
         condition,
         sim_type: simType,
@@ -217,7 +234,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
       setCurrentUnit(updatedUnit);
       setIsEditing(false);
       toast.success('Device Details Updated', {
-        description: `${productName} (${updatedUnit.imei_or_serial || 'Unit'}) information successfully updated.`,
+        description: `${updatedUnit.variant?.product?.name || productName} (${updatedUnit.imei_or_serial || 'Unit'}) information successfully updated.`,
       });
       if (onUnitUpdated) {
         onUnitUpdated(updatedUnit);
@@ -226,6 +243,30 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
       toast.error('Failed to update device', { description: err.message });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDeleteUnit = async () => {
+    if (!currentUnit) return;
+    try {
+      setDeleting(true);
+      await api.deleteInventoryUnit(currentUnit.id);
+      toast.success('Unit Deleted', {
+        description: `${productName} (${currentUnit.imei_or_serial || 'Unit'}) removed from inventory.`,
+      });
+      setShowDeleteConfirm(false);
+      onClose();
+      if (onUnitDeleted) {
+        onUnitDeleted(currentUnit.id);
+      } else if (onRestockSuccess) {
+        onRestockSuccess();
+      }
+    } catch (err: any) {
+      toast.error('Cannot delete unit', {
+        description: err.message || 'Operation failed.',
+      });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -333,6 +374,28 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
             </button>
           )}
 
+          {(isOwner || canManageInv) && !isEditing && (
+            <button
+              type="button"
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={currentUnit.status === 'sold' || currentUnit.status === 'out'}
+              title={
+                currentUnit.status === 'sold'
+                  ? 'Sold units cannot be deleted'
+                  : currentUnit.status === 'out'
+                  ? 'Restock unit from handover first'
+                  : 'Delete this single unit'
+              }
+              className={`p-2 rounded-xl transition-colors cursor-pointer ${
+                currentUnit.status === 'sold' || currentUnit.status === 'out'
+                  ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed opacity-50'
+                  : 'text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40'
+              }`}
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
+
           {(isOwner || canManageInv) && (
             <button
               type="button"
@@ -361,17 +424,31 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
       footerActions={
         isEditing ? (
           <div className="flex items-center justify-between gap-3 w-full">
-            <button
-              type="button"
-              onClick={() => {
-                initForm(currentUnit);
-                setIsEditing(false);
-              }}
-              disabled={saving}
-              className="flex-1 sm:flex-none h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0 whitespace-nowrap"
-            >
-              Cancel
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  initForm(currentUnit);
+                  setIsEditing(false);
+                }}
+                disabled={saving}
+                className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0 whitespace-nowrap"
+              >
+                Cancel
+              </button>
+              {(isOwner || canManageInv) && currentUnit.status !== 'sold' && currentUnit.status !== 'out' && (
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  disabled={saving}
+                  className="h-9 px-3 rounded-xl border border-rose-200 dark:border-rose-900/60 bg-rose-50/50 dark:bg-rose-950/30 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/50 transition-colors cursor-pointer shrink-0 whitespace-nowrap flex items-center gap-1.5"
+                  title="Delete this unit"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Delete Unit</span>
+                </button>
+              )}
+            </div>
             <button
               type="button"
               onClick={handleSave}
@@ -753,6 +830,107 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
             <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/60">
               Live Edit
             </span>
+          </div>
+
+          {/* Section 0: Product Model & Hardware Variant */}
+          <div className="p-3.5 rounded-2xl bg-white dark:bg-[#131926] border border-slate-100 dark:border-slate-800 space-y-3 shadow-2xs">
+            <div className="flex items-center justify-between">
+              <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                Product Model & Hardware Variant
+              </h4>
+              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                Device Catalog Details
+              </span>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Product / Model Name
+              </label>
+              <input
+                type="text"
+                value={productModelName}
+                onChange={(e) => setProductModelName(e.target.value)}
+                placeholder="e.g. iPhone 15 Pro Max"
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              />
+              <span className="text-[10px] text-slate-400 mt-1 block">
+                Model family or device series name
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Storage
+                </label>
+                <input
+                  type="text"
+                  value={variantStorage}
+                  onChange={(e) => setVariantStorage(e.target.value)}
+                  placeholder="e.g. 128GB, 256GB"
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                />
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {['64GB', '128GB', '256GB', '512GB', '1TB'].map((st) => (
+                    <button
+                      key={st}
+                      type="button"
+                      onClick={() => setVariantStorage(st)}
+                      className={`px-1.5 py-0.5 rounded text-[9px] font-semibold transition-colors cursor-pointer ${
+                        variantStorage === st
+                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200'
+                      }`}
+                    >
+                      {st}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  RAM (Memory)
+                </label>
+                <input
+                  type="text"
+                  value={variantRam}
+                  onChange={(e) => setVariantRam(e.target.value)}
+                  placeholder="e.g. 6GB, 8GB"
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                />
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {['4GB', '6GB', '8GB', '12GB', '16GB'].map((r) => (
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() => setVariantRam(r)}
+                      className={`px-1.5 py-0.5 rounded text-[9px] font-semibold transition-colors cursor-pointer ${
+                        variantRam === r
+                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200'
+                      }`}
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Color / Finish
+                </label>
+                <input
+                  type="text"
+                  value={variantColor}
+                  onChange={(e) => setVariantColor(e.target.value)}
+                  placeholder="e.g. Black, Blue"
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                />
+              </div>
+            </div>
           </div>
 
           {/* Section 1: Identification & Condition */}
@@ -1757,7 +1935,108 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
               <div>{currentUnit.notes || 'Clean intake unit, standard store inspection verified.'}</div>
             </div>
           </div>
+
+          {/* Unit Management & Removal Section */}
+          {(isOwner || canManageInv) && (
+            <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+              <div className="p-3.5 rounded-2xl bg-rose-50/40 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/40 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                    Delete Inventory Unit
+                  </h4>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                    {currentUnit.status === 'sold'
+                      ? 'Sold unit cannot be deleted to protect accounting and sales records.'
+                      : currentUnit.status === 'out'
+                      ? 'Unit is currently out for handover. Restock to shelf before deleting.'
+                      : 'Safely deletes this single unit and cancels any open unpaid intake debt.'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  disabled={currentUnit.status === 'sold' || currentUnit.status === 'out'}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shrink-0 cursor-pointer ${
+                    currentUnit.status === 'sold' || currentUnit.status === 'out'
+                      ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed opacity-60'
+                      : 'bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/60 border border-rose-200/80 dark:border-rose-800/80 active:scale-95 shadow-2xs'
+                  }`}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Delete Unit</span>
+                </button>
+              </div>
+            </div>
+          )}
         </>
+      )}
+
+      {/* Delete Unit Confirmation Dialog */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-md rounded-2xl bg-white dark:bg-[#131926] border border-slate-200 dark:border-slate-800 p-5 shadow-2xl space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                  Delete Inventory Unit
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Are you sure you want to delete this specific unit? This removes it from active inventory.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 text-xs space-y-1.5 font-mono">
+              <div className="flex justify-between text-slate-600 dark:text-slate-300">
+                <span className="font-sans font-medium text-slate-400">Device Model:</span>
+                <span className="font-bold">{productName}</span>
+              </div>
+              {specText && (
+                <div className="flex justify-between text-slate-600 dark:text-slate-300">
+                  <span className="font-sans font-medium text-slate-400">Specifications:</span>
+                  <span>{specText}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-slate-600 dark:text-slate-300">
+                <span className="font-sans font-medium text-slate-400">Serial/IMEI:</span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                  {currentUnit.imei_or_serial || 'Unserialized'}
+                </span>
+              </div>
+              <div className="flex justify-between text-slate-600 dark:text-slate-300">
+                <span className="font-sans font-medium text-slate-400">Condition:</span>
+                <span className="capitalize">{currentUnit.condition}</span>
+              </div>
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-800/60 text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
+              Deleting this unit will safely adjust shop stock counts. If an open unpaid intake payable was generated for this device, it will be automatically cancelled.
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={deleting}
+                className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteUnit}
+                disabled={deleting}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all shadow-xs active:scale-95 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                <span>Confirm Delete</span>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </SlideOverDrawer>
   );

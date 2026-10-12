@@ -13,6 +13,7 @@ use App\Models\FinancialAccount;
 use App\Models\FinancialTransaction;
 use App\Models\InventoryStock;
 use App\Models\InventoryUnit;
+use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\SalesOrder;
 use App\Models\SalesOrderItem;
@@ -897,7 +898,7 @@ class InventoryController extends Controller
     }
 
     /**
-     * Update details of an existing inventory unit (IMEI, condition, cost basis, selling price, diagnostics, location, notes, supplier).
+     * Update details of an existing inventory unit (IMEI, condition, cost basis, selling price, diagnostics, location, notes, supplier, product name, variants).
      */
     public function updateUnit(Request $request, string $id): JsonResponse
     {
@@ -913,6 +914,11 @@ class InventoryController extends Controller
         $unit = InventoryUnit::with(['variant.product', 'supplier'])->findOrFail($id);
 
         $validated = $request->validate([
+            'product_name' => ['nullable', 'string', 'max:255'],
+            'storage' => ['nullable', 'string', 'max:50'],
+            'ram' => ['nullable', 'string', 'max:50'],
+            'color' => ['nullable', 'string', 'max:50'],
+            'variant_id' => ['nullable', 'exists:product_variants,id'],
             'imei_or_serial' => ['nullable', 'string', 'max:100'],
             'condition' => ['nullable', 'string', 'max:50'],
             'cost_basis' => ['nullable', 'numeric', 'min:0'],
@@ -945,7 +951,109 @@ class InventoryController extends Controller
             $validated['imei_or_serial'] = $newImei !== '' ? $newImei : null;
         }
 
+        $currentVariant = $unit->variant;
+        $currentProduct = $currentVariant?->product;
+
+        // 1. Handle Product Name update if provided
+        $targetProduct = $currentProduct;
+        if (! empty($validated['product_name']) && $currentProduct) {
+            $newProductName = trim($validated['product_name']);
+            if ($newProductName !== $currentProduct->name) {
+                $existingProduct = Product::where('tenant_id', $user->tenant_id)
+                    ->where('name', $newProductName)
+                    ->first();
+
+                if ($existingProduct) {
+                    $targetProduct = $existingProduct;
+                } else {
+                    $otherUnitsCount = InventoryUnit::where('tenant_id', $user->tenant_id)
+                        ->where('id', '!=', $unit->id)
+                        ->whereHas('variant', function ($q) use ($currentProduct) {
+                            $q->where('product_id', $currentProduct->id);
+                        })
+                        ->count();
+
+                    if ($otherUnitsCount === 0) {
+                        $currentProduct->update(['name' => $newProductName]);
+                        $targetProduct = $currentProduct;
+                    } else {
+                        $targetProduct = Product::create([
+                            'tenant_id' => $user->tenant_id,
+                            'name' => $newProductName,
+                            'brand' => $currentProduct->brand,
+                            'category' => $currentProduct->category,
+                            'category_id' => $currentProduct->category_id,
+                            'has_serials' => $currentProduct->has_serials,
+                            'is_active' => true,
+                        ]);
+                    }
+                }
+            }
+        }
+
+        // 2. Handle Variant update (Storage, RAM, Color)
+        $newStorage = array_key_exists('storage', $validated) ? (trim($validated['storage'] ?? '') ?: null) : $currentVariant?->storage;
+        $newRam = array_key_exists('ram', $validated) ? (trim($validated['ram'] ?? '') ?: null) : $currentVariant?->ram;
+        $newColor = array_key_exists('color', $validated) ? (trim($validated['color'] ?? '') ?: null) : $currentVariant?->color;
+
+        $targetVariantId = $unit->variant_id;
+
+        if (! empty($validated['variant_id'])) {
+            $targetVariantId = $validated['variant_id'];
+        } elseif ($targetProduct) {
+            $variantChanged = ($targetProduct->id !== $currentVariant?->product_id)
+                || ($newStorage !== $currentVariant?->storage)
+                || ($newRam !== $currentVariant?->ram)
+                || ($newColor !== $currentVariant?->color);
+
+            if ($variantChanged) {
+                $variantQuery = ProductVariant::where('tenant_id', $user->tenant_id)
+                    ->where('product_id', $targetProduct->id);
+
+                if ($newStorage !== null) {
+                    $variantQuery->where('storage', $newStorage);
+                } else {
+                    $variantQuery->whereNull('storage');
+                }
+
+                if ($newRam !== null) {
+                    $variantQuery->where('ram', $newRam);
+                } else {
+                    $variantQuery->whereNull('ram');
+                }
+
+                if ($newColor !== null) {
+                    $variantQuery->where('color', $newColor);
+                } else {
+                    $variantQuery->whereNull('color');
+                }
+
+                $matchedVariant = $variantQuery->first();
+
+                if ($matchedVariant) {
+                    $targetVariantId = $matchedVariant->id;
+                } else {
+                    $skuParts = array_filter([$targetProduct->name, $newStorage, $newColor]);
+                    $sku = strtoupper(Str::slug(implode('-', $skuParts)));
+                    $newVariant = ProductVariant::create([
+                        'tenant_id' => $user->tenant_id,
+                        'product_id' => $targetProduct->id,
+                        'storage' => $newStorage,
+                        'ram' => $newRam,
+                        'color' => $newColor,
+                        'sku' => $sku ?: null,
+                        'default_selling_price' => $validated['selling_price'] ?? $unit->selling_price,
+                    ]);
+                    $targetVariantId = $newVariant->id;
+                }
+            }
+        }
+
+        $validated['variant_id'] = $targetVariantId;
+        unset($validated['product_name'], $validated['storage'], $validated['ram'], $validated['color']);
+
         $oldValues = $unit->only([
+            'variant_id',
             'imei_or_serial',
             'condition',
             'cost_basis',
@@ -962,12 +1070,27 @@ class InventoryController extends Controller
             && $validated['cost_basis'] !== null
             && (float) $validated['cost_basis'] !== (float) $unit->cost_basis;
 
-        DB::transaction(function () use ($unit, $validated, $oldValues, $costBasisChanged) {
+        DB::transaction(function () use ($unit, $validated, $oldValues, $costBasisChanged, $user) {
             $unit->update($validated);
 
-            if ($costBasisChanged && $unit->status === 'in_stock') {
-                (new SynchronizeInventoryStockAction)->execute();
+            if ($costBasisChanged) {
+                $unpaidIntakeDebt = Debt::where('tenant_id', $user->tenant_id)
+                    ->where('reference_type', 'stock_intake')
+                    ->where('reference_id', $unit->id)
+                    ->where('status', 'open')
+                    ->where('paid_amount', '<=', 0.01)
+                    ->first();
+
+                if ($unpaidIntakeDebt) {
+                    $newCost = (float) $validated['cost_basis'];
+                    $unpaidIntakeDebt->update([
+                        'original_amount' => $newCost,
+                        'remaining_amount' => $newCost,
+                    ]);
+                }
             }
+
+            (new SynchronizeInventoryStockAction)->execute();
 
             AuditLog::record(
                 action: 'updated_unit',
@@ -992,6 +1115,114 @@ class InventoryController extends Controller
             'success' => true,
             'message' => 'Device details updated successfully.',
             'data' => $freshUnit,
+        ]);
+    }
+
+    /**
+     * Delete an individual inventory unit safely.
+     */
+    public function destroyUnit(Request $request, string $id): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        if (! ($user->isOwner() || $user->canManageInventory())) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. Deleting inventory units is restricted to authorized personnel.',
+            ], 403);
+        }
+
+        $unit = InventoryUnit::with(['variant.product', 'salesOrderItem'])->findOrFail($id);
+
+        // 1. Sold items can NEVER be deleted
+        if ($unit->status === 'sold' || $unit->salesOrderItem()->exists() || ! empty($unit->sold_at)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot delete a sold unit. It is permanently bound to customer sales orders and financial accounting history.',
+            ], 422);
+        }
+
+        // 2. Units currently out for handover cannot be deleted
+        if ($unit->status === 'out' || ! empty($unit->handover_to) || ! empty($unit->handed_out_at)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot delete a unit currently handed out for sale. Please restock it back to shop shelf first.',
+            ], 422);
+        }
+
+        // 3. Swapped or customer exchange units
+        if ($unit->is_swapped || ! empty($unit->exchange_sales_order_id) || ! empty($unit->swapped_sales_order_id)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot delete a unit linked to a warranty device swap or customer exchange record.',
+            ], 422);
+        }
+
+        // 4. Linked Debts / Payables check
+        $linkedDebts = Debt::where('tenant_id', $user->tenant_id)
+            ->where('reference_id', $unit->id)
+            ->get();
+
+        $paidDebt = $linkedDebts->first(fn ($d) => (float) $d->paid_amount > 0.01);
+        if ($paidDebt) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot delete this unit because payments or financial settlements have already been recorded on its intake payable.',
+            ], 422);
+        }
+
+        // 5. Maintenance records with financial account deductions
+        $hasPaidMaintenance = $unit->maintenanceRecords()
+            ->where('cost', '>', 0)
+            ->whereNotNull('financial_account_id')
+            ->exists();
+
+        if ($hasPaidMaintenance) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot delete this unit because service or repair expenses have been settled through financial treasury accounts.',
+            ], 422);
+        }
+
+        DB::transaction(function () use ($unit, $linkedDebts, $user) {
+            // Cancel any unpaid linked debts so no orphan debts remain
+            foreach ($linkedDebts as $debt) {
+                $debt->update([
+                    'status' => 'cancelled',
+                    'remaining_amount' => 0,
+                    'notes' => trim(($debt->notes ?? '')." [Voided upon deletion of unit {$unit->imei_or_serial}]"),
+                ]);
+            }
+
+            // If supplier was involved, reconcile mutual debts
+            if ($unit->supplier_contact_id) {
+                Debt::reconcileContactMutualDebts($user->tenant_id, (string) $unit->supplier_contact_id);
+            }
+
+            // Remove unpaid maintenance records if any
+            $unit->maintenanceRecords()->delete();
+
+            $oldData = $unit->toArray();
+
+            // Soft-delete unit
+            $unit->update(['status' => 'archived']);
+            $unit->delete();
+
+            // Resynchronize stock counts
+            (new SynchronizeInventoryStockAction)->execute();
+
+            AuditLog::record(
+                action: 'deleted_unit',
+                entityType: 'InventoryUnit',
+                entityId: (string) $unit->id,
+                oldValues: $oldData,
+                newValues: ['status' => 'archived', 'deleted_at' => now()->toIso8601String()]
+            );
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Inventory unit deleted successfully and stock counts updated.',
         ]);
     }
 

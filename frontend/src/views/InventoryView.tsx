@@ -232,6 +232,32 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   // Warranty Swap Modal State
   const [swapTargetUnit, setSwapTargetUnit] = useState<InventoryUnit | null>(null);
 
+  // Unit Deletion Modal State
+  const [unitToDelete, setUnitToDelete] = useState<InventoryUnit | null>(null);
+  const [deletingUnit, setDeletingUnit] = useState(false);
+
+  const handleConfirmDeleteUnit = async () => {
+    if (!unitToDelete) return;
+    try {
+      setDeletingUnit(true);
+      await api.deleteInventoryUnit(unitToDelete.id);
+      toast.success('Unit Deleted', {
+        description: `${unitToDelete.variant?.product?.name || 'Device'} (${unitToDelete.imei_or_serial || 'Unit'}) removed from inventory.`,
+      });
+      setUnitToDelete(null);
+      if (selectedUnit?.id === unitToDelete.id) {
+        setSelectedUnit(null);
+      }
+      await loadInventory();
+    } catch (err: any) {
+      toast.error('Cannot delete unit', {
+        description: err.message || 'Operation failed.',
+      });
+    } finally {
+      setDeletingUnit(false);
+    }
+  };
+
   // Debounce search input for high performance
   useEffect(() => {
     if (search === debouncedSearch) {
@@ -1332,6 +1358,15 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                                       <span>Handover</span>
                                     </button>
                                   )}
+                                    {(isOwner || canManageInv) && unit.status !== 'sold' && unit.status !== 'out' && (
+                                      <button
+                                        onClick={() => setUnitToDelete(unit)}
+                                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors shadow-2xs active:scale-95 cursor-pointer"
+                                        title="Delete this unit"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
                                   </div>
                                 </td>
                               )}
@@ -2040,9 +2075,20 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                                 </div>
                               </div>
 
-                              <div className="flex items-center gap-1 text-[11px] text-slate-400 shrink-0">
-                                <span>Inspect</span>
-                                <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
+                              <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                {(isOwner || canManageInv) && unit.status !== 'sold' && unit.status !== 'out' && (
+                                  <button
+                                    onClick={() => setUnitToDelete(unit)}
+                                    className="p-1 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+                                    title="Delete this unit"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                                <div className="flex items-center gap-1 text-[11px] text-slate-400 cursor-pointer" onClick={() => setSelectedUnit(unit)}>
+                                  <span>Inspect</span>
+                                  <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
+                                </div>
                               </div>
                             </div>
                           );
@@ -3907,6 +3953,10 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         onClose={() => setSelectedUnit(null)}
         user={user}
         onRestockSuccess={loadInventory}
+        onUnitDeleted={() => {
+          setSelectedUnit(null);
+          loadInventory();
+        }}
         onUnitUpdated={(updated) => {
           setSelectedUnit(updated);
           loadInventory();
@@ -3986,6 +4036,74 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           onInventoryChange?.();
         }}
       />
+
+      {/* Unit Row Deletion Modal */}
+      {unitToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-md rounded-2xl bg-white dark:bg-[#131926] border border-slate-200 dark:border-slate-800 p-5 shadow-2xl space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                  Delete Inventory Unit
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Are you sure you want to permanently delete this unit from inventory?
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 text-xs space-y-1.5 font-mono">
+              <div className="flex justify-between text-slate-600 dark:text-slate-300">
+                <span className="font-sans font-medium text-slate-400">Device Model:</span>
+                <span className="font-bold">{unitToDelete.variant?.product?.name || 'Device'}</span>
+              </div>
+              <div className="flex justify-between text-slate-600 dark:text-slate-300">
+                <span className="font-sans font-medium text-slate-400">Variant:</span>
+                <span>
+                  {[unitToDelete.variant?.storage, unitToDelete.variant?.color].filter(Boolean).join(' • ') || 'Standard'}
+                </span>
+              </div>
+              <div className="flex justify-between text-slate-600 dark:text-slate-300">
+                <span className="font-sans font-medium text-slate-400">Serial/IMEI:</span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                  {unitToDelete.imei_or_serial || 'Unserialized'}
+                </span>
+              </div>
+              <div className="flex justify-between text-slate-600 dark:text-slate-300">
+                <span className="font-sans font-medium text-slate-400">Status:</span>
+                <span className="uppercase">{unitToDelete.status}</span>
+              </div>
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-800/60 text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
+              Deleting this unit will safely adjust inventory counts. Any open unpaid intake debt for this unit will be cleanly voided.
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setUnitToDelete(null)}
+                disabled={deletingUnit}
+                className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteUnit}
+                disabled={deletingUnit}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all shadow-xs active:scale-95 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                {deletingUnit ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                <span>Confirm Delete</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1138,6 +1138,11 @@ export const api = {
   updateInventoryUnit: (
     id: string,
     data: {
+      product_name?: string | null;
+      storage?: string | null;
+      ram?: string | null;
+      color?: string | null;
+      variant_id?: string | null;
       imei_or_serial?: string | null;
       condition?: string;
       cost_basis?: number;
@@ -1153,6 +1158,11 @@ export const api = {
     request<InventoryUnit>(`/inventory/units/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
+    }),
+
+  deleteInventoryUnit: (id: string) =>
+    request<{ success: boolean; message: string }>(`/inventory/units/${id}`, {
+      method: 'DELETE',
     }),
 
   handoverInventoryUnit: (id: string, data: { handover_to: string; location?: string; notes?: string; return_deadline?: string; handover_payout?: number; instant_offset?: boolean }) =>

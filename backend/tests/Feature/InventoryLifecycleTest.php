@@ -719,6 +719,129 @@ test('owner can mark a handed-out device as sold on credit keeping receivable op
     expect($freshDebt->notes)->toContain('Device confirmed SOLD');
 });
 
+test('staff can update full product details including name, variants, cost basis and selling price', function () {
+    $response = $this->actingAs($this->user)
+        ->putJson("/api/v1/inventory/units/{$this->unit->id}", [
+            'product_name' => 'iPhone 16 Pro Max Edition',
+            'storage' => '512GB',
+            'color' => 'Black Titanium',
+            'ram' => '8GB',
+            'cost_basis' => 170000.00,
+            'selling_price' => 195000.00,
+            'condition' => 'new',
+            'battery_health' => 99,
+        ]);
+
+    $response->assertStatus(200)
+        ->assertJsonPath('success', true);
+
+    $freshUnit = $this->unit->fresh()->load('variant.product');
+    expect($freshUnit->variant->product->name)->toBe('iPhone 16 Pro Max Edition');
+    expect($freshUnit->variant->storage)->toBe('512GB');
+    expect($freshUnit->variant->color)->toBe('Black Titanium');
+    expect($freshUnit->variant->ram)->toBe('8GB');
+    expect((float) $freshUnit->cost_basis)->toBe(170000.00);
+    expect((float) $freshUnit->selling_price)->toBe(195000.00);
+    expect($freshUnit->battery_health)->toBe(99);
+});
+
+test('can safely delete an in-stock unit and cancel its unpaid intake debt', function () {
+    $contact = \App\Models\Contact::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Abebe Supplier',
+        'type' => 'supplier',
+        'roles' => ['supplier'],
+    ]);
+
+    $unpaidDebt = \App\Models\Debt::create([
+        'tenant_id' => $this->tenant->id,
+        'contact_id' => $contact->id,
+        'type' => 'payable',
+        'reference_type' => 'stock_intake',
+        'reference_id' => $this->unit->id,
+        'original_amount' => 160000.00,
+        'paid_amount' => 0.0,
+        'remaining_amount' => 160000.00,
+        'status' => 'open',
+    ]);
+
+    $response = $this->actingAs($this->user)
+        ->deleteJson("/api/v1/inventory/units/{$this->unit->id}");
+
+    $response->assertStatus(200)
+        ->assertJsonPath('success', true);
+
+    // Unit is soft-deleted
+    expect(InventoryUnit::find($this->unit->id))->toBeNull();
+    expect(InventoryUnit::withTrashed()->find($this->unit->id))->not->toBeNull();
+
+    // Debt is cancelled and zeroed
+    $freshDebt = $unpaidDebt->fresh();
+    expect($freshDebt->status)->toBe('cancelled');
+    expect((float) $freshDebt->remaining_amount)->toBe(0.0);
+    expect($freshDebt->notes)->toContain('Voided upon deletion of unit');
+});
+
+test('cannot delete a sold unit', function () {
+    $this->unit->update([
+        'status' => 'sold',
+        'sold_at' => now(),
+    ]);
+
+    $response = $this->actingAs($this->user)
+        ->deleteJson("/api/v1/inventory/units/{$this->unit->id}");
+
+    $response->assertStatus(422)
+        ->assertJsonPath('success', false);
+
+    expect(InventoryUnit::find($this->unit->id))->not->toBeNull();
+});
+
+test('cannot delete a unit currently out for handover', function () {
+    $this->unit->update([
+        'status' => 'out',
+        'handover_to' => 'Kebede',
+        'handed_out_at' => now(),
+    ]);
+
+    $response = $this->actingAs($this->user)
+        ->deleteJson("/api/v1/inventory/units/{$this->unit->id}");
+
+    $response->assertStatus(422)
+        ->assertJsonPath('success', false);
+
+    expect(InventoryUnit::find($this->unit->id))->not->toBeNull();
+});
+
+test('cannot delete a unit with partially or fully paid intake debt', function () {
+    $contact = \App\Models\Contact::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Paid Supplier',
+        'type' => 'supplier',
+        'roles' => ['supplier'],
+    ]);
+
+    \App\Models\Debt::create([
+        'tenant_id' => $this->tenant->id,
+        'contact_id' => $contact->id,
+        'type' => 'payable',
+        'reference_type' => 'stock_intake',
+        'reference_id' => $this->unit->id,
+        'original_amount' => 160000.00,
+        'paid_amount' => 50000.00,
+        'remaining_amount' => 110000.00,
+        'status' => 'partially_paid',
+    ]);
+
+    $response = $this->actingAs($this->user)
+        ->deleteJson("/api/v1/inventory/units/{$this->unit->id}");
+
+    $response->assertStatus(422)
+        ->assertJsonPath('success', false);
+
+    expect(InventoryUnit::find($this->unit->id))->not->toBeNull();
+});
+
 
 
 
