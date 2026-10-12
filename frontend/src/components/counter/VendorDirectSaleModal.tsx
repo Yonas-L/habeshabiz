@@ -14,10 +14,10 @@ import {
   Clock,
   ShieldAlert,
   Plus,
-  Smartphone,
-  CreditCard,
   Banknote,
-  Wallet,
+  ArrowLeftRight,
+  Clock3,
+  Flag,
   User as UserIcon,
 } from 'lucide-react';
 import { LdrsSpinner } from '../loading/LdrsSpinner';
@@ -70,7 +70,9 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
   // Customer & POS Sale Details
   const [sellingPrice, setSellingPrice] = useState('');
   const [paidAmount, setPaidAmount] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('telebirr');
+  const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [isCreditSale, setIsCreditSale] = useState(false);
+  const [isWriteOff, setIsWriteOff] = useState(false);
   const [customerAccountId, setCustomerAccountId] = useState('');
   const [customerMode, setCustomerMode] = useState<'walk_in' | 'new' | 'existing'>('walk_in');
   const [customerId, setCustomerId] = useState('');
@@ -255,8 +257,13 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
       }
     }
 
-    if (paidAmountNum > 0 && paymentMethod !== 'cash' && !customerAccountId) {
+    if (paidAmountNum > 0 && paymentMethod !== 'debt_offset' && !isCreditSale && !isWriteOff && !customerAccountId) {
       toast.error('Please select the shop receiving account');
+      return;
+    }
+
+    if (paymentMethod === 'debt_offset' && (!customerId || customerMode !== 'existing')) {
+      toast.error('Please select an existing customer/party contact for debt offset');
       return;
     }
 
@@ -289,8 +296,12 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
           : undefined,
         selling_price: sellingPriceNum,
         paid_amount: paidAmountNum,
-        payment_method: paymentMethod as any,
-        financial_account_id: paidAmountNum > 0 && paymentMethod !== 'cash' ? customerAccountId : undefined,
+        payment_method: (isCreditSale
+          ? 'credit'
+          : (paymentMethod || 'cash')) as any,
+        credit_sale: isCreditSale,
+        intentional_shortfall: isWriteOff,
+        financial_account_id: paidAmountNum > 0 && paymentMethod !== 'debt_offset' && !isCreditSale && !isWriteOff ? customerAccountId : undefined,
         customer_id: customerMode === 'existing' ? customerId || undefined : undefined,
         customer_name: customerMode === 'new' && customerName.trim() ? customerName.trim() : undefined,
         customer_phone: customerMode === 'new' && customerPhone.trim() ? customerPhone.trim() : undefined,
@@ -314,6 +325,9 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
       setNotes('');
       setIsVendorSplit(false);
       setVendorPaymentSplits([]);
+      setIsCreditSale(false);
+      setIsWriteOff(false);
+      setPaymentMethod('cash');
 
       onSaleSuccess();
       onClose();
@@ -834,18 +848,37 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
                 </label>
                 <div className="grid grid-cols-2 gap-1.5">
                   {[
-                    { value: 'telebirr', label: 'TeleBirr', icon: Smartphone },
-                    { value: 'cbe', label: 'CBE', icon: CreditCard },
-                    { value: 'cash', label: 'Cash', icon: Banknote },
-                    { value: 'bank_transfer', label: 'Other Bank', icon: Wallet },
+                    { value: 'cash', label: 'Cash transfer', icon: Banknote },
+                    { value: 'debt_offset', label: 'Debt offset', icon: ArrowLeftRight },
+                    { value: 'credit', label: 'Credit sale', icon: Clock3 },
+                    { value: 'writeoff', label: 'Price concession', icon: Flag },
                   ].map((m) => {
                     const Icon = m.icon;
-                    const isSelected = paymentMethod === m.value;
+                    const isSelected = m.value === 'credit'
+                      ? isCreditSale
+                      : m.value === 'writeoff'
+                        ? isWriteOff
+                        : paymentMethod === m.value && !isCreditSale && !isWriteOff;
                     return (
                       <button
                         key={m.value}
                         type="button"
-                        onClick={() => setPaymentMethod(m.value)}
+                        onClick={() => {
+                          const isCreditOption = m.value === 'credit';
+                          const isWriteOffOption = m.value === 'writeoff';
+                          setPaymentMethod(isCreditOption || isWriteOffOption ? 'cash' : m.value);
+                          setIsCreditSale(isCreditOption);
+                          setIsWriteOff(isWriteOffOption);
+                          if (!isCreditOption && !isWriteOffOption) {
+                            if (sellingPriceNum > 0) {
+                              setPaidAmount(String(sellingPriceNum));
+                            }
+                          } else if (isCreditOption && paidAmountNum >= sellingPriceNum) {
+                            setPaidAmount('0');
+                          } else if (isWriteOffOption && paidAmountNum >= sellingPriceNum) {
+                            setPaidAmount('0');
+                          }
+                        }}
                         className={`h-9 px-2 rounded-xl border text-left flex items-center gap-1.5 text-xs font-semibold transition-all cursor-pointer ${
                           isSelected
                             ? 'border-slate-800 bg-slate-900 dark:bg-slate-900 text-emerald-400 dark:text-emerald-400 font-bold shadow-xs ring-1 ring-emerald-500/20'
@@ -860,7 +893,7 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
                 </div>
               </div>
 
-              {paidAmountNum > 0 && paymentMethod !== 'cash' && (
+              {paidAmountNum > 0 && paymentMethod !== 'debt_offset' && !isCreditSale && !isWriteOff && (
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
                     Shop Deposit Account *
