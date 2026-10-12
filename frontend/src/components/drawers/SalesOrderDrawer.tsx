@@ -287,16 +287,17 @@ export const SalesOrderDrawer: React.FC<SalesOrderDrawerProps> = ({
     const itemsText = order.items
       .map((item, index) => {
         const unit = item.inventory_unit;
+        const variant = unit?.variant || item.variant;
         const isExchanged = unit?.source_type === 'exchange' || Boolean(unit?.exchange_sales_order_id);
         const tagText = isExchanged ? ' - Exchanged' : '';
         const imeiText = unit?.imei_or_serial ? `\n   SN: ${unit.imei_or_serial}` : '';
         const batteryText = unit?.battery_health ? ` · ${unit.battery_health}% Batt` : '';
-        const spec = [item.variant?.storage, item.variant?.color].filter(Boolean).join(' · ');
+        const spec = [variant?.storage, variant?.color].filter(Boolean).join(' · ');
         const specText = spec ? ` - ${spec}` : '';
         const receiptUnitPrice = order.items.length === 1
           ? settledSaleValue / Math.max(1, Number(item.quantity || 1))
           : Number(item.unit_price);
-        return `${index + 1}. ${item.quantity}x ${item.variant?.product?.name || 'Device'}${specText}${tagText}${imeiText}${batteryText}\n   ${receiptUnitPrice.toLocaleString()} ETB`;
+        return `${index + 1}. ${item.quantity}x ${variant?.product?.name || item.variant?.product?.name || 'Device'}${specText}${tagText}${imeiText}${batteryText}\n   ${receiptUnitPrice.toLocaleString()} ETB`;
       })
       .join('\n\n');
 
@@ -748,7 +749,9 @@ Thank you for choosing Habeshabiz Electronics!
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
                   {order.items.map((item, idx) => {
                     const unit = item.inventory_unit;
-                    const specString = [item.variant?.storage, item.variant?.color].filter(Boolean).join(' · ');
+                    const variant = unit?.variant || item.variant;
+                    const specString = [variant?.storage, variant?.color].filter(Boolean).join(' · ');
+                    const pName = variant?.product?.name || item.variant?.product?.name || 'Device';
                     const conditionStr = formatCondition(unit?.condition);
                     const simStr = formatSimType(unit?.sim_type);
                     const lineUnitPrice =
@@ -762,7 +765,7 @@ Thank you for choosing Habeshabiz Electronics!
                         <td className="py-2.5 px-1 text-center text-slate-400 font-mono text-[11px]">{idx + 1}</td>
                         <td className="py-2.5 px-2 space-y-1">
                           <div className="font-bold text-slate-900 dark:text-white text-xs flex items-center flex-wrap gap-1.5">
-                            <span>{item.variant?.product?.name || 'Device'}</span>
+                            <span>{pName}</span>
                             {specString && <span className="font-normal text-slate-400">({specString})</span>}
                           </div>
 
@@ -829,7 +832,9 @@ Thank you for choosing Habeshabiz Electronics!
             <div className="md:hidden space-y-2.5">
               {order.items.map((item, idx) => {
                 const unit = item.inventory_unit;
-                const specString = [item.variant?.storage, item.variant?.color].filter(Boolean).join(' · ');
+                const variant = unit?.variant || item.variant;
+                const specString = [variant?.storage, variant?.color].filter(Boolean).join(' · ');
+                const pName = variant?.product?.name || item.variant?.product?.name || 'Device';
                 const conditionStr = formatCondition(unit?.condition);
                 const lineUnitPrice =
                   order.items.length === 1
@@ -845,7 +850,7 @@ Thank you for choosing Habeshabiz Electronics!
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <div className="font-bold text-slate-900 dark:text-white text-xs">
-                          {item.variant?.product?.name || 'Device'}
+                          {pName}
                         </div>
                         {specString && (
                           <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
@@ -1035,7 +1040,7 @@ Thank you for choosing Habeshabiz Electronics!
                       >
                         <div className="min-w-0">
                           <span className="font-semibold text-slate-800 dark:text-slate-200 truncate block">
-                            {item.variant?.product?.name}
+                            {item.inventory_unit?.variant?.product?.name || item.variant?.product?.name || 'Device'}
                           </span>
                           {isBrokered ? (
                             <span className="text-[10px] text-amber-600 dark:text-amber-400 flex items-center gap-1">

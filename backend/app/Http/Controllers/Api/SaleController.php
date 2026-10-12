@@ -67,6 +67,7 @@ class SaleController extends Controller
                     ->orWhereHas('customer', fn ($cq) => $cq->where('name', 'ilike', "%{$search}%"))
                     ->orWhereHas('items.inventoryUnit', fn ($iq) => $iq->where('imei_or_serial', 'ilike', "%{$search}%"))
                     ->orWhereHas('items.variant.product', fn ($pq) => $pq->where('name', 'ilike', "%{$search}%"))
+                    ->orWhereHas('items.inventoryUnit.variant.product', fn ($pq) => $pq->where('name', 'ilike', "%{$search}%"))
                     ->orWhereHas('exchangeUnit', fn ($eq) => $eq->where('imei_or_serial', 'ilike', "%{$search}%"));
             });
         }

@@ -1098,6 +1098,79 @@ test('editing an in-stock unit updates stock intake debt and debt notes across v
     expect($entry['context'])->toContain('999888777');
 });
 
+test('sync sales order items unit variants migration heals mismatched historical order items', function () {
+    $category = \App\Models\Category::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Laptops',
+        'slug' => 'laptops-'.uniqid(),
+    ]);
+
+    $prod1 = \App\Models\Product::create([
+        'tenant_id' => $this->tenant->id,
+        'category_id' => $category->id,
+        'name' => 'MacBook Air M1',
+        'brand' => 'Apple',
+    ]);
+    $var1 = \App\Models\ProductVariant::create([
+        'tenant_id' => $this->tenant->id,
+        'product_id' => $prod1->id,
+        'storage' => '256GB',
+        'default_selling_price' => 50000.00,
+    ]);
+
+    $prod2 = \App\Models\Product::create([
+        'tenant_id' => $this->tenant->id,
+        'category_id' => $category->id,
+        'name' => 'MacBook Pro M3',
+        'brand' => 'Apple',
+    ]);
+    $var2 = \App\Models\ProductVariant::create([
+        'tenant_id' => $this->tenant->id,
+        'product_id' => $prod2->id,
+        'storage' => '512GB',
+        'default_selling_price' => 95000.00,
+    ]);
+
+    $unit = \App\Models\InventoryUnit::create([
+        'tenant_id' => $this->tenant->id,
+        'variant_id' => $var2->id,
+        'imei_or_serial' => 'MBP-998877',
+        'status' => 'sold',
+        'cost_basis' => 80000.00,
+        'selling_price' => 95000.00,
+    ]);
+
+    $order = \App\Models\SalesOrder::create([
+        'tenant_id' => $this->tenant->id,
+        'order_number' => 'ORD-SYNC-TEST-001',
+        'salesperson_id' => $this->user->id,
+        'total_amount' => 95000.00,
+        'paid_amount' => 95000.00,
+        'payment_status' => 'paid',
+        'order_date' => now(),
+    ]);
+
+    $soItem = \App\Models\SalesOrderItem::create([
+        'tenant_id' => $this->tenant->id,
+        'sales_order_id' => $order->id,
+        'variant_id' => $var1->id,
+        'inventory_unit_id' => $unit->id,
+        'quantity' => 1,
+        'unit_price' => 95000.00,
+        'unit_cost' => 80000.00,
+        'profit' => 15000.00,
+    ]);
+
+    expect($soItem->variant_id)->toBe($var1->id);
+
+    // Run the migration up
+    $migration = require database_path('migrations/2026_10_12_000001_sync_sales_order_items_unit_variants.php');
+    $migration->up();
+
+    $soItem->refresh();
+    expect($soItem->variant_id)->toBe($var2->id);
+});
+
 
 
 

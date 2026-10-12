@@ -576,13 +576,14 @@ class GeneratePartnerStatementAction
         $customerOrders = SalesOrder::where('customer_id', $contact->id)
             ->whereNotIn('id', $creditOrderIds)
             ->where('payment_method', '!=', 'debt_offset')
-            ->where('notes', 'not like', '%Handover sale%')
-            ->whereDoesntHave('items', function ($q) use ($handoverUnitIds) {
-                if (! empty($handoverUnitIds)) {
-                    $q->whereIn('inventory_unit_id', $handoverUnitIds);
-                }
+            ->where(function ($q) {
+                $q->whereNull('notes')
+                    ->orWhere('notes', 'not like', '%Handover sale%');
             })
-            ->with(['items.variant.product', 'items.inventoryUnit', 'financialAccount', 'exchangeUnit.variant.product'])
+            ->when(! empty($handoverUnitIds), function ($query) use ($handoverUnitIds) {
+                $query->whereDoesntHave('items', fn ($q) => $q->whereIn('inventory_unit_id', $handoverUnitIds));
+            })
+            ->with(['items.variant.product', 'items.inventoryUnit.variant.product', 'financialAccount', 'exchangeUnit.variant.product'])
             ->get();
 
         foreach ($customerOrders as $co) {
@@ -593,7 +594,7 @@ class GeneratePartnerStatementAction
             $orderDate = Carbon::parse($co->order_date ?? $co->created_at);
             $itemDesc = $co->items->isNotEmpty()
                 ? $co->items->map(function ($it) {
-                    $pName = $it->variant?->product?->name ?? 'Item';
+                    $pName = $it->inventoryUnit?->variant?->product?->name ?? $it->variant?->product?->name ?? 'Item';
                     $sn = $it->inventoryUnit?->imei_or_serial ? " (SN: {$it->inventoryUnit->imei_or_serial})" : '';
                     $qty = $it->quantity > 1 ? " x{$it->quantity}" : '';
 

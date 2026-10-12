@@ -821,3 +821,108 @@ test('partner statement preserves confidentiality by omitting order ids, present
     expect($ledger[1]['context'])->not->toContain('Wire payout');
     expect($ledger[1]['context'])->toContain($this->cbe->name);
 });
+
+test('customer statement accurately displays direct sales orders, payments, and renamed inventory unit', function () {
+    $customer = Contact::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Kuma walking',
+        'phone' => '+251920625279',
+        'roles' => ['customer'],
+        'is_active' => true,
+    ]);
+
+    $category = Category::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Smartphones',
+        'slug' => 'smartphones-'.uniqid(),
+    ]);
+
+    $product1 = Product::create([
+        'tenant_id' => $this->tenant->id,
+        'category_id' => $category->id,
+        'name' => 'Samsung Galaxy s24 ultra',
+        'brand' => 'Samsung',
+    ]);
+
+    $variant1 = ProductVariant::create([
+        'tenant_id' => $this->tenant->id,
+        'product_id' => $product1->id,
+        'storage' => '256GB',
+        'color' => 'Natural',
+        'default_selling_price' => 98000.00,
+    ]);
+
+    $product2 = Product::create([
+        'tenant_id' => $this->tenant->id,
+        'category_id' => $category->id,
+        'name' => 'Iphone 13 pro max',
+        'brand' => 'Apple',
+    ]);
+
+    $variant2 = ProductVariant::create([
+        'tenant_id' => $this->tenant->id,
+        'product_id' => $product2->id,
+        'storage' => '256GB',
+        'color' => 'Natural',
+        'default_selling_price' => 98000.00,
+    ]);
+
+    // Unit was updated to iPhone 13 Pro Max
+    $unit = InventoryUnit::create([
+        'tenant_id' => $this->tenant->id,
+        'variant_id' => $variant2->id,
+        'imei_or_serial' => '9921187',
+        'status' => 'sold',
+        'cost_basis' => 96000.00,
+        'selling_price' => 98000.00,
+        'condition' => 'used clean',
+        'battery_health' => 93,
+    ]);
+
+    $order = SalesOrder::create([
+        'tenant_id' => $this->tenant->id,
+        'order_number' => 'ORD-DJTXN7VI',
+        'salesperson_id' => $this->user->id,
+        'customer_id' => $customer->id,
+        'financial_account_id' => $this->cbe->id,
+        'total_amount' => 98000.00,
+        'paid_amount' => 98000.00,
+        'payment_status' => 'paid',
+        'payment_method' => 'bank_transfer',
+        'order_date' => now(),
+    ]);
+
+    SalesOrderItem::create([
+        'tenant_id' => $this->tenant->id,
+        'sales_order_id' => $order->id,
+        'variant_id' => $variant1->id,
+        'inventory_unit_id' => $unit->id,
+        'quantity' => 1,
+        'unit_price' => 98000.00,
+        'unit_cost' => 96000.00,
+        'profit' => 2000.00,
+    ]);
+
+    // Request customer statement
+    $res = $this->actingAs($this->user, 'sanctum')->getJson("/api/v1/contacts/{$customer->id}/statement");
+    $res->assertOk();
+
+    $ledger = $res->json('data.ledger');
+    expect(count($ledger))->toBe(2);
+
+    // One entry is Payment Received (-98,000)
+    $paymentEntry = collect($ledger)->firstWhere('type', 'payment_received');
+    expect($paymentEntry)->not->toBeNull();
+    expect((float) $paymentEntry['receivable'])->toBe(-98000.0);
+    expect($paymentEntry['context'])->toContain('Paid (CBE Main)');
+
+    // One entry is Purchase (+98,000), using the inventory unit's updated product name
+    $purchaseEntry = collect($ledger)->firstWhere('type', 'customer_purchase');
+    expect($purchaseEntry)->not->toBeNull();
+    expect((float) $purchaseEntry['receivable'])->toBe(98000.0);
+    expect($purchaseEntry['context'])->toContain('Iphone 13 pro max');
+    expect($purchaseEntry['context'])->toContain('SN: 9921187');
+
+    // Closing balance is settled (0)
+    expect((float) $res->json('data.kpis.range_closing_balance'))->toBe(0.0);
+});
