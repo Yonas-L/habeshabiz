@@ -27,6 +27,8 @@ export type VitalType = 'cash' | 'receivables' | 'inventory' | 'reserves' | 'pay
 
 interface VitalBreakdownDrawerProps {
   vitalType: VitalType | null;
+  focusedContactId?: string | null;
+  onClearFocusedContact?: () => void;
   isOpen: boolean;
   onClose: () => void;
   data: DashboardData | null;
@@ -46,6 +48,8 @@ const formatMonthLabel = (mStr?: string) => {
 
 export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
   vitalType,
+  focusedContactId,
+  onClearFocusedContact,
   isOpen,
   onClose,
   data,
@@ -267,6 +271,71 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
       .sort((a, b) => b.netRemaining - a.netRemaining);
   }, [top_payables]);
 
+  const [internalFocusedContactId, setInternalFocusedContactId] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    setInternalFocusedContactId(focusedContactId || null);
+  }, [focusedContactId, isOpen]);
+
+  const activeFocusedContactId = internalFocusedContactId;
+
+  const focusedReceivableGroup = useMemo(() => {
+    if (!activeFocusedContactId) return null;
+    return (
+      groupedReceivables.find(
+        (g) => g.contactId === activeFocusedContactId || g.name.toLowerCase() === activeFocusedContactId.toLowerCase()
+      ) || null
+    );
+  }, [groupedReceivables, activeFocusedContactId]);
+
+  const focusedPayableGroup = useMemo(() => {
+    if (!activeFocusedContactId) return null;
+    return (
+      groupedPayables.find(
+        (g) => g.contactId === activeFocusedContactId || g.name.toLowerCase() === activeFocusedContactId.toLowerCase()
+      ) || null
+    );
+  }, [groupedPayables, activeFocusedContactId]);
+
+  const focusedGroup = vitalType === 'receivables' ? focusedReceivableGroup : vitalType === 'payables' ? focusedPayableGroup : null;
+
+  const drawerTitle = focusedGroup ? focusedGroup.name : current.title;
+  const drawerSubtitle = focusedGroup
+    ? `${focusedGroup.openCount} ${focusedGroup.openCount === 1 ? 'obligation' : 'obligations'} · ${vitalType === 'receivables' ? 'Customer / Partner Holdings' : 'Supplier Debt Ledger'}${focusedGroup.phone ? ` · ${focusedGroup.phone}` : ''}`
+    : current.subtitle;
+  const drawerAmount = focusedGroup ? focusedGroup.netRemaining : current.amount;
+  const valuationLabel = focusedGroup
+    ? (selectedMonth ? `Net Position as of ${formatMonthLabel(selectedMonth)}` : 'Net Position')
+    : (selectedMonth ? `Valuation as of ${formatMonthLabel(selectedMonth)}` : 'Total Valuation');
+
+  const drawerBadge = focusedGroup ? (
+    <div className="flex items-center gap-1.5">
+      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+        vitalType === 'receivables'
+          ? 'bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/60'
+          : 'bg-rose-100 dark:bg-rose-900/60 text-rose-800 dark:text-rose-300 border border-rose-200/60 dark:border-rose-800/60'
+      }`}>
+        {vitalType === 'receivables' ? 'Party Receivable' : 'Party Payable'}
+      </span>
+      {selectedMonth && (
+        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
+          {formatMonthLabel(selectedMonth)}
+        </span>
+      )}
+    </div>
+  ) : (
+    <div className="flex items-center gap-1.5">
+      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+        Store Asset
+      </span>
+      {selectedMonth && (
+        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60 font-mono">
+          {formatMonthLabel(selectedMonth)}
+        </span>
+      )}
+    </div>
+  );
+
   const handleOpenCreate = (type = 'bank') => {
     setEditingAccount(null);
     setAccountDefaultType(type);
@@ -319,26 +388,15 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
       <SlideOverDrawer
       isOpen={isOpen}
       onClose={onClose}
-      title={current.title}
-      subtitle={current.subtitle}
-      badge={
-        <div className="flex items-center gap-1.5">
-          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-            Store Asset
-          </span>
-          {selectedMonth && (
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60 font-mono">
-              {formatMonthLabel(selectedMonth)}
-            </span>
-          )}
-        </div>
-      }
+      title={drawerTitle}
+      subtitle={drawerSubtitle}
+      badge={drawerBadge}
       footerActions={
         <>
           <button
             type="button"
             onClick={onClose}
-            className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
           >
             Close
           </button>
@@ -349,29 +407,71 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
               onClose();
               onNavigateTab(current.targetTab);
             }}
-            className="h-9 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs flex items-center gap-1.5 active:scale-95"
+            className="h-9 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs flex items-center gap-1.5 active:scale-95 cursor-pointer"
           >
-            <span>{current.actionLabel}</span>
+            <span>{focusedGroup ? `Open ${focusedGroup.name} in Debts` : current.actionLabel}</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </>
       }
     >
       {/* Hero Metric Card */}
-      <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between">
-        <div>
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-            {selectedMonth ? `Valuation as of ${formatMonthLabel(selectedMonth)}` : 'Total Valuation'}
-          </span>
-          <div className="text-3xl font-black text-slate-900 dark:text-white font-mono tabular-nums tracking-tight mt-1">
-            <AnimatedNumber value={current.amount} />{' '}
-            <span className="text-sm font-bold text-slate-400 font-sans">ETB</span>
+      <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              {valuationLabel}
+            </span>
+            <div className="text-3xl font-black text-slate-900 dark:text-white font-mono tabular-nums tracking-tight mt-1">
+              <AnimatedNumber value={drawerAmount} />{' '}
+              <span className="text-sm font-bold text-slate-400 font-sans">ETB</span>
+            </div>
+            {focusedGroup && focusedGroup.offsetAmount > 0.01 && (
+              <div className="text-[11px] text-amber-600 dark:text-amber-400 font-medium mt-1">
+                Gross {focusedGroup.totalRemaining.toLocaleString()} ETB · Offset −{focusedGroup.offsetAmount.toLocaleString()} ETB
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            {focusedGroup && (
+              <button
+                type="button"
+                onClick={() => setSettlingParty({
+                  id: focusedGroup.contactId,
+                  name: focusedGroup.name,
+                  phone: focusedGroup.phone,
+                  totalRemaining: focusedGroup.netRemaining,
+                  debtCount: focusedGroup.openCount,
+                })}
+                className="h-9 px-3 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs active:scale-95 flex items-center gap-1.5 cursor-pointer"
+              >
+                <span>{vitalType === 'receivables' ? 'Collect All' : 'Pay All'}</span>
+              </button>
+            )}
+            <div className="w-11 h-11 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-300 shadow-xs">
+              <Icon className="w-5 h-5" />
+            </div>
           </div>
         </div>
 
-        <div className="w-11 h-11 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-300 shadow-xs">
-          <Icon className="w-5 h-5" />
-        </div>
+        {focusedGroup && (
+          <div className="pt-2 border-t border-slate-200/60 dark:border-slate-800 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => {
+                setInternalFocusedContactId(null);
+                if (onClearFocusedContact) onClearFocusedContact();
+              }}
+              className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
+            >
+              <span>← View all {vitalType === 'receivables' ? 'store receivables' : 'store payables'}</span>
+            </button>
+            {focusedGroup.phone && (
+              <span className="text-[11px] text-slate-400 font-mono">{focusedGroup.phone}</span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Conditional Content by Vital Type */}
@@ -454,19 +554,19 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
 
       {vitalType === 'receivables' && (
         <ProgressiveSection
-          title="Receivables & Handover Holdings"
+          title={focusedGroup ? `${focusedGroup.name}'s Obligations` : 'Receivables & Handover Holdings'}
           icon={<CreditCard className="w-4 h-4" />}
           defaultOpen={true}
         >
           <div className="space-y-2">
-            {groupedReceivables.length === 0 ? (
+            {(focusedGroup ? [focusedGroup] : groupedReceivables).length === 0 ? (
               <div className="p-6 text-center text-xs text-slate-400 bg-white dark:bg-[#131926] rounded-xl border border-slate-200/70 dark:border-slate-800/90">
                 <div className="font-semibold text-slate-700 dark:text-slate-300 mb-0.5">No Open Receivables</div>
                 <div className="text-[11px]">All customer and partner receivables are settled.</div>
               </div>
             ) : (
-              groupedReceivables.map((group) => {
-                const isExpanded = !!expandedParties[group.contactId];
+              (focusedGroup ? [focusedGroup] : groupedReceivables).map((group) => {
+                const isExpanded = !!focusedGroup || !!expandedParties[group.contactId];
                 return (
                   <div
                     key={group.contactId}
@@ -489,8 +589,23 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                           )}
                         </button>
                         <div className="min-w-0">
-                          <div className="font-bold text-slate-900 dark:text-white truncate">
-                            {group.name}
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="font-bold text-slate-900 dark:text-white truncate">
+                              {group.name}
+                            </span>
+                            {!focusedGroup && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setInternalFocusedContactId(group.contactId);
+                                }}
+                                title={`Focus on ${group.name}'s drawer`}
+                                className="text-[10px] text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+                              >
+                                Focus →
+                              </button>
+                            )}
                           </div>
                           <div className="text-[11px] text-slate-400 mt-0.5">
                             {group.openCount} {group.openCount === 1 ? 'obligation' : 'obligations'}
@@ -656,19 +771,19 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
 
       {vitalType === 'payables' && (
         <ProgressiveSection
-          title="Outstanding Payables"
+          title={focusedGroup ? `${focusedGroup.name}'s Payables` : 'Outstanding Payables'}
           icon={<Clock className="w-4 h-4" />}
           defaultOpen={true}
         >
           <div className="space-y-2">
-            {groupedPayables.length === 0 ? (
+            {(focusedGroup ? [focusedGroup] : groupedPayables).length === 0 ? (
               <div className="p-6 text-center text-xs text-slate-400 bg-white dark:bg-[#131926] rounded-xl border border-slate-200/70 dark:border-slate-800/90">
                 <div className="font-semibold text-slate-700 dark:text-slate-300 mb-0.5">No Outstanding Payables Due</div>
                 <div className="text-[11px]">All vendor debts are fully settled or offset by handovers & receivables.</div>
               </div>
             ) : (
-              groupedPayables.map((group) => {
-                const isExpanded = !!expandedParties[group.contactId];
+              (focusedGroup ? [focusedGroup] : groupedPayables).map((group) => {
+                const isExpanded = !!focusedGroup || !!expandedParties[group.contactId];
                 return (
                   <div
                     key={group.contactId}
@@ -691,8 +806,23 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                           )}
                         </button>
                         <div className="min-w-0">
-                          <div className="font-bold text-slate-900 dark:text-white truncate">
-                            {group.name}
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="font-bold text-slate-900 dark:text-white truncate">
+                              {group.name}
+                            </span>
+                            {!focusedGroup && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setInternalFocusedContactId(group.contactId);
+                                }}
+                                title={`Focus on ${group.name}'s drawer`}
+                                className="text-[10px] text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"
+                              >
+                                Focus →
+                              </button>
+                            )}
                           </div>
                           <div className="text-[11px] text-slate-400 mt-0.5">
                             {group.openCount} {group.openCount === 1 ? 'obligation' : 'obligations'}

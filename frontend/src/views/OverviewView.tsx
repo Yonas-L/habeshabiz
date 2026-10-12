@@ -42,12 +42,18 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   onRefreshData,
 }) => {
   const [selectedVital, setSelectedVital] = useState<VitalType | null>(null);
+  const [focusedContactId, setFocusedContactId] = useState<string | null>(null);
   const [selectedDebt, setSelectedDebt] = useState<Debt | null>(null);
   const [topSeller, setTopSeller] = useState<LeaderboardItem | null>(null);
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [isDebtModalOpen, setIsDebtModalOpen] = useState(false);
   const [debtModalDefaultType, setDebtModalDefaultType] = useState<'receivable' | 'payable'>('receivable');
   const [isBarAnimated, setIsBarAnimated] = useState(false);
+
+  const openVital = (vital: VitalType, contactId: string | null = null) => {
+    setFocusedContactId(contactId);
+    setSelectedVital(vital);
+  };
   const barMountedRef = useRef(false);
 
   useEffect(() => {
@@ -230,7 +236,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       prefix: '',
       icon: <Package className="w-3.5 h-3.5 text-slate-600 dark:text-slate-300" />,
       colorBg: 'bg-slate-100 dark:bg-slate-800',
-      onClick: () => setSelectedVital('inventory'),
+      onClick: () => openVital('inventory'),
     },
     {
       key: 'receivables',
@@ -240,7 +246,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       accent: 'text-emerald-600 dark:text-emerald-400',
       icon: <ArrowDownLeft className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />,
       colorBg: 'bg-emerald-50 dark:bg-emerald-950/60',
-      onClick: () => setSelectedVital('receivables'),
+      onClick: () => openVital('receivables'),
     },
     {
       key: 'cash',
@@ -249,7 +255,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       prefix: '',
       icon: <Landmark className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />,
       colorBg: 'bg-teal-50 dark:bg-teal-950/60',
-      onClick: () => setSelectedVital('cash'),
+      onClick: () => openVital('cash'),
     },
     {
       key: 'reserves',
@@ -258,7 +264,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       prefix: '',
       icon: <Coins className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />,
       colorBg: 'bg-amber-50 dark:bg-amber-950/60',
-      onClick: () => setSelectedVital('reserves'),
+      onClick: () => openVital('reserves'),
     },
     {
       key: 'payables',
@@ -268,7 +274,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       accent: 'text-rose-600/80 dark:text-rose-400/80',
       icon: <ArrowUpRight className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />,
       colorBg: 'bg-rose-50 dark:bg-rose-950/60',
-      onClick: () => setSelectedVital('payables'),
+      onClick: () => openVital('payables'),
     },
   ];
 
@@ -446,7 +452,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         <div className="grid grid-cols-5 gap-1.5 pt-1.5 pb-1">
           {/* 1. Stock */}
           <button
-            onClick={() => setSelectedVital('inventory')}
+            onClick={() => openVital('inventory')}
             className="flex flex-col items-center text-center group cursor-pointer active:scale-90 transition-transform"
             title={`Stock: ${capital_overview.stock_value.toLocaleString()} ETB`}
           >
@@ -463,7 +469,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
           {/* 2. Bank */}
           <button
-            onClick={() => setSelectedVital('cash')}
+            onClick={() => openVital('cash')}
             className="flex flex-col items-center text-center group cursor-pointer active:scale-90 transition-transform"
             title={`Bank: ${capital_overview.cash_and_banks.toLocaleString()} ETB`}
           >
@@ -480,7 +486,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
           {/* 3. Owed to You (green down arrow) */}
           <button
-            onClick={() => setSelectedVital('receivables')}
+            onClick={() => openVital('receivables')}
             className="flex flex-col items-center text-center group cursor-pointer active:scale-90 transition-transform"
             title={`Owed to You: ${capital_overview.receivables.toLocaleString()} ETB`}
           >
@@ -497,7 +503,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
           {/* 4. You Owe (red up arrow) */}
           <button
-            onClick={() => setSelectedVital('payables')}
+            onClick={() => openVital('payables')}
             className="flex flex-col items-center text-center group cursor-pointer active:scale-90 transition-transform"
             title={`You Owe: ${capital_overview.payables.toLocaleString()} ETB`}
           >
@@ -514,7 +520,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
           {/* 5. Other Assets */}
           <button
-            onClick={() => setSelectedVital('reserves')}
+            onClick={() => openVital('reserves')}
             className="flex flex-col items-center text-center group cursor-pointer active:scale-90 transition-transform"
             title={`Other Assets: ${capital_overview.custom_assets.toLocaleString()} ETB`}
           >
@@ -803,14 +809,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               {groupedReceivables.map((group) => (
                 <button
                   key={group.contactId}
-                  onClick={() => {
-                    if (group.openCount === 1) {
-                      const singleOpenDebt = group.debts.find((d) => Number(d.remaining_amount) > 0.001) || group.debts[0];
-                      setSelectedDebt(singleOpenDebt);
-                    } else {
-                      setSelectedVital('receivables');
-                    }
-                  }}
+                  onClick={() => openVital('receivables', group.contactId)}
                   className="w-full flex items-center justify-between min-h-[46px] p-2.5 sm:py-2 sm:px-2 rounded-xl sm:rounded-lg text-xs bg-slate-50/70 dark:bg-[#0c1017]/70 sm:bg-transparent border border-slate-100/90 dark:border-slate-800/70 sm:border-0 hover:bg-slate-100/80 dark:hover:bg-slate-800/60 sm:hover:bg-slate-50 sm:dark:hover:bg-slate-800/40 active:scale-[0.99] sm:active:scale-100 transition-all group text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 cursor-pointer"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
@@ -887,14 +886,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               {groupedPayables.map((group) => (
                 <button
                   key={group.contactId}
-                  onClick={() => {
-                    if (group.openCount === 1) {
-                      const singleOpenDebt = group.debts.find((d) => Number(d.remaining_amount) > 0.001) || group.debts[0];
-                      setSelectedDebt(singleOpenDebt);
-                    } else {
-                      setSelectedVital('payables');
-                    }
-                  }}
+                  onClick={() => openVital('payables', group.contactId)}
                   className="w-full flex items-center justify-between min-h-[46px] p-2.5 sm:py-2 sm:px-2 rounded-xl sm:rounded-lg text-xs bg-slate-50/70 dark:bg-[#0c1017]/70 sm:bg-transparent border border-slate-100/90 dark:border-slate-800/70 sm:border-0 hover:bg-slate-100/80 dark:hover:bg-slate-800/60 sm:hover:bg-slate-50 sm:dark:hover:bg-slate-800/40 active:scale-[0.99] sm:active:scale-100 transition-all group text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/40 cursor-pointer"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
@@ -927,14 +919,20 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       {/* ── Drawers ── */}
       <VitalBreakdownDrawer
         vitalType={selectedVital}
+        focusedContactId={focusedContactId}
+        onClearFocusedContact={() => setFocusedContactId(null)}
         isOpen={selectedVital !== null}
-        onClose={() => setSelectedVital(null)}
+        onClose={() => {
+          setSelectedVital(null);
+          setFocusedContactId(null);
+        }}
         data={data}
         accounts={accounts}
         selectedMonth={selectedMonth}
         onNavigateTab={onNavigateTab}
         onSelectDebt={(debt) => {
           setSelectedVital(null);
+          setFocusedContactId(null);
           setSelectedDebt(debt);
         }}
         onRefreshData={onRefreshData}
