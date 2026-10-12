@@ -574,17 +574,22 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                           );
                         })}
                         {group.offsetAmount > 0.01 && (
-                          <div className="flex items-center justify-between p-2 rounded-xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-800/40 text-xs">
+                          <div className="flex items-center justify-between p-2.5 rounded-xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40 text-xs">
                             <div>
-                              <div className="font-semibold text-slate-700 dark:text-slate-300">
-                                Mutual Offset
+                              <div className="font-semibold text-slate-800 dark:text-slate-200">
+                                Mutual Trade Offset
                               </div>
-                              <div className="text-[10px] text-slate-400">
-                                Offsetting open payables
+                              <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                Deducted for product received from {group.name}
                               </div>
                             </div>
-                            <div className="font-mono font-bold text-amber-600 dark:text-amber-400 text-xs">
-                              −{Number(group.offsetAmount).toLocaleString()} ETB
+                            <div className="text-right">
+                              <div className="font-mono font-bold text-amber-600 dark:text-amber-400 text-xs">
+                                −{Number(group.offsetAmount).toLocaleString()} ETB
+                              </div>
+                              <div className="text-[10px] text-slate-400 mt-0.5 font-mono">
+                                Net: +{group.netRemaining.toLocaleString()} ETB
+                              </div>
                             </div>
                           </div>
                         )}
@@ -760,17 +765,22 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                           );
                         })}
                         {group.offsetAmount > 0.01 && (
-                          <div className="flex items-center justify-between p-2 rounded-xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-800/40 text-xs">
+                          <div className="flex items-center justify-between p-2.5 rounded-xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40 text-xs">
                             <div>
-                              <div className="font-semibold text-slate-700 dark:text-slate-300">
-                                Mutual Handover Offset
+                              <div className="font-semibold text-slate-800 dark:text-slate-200">
+                                Mutual Trade Offset
                               </div>
-                              <div className="text-[10px] text-slate-400">
-                                Offsetting receivables & handovers
+                              <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                Deducted for devices held or owed by {group.name}
                               </div>
                             </div>
-                            <div className="font-mono font-bold text-amber-600 dark:text-amber-400 text-xs">
-                              +{Number(group.offsetAmount).toLocaleString()} ETB
+                            <div className="text-right">
+                              <div className="font-mono font-bold text-amber-600 dark:text-amber-400 text-xs">
+                                +{Number(group.offsetAmount).toLocaleString()} ETB
+                              </div>
+                              <div className="text-[10px] text-slate-400 mt-0.5 font-mono">
+                                Net: −{group.netRemaining.toLocaleString()} ETB
+                              </div>
                             </div>
                           </div>
                         )}
