@@ -31,6 +31,7 @@ class InventoryController extends Controller
         $query = InventoryUnit::with([
             'variant.product.categoryRel',
             'supplier',
+            'paymentAccount',
             'maintenanceRecords.financialAccount',
             'salesOrderItem.salesOrder.customer',
             'salesOrderItem.salesOrder.salesperson',
@@ -1132,7 +1133,7 @@ class InventoryController extends Controller
             ], 403);
         }
 
-        $unit = InventoryUnit::with(['variant.product', 'salesOrderItem'])->findOrFail($id);
+        $unit = InventoryUnit::with(['variant.product', 'salesOrderItem', 'supplier', 'paymentAccount'])->findOrFail($id);
 
         // 1. Sold items can NEVER be deleted
         if ($unit->status === 'sold' || $unit->salesOrderItem()->exists() || ! empty($unit->sold_at)) {
@@ -1184,45 +1185,132 @@ class InventoryController extends Controller
             ], 422);
         }
 
-        DB::transaction(function () use ($unit, $linkedDebts, $user) {
-            // Cancel any unpaid linked debts so no orphan debts remain
+        $refundAccount = $request->boolean('refund_account', true);
+        $refundAccountId = $request->input('refund_account_id');
+        $deletionReason = $request->input('reason', 'Removed from inventory by authorized staff');
+        $refundSummary = null;
+
+        DB::transaction(function () use ($unit, $linkedDebts, $user, $refundAccount, $refundAccountId, $deletionReason, &$refundSummary) {
+            $productName = $unit->variant?->product?->name ?? 'Device';
+            $refundedDetails = [];
+
+            // 1. Process Bank Refund if funded from bank account and refund_account is true
+            if ($refundAccount) {
+                $costBasis = (float) $unit->cost_basis;
+
+                // Priority A: Proportional payment splits if multiple accounts were used
+                if (! empty($unit->payment_splits) && is_array($unit->payment_splits) && count($unit->payment_splits) > 0) {
+                    foreach ($unit->payment_splits as $split) {
+                        $splitAccId = $split['financial_account_id'] ?? null;
+                        $splitAmt = (float) ($split['amount'] ?? 0);
+                        if ($splitAccId && $splitAmt > 0) {
+                            $acc = FinancialAccount::where('tenant_id', $user->tenant_id)->find($splitAccId);
+                            if ($acc) {
+                                $acc->increment('current_balance', $splitAmt);
+                                FinancialTransaction::create([
+                                    'tenant_id' => $user->tenant_id,
+                                    'transaction_number' => 'TXN-'.strtoupper(Str::random(8)),
+                                    'destination_account_id' => $acc->id,
+                                    'type' => 'supplier_refund',
+                                    'amount' => $splitAmt,
+                                    'contact_id' => $unit->supplier_contact_id,
+                                    'description' => "Unit deleted / intake reversed: Refund for {$productName} (SN: {$unit->imei_or_serial})",
+                                    'date' => now(),
+                                    'created_by' => $user->id,
+                                ]);
+                                $refundedDetails[] = number_format($splitAmt, 2)." ETB to {$acc->name}";
+                            }
+                        }
+                    }
+                }
+                // Priority B: Primary payment account or user-specified refund account
+                elseif (($targetAccId = $refundAccountId ?? $unit->payment_account_id) && $costBasis > 0) {
+                    $acc = FinancialAccount::where('tenant_id', $user->tenant_id)->find($targetAccId);
+                    if ($acc) {
+                        $acc->increment('current_balance', $costBasis);
+                        FinancialTransaction::create([
+                            'tenant_id' => $user->tenant_id,
+                            'transaction_number' => 'TXN-'.strtoupper(Str::random(8)),
+                            'destination_account_id' => $acc->id,
+                            'type' => 'supplier_refund',
+                            'amount' => $costBasis,
+                            'contact_id' => $unit->supplier_contact_id,
+                            'description' => "Unit deleted / intake reversed: Refund for {$productName} (SN: {$unit->imei_or_serial})",
+                            'date' => now(),
+                            'created_by' => $user->id,
+                        ]);
+                        $refundedDetails[] = number_format($costBasis, 2)." ETB to {$acc->name}";
+                    }
+                }
+            }
+
+            // 2. Cancel any unpaid linked debts so no orphan debts remain
+            $cancelledDebtsCount = 0;
             foreach ($linkedDebts as $debt) {
                 $debt->update([
                     'status' => 'cancelled',
                     'remaining_amount' => 0,
                     'notes' => trim(($debt->notes ?? '')." [Voided upon deletion of unit {$unit->imei_or_serial}]"),
                 ]);
+                $cancelledDebtsCount++;
             }
 
-            // If supplier was involved, reconcile mutual debts
+            // 3. If supplier was involved, reconcile mutual debts
             if ($unit->supplier_contact_id) {
                 Debt::reconcileContactMutualDebts($user->tenant_id, (string) $unit->supplier_contact_id);
             }
 
-            // Remove unpaid maintenance records if any
+            // 4. Remove unpaid maintenance records if any
             $unit->maintenanceRecords()->delete();
 
             $oldData = $unit->toArray();
 
-            // Soft-delete unit
+            // 5. Soft-delete unit
             $unit->update(['status' => 'archived']);
             $unit->delete();
 
-            // Resynchronize stock counts
+            // 6. Resynchronize stock counts
             (new SynchronizeInventoryStockAction)->execute();
 
+            $refundSummary = count($refundedDetails) > 0 ? implode(', ', $refundedDetails) : null;
+
+            // 7. Record immutable audit log visible to the owner
             AuditLog::record(
                 action: 'deleted_unit',
                 entityType: 'InventoryUnit',
                 entityId: (string) $unit->id,
-                oldValues: $oldData,
-                newValues: ['status' => 'archived', 'deleted_at' => now()->toIso8601String()]
+                oldValues: array_merge($oldData, [
+                    'product_name' => $productName,
+                    'variant_specs' => trim(($unit->variant?->storage ?? '').' '.($unit->variant?->color ?? '')),
+                    'supplier_name' => $unit->supplier?->name,
+                    'payment_account_name' => $unit->paymentAccount?->name,
+                ]),
+                newValues: [
+                    'status' => 'archived',
+                    'deleted_at' => now()->toIso8601String(),
+                    'deleted_by' => [
+                        'id' => $user->id,
+                        'name' => $user->name,
+                        'email' => $user->email,
+                        'role' => $user->role,
+                    ],
+                    'bank_refund_issued' => count($refundedDetails) > 0,
+                    'refund_summary' => $refundSummary,
+                    'unpaid_debts_voided' => $cancelledDebtsCount,
+                    'reason' => $deletionReason,
+                ]
             );
         });
 
+        $message = 'Inventory unit deleted successfully and stock counts updated.';
+        if ($refundSummary) {
+            $message .= " Bank refund credited: {$refundSummary}.";
+        }
+
         return response()->json([
             'success' => true,
-            'message' => 'Inventory unit deleted successfully and stock counts updated.',
+            'message' => $message,
+            'refund_summary' => $refundSummary,
         ]);
     }
 

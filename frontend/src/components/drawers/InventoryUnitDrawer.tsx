@@ -91,6 +91,8 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [refundToBank, setRefundToBank] = useState(true);
+  const [deleteReason, setDeleteReason] = useState('');
 
   // Editable form fields
   const [productModelName, setProductModelName] = useState('');
@@ -250,9 +252,14 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
     if (!currentUnit) return;
     try {
       setDeleting(true);
-      await api.deleteInventoryUnit(currentUnit.id);
+      const res = await api.deleteInventoryUnit(currentUnit.id, {
+        refund_account: refundToBank,
+        reason: deleteReason.trim() || undefined,
+      });
       toast.success('Unit Deleted', {
-        description: `${productName} (${currentUnit.imei_or_serial || 'Unit'}) removed from inventory.`,
+        description: res.refund_summary
+          ? `${productName} removed. Refunded: ${res.refund_summary}.`
+          : `${productName} (${currentUnit.imei_or_serial || 'Unit'}) removed from inventory.`,
       });
       setShowDeleteConfirm(false);
       onClose();
@@ -2014,6 +2021,45 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
 
             <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-800/60 text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
               Deleting this unit will safely adjust shop stock counts. If an open unpaid intake payable was generated for this device, it will be automatically cancelled.
+            </div>
+
+            {Boolean(currentUnit.payment_account_id || currentUnit.paymentAccount || (currentUnit.payment_splits && currentUnit.payment_splits.length > 0) || ['account', 'shop_account', 'split'].includes(currentUnit.funding_source || '')) && (
+              <div className="p-3 rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/60 dark:border-blue-800/60 text-xs space-y-2">
+                <div className="flex items-center justify-between text-blue-950 dark:text-blue-100 font-semibold">
+                  <span className="flex items-center gap-1.5">
+                    <DollarSign className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Bank Payment Detected</span>
+                  </span>
+                  <span className="font-mono font-bold text-blue-600 dark:text-blue-400">
+                    {Number(currentUnit.cost_basis).toLocaleString()} ETB
+                  </span>
+                </div>
+                <label className="flex items-start gap-2 cursor-pointer text-[11px] text-blue-800 dark:text-blue-200">
+                  <input
+                    type="checkbox"
+                    checked={refundToBank}
+                    onChange={(e) => setRefundToBank(e.target.checked)}
+                    className="mt-0.5 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                  <span>
+                    <strong>Refund {Number(currentUnit.cost_basis).toLocaleString()} ETB</strong> back to{' '}
+                    <strong>{currentUnit.paymentAccount?.name || 'Shop Financial Account'}</strong> (restores bank balance & logs reversal).
+                  </span>
+                </label>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Reason / Audit Note (Logged to Owner)
+              </label>
+              <input
+                type="text"
+                value={deleteReason}
+                onChange={(e) => setDeleteReason(e.target.value)}
+                placeholder="e.g. Intake error, duplicate entry, supplier return"
+                className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-500/20"
+              />
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-2">

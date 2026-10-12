@@ -145,6 +145,8 @@ export interface InventoryUnit {
   updated_at?: string;
   variant?: ProductVariant & { product?: Product };
   supplier?: Contact;
+  payment_account?: FinancialAccount | null;
+  paymentAccount?: FinancialAccount | null;
   maintenance_records?: MaintenanceRecord[];
   sales_order_item?: SalesOrderItem;
 }
@@ -1160,9 +1162,17 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
-  deleteInventoryUnit: (id: string) =>
-    request<{ success: boolean; message: string }>(`/inventory/units/${id}`, {
+  deleteInventoryUnit: (
+    id: string,
+    data?: {
+      refund_account?: boolean;
+      refund_account_id?: string;
+      reason?: string;
+    }
+  ) =>
+    request<{ success: boolean; message: string; refund_summary?: string }>(`/inventory/units/${id}`, {
       method: 'DELETE',
+      body: data ? JSON.stringify(data) : undefined,
     }),
 
   handoverInventoryUnit: (id: string, data: { handover_to: string; location?: string; notes?: string; return_deadline?: string; handover_payout?: number; instant_offset?: boolean }) =>

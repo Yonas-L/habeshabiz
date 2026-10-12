@@ -235,16 +235,24 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   // Unit Deletion Modal State
   const [unitToDelete, setUnitToDelete] = useState<InventoryUnit | null>(null);
   const [deletingUnit, setDeletingUnit] = useState(false);
+  const [deleteRefundToBank, setDeleteRefundToBank] = useState(true);
+  const [deleteUnitReason, setDeleteUnitReason] = useState('');
 
   const handleConfirmDeleteUnit = async () => {
     if (!unitToDelete) return;
     try {
       setDeletingUnit(true);
-      await api.deleteInventoryUnit(unitToDelete.id);
+      const res = await api.deleteInventoryUnit(unitToDelete.id, {
+        refund_account: deleteRefundToBank,
+        reason: deleteUnitReason.trim() || undefined,
+      });
       toast.success('Unit Deleted', {
-        description: `${unitToDelete.variant?.product?.name || 'Device'} (${unitToDelete.imei_or_serial || 'Unit'}) removed from inventory.`,
+        description: res.refund_summary
+          ? `${unitToDelete.variant?.product?.name || 'Device'} removed. Refunded: ${res.refund_summary}.`
+          : `${unitToDelete.variant?.product?.name || 'Device'} (${unitToDelete.imei_or_serial || 'Unit'}) removed from inventory.`,
       });
       setUnitToDelete(null);
+      setDeleteUnitReason('');
       if (selectedUnit?.id === unitToDelete.id) {
         setSelectedUnit(null);
       }
@@ -4080,6 +4088,45 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
             <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-800/60 text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
               Deleting this unit will safely adjust inventory counts. Any open unpaid intake debt for this unit will be cleanly voided.
+            </div>
+
+            {Boolean(unitToDelete.payment_account_id || unitToDelete.paymentAccount || (unitToDelete.payment_splits && unitToDelete.payment_splits.length > 0) || ['account', 'shop_account', 'split'].includes(unitToDelete.funding_source || '')) && (
+              <div className="p-3 rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/60 dark:border-blue-800/60 text-xs space-y-2">
+                <div className="flex items-center justify-between text-blue-950 dark:text-blue-100 font-semibold">
+                  <span className="flex items-center gap-1.5">
+                    <DollarSign className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Bank Payment Detected</span>
+                  </span>
+                  <span className="font-mono font-bold text-blue-600 dark:text-blue-400">
+                    {Number(unitToDelete.cost_basis).toLocaleString()} ETB
+                  </span>
+                </div>
+                <label className="flex items-start gap-2 cursor-pointer text-[11px] text-blue-800 dark:text-blue-200">
+                  <input
+                    type="checkbox"
+                    checked={deleteRefundToBank}
+                    onChange={(e) => setDeleteRefundToBank(e.target.checked)}
+                    className="mt-0.5 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                  <span>
+                    <strong>Refund {Number(unitToDelete.cost_basis).toLocaleString()} ETB</strong> back to{' '}
+                    <strong>{unitToDelete.paymentAccount?.name || 'Shop Financial Account'}</strong> (restores bank balance & logs reversal).
+                  </span>
+                </label>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Reason / Audit Note (Logged to Owner)
+              </label>
+              <input
+                type="text"
+                value={deleteUnitReason}
+                onChange={(e) => setDeleteUnitReason(e.target.value)}
+                placeholder="e.g. Intake error, duplicate entry, supplier return"
+                className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-500/20"
+              />
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-2">

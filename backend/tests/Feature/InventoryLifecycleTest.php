@@ -842,6 +842,53 @@ test('cannot delete a unit with partially or fully paid intake debt', function (
     expect(InventoryUnit::find($this->unit->id))->not->toBeNull();
 });
 
+test('deleting a unit funded via shop bank account automatically refunds the bank balance and logs audit trail with deleted_by info', function () {
+    $account = \App\Models\FinancialAccount::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Commercial Bank of Ethiopia (CBE)',
+        'type' => 'bank',
+        'current_balance' => 500000.00,
+    ]);
+
+    $this->unit->update([
+        'cost_basis' => 160000.00,
+        'payment_account_id' => $account->id,
+        'funding_source' => 'shop_account',
+    ]);
+
+    $response = $this->actingAs($this->user)
+        ->deleteJson("/api/v1/inventory/units/{$this->unit->id}", [
+            'refund_account' => true,
+            'reason' => 'Duplicate intake mistake',
+        ]);
+
+    $response->assertStatus(200)
+        ->assertJsonPath('success', true);
+
+    // 1. Account balance is refunded
+    expect((float) $account->fresh()->current_balance)->toBe(660000.00);
+
+    // 2. FinancialTransaction is created
+    $txn = \App\Models\FinancialTransaction::where('destination_account_id', $account->id)
+        ->where('type', 'supplier_refund')
+        ->first();
+    expect($txn)->not->toBeNull();
+    expect((float) $txn->amount)->toBe(160000.00);
+    expect($txn->description)->toContain('Unit deleted / intake reversed');
+
+    // 3. AuditLog is recorded with who deleted it and what was deleted
+    $log = \App\Models\AuditLog::where('action', 'deleted_unit')
+        ->where('entity_id', $this->unit->id)
+        ->first();
+    expect($log)->not->toBeNull();
+    expect($log->user_id)->toBe($this->user->id);
+    expect($log->new_values['deleted_by']['name'])->toBe('Yoni Owner');
+    expect($log->new_values['deleted_by']['role'])->toBe('owner');
+    expect($log->new_values['bank_refund_issued'])->toBeTrue();
+    expect($log->new_values['refund_summary'])->toContain('Commercial Bank of Ethiopia');
+    expect($log->new_values['reason'])->toBe('Duplicate intake mistake');
+});
+
 
 
 
