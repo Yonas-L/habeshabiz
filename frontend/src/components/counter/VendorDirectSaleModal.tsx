@@ -14,6 +14,7 @@ import {
   Clock,
   ShieldAlert,
   Plus,
+  Search,
   ChevronDown,
   Banknote,
   ArrowLeftRight,
@@ -57,6 +58,9 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
   // Category & Product Selection
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [selectedProductId, setSelectedProductId] = useState<string>('');
+  const [modelSearchQuery, setModelSearchQuery] = useState('');
+  const [isModelSearchOpen, setIsModelSearchOpen] = useState(false);
+  const modelSearchContainerRef = useRef<HTMLDivElement>(null);
   const [customProductName, setCustomProductName] = useState('');
   const [selectedVariantId, setSelectedVariantId] = useState<string>('');
 
@@ -114,6 +118,17 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
+  // Close model search dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (modelSearchContainerRef.current && !modelSearchContainerRef.current.contains(e.target as Node)) {
+        setIsModelSearchOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   // Set initial product, category or defaults
   useEffect(() => {
     if (isOpen) {
@@ -121,6 +136,7 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
         const prod = localProducts.find((p) => p.id === initialProductId);
         if (prod) {
           setSelectedProductId(prod.id);
+          setModelSearchQuery(prod.name);
           if (prod.category_id) {
             setSelectedCategoryId(prod.category_id);
           } else if (prod.category) {
@@ -151,6 +167,10 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
       setIsCreatingProduct(false);
       setNewProductName('');
       setNewProductBrand('');
+      if (!initialProductId) {
+        setModelSearchQuery('');
+        setIsModelSearchOpen(false);
+      }
     }
   }, [isOpen, initialProductId, localProducts, categories, selectedCategoryId, accounts]);
 
@@ -178,6 +198,42 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
   const selectedProduct = useMemo(() => {
     return localProducts.find((p) => p.id === selectedProductId) || null;
   }, [localProducts, selectedProductId]);
+
+  // Real-time search filter for Model search field
+  const searchedProducts = useMemo(() => {
+    const query = modelSearchQuery.trim().toLowerCase();
+    // If query matches the currently selected product name, show all category models so user can easily switch
+    if (!query || (selectedProduct && query === selectedProduct.name.toLowerCase())) {
+      return filteredProducts;
+    }
+    return filteredProducts.filter((p) => {
+      const name = p.name.toLowerCase();
+      const brand = (p.brand || '').toLowerCase();
+      return name.includes(query) || brand.includes(query);
+    });
+  }, [filteredProducts, modelSearchQuery, selectedProduct]);
+
+  const handleSelectSearchedProduct = (prod: Product) => {
+    setSelectedProductId(prod.id);
+    setModelSearchQuery(prod.name);
+    setCustomProductName('');
+    setIsModelSearchOpen(false);
+
+    if (prod.variants && prod.variants.length > 0) {
+      const v = prod.variants[0];
+      setSelectedVariantId(v.id);
+      if (v.storage) setStorage(v.storage);
+      if (v.ram) setRam(v.ram);
+      if (v.color) setColor(v.color);
+      if (v.default_selling_price) {
+        const defPrice = formatCurrencyInput(v.default_selling_price);
+        setSellingPrice(defPrice);
+        setPaidAmount(defPrice);
+      }
+    } else {
+      setSelectedVariantId('');
+    }
+  };
 
   const vendorContacts = useMemo(
     () => liveContacts.filter((contact) =>
@@ -233,6 +289,8 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
 
       setLocalProducts((prev) => [res, ...prev.filter((p) => p.id !== res.id)]);
       setSelectedProductId(res.id);
+      setModelSearchQuery(res.name);
+      setIsModelSearchOpen(false);
       if (res.variants && res.variants.length > 0) {
         setSelectedVariantId(res.variants[0].id);
       }
@@ -311,9 +369,23 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const finalProductName = selectedProduct
+    let finalProductId = selectedProductId && selectedProductId !== '__custom__' ? selectedProductId : undefined;
+    let finalProductName = selectedProduct
       ? selectedProduct.name
       : (customProductName.trim() || newProductName.trim());
+
+    if (!finalProductName && modelSearchQuery.trim()) {
+      const match = filteredProducts.find(
+        (p) => p.name.toLowerCase() === modelSearchQuery.trim().toLowerCase()
+      );
+      if (match) {
+        finalProductId = match.id;
+        finalProductName = match.name;
+      } else {
+        finalProductName = modelSearchQuery.trim();
+      }
+    }
+
     if (!finalProductName) {
       toast.error('Please select or create the device model');
       return;
@@ -371,7 +443,7 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
       setSubmitting(true);
 
       const payload = {
-        product_id: selectedProductId && selectedProductId !== '__custom__' ? selectedProductId : undefined,
+        product_id: finalProductId,
         product_name: finalProductName,
         variant_id: selectedVariantId || undefined,
         storage: storage.trim() || undefined,
@@ -422,6 +494,8 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
       setIsCreatingProduct(false);
       setNewProductName('');
       setNewProductBrand('');
+      setModelSearchQuery('');
+      setIsModelSearchOpen(false);
       setIsVendorSplit(false);
       setVendorPaymentSplits([]);
       setIsCreditSale(false);
@@ -635,54 +709,134 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
                     </div>
                   </div>
 
-                  {/* Model Dropdown */}
-                  <div>
+                  {/* Model Searchable Combobox */}
+                  <div ref={modelSearchContainerRef} className="relative">
                     <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
-                      Model
+                      Model <span className="text-slate-400 font-normal">({filteredProducts.length} available)</span>
                     </label>
-                    <div className="relative">
-                      <select
-                        value={selectedProductId}
+                    <div className="relative flex items-center">
+                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none" />
+                      <input
+                        type="text"
+                        value={modelSearchQuery}
+                        onFocus={() => setIsModelSearchOpen(true)}
                         onChange={(e) => {
-                          const pid = e.target.value;
-                          setSelectedProductId(pid);
-                          if (pid && pid !== '__custom__') {
+                          const val = e.target.value;
+                          setModelSearchQuery(val);
+                          setIsModelSearchOpen(true);
+                          if (!val.trim()) {
+                            setSelectedProductId('');
+                            setSelectedVariantId('');
                             setCustomProductName('');
-                            const prod = localProducts.find((p) => p.id === pid);
-                            if (prod?.variants && prod.variants.length > 0) {
-                              const v = prod.variants[0];
-                              setSelectedVariantId(v.id);
-                              if (v.storage) setStorage(v.storage);
-                              if (v.ram) setRam(v.ram);
-                              if (v.color) setColor(v.color);
-                              if (v.default_selling_price) {
-                                const defPrice = formatCurrencyInput(v.default_selling_price);
-                                setSellingPrice(defPrice);
-                                setPaidAmount(defPrice);
-                              }
-                            } else {
+                          } else if (selectedProductId && selectedProductId !== '__custom__') {
+                            const current = localProducts.find((p) => p.id === selectedProductId);
+                            if (current && current.name.toLowerCase() !== val.trim().toLowerCase()) {
+                              setSelectedProductId('');
                               setSelectedVariantId('');
                             }
-                          } else {
-                            setSelectedVariantId('');
                           }
                         }}
-                        className="w-full h-10 pl-3 pr-8 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-900 dark:text-white appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
-                      >
-                        <option value="">
-                          {filteredProducts.length === 0
-                            ? '-- No models in this category yet --'
-                            : `-- Choose Model (${filteredProducts.length} available) --`}
-                        </option>
-                        {filteredProducts.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name} {p.brand ? `(${p.brand})` : ''}
-                          </option>
-                        ))}
-                        <option value="__custom__">— Custom One-off (Unsaved) —</option>
-                      </select>
-                      <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-3.5 pointer-events-none" />
+                        placeholder={
+                          filteredProducts.length === 0
+                            ? 'No models in this category yet'
+                            : 'Type to filter model or add custom...'
+                        }
+                        className="w-full h-10 pl-9 pr-8 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+                      />
+                      {modelSearchQuery ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setModelSearchQuery('');
+                            setSelectedProductId('');
+                            setSelectedVariantId('');
+                            setCustomProductName('');
+                            setIsModelSearchOpen(true);
+                          }}
+                          className="absolute right-2.5 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                          title="Clear model"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      ) : (
+                        <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-3 pointer-events-none" />
+                      )}
                     </div>
+
+                    {/* Floating Filtered Suggestions */}
+                    {isModelSearchOpen && (
+                      <div className="absolute left-0 right-0 top-full mt-1.5 py-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-30 max-h-60 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
+                        {searchedProducts.length > 0 ? (
+                          <div className="py-1">
+                            {searchedProducts.map((p) => {
+                              const isSelected = p.id === selectedProductId;
+                              return (
+                                <button
+                                  key={p.id}
+                                  type="button"
+                                  onClick={() => handleSelectSearchedProduct(p)}
+                                  className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/70 transition-colors ${
+                                    isSelected
+                                      ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 font-semibold'
+                                      : 'text-slate-700 dark:text-slate-200'
+                                  }`}
+                                >
+                                  <div className="min-w-0 pr-2">
+                                    <div className="font-semibold truncate">{p.name}</div>
+                                    {p.brand && (
+                                      <div className="text-[10px] text-slate-400 dark:text-slate-500 font-normal">
+                                        {p.brand}
+                                      </div>
+                                    )}
+                                  </div>
+                                  {isSelected && (
+                                    <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="px-3 py-3 text-xs text-slate-400 text-center">
+                            No existing models found for "{modelSearchQuery}"
+                          </div>
+                        )}
+
+                        {/* Quick Actions (Create Model or One-Off) */}
+                        <div className="p-1.5 space-y-1 bg-slate-50/50 dark:bg-slate-800/40">
+                          {modelSearchQuery.trim() && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setNewProductName(modelSearchQuery.trim());
+                                setIsCreatingProduct(true);
+                                setIsModelSearchOpen(false);
+                              }}
+                              className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 flex items-center gap-1.5 transition-colors"
+                            >
+                              <Plus className="w-3.5 h-3.5 shrink-0" />
+                              <span className="truncate">Add "{modelSearchQuery.trim()}" to Catalog</span>
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedProductId('__custom__');
+                              setCustomProductName(modelSearchQuery.trim() || '');
+                              setIsModelSearchOpen(false);
+                            }}
+                            className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-1.5 transition-colors"
+                          >
+                            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 shrink-0">One-off</span>
+                            <span className="truncate">
+                              {modelSearchQuery.trim()
+                                ? `Use "${modelSearchQuery.trim()}" (Unsaved one-off)`
+                                : 'Enter custom one-off model name'}
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -697,7 +851,10 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
                       required
                       placeholder="e.g. iPhone 16 Pro Max"
                       value={customProductName}
-                      onChange={(e) => setCustomProductName(e.target.value)}
+                      onChange={(e) => {
+                        setCustomProductName(e.target.value);
+                        setModelSearchQuery(e.target.value);
+                      }}
                       className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
                     />
                   </div>
