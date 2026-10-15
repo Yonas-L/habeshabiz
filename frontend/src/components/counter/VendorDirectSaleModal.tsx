@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import type { Product, ProductCategory, Contact, FinancialAccount } from '../../api/client';
+import type { Product, ProductVariant, ProductCategory, Contact, FinancialAccount } from '../../api/client';
 import { api } from '../../api/client';
 import { toast } from 'sonner';
 import { formatCurrencyInput, parseFormattedNumber } from '../../utils/numberUtils';
@@ -26,6 +26,46 @@ import { LdrsSpinner } from '../loading/LdrsSpinner';
 import { PartnerFormModal } from '../partners/PartnerFormModal';
 import { SplitPaymentSelector, type PaymentSplitItem } from '../common/SplitPaymentSelector';
 
+type CategoryArchetype =
+  | 'phone_tablet'
+  | 'laptop_computer'
+  | 'smartwatch'
+  | 'screen_protector'
+  | 'case_cover'
+  | 'charger_cable'
+  | 'audio'
+  | 'gaming'
+  | 'general';
+
+function getCategoryArchetype(catSlug?: string, catName?: string): CategoryArchetype {
+  const s = `${catSlug || ''} ${catName || ''}`.toLowerCase();
+  if (s.includes('protector') || s.includes('glass') || s.includes('tempered') || s.includes('film')) {
+    return 'screen_protector';
+  }
+  if (s.includes('case') || s.includes('cover') || s.includes('pouch') || s.includes('skin')) {
+    return 'case_cover';
+  }
+  if (s.includes('charger') || s.includes('cable') || s.includes('power') || s.includes('adapter')) {
+    return 'charger_cable';
+  }
+  if (s.includes('watch') || s.includes('wearable')) {
+    return 'smartwatch';
+  }
+  if (s.includes('laptop') || s.includes('macbook') || s.includes('computer') || s.includes('pc') || s.includes('desktop')) {
+    return 'laptop_computer';
+  }
+  if (s.includes('audio') || s.includes('headphone') || s.includes('earphone') || s.includes('airpod') || s.includes('speaker')) {
+    return 'audio';
+  }
+  if (s.includes('game') || s.includes('gaming') || s.includes('console') || s.includes('playstation') || s.includes('xbox')) {
+    return 'gaming';
+  }
+  if (s.includes('phone') || s.includes('tablet') || s.includes('ipad') || s.includes('smartphone')) {
+    return 'phone_tablet';
+  }
+  return 'general';
+}
+
 interface VendorDirectSaleModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -35,6 +75,7 @@ interface VendorDirectSaleModalProps {
   accounts: FinancialAccount[];
   isOwner?: boolean;
   initialProductId?: string;
+  initialVariantId?: string;
   onSaleSuccess: () => void;
 }
 
@@ -47,6 +88,7 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
   accounts,
   isOwner = false,
   initialProductId,
+  initialVariantId,
   onSaleSuccess,
 }) => {
   // Local products cache to immediately show newly created models
@@ -63,12 +105,28 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
   const modelSearchContainerRef = useRef<HTMLDivElement>(null);
   const [customProductName, setCustomProductName] = useState('');
   const [selectedVariantId, setSelectedVariantId] = useState<string>('');
+  const variantListRef = useRef<HTMLDivElement>(null);
 
   // Quick Add Product Model State
   const [isCreatingProduct, setIsCreatingProduct] = useState(false);
   const [newProductName, setNewProductName] = useState('');
   const [newProductBrand, setNewProductBrand] = useState('');
   const [isSubmittingProduct, setIsSubmittingProduct] = useState(false);
+
+  // Structured Variant Fields for Product / Variant Creation
+  const [variantStorage, setVariantStorage] = useState('128GB');
+  const [variantRam, setVariantRam] = useState('');
+  const [variantColor, setVariantColor] = useState('');
+  const [variantProcessor, setVariantProcessor] = useState('');
+  const [variantCompatibility, setVariantCompatibility] = useState('');
+  const [variantGlassType, setVariantGlassType] = useState('');
+  const [variantWattage, setVariantWattage] = useState('');
+  const [variantCaseSize, setVariantCaseSize] = useState('');
+  const [variantMaterial, setVariantMaterial] = useState('');
+  const [variantGeneralSpec, setVariantGeneralSpec] = useState('');
+
+  const [isCreatingVariant, setIsCreatingVariant] = useState(false);
+  const [isSubmittingVariant, setIsSubmittingVariant] = useState(false);
 
   // Hardware Diagnostic Specs
   const [storage, setStorage] = useState('128GB');
@@ -129,9 +187,25 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const resetVariantInputs = () => {
+    setVariantStorage('128GB');
+    setVariantRam('');
+    setVariantColor('');
+    setVariantProcessor('');
+    setVariantCompatibility('');
+    setVariantGlassType('');
+    setVariantWattage('');
+    setVariantCaseSize('');
+    setVariantMaterial('');
+    setVariantGeneralSpec('');
+  };
+
   // Set initial product, category or defaults
   useEffect(() => {
     if (isOpen) {
+      setIsCreatingVariant(false);
+      resetVariantInputs();
+
       if (initialProductId) {
         const prod = localProducts.find((p) => p.id === initialProductId);
         if (prod) {
@@ -143,7 +217,20 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
             const matchCat = categories.find((c) => c.slug === prod.category);
             if (matchCat) setSelectedCategoryId(matchCat.id);
           }
-          if (prod.variants && prod.variants.length > 0) {
+          if (initialVariantId && prod.variants?.some((v) => v.id === initialVariantId)) {
+            setSelectedVariantId(initialVariantId);
+            const v = prod.variants.find((v) => v.id === initialVariantId);
+            if (v) {
+              if (v.storage) setStorage(v.storage);
+              if (v.ram) setRam(v.ram);
+              if (v.color) setColor(v.color);
+              if (v.default_selling_price && !sellingPrice) {
+                const defPrice = formatCurrencyInput(v.default_selling_price);
+                setSellingPrice(defPrice);
+                setPaidAmount(defPrice);
+              }
+            }
+          } else if (prod.variants && prod.variants.length > 0) {
             setSelectedVariantId(prod.variants[0].id);
             if (prod.variants[0].storage) setStorage(prod.variants[0].storage);
             if (prod.variants[0].ram) setRam(prod.variants[0].ram);
@@ -172,11 +259,15 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
         setIsModelSearchOpen(false);
       }
     }
-  }, [isOpen, initialProductId, localProducts, categories, selectedCategoryId, accounts]);
+  }, [isOpen, initialProductId, initialVariantId, localProducts, categories, selectedCategoryId, accounts]);
 
   const activeCategory = useMemo(() => {
     return categories.find((c) => c.id === selectedCategoryId) || categories[0];
   }, [categories, selectedCategoryId]);
+
+  const activeArchetype = useMemo(() => {
+    return getCategoryArchetype(activeCategory?.slug, activeCategory?.name);
+  }, [activeCategory]);
 
   // Filter products by selected category
   const filteredProducts = useMemo(() => {
@@ -199,6 +290,194 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
     return localProducts.find((p) => p.id === selectedProductId) || null;
   }, [localProducts, selectedProductId]);
 
+  const productExistingStorages = useMemo(() => {
+    if (!selectedProduct?.variants) return [];
+    return Array.from(new Set(selectedProduct.variants.map((v) => v.storage).filter(Boolean))) as string[];
+  }, [selectedProduct]);
+
+  const productExistingRams = useMemo(() => {
+    if (!selectedProduct?.variants) return [];
+    return Array.from(new Set(selectedProduct.variants.map((v) => v.ram).filter(Boolean))) as string[];
+  }, [selectedProduct]);
+
+  const productExistingColors = useMemo(() => {
+    if (!selectedProduct?.variants) return [];
+    return Array.from(new Set(selectedProduct.variants.map((v) => v.color).filter(Boolean))) as string[];
+  }, [selectedProduct]);
+
+  const quickStorageOptions = useMemo(() => {
+    const defaults = ['64GB', '128GB', '256GB', '512GB', '1TB', '2TB'];
+    const merged = [...defaults];
+    productExistingStorages.forEach((s) => {
+      if (!merged.some((m) => m.toLowerCase() === s.toLowerCase())) merged.push(s);
+    });
+    return merged;
+  }, [productExistingStorages]);
+
+  const quickRamOptions = useMemo(() => {
+    const defaults = ['4GB', '6GB', '8GB', '12GB', '16GB', '24GB', '32GB'];
+    const merged = [...defaults];
+    productExistingRams.forEach((r) => {
+      if (!merged.some((m) => m.toLowerCase() === r.toLowerCase())) merged.push(r);
+    });
+    return merged;
+  }, [productExistingRams]);
+
+  const quickColorOptions = useMemo(() => {
+    const defaults = [
+      'Natural Titanium',
+      'Black Titanium',
+      'White Titanium',
+      'Desert Titanium',
+      'Blue Titanium',
+      'Space Black',
+      'Silver',
+      'Gold',
+      'Midnight',
+      'Starlight',
+      'Graphite',
+      'Deep Purple',
+      'Black',
+      'White',
+      'Gray',
+      'Blue',
+    ];
+    const list: string[] = [];
+    productExistingColors.forEach((c) => {
+      if (!list.some((l) => l.toLowerCase() === c.toLowerCase())) list.push(c);
+    });
+    defaults.forEach((c) => {
+      if (!list.some((l) => l.toLowerCase() === c.toLowerCase())) list.push(c);
+    });
+    return list;
+  }, [productExistingColors]);
+
+  const quickLaptopStorageOptions = useMemo(() => {
+    const defaults = ['256GB SSD', '512GB SSD', '1TB SSD', '2TB SSD', '4TB SSD'];
+    const merged = [...defaults];
+    productExistingStorages.forEach((s) => {
+      if (!merged.some((m) => m.toLowerCase() === s.toLowerCase())) merged.push(s);
+    });
+    return merged;
+  }, [productExistingStorages]);
+
+  const quickLaptopRamOptions = useMemo(() => {
+    const defaults = ['8GB', '16GB', '24GB', '32GB', '36GB', '48GB', '64GB', '128GB'];
+    const merged = [...defaults];
+    productExistingRams.forEach((r) => {
+      if (!merged.some((m) => m.toLowerCase() === r.toLowerCase())) merged.push(r);
+    });
+    return merged;
+  }, [productExistingRams]);
+
+  const quickProcessorOptions = useMemo(() => {
+    return [
+      'M1',
+      'M2',
+      'M3',
+      'M3 Pro',
+      'M3 Max',
+      'M4',
+      'M4 Pro',
+      'M4 Max',
+      'Intel Core i5',
+      'Intel Core i7',
+      'Intel Core i9',
+      'Intel Core Ultra 7',
+      'AMD Ryzen 7',
+      'AMD Ryzen 9',
+    ];
+  }, []);
+
+  // Build variant payload based on category archetype
+  const buildVariantData = () => {
+    const specs: Record<string, any> = {};
+
+    let vStorage: string | undefined = undefined;
+    let vRam: string | undefined = undefined;
+    let vColor: string | undefined = undefined;
+
+    switch (activeArchetype) {
+      case 'phone_tablet':
+        vStorage = variantStorage.trim() || undefined;
+        vRam = variantRam.trim() || undefined;
+        vColor = variantColor.trim() || undefined;
+        break;
+
+      case 'laptop_computer':
+        vStorage = variantStorage.trim() || undefined;
+        vRam = variantRam.trim() || undefined;
+        vColor = variantColor.trim() || undefined;
+        if (variantProcessor.trim()) specs.processor = variantProcessor.trim();
+        break;
+
+      case 'smartwatch':
+        if (variantCaseSize.trim()) specs.case_size = variantCaseSize.trim();
+        vColor = variantColor.trim() || undefined;
+        if (variantRam.trim()) specs.connectivity = variantRam.trim();
+        break;
+
+      case 'screen_protector':
+        if (variantCompatibility.trim()) specs.compatibility = variantCompatibility.trim();
+        if (variantGlassType.trim()) specs.glass_type = variantGlassType.trim();
+        break;
+
+      case 'case_cover':
+        if (variantCompatibility.trim()) specs.compatibility = variantCompatibility.trim();
+        if (variantMaterial.trim()) specs.material = variantMaterial.trim();
+        vColor = variantColor.trim() || undefined;
+        break;
+
+      case 'charger_cable':
+        if (variantWattage.trim()) specs.wattage = variantWattage.trim();
+        if (variantGeneralSpec.trim()) specs.port_type = variantGeneralSpec.trim();
+        vColor = variantColor.trim() || undefined;
+        break;
+
+      case 'audio':
+      case 'gaming':
+      case 'general':
+      default:
+        vStorage = variantStorage.trim() || undefined;
+        vColor = variantColor.trim() || undefined;
+        if (variantGeneralSpec.trim()) specs.edition = variantGeneralSpec.trim();
+        break;
+    }
+
+    return {
+      storage: vStorage,
+      ram: vRam,
+      color: vColor,
+      specs: Object.keys(specs).length > 0 ? specs : undefined,
+    };
+  };
+
+  // When variant changes, auto-fill specs and default selling price
+  const handleVariantChange = (variantId: string) => {
+    setSelectedVariantId(variantId);
+    const v = selectedProduct?.variants?.find((item) => item.id === variantId);
+    if (v) {
+      if (v.storage) setStorage(v.storage);
+      if (v.ram) setRam(v.ram);
+      if (v.color) setColor(v.color);
+      if (v.default_selling_price) {
+        const defPrice = formatCurrencyInput(v.default_selling_price);
+        setSellingPrice(defPrice);
+        setPaidAmount(defPrice);
+      }
+    }
+  };
+
+  // Smoothly scroll selected variant into view inside the fixed-height list
+  useEffect(() => {
+    if (selectedVariantId && variantListRef.current) {
+      const el = variantListRef.current.querySelector<HTMLElement>(`[data-variant-id="${selectedVariantId}"]`);
+      if (el) {
+        el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    }
+  }, [selectedVariantId]);
+
   // Real-time search filter for Model search field
   const searchedProducts = useMemo(() => {
     const query = modelSearchQuery.trim().toLowerCase();
@@ -218,6 +497,7 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
     setModelSearchQuery(prod.name);
     setCustomProductName('');
     setIsModelSearchOpen(false);
+    setIsCreatingVariant(false);
 
     if (prod.variants && prod.variants.length > 0) {
       const v = prod.variants[0];
@@ -266,6 +546,8 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
 
     try {
       setIsSubmittingProduct(true);
+      const variantData = buildVariantData();
+
       const res = await api.createProduct({
         name: newProductName.trim(),
         brand: newProductBrand.trim() || undefined,
@@ -274,9 +556,7 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
         has_serials: activeCategory?.has_serials ?? true,
         variants: [
           {
-            storage: storage.trim() || undefined,
-            ram: ram.trim() || undefined,
-            color: color.trim() || undefined,
+            ...variantData,
             default_selling_price: parseFormattedNumber(sellingPrice) || undefined,
           },
         ],
@@ -286,18 +566,77 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
       setIsCreatingProduct(false);
       setNewProductName('');
       setNewProductBrand('');
+      resetVariantInputs();
 
       setLocalProducts((prev) => [res, ...prev.filter((p) => p.id !== res.id)]);
       setSelectedProductId(res.id);
       setModelSearchQuery(res.name);
       setIsModelSearchOpen(false);
       if (res.variants && res.variants.length > 0) {
-        setSelectedVariantId(res.variants[0].id);
+        const v = res.variants[0];
+        setSelectedVariantId(v.id);
+        if (v.storage) setStorage(v.storage);
+        if (v.ram) setRam(v.ram);
+        if (v.color) setColor(v.color);
+        if (v.default_selling_price && !sellingPrice) {
+          const defPrice = formatCurrencyInput(v.default_selling_price);
+          setSellingPrice(defPrice);
+          setPaidAmount(defPrice);
+        }
       }
     } catch (err: any) {
       toast.error(err.message || 'Failed to create product model');
     } finally {
       setIsSubmittingProduct(false);
+    }
+  };
+
+  // Handle Dynamic Variant Addition to Existing Product
+  const handleCreateVariant = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!selectedProductId) {
+      toast.error('Please select a product model first');
+      return;
+    }
+
+    try {
+      setIsSubmittingVariant(true);
+      const variantData = buildVariantData();
+
+      const createdVariant: ProductVariant = await api.addVariant(selectedProductId, {
+        ...variantData,
+        default_selling_price: parseFormattedNumber(sellingPrice) || undefined,
+      });
+
+      toast.success('Variant added to model');
+
+      setLocalProducts((prev) =>
+        prev.map((p) => {
+          if (p.id === selectedProductId) {
+            return {
+              ...p,
+              variants: [...(p.variants || []), createdVariant],
+            };
+          }
+          return p;
+        })
+      );
+
+      setSelectedVariantId(createdVariant.id);
+      if (createdVariant.storage) setStorage(createdVariant.storage);
+      if (createdVariant.ram) setRam(createdVariant.ram);
+      if (createdVariant.color) setColor(createdVariant.color);
+      if (createdVariant.default_selling_price && !sellingPrice) {
+        const defPrice = formatCurrencyInput(createdVariant.default_selling_price);
+        setSellingPrice(defPrice);
+        setPaidAmount(defPrice);
+      }
+      setIsCreatingVariant(false);
+      resetVariantInputs();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to add variant');
+    } finally {
+      setIsSubmittingVariant(false);
     }
   };
 
@@ -512,6 +851,441 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
     }
   };
 
+  // Render context-aware variant input fields
+  const renderCategoryVariantInputs = () => {
+    switch (activeArchetype) {
+      case 'screen_protector':
+        return (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                Compatible Phone Model *
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. iPhone 16 Pro Max, S24 Ultra"
+                value={variantCompatibility}
+                onChange={(e) => setVariantCompatibility(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                Glass / Finish Type
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Privacy Glass, Clear HD, Matte"
+                value={variantGlassType}
+                onChange={(e) => setVariantGlassType(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+              />
+            </div>
+          </div>
+        );
+
+      case 'case_cover':
+        return (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                Phone Model *
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. iPhone 16 Pro, S24"
+                value={variantCompatibility}
+                onChange={(e) => setVariantCompatibility(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                Material / Style
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. MagSafe Clear, Silicone, Leather"
+                value={variantMaterial}
+                onChange={(e) => setVariantMaterial(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                Color
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Midnight, Deep Purple, Clear"
+                value={variantColor}
+                onChange={(e) => setVariantColor(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+              />
+            </div>
+          </div>
+        );
+
+      case 'charger_cable':
+        return (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                Power / Wattage
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. 20W, 65W GaN, 20000mAh"
+                value={variantWattage}
+                onChange={(e) => setVariantWattage(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                Connector / Length
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. USB-C to C (1m), 3-in-1"
+                value={variantGeneralSpec}
+                onChange={(e) => setVariantGeneralSpec(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                Color
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. White, Braided Black"
+                value={variantColor}
+                onChange={(e) => setVariantColor(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+              />
+            </div>
+          </div>
+        );
+
+      case 'smartwatch':
+        return (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                Case Size
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. 41mm, 45mm, 49mm"
+                value={variantCaseSize}
+                onChange={(e) => setVariantCaseSize(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                Connectivity
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. GPS, GPS + Cellular"
+                value={variantRam}
+                onChange={(e) => setVariantRam(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                Band & Color
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Midnight, Starlight"
+                value={variantColor}
+                onChange={(e) => setVariantColor(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+              />
+            </div>
+          </div>
+        );
+
+      case 'laptop_computer':
+        return (
+          <div className="space-y-3.5">
+            {/* SSD Storage Radio Buttons */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                  SSD Storage <span className="text-rose-500">*</span>
+                </label>
+                <span className="text-[10px] text-slate-400">Select or enter new</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5 mb-1.5">
+                {quickLaptopStorageOptions.map((opt) => {
+                  const isSelected = variantStorage.trim().toLowerCase() === opt.toLowerCase();
+                  return (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => setVariantStorage(opt)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-slate-900 dark:bg-slate-900 text-emerald-400 dark:text-emerald-400 border-slate-800 dark:border-slate-800 shadow-2xs font-bold ring-1 ring-emerald-500/20'
+                          : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                      }`}
+                    >
+                      {opt}
+                    </button>
+                  );
+                })}
+              </div>
+              <input
+                type="text"
+                placeholder="Or custom capacity (e.g. 2TB SSD, 8TB)..."
+                value={variantStorage}
+                onChange={(e) => setVariantStorage(e.target.value)}
+                className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900/20"
+              />
+            </div>
+
+            {/* RAM Radio Buttons */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                  Unified RAM / Memory
+                </label>
+                <span className="text-[10px] text-slate-400">Select or enter new</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5 mb-1.5">
+                {quickLaptopRamOptions.map((opt) => {
+                  const isSelected = variantRam.trim().toLowerCase() === opt.toLowerCase();
+                  return (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => setVariantRam(opt)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-slate-900 dark:bg-slate-900 text-emerald-400 dark:text-emerald-400 border-slate-800 dark:border-slate-800 shadow-2xs font-bold ring-1 ring-emerald-500/20'
+                          : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                      }`}
+                    >
+                      {opt}
+                    </button>
+                  );
+                })}
+              </div>
+              <input
+                type="text"
+                placeholder="Or custom RAM (e.g. 18GB, 96GB)..."
+                value={variantRam}
+                onChange={(e) => setVariantRam(e.target.value)}
+                className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900/20"
+              />
+            </div>
+
+            {/* Processor / Chip Radio Buttons */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                  Processor / Chip
+                </label>
+                <span className="text-[10px] text-slate-400">Select or enter new</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5 mb-1.5">
+                {quickProcessorOptions.map((opt) => {
+                  const isSelected = variantProcessor.trim().toLowerCase() === opt.toLowerCase();
+                  return (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => setVariantProcessor(opt)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-slate-900 dark:bg-slate-900 text-emerald-400 dark:text-emerald-400 border-slate-800 dark:border-slate-800 shadow-2xs font-bold ring-1 ring-emerald-500/20'
+                          : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                      }`}
+                    >
+                      {opt}
+                    </button>
+                  );
+                })}
+              </div>
+              <input
+                type="text"
+                placeholder="Or custom processor (e.g. Ultra 9 185H)..."
+                value={variantProcessor}
+                onChange={(e) => setVariantProcessor(e.target.value)}
+                className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900/20"
+              />
+            </div>
+
+            {/* Color Radio Buttons */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                  Color / Finish
+                </label>
+                <span className="text-[10px] text-slate-400">Select or enter new</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5 mb-1.5">
+                {['Space Black', 'Silver', 'Space Gray', 'Midnight', 'Starlight'].map((opt) => {
+                  const isSelected = variantColor.trim().toLowerCase() === opt.toLowerCase();
+                  return (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => setVariantColor(opt)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-slate-900 dark:bg-slate-900 text-emerald-400 dark:text-emerald-400 border-slate-800 dark:border-slate-800 shadow-2xs font-bold ring-1 ring-emerald-500/20'
+                          : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                      }`}
+                    >
+                      {opt}
+                    </button>
+                  );
+                })}
+              </div>
+              <input
+                type="text"
+                placeholder="Or custom color..."
+                value={variantColor}
+                onChange={(e) => setVariantColor(e.target.value)}
+                className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900/20"
+              />
+            </div>
+          </div>
+        );
+
+      case 'phone_tablet':
+      default:
+        return (
+          <div className="space-y-3.5">
+            {/* Storage Radio Buttons */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                  Storage / Capacity <span className="text-rose-500">*</span>
+                </label>
+                <span className="text-[10px] text-slate-400">Click to select or enter new</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5 mb-1.5">
+                {quickStorageOptions.map((opt) => {
+                  const isSelected = variantStorage.trim().toLowerCase() === opt.toLowerCase();
+                  return (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => setVariantStorage(opt)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-slate-900 dark:bg-slate-900 text-emerald-400 dark:text-emerald-400 border-slate-800 dark:border-slate-800 shadow-2xs font-bold ring-1 ring-emerald-500/20'
+                          : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                      }`}
+                    >
+                      {opt}
+                    </button>
+                  );
+                })}
+              </div>
+              <input
+                type="text"
+                placeholder="Or custom capacity (e.g. 2TB, 4TB)..."
+                value={variantStorage}
+                onChange={(e) => setVariantStorage(e.target.value)}
+                className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900/20"
+              />
+            </div>
+
+            {/* RAM Radio Buttons */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                  RAM / Memory (Optional)
+                </label>
+                <span className="text-[10px] text-slate-400">Click to select</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5 mb-1.5">
+                <button
+                  type="button"
+                  onClick={() => setVariantRam('')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                    !variantRam
+                      ? 'bg-slate-900 dark:bg-slate-900 text-emerald-400 dark:text-emerald-400 border-slate-800 dark:border-slate-800 shadow-2xs font-bold ring-1 ring-emerald-500/20'
+                      : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:border-slate-300'
+                  }`}
+                >
+                  Standard / N/A
+                </button>
+                {quickRamOptions.map((opt) => {
+                  const isSelected = variantRam.trim().toLowerCase() === opt.toLowerCase();
+                  return (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => setVariantRam(opt)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-slate-900 dark:bg-slate-900 text-emerald-400 dark:text-emerald-400 border-slate-800 dark:border-slate-800 shadow-2xs font-bold ring-1 ring-emerald-500/20'
+                          : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                      }`}
+                    >
+                      {opt}
+                    </button>
+                  );
+                })}
+              </div>
+              <input
+                type="text"
+                placeholder="Or custom RAM (e.g. 18GB)..."
+                value={variantRam}
+                onChange={(e) => setVariantRam(e.target.value)}
+                className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900/20"
+              />
+            </div>
+
+            {/* Color Radio Buttons */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                  Color / Finish
+                </label>
+                <span className="text-[10px] text-slate-400">Click to select existing or enter new</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5 mb-1.5">
+                {quickColorOptions.slice(0, 12).map((opt) => {
+                  const isSelected = variantColor.trim().toLowerCase() === opt.toLowerCase();
+                  return (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => setVariantColor(opt)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-slate-900 dark:bg-slate-900 text-emerald-400 dark:text-emerald-400 border-slate-800 dark:border-slate-800 shadow-2xs font-bold ring-1 ring-emerald-500/20'
+                          : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                      }`}
+                    >
+                      {opt}
+                    </button>
+                  );
+                })}
+              </div>
+              <input
+                type="text"
+                placeholder="Or custom color (e.g. Desert Titanium, Cosmic Orange)..."
+                value={variantColor}
+                onChange={(e) => setVariantColor(e.target.value)}
+                className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900/20"
+              />
+            </div>
+          </div>
+        );
+    }
+  };
+
   if (!isOpen) return null;
 
   const modalContent = (
@@ -618,50 +1392,22 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
                   </div>
                 </div>
 
-                {/* Quick Initial Variant Specs */}
-                <div className="pt-1 space-y-2">
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 block">
+                {/* Category-Specific Variant Fields for New Model */}
+                <div className="pt-1">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-2 block">
                     Initial Variant Specification
                   </span>
-                  <div className="grid grid-cols-3 gap-2.5">
-                    <div>
-                      <label className="block text-[10px] font-semibold text-slate-500 mb-1">Storage</label>
-                      <input
-                        type="text"
-                        placeholder="256GB"
-                        value={storage}
-                        onChange={(e) => setStorage(e.target.value)}
-                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-semibold text-slate-500 mb-1">RAM</label>
-                      <input
-                        type="text"
-                        placeholder="8GB"
-                        value={ram}
-                        onChange={(e) => setRam(e.target.value)}
-                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-semibold text-slate-500 mb-1">Color</label>
-                      <input
-                        type="text"
-                        placeholder="Natural Titanium"
-                        value={color}
-                        onChange={(e) => setColor(e.target.value)}
-                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white"
-                      />
-                    </div>
-                  </div>
+                  {renderCategoryVariantInputs()}
                 </div>
 
-                <div className="flex justify-end gap-2 pt-1">
+                <div className="flex justify-end gap-2 pt-2">
                   <button
                     type="button"
-                    onClick={() => setIsCreatingProduct(false)}
-                    className="h-8 px-3 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 cursor-pointer"
+                    onClick={() => {
+                      setIsCreatingProduct(false);
+                      resetVariantInputs();
+                    }}
+                    className="h-9 px-3.5 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 cursor-pointer"
                   >
                     Cancel
                   </button>
@@ -860,94 +1606,233 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
                   </div>
                 )}
 
-                {/* If Selected Product has Variants */}
-                {selectedProduct && selectedProduct.variants && selectedProduct.variants.length > 0 && (
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">
-                        Variant Specification
-                      </label>
-                      <span className="text-[10px] text-slate-400">
-                        {selectedProduct.variants.length} variant{selectedProduct.variants.length > 1 ? 's' : ''} in catalog
-                      </span>
-                    </div>
-                    <div className="relative">
-                      <select
-                        value={selectedVariantId}
-                        onChange={(e) => {
-                          const vid = e.target.value;
-                          setSelectedVariantId(vid);
-                          const v = selectedProduct.variants.find((item) => item.id === vid);
-                          if (v) {
-                            if (v.storage) setStorage(v.storage);
-                            if (v.ram) setRam(v.ram);
-                            if (v.color) setColor(v.color);
-                            if (v.default_selling_price) {
-                              const defPrice = formatCurrencyInput(v.default_selling_price);
-                              setSellingPrice(defPrice);
-                              setPaidAmount(defPrice);
-                            }
-                          }
-                        }}
-                        className="w-full h-10 pl-3 pr-8 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-900 dark:text-white appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+                {/* Variant Selector — Radio Tiles & Inline Builder */}
+                {selectedProduct && (
+                  <div className="space-y-2.5 pt-1">
+                    {!isCreatingVariant && (
+                      <div className="flex items-center justify-between">
+                        <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                          Device Variant <span className="text-rose-500">*</span>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsCreatingVariant(true);
+                            resetVariantInputs();
+                          }}
+                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 transition-colors cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>New Variant</span>
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Radio Cards for Existing Variants — hidden while adding a new one */}
+                    {!isCreatingVariant && selectedProduct.variants && selectedProduct.variants.length > 0 ? (
+                      <div
+                        ref={variantListRef}
+                        className="max-h-[220px] overflow-y-auto pr-1.5 overscroll-contain"
                       >
-                        {selectedProduct.variants.map((v) => {
-                          const ramLabel = v.ram ? (v.ram.toLowerCase().includes('ram') ? v.ram : `${v.ram} RAM`) : null;
-                          const label = [v.storage, ramLabel, v.color].filter(Boolean).join(' · ') || 'Standard';
-                          return (
-                            <option key={v.id} value={v.id}>
-                              {label} {v.default_selling_price ? `(${Number(v.default_selling_price).toLocaleString()} ETB)` : ''}
-                            </option>
-                          );
-                        })}
-                      </select>
-                      <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-3.5 pointer-events-none" />
-                    </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-0.5">
+                          {selectedProduct.variants.map((v) => {
+                            const isSelected = selectedVariantId === v.id && !isCreatingVariant;
+                            const specValues = v.specs ? Object.values(v.specs).map(String) : [];
+                            const specLabel = [v.ram ? `${v.ram} RAM` : null, ...specValues].filter(Boolean).join(' • ');
+
+                            return (
+                              <button
+                                type="button"
+                                key={v.id}
+                                data-variant-id={v.id}
+                                onClick={() => {
+                                  setIsCreatingVariant(false);
+                                  handleVariantChange(v.id);
+                                }}
+                                className={`relative text-left flex items-center justify-between p-3 rounded-xl border text-xs cursor-pointer transition-all ${
+                                  isSelected
+                                    ? 'border-emerald-600 dark:border-emerald-500 bg-emerald-50/70 dark:bg-emerald-950/30 ring-1 ring-emerald-600/30 dark:ring-emerald-500/30 shadow-xs'
+                                    : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50/60 dark:hover:bg-slate-800/40'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                                  <span
+                                    className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
+                                      isSelected
+                                        ? 'border-emerald-600 bg-emerald-600 dark:border-emerald-500 dark:bg-emerald-500'
+                                        : 'border-slate-300 dark:border-slate-600 bg-transparent'
+                                    }`}
+                                  >
+                                    {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+                                  </span>
+                                  <div className="min-w-0">
+                                    <div className="font-bold text-slate-900 dark:text-white truncate flex items-center gap-1.5 flex-wrap">
+                                      <span>{v.storage || 'Standard'}</span>
+                                      {v.ram && (
+                                        <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 px-1.5 py-0.2 rounded bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200/50 dark:border-emerald-800/50">
+                                          {v.ram.toLowerCase().includes('ram') ? v.ram : `${v.ram} RAM`}
+                                        </span>
+                                      )}
+                                      {v.color && (
+                                        <span className="text-[10px] font-normal text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 truncate">
+                                          {v.color}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {specLabel && (
+                                      <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
+                                        {specLabel}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                {v.default_selling_price && (
+                                  <div className="text-right shrink-0">
+                                    <span className="text-[10px] font-mono font-bold text-slate-700 dark:text-slate-300 block">
+                                      {Number(v.default_selling_price).toLocaleString()}
+                                    </span>
+                                    <span className="text-[8px] text-slate-400 uppercase">ETB</span>
+                                  </div>
+                                )}
+                              </button>
+                            );
+                          })}
+
+                          {!isCreatingVariant && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsCreatingVariant(true);
+                                resetVariantInputs();
+                              }}
+                              className="flex items-center gap-2.5 p-3 rounded-xl border border-dashed text-xs font-semibold transition-all cursor-pointer border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-50/50 dark:hover:bg-slate-800/30"
+                            >
+                              <span className="w-4 h-4 rounded-full border border-dashed border-slate-400 dark:border-slate-500 flex items-center justify-center shrink-0">
+                                <Plus className="w-2.5 h-2.5" />
+                              </span>
+                              <span className="truncate">+ New Variant (e.g. 2TB)...</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ) : !isCreatingVariant ? (
+                      <div className="p-3.5 rounded-xl border border-dashed border-amber-300 dark:border-amber-800/60 bg-amber-50/50 dark:bg-amber-950/20 text-xs text-amber-800 dark:text-amber-300 flex items-center justify-between">
+                        <span>No specifications defined yet for this model.</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsCreatingVariant(true);
+                            resetVariantInputs();
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs cursor-pointer"
+                        >
+                          Add Initial Variant
+                        </button>
+                      </div>
+                    ) : null}
+
+                    {/* Inline New Variant Builder */}
+                    {isCreatingVariant && (
+                      <div className="mt-2.5 p-4 rounded-2xl bg-slate-50/90 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 space-y-4 shadow-sm animate-fade-in">
+                        <div className="flex items-center justify-between pb-2 border-b border-slate-200/70 dark:border-slate-800">
+                          <div>
+                            <span className="text-xs font-bold text-slate-900 dark:text-white block">
+                              Add New Variant to {selectedProduct.name}
+                            </span>
+                            <span className="text-[10px] text-slate-400">
+                              Click options below or type new custom specifications
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsCreatingVariant(false);
+                              resetVariantInputs();
+                            }}
+                            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer"
+                            title="Close"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        {/* Interactive Radio Builders for Storage, RAM, Color, etc. */}
+                        {renderCategoryVariantInputs()}
+
+                        {/* Actions */}
+                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200/70 dark:border-slate-800">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsCreatingVariant(false);
+                              resetVariantInputs();
+                            }}
+                            className="h-8 px-3.5 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleCreateVariant()}
+                            disabled={isSubmittingVariant}
+                            className="h-8 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-800 text-emerald-400 dark:text-emerald-400 text-xs font-bold disabled:opacity-50 transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
+                          >
+                            {isSubmittingVariant ? <LdrsSpinner size={14} color="#34d399" stroke={2.5} /> : <Check className="w-3.5 h-3.5" />}
+                            <span>Save & Select Variant</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
             )}
 
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                  Storage
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. 256GB"
-                  value={storage}
-                  onChange={(e) => setStorage(e.target.value)}
-                  className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
-                />
-              </div>
+            {/* If Custom One-Off or Model with No Variants, allow manual Storage, RAM, Color entry */}
+            {(selectedProductId === '__custom__' || (selectedProduct && (!selectedProduct.variants || selectedProduct.variants.length === 0))) && (
+              <div className="grid grid-cols-3 gap-2.5">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                    Storage
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 256GB"
+                    value={storage}
+                    onChange={(e) => setStorage(e.target.value)}
+                    className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                  RAM / Memory
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. 8GB, 12GB"
-                  value={ram}
-                  onChange={(e) => setRam(e.target.value)}
-                  className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
-                />
-              </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                    RAM / Memory
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 8GB, 12GB"
+                    value={ram}
+                    onChange={(e) => setRam(e.target.value)}
+                    className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                  Color
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Black"
-                  value={color}
-                  onChange={(e) => setColor(e.target.value)}
-                  className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
-                />
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                    Color
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Black"
+                    value={color}
+                    onChange={(e) => setColor(e.target.value)}
+                    className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
+                  />
+                </div>
               </div>
+            )}
 
+            <div className="grid grid-cols-2 gap-2.5">
               <div>
                 <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
                   Condition
