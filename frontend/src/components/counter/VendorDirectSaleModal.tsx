@@ -14,6 +14,7 @@ import {
   Clock,
   ShieldAlert,
   Plus,
+  ChevronDown,
   Banknote,
   ArrowLeftRight,
   Clock3,
@@ -40,16 +41,32 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
   isOpen,
   onClose,
   products,
+  categories = [],
   contacts,
   accounts,
   isOwner = false,
   initialProductId,
   onSaleSuccess,
 }) => {
-  // Device Selection & Details
+  // Local products cache to immediately show newly created models
+  const [localProducts, setLocalProducts] = useState<Product[]>(products);
+  useEffect(() => {
+    setLocalProducts(products);
+  }, [products]);
+
+  // Category & Product Selection
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [selectedProductId, setSelectedProductId] = useState<string>('');
   const [customProductName, setCustomProductName] = useState('');
   const [selectedVariantId, setSelectedVariantId] = useState<string>('');
+
+  // Quick Add Product Model State
+  const [isCreatingProduct, setIsCreatingProduct] = useState(false);
+  const [newProductName, setNewProductName] = useState('');
+  const [newProductBrand, setNewProductBrand] = useState('');
+  const [isSubmittingProduct, setIsSubmittingProduct] = useState(false);
+
+  // Hardware Diagnostic Specs
   const [storage, setStorage] = useState('128GB');
   const [ram, setRam] = useState('');
   const [color, setColor] = useState('');
@@ -97,13 +114,19 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  // Set initial product or defaults
+  // Set initial product, category or defaults
   useEffect(() => {
     if (isOpen) {
       if (initialProductId) {
-        const prod = products.find((p) => p.id === initialProductId);
+        const prod = localProducts.find((p) => p.id === initialProductId);
         if (prod) {
           setSelectedProductId(prod.id);
+          if (prod.category_id) {
+            setSelectedCategoryId(prod.category_id);
+          } else if (prod.category) {
+            const matchCat = categories.find((c) => c.slug === prod.category);
+            if (matchCat) setSelectedCategoryId(matchCat.id);
+          }
           if (prod.variants && prod.variants.length > 0) {
             setSelectedVariantId(prod.variants[0].id);
             if (prod.variants[0].storage) setStorage(prod.variants[0].storage);
@@ -116,6 +139,8 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
             }
           }
         }
+      } else if (categories.length > 0 && !selectedCategoryId) {
+        setSelectedCategoryId(categories[0].id);
       }
       if (accounts.length > 0) {
         if (!vendorAccountId) setVendorAccountId(accounts[0].id);
@@ -123,12 +148,36 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
       }
       setIsVendorSplit(false);
       setVendorPaymentSplits([]);
+      setIsCreatingProduct(false);
+      setNewProductName('');
+      setNewProductBrand('');
     }
-  }, [isOpen, initialProductId, products, accounts]);
+  }, [isOpen, initialProductId, localProducts, categories, selectedCategoryId, accounts]);
+
+  const activeCategory = useMemo(() => {
+    return categories.find((c) => c.id === selectedCategoryId) || categories[0];
+  }, [categories, selectedCategoryId]);
+
+  // Filter products by selected category
+  const filteredProducts = useMemo(() => {
+    if (!selectedCategoryId) return localProducts;
+    const cat = categories.find((c) => c.id === selectedCategoryId);
+    const catSlug = cat?.slug?.toLowerCase();
+    const catName = cat?.name?.toLowerCase();
+
+    return localProducts.filter((p) => {
+      if (p.category_id && p.category_id === selectedCategoryId) return true;
+      if (p.category_rel && p.category_rel.id === selectedCategoryId) return true;
+      const pCat = (p.category || '').toLowerCase();
+      if (catSlug && pCat === catSlug) return true;
+      if (catName && pCat === catName) return true;
+      return false;
+    });
+  }, [localProducts, selectedCategoryId, categories]);
 
   const selectedProduct = useMemo(() => {
-    return products.find((p) => p.id === selectedProductId) || null;
-  }, [products, selectedProductId]);
+    return localProducts.find((p) => p.id === selectedProductId) || null;
+  }, [localProducts, selectedProductId]);
 
   const vendorContacts = useMemo(
     () => liveContacts.filter((contact) =>
@@ -139,16 +188,60 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
   );
 
   const isPhone = useMemo(() => {
-    const name = (selectedProduct?.name || customProductName).toLowerCase();
-    const cat = (selectedProduct?.category || '').toLowerCase();
+    const name = (selectedProduct?.name || customProductName || newProductName).toLowerCase();
+    const cat = (activeCategory?.name || activeCategory?.slug || selectedProduct?.category || '').toLowerCase();
     return (
       cat.includes('phone') ||
+      cat.includes('tablet') ||
       cat.includes('smartphone') ||
       name.includes('iphone') ||
       name.includes('galaxy') ||
       name.includes('pixel')
     );
-  }, [selectedProduct, customProductName]);
+  }, [selectedProduct, customProductName, newProductName, activeCategory]);
+
+  // Handle Quick Product Model Creation
+  const handleCreateProduct = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!newProductName.trim()) {
+      toast.error('Model name is required');
+      return;
+    }
+
+    try {
+      setIsSubmittingProduct(true);
+      const res = await api.createProduct({
+        name: newProductName.trim(),
+        brand: newProductBrand.trim() || undefined,
+        category: activeCategory?.slug || 'other',
+        category_id: activeCategory?.id,
+        has_serials: activeCategory?.has_serials ?? true,
+        variants: [
+          {
+            storage: storage.trim() || undefined,
+            ram: ram.trim() || undefined,
+            color: color.trim() || undefined,
+            default_selling_price: parseFormattedNumber(sellingPrice) || undefined,
+          },
+        ],
+      });
+
+      toast.success(`Model "${res.name}" created`);
+      setIsCreatingProduct(false);
+      setNewProductName('');
+      setNewProductBrand('');
+
+      setLocalProducts((prev) => [res, ...prev.filter((p) => p.id !== res.id)]);
+      setSelectedProductId(res.id);
+      if (res.variants && res.variants.length > 0) {
+        setSelectedVariantId(res.variants[0].id);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to create product model');
+    } finally {
+      setIsSubmittingProduct(false);
+    }
+  };
 
   // Numeric calculations
   const vendorCostNum = parseFormattedNumber(vendorCost) || 0;
@@ -218,9 +311,11 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const finalProductName = selectedProduct ? selectedProduct.name : customProductName.trim();
+    const finalProductName = selectedProduct
+      ? selectedProduct.name
+      : (customProductName.trim() || newProductName.trim());
     if (!finalProductName) {
-      toast.error('Please select or enter the device model name');
+      toast.error('Please select or create the device model');
       return;
     }
 
@@ -276,7 +371,7 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
       setSubmitting(true);
 
       const payload = {
-        product_id: selectedProductId || undefined,
+        product_id: selectedProductId && selectedProductId !== '__custom__' ? selectedProductId : undefined,
         product_name: finalProductName,
         variant_id: selectedVariantId || undefined,
         storage: storage.trim() || undefined,
@@ -323,6 +418,10 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
       setVendorCost('');
       setRam('');
       setNotes('');
+      setCustomProductName('');
+      setIsCreatingProduct(false);
+      setNewProductName('');
+      setNewProductBrand('');
       setIsVendorSplit(false);
       setVendorPaymentSplits([]);
       setIsCreditSale(false);
@@ -387,83 +486,270 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
         >
           {/* ── SECTION 1: DEVICE DETAILS ── */}
           <div className="space-y-3">
-            <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Device Details <span className="text-rose-500">*</span>
-            </label>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                  Catalog Model
-                </label>
-                <select
-                  value={selectedProductId}
-                  onChange={(e) => {
-                    const pid = e.target.value;
-                    setSelectedProductId(pid);
-                    const prod = products.find((p) => p.id === pid);
-                    if (prod?.variants && prod.variants.length > 0) {
-                      setSelectedVariantId(prod.variants[0].id);
-                      if (prod.variants[0].storage) setStorage(prod.variants[0].storage);
-                      if (prod.variants[0].ram) setRam(prod.variants[0].ram);
-                      if (prod.variants[0].color) setColor(prod.variants[0].color);
-                    }
+            <div className="flex items-center justify-between">
+              <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Device Details <span className="text-rose-500">*</span>
+              </label>
+              {!isCreatingProduct && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCreatingProduct(true);
+                    setNewProductName('');
+                    setNewProductBrand('');
                   }}
-                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none cursor-pointer"
+                  className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
                 >
-                  <option value="">— Custom Model (Type Below) —</option>
-                  {products.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} {p.brand ? `(${p.brand})` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {!selectedProductId ? (
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                    Custom Model Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. iPhone 16 Pro Max"
-                    value={customProductName}
-                    onChange={(e) => setCustomProductName(e.target.value)}
-                    className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
-                  />
-                </div>
-              ) : selectedProduct?.variants && selectedProduct.variants.length > 0 ? (
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                    Variant
-                  </label>
-                  <select
-                    value={selectedVariantId}
-                    onChange={(e) => {
-                      const vid = e.target.value;
-                      setSelectedVariantId(vid);
-                      const v = selectedProduct.variants.find((item) => item.id === vid);
-                      if (v?.storage) setStorage(v.storage);
-                      if (v?.ram) setRam(v.ram);
-                      if (v?.color) setColor(v.color);
-                    }}
-                    className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none cursor-pointer"
-                  >
-                    {selectedProduct.variants.map((v) => {
-                      const ramLabel = v.ram ? (v.ram.toLowerCase().includes('ram') ? v.ram : `${v.ram} RAM`) : null;
-                      const label = [v.storage, ramLabel, v.color].filter(Boolean).join(' · ') || 'Standard';
-                      return (
-                        <option key={v.id} value={v.id}>
-                          {label}
-                        </option>
-                      );
-                    })}
-                  </select>
-                </div>
-              ) : null}
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>New Model</span>
+                </button>
+              )}
             </div>
+
+            {/* Quick Add Product Model Form (Matches Stock Intake Modal) */}
+            {isCreatingProduct && (
+              <div className="p-4 rounded-xl bg-slate-50/80 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 space-y-3 animate-modal-enter">
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-bold text-slate-900 dark:text-white">
+                    New Product Model ({activeCategory?.name || 'Category'})
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-medium">Saves to catalog</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                      Model Name <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. iPhone 16 Pro Max, Galaxy S24 Ultra"
+                      value={newProductName}
+                      onChange={(e) => setNewProductName(e.target.value)}
+                      className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                      Brand
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Apple, Samsung, Google"
+                      value={newProductBrand}
+                      onChange={(e) => setNewProductBrand(e.target.value)}
+                      className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+                    />
+                  </div>
+                </div>
+
+                {/* Quick Initial Variant Specs */}
+                <div className="pt-1 space-y-2">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 block">
+                    Initial Variant Specification
+                  </span>
+                  <div className="grid grid-cols-3 gap-2.5">
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-500 mb-1">Storage</label>
+                      <input
+                        type="text"
+                        placeholder="256GB"
+                        value={storage}
+                        onChange={(e) => setStorage(e.target.value)}
+                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-500 mb-1">RAM</label>
+                      <input
+                        type="text"
+                        placeholder="8GB"
+                        value={ram}
+                        onChange={(e) => setRam(e.target.value)}
+                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-500 mb-1">Color</label>
+                      <input
+                        type="text"
+                        placeholder="Natural Titanium"
+                        value={color}
+                        onChange={(e) => setColor(e.target.value)}
+                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsCreatingProduct(false)}
+                    className="h-8 px-3 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCreateProduct}
+                    disabled={isSubmittingProduct || !newProductName.trim()}
+                    className="h-8 px-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-800 text-emerald-400 dark:text-emerald-400 text-xs font-bold disabled:opacity-50 transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
+                  >
+                    {isSubmittingProduct ? <LdrsSpinner size={14} color="#34d399" stroke={2.5} /> : null}
+                    <span>Save Model</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Standard Dropdowns (Category, Model, Variant) */}
+            {!isCreatingProduct && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Category Dropdown */}
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
+                      Category
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={selectedCategoryId}
+                        onChange={(e) => {
+                          const newCatId = e.target.value;
+                          setSelectedCategoryId(newCatId);
+                          setSelectedProductId('');
+                          setSelectedVariantId('');
+                          setCustomProductName('');
+                        }}
+                        className="w-full h-10 pl-3 pr-8 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-900 dark:text-white appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+                      >
+                        {categories.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name} {c.has_serials ? '(Serialized)' : '(Batch)'}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-3.5 pointer-events-none" />
+                    </div>
+                  </div>
+
+                  {/* Model Dropdown */}
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
+                      Model
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={selectedProductId}
+                        onChange={(e) => {
+                          const pid = e.target.value;
+                          setSelectedProductId(pid);
+                          if (pid && pid !== '__custom__') {
+                            setCustomProductName('');
+                            const prod = localProducts.find((p) => p.id === pid);
+                            if (prod?.variants && prod.variants.length > 0) {
+                              const v = prod.variants[0];
+                              setSelectedVariantId(v.id);
+                              if (v.storage) setStorage(v.storage);
+                              if (v.ram) setRam(v.ram);
+                              if (v.color) setColor(v.color);
+                              if (v.default_selling_price) {
+                                const defPrice = formatCurrencyInput(v.default_selling_price);
+                                setSellingPrice(defPrice);
+                                setPaidAmount(defPrice);
+                              }
+                            } else {
+                              setSelectedVariantId('');
+                            }
+                          } else {
+                            setSelectedVariantId('');
+                          }
+                        }}
+                        className="w-full h-10 pl-3 pr-8 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-900 dark:text-white appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+                      >
+                        <option value="">
+                          {filteredProducts.length === 0
+                            ? '-- No models in this category yet --'
+                            : `-- Choose Model (${filteredProducts.length} available) --`}
+                        </option>
+                        {filteredProducts.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name} {p.brand ? `(${p.brand})` : ''}
+                          </option>
+                        ))}
+                        <option value="__custom__">— Custom One-off (Unsaved) —</option>
+                      </select>
+                      <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-3.5 pointer-events-none" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* If Custom One-Off Selected */}
+                {selectedProductId === '__custom__' && (
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                      Custom Model Name <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. iPhone 16 Pro Max"
+                      value={customProductName}
+                      onChange={(e) => setCustomProductName(e.target.value)}
+                      className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+                    />
+                  </div>
+                )}
+
+                {/* If Selected Product has Variants */}
+                {selectedProduct && selectedProduct.variants && selectedProduct.variants.length > 0 && (
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+                        Variant Specification
+                      </label>
+                      <span className="text-[10px] text-slate-400">
+                        {selectedProduct.variants.length} variant{selectedProduct.variants.length > 1 ? 's' : ''} in catalog
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <select
+                        value={selectedVariantId}
+                        onChange={(e) => {
+                          const vid = e.target.value;
+                          setSelectedVariantId(vid);
+                          const v = selectedProduct.variants.find((item) => item.id === vid);
+                          if (v) {
+                            if (v.storage) setStorage(v.storage);
+                            if (v.ram) setRam(v.ram);
+                            if (v.color) setColor(v.color);
+                            if (v.default_selling_price) {
+                              const defPrice = formatCurrencyInput(v.default_selling_price);
+                              setSellingPrice(defPrice);
+                              setPaidAmount(defPrice);
+                            }
+                          }
+                        }}
+                        className="w-full h-10 pl-3 pr-8 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-900 dark:text-white appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+                      >
+                        {selectedProduct.variants.map((v) => {
+                          const ramLabel = v.ram ? (v.ram.toLowerCase().includes('ram') ? v.ram : `${v.ram} RAM`) : null;
+                          const label = [v.storage, ramLabel, v.color].filter(Boolean).join(' · ') || 'Standard';
+                          return (
+                            <option key={v.id} value={v.id}>
+                              {label} {v.default_selling_price ? `(${Number(v.default_selling_price).toLocaleString()} ETB)` : ''}
+                            </option>
+                          );
+                        })}
+                      </select>
+                      <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-3.5 pointer-events-none" />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
               <div>
