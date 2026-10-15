@@ -939,6 +939,11 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                                   {u.battery_health}%
                                 </span>
                               )}
+                              {u.cycle_count !== null && u.cycle_count !== undefined && (
+                                <span className="text-[10px] font-mono text-slate-400">
+                                  ({u.cycle_count}c)
+                                </span>
+                              )}
                               {u.source_type === 'consignment' && (
                                 <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400">
                                   <Handshake className="w-2.5 h-2.5" />

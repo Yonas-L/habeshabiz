@@ -516,6 +516,18 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     });
   }, [statusFilter, units, activeProducts, selectedCategoryId, categories, search]);
 
+  // Sort sold units strictly by most recently sold first
+  const displayUnits = useMemo(() => {
+    if (statusFilter === 'sold') {
+      return [...units].sort((a, b) => {
+        const timeA = a.sold_at ? new Date(a.sold_at).getTime() : (a.updated_at ? new Date(a.updated_at).getTime() : (a.created_at ? new Date(a.created_at).getTime() : 0));
+        const timeB = b.sold_at ? new Date(b.sold_at).getTime() : (b.updated_at ? new Date(b.updated_at).getTime() : (b.created_at ? new Date(b.created_at).getTime() : 0));
+        return timeB - timeA;
+      });
+    }
+    return units;
+  }, [units, statusFilter]);
+
   // Restock an unsold OUT device back to shelf
   const handleRestockOut = async (unit: InventoryUnit) => {
     try {
@@ -1293,6 +1305,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                                       {unit.battery_health}%
                                     </span>
                                   )}
+                                  {unit.cycle_count !== null && unit.cycle_count !== undefined && (
+                                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-mono text-slate-500 dark:text-slate-400 border border-slate-200/50 dark:border-slate-700/50 shrink-0">
+                                      {unit.cycle_count}c
+                                    </span>
+                                  )}
                                   {unit.source_type === 'exchange' && (
                                     <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/50 dark:border-purple-800/50 shrink-0">
                                       <Repeat className="w-2.5 h-2.5" />
@@ -1585,7 +1602,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                       <CustomPageLoader mode="app" fullScreen={false} />
                     </td>
                   </tr>
-                ) : units.length === 0 ? (
+                ) : displayUnits.length === 0 ? (
                   <tr>
                     <td colSpan={canViewCost ? (canAction ? 6 : 5) : (canAction ? 5 : 4)} className="py-16 text-center text-slate-400">
                       {statusFilter === 'out'
@@ -1602,7 +1619,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     </td>
                   </tr>
                 ) : (
-                  units.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((unit) => {
+                  displayUnits.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((unit) => {
                     const pName = unit.variant?.product?.name || 'Device';
                     const pCat = unit.variant?.product?.category;
                     const pCatRel = unit.variant?.product?.category_rel;
@@ -1689,6 +1706,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                                 {unit.battery_health}%
                               </span>
                             )}
+                            {isUnitPhone && unit.cycle_count !== null && unit.cycle_count !== undefined && (
+                              <span className="font-mono text-[10px] text-slate-400">
+                                ({unit.cycle_count}c)
+                              </span>
+                            )}
                           </div>
                         </td>
 
@@ -1711,10 +1733,10 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                           {unit.status === 'sold' && (
                             <div
                               className="flex items-center justify-center gap-1 text-[10px] font-bold text-purple-600 dark:text-purple-300"
-                              title={unit.created_at ? `Purchased: ${new Date(unit.created_at).toLocaleDateString()} (${formatPurchaseAge(unit.created_at)} ago)` : undefined}
+                              title={unit.sold_at ? `Sold: ${new Date(unit.sold_at).toLocaleString()}` : (unit.created_at ? `Purchased: ${new Date(unit.created_at).toLocaleDateString()}` : undefined)}
                             >
                               <CheckCircle2 className="w-3 h-3" />
-                              <span>Sold ({formatPurchaseAge(unit.created_at)})</span>
+                              <span>Sold ({formatPurchaseAge(unit.sold_at || unit.created_at)})</span>
                             </div>
                           )}
 
@@ -2077,6 +2099,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                                       {unit.battery_health}%
                                     </span>
                                   )}
+                                  {unit.cycle_count !== null && unit.cycle_count !== undefined && (
+                                    <span className="text-[10px] text-slate-400 shrink-0">
+                                      ({unit.cycle_count}c)
+                                    </span>
+                                  )}
                                 </div>
                                 <div className="text-[10px] text-slate-400 truncate mt-0.5 font-sans">
                                   {unitSpec}
@@ -2163,7 +2190,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               <div className="py-6 text-center">
                 <CustomPageLoader mode="app" fullScreen={false} />
               </div>
-            ) : units.length === 0 ? (
+            ) : displayUnits.length === 0 ? (
               <div className="py-12 text-center text-slate-400 text-xs">
                 {statusFilter === 'out'
                   ? 'No items are currently out with staff or brokers.'
@@ -2178,7 +2205,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   : 'No inventory units found in this category.'}
               </div>
             ) : (
-              units.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((unit) => {
+              displayUnits.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((unit) => {
                 const pName = unit.variant?.product?.name || 'Device';
                 const specVals = unit.variant?.specs ? Object.values(unit.variant.specs).map(String) : [];
                 const variantSubtitle = [
@@ -2237,6 +2264,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                             {unit.battery_health}%
                           </span>
                         )}
+                        {unit.cycle_count !== null && unit.cycle_count !== undefined && (
+                          <span className="text-[11px] font-mono text-slate-400">
+                            ({unit.cycle_count}c)
+                          </span>
+                        )}
                       </div>
 
                       <div className="flex items-center gap-1 text-[11px] text-slate-400">
@@ -2260,7 +2292,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 ? inStockProducts.length
                 : statusFilter === 'archived'
                 ? filteredArchivedProducts.length
-                : units.length
+                : displayUnits.length
             }
             pageSize={pageSize}
             onPageChange={setCurrentPage}

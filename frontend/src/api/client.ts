@@ -1321,6 +1321,9 @@ export const api = {
     color?: string;
     imei_or_serial?: string;
     condition?: string;
+    battery_health?: number | null;
+    cycle_count?: number | null;
+    sim_type?: string | null;
     vendor_contact_id: string;
     vendor_cost: number;
     vendor_payment_method: 'paid_now' | 'owed';

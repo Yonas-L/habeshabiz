@@ -69,6 +69,7 @@ export const ExchangeDeviceModal: React.FC<ExchangeDeviceModalProps> = ({
   const [imei, setImei] = useState<string>('');
   const [condition, setCondition] = useState<string>('used_clean');
   const [batteryHealth, setBatteryHealth] = useState<string>('85');
+  const [cycleCount, setCycleCount] = useState<string>('');
   const [simType, setSimType] = useState<'physical' | 'esim' | 'dual' | 'na'>('physical');
   const [notes, setNotes] = useState<string>('');
 
@@ -99,6 +100,7 @@ export const ExchangeDeviceModal: React.FC<ExchangeDeviceModalProps> = ({
       setImei(initialExchange.imei_or_serial || '');
       setCondition(initialExchange.condition || 'used_clean');
       setBatteryHealth(initialExchange.battery_health ? String(initialExchange.battery_health) : '');
+      setCycleCount(initialExchange.cycle_count !== null && initialExchange.cycle_count !== undefined ? String(initialExchange.cycle_count) : '');
       setSimType(initialExchange.sim_type || 'physical');
       setNotes(initialExchange.notes || '');
       setMode('existing');
@@ -113,6 +115,7 @@ export const ExchangeDeviceModal: React.FC<ExchangeDeviceModalProps> = ({
       setImei('');
       setCondition('used_clean');
       setBatteryHealth('85');
+      setCycleCount('');
       setSimType('physical');
       setNotes('');
     }
@@ -305,7 +308,7 @@ export const ExchangeDeviceModal: React.FC<ExchangeDeviceModalProps> = ({
       imei_or_serial: imei.trim(),
       condition,
       battery_health: batteryHealth ? parseInt(batteryHealth, 10) : null,
-      cycle_count: null,
+      cycle_count: cycleCount ? parseInt(cycleCount, 10) : null,
       sim_type: simType,
       location: 'Shop Counter',
       notes: notes.trim() || undefined,
@@ -586,8 +589,8 @@ export const ExchangeDeviceModal: React.FC<ExchangeDeviceModalProps> = ({
               </div>
             </div>
 
-            {/* Condition, Battery & SIM (3 Columns) */}
-            <div className="grid grid-cols-3 gap-2.5">
+            {/* Condition, Battery, Cycles & SIM (4 Columns) */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               <div>
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5 h-4">
                   Condition
@@ -617,6 +620,20 @@ export const ExchangeDeviceModal: React.FC<ExchangeDeviceModalProps> = ({
                   placeholder="85"
                   value={batteryHealth}
                   onChange={(e) => setBatteryHealth(e.target.value)}
+                  className="w-full h-9 px-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 font-mono text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5 h-4">
+                  Cycle Count
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="e.g. 50"
+                  value={cycleCount}
+                  onChange={(e) => setCycleCount(e.target.value)}
                   className="w-full h-9 px-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 font-mono text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/20"
                 />
               </div>

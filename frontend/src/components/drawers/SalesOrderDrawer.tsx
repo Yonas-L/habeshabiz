@@ -297,12 +297,13 @@ export const SalesOrderDrawer: React.FC<SalesOrderDrawerProps> = ({
         const tagText = isExchanged ? ' - Exchanged' : '';
         const imeiText = unit?.imei_or_serial ? `\n   SN: ${unit.imei_or_serial}` : '';
         const batteryText = unit?.battery_health ? ` · ${unit.battery_health}% Batt` : '';
+        const cycleText = unit?.cycle_count !== null && unit?.cycle_count !== undefined ? ` · ${unit.cycle_count} cycles` : '';
         const spec = [variant?.storage, variant?.color].filter(Boolean).join(' · ');
         const specText = spec ? ` - ${spec}` : '';
         const receiptUnitPrice = order.items.length === 1
           ? settledSaleValue / Math.max(1, Number(item.quantity || 1))
           : Number(item.unit_price);
-        return `${index + 1}. ${item.quantity}x ${variant?.product?.name || item.variant?.product?.name || 'Device'}${specText}${tagText}${imeiText}${batteryText}\n   ${receiptUnitPrice.toLocaleString()} ETB`;
+        return `${index + 1}. ${item.quantity}x ${variant?.product?.name || item.variant?.product?.name || 'Device'}${specText}${tagText}${imeiText}${batteryText}${cycleText}\n   ${receiptUnitPrice.toLocaleString()} ETB`;
       })
       .join('\n\n');
 
@@ -790,6 +791,7 @@ Thank you for choosing Habeshabiz Electronics!
                               </button>
                             )}
                             {unit?.battery_health != null && <span>· {unit.battery_health}% Batt</span>}
+                            {unit?.cycle_count != null && <span>· {unit.cycle_count} cycles</span>}
                             {simStr && <span>· {simStr}</span>}
                             {conditionStr && <span>· {conditionStr}</span>}
                           </div>
@@ -888,6 +890,11 @@ Thank you for choosing Habeshabiz Electronics!
                       {unit?.battery_health != null && (
                         <span className="px-1.5 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300">
                           {unit.battery_health}% Batt
+                        </span>
+                      )}
+                      {unit?.cycle_count != null && (
+                        <span className="px-1.5 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300">
+                          {unit.cycle_count} cycles
                         </span>
                       )}
                       {conditionStr && (

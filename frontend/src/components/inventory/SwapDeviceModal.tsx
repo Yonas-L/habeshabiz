@@ -238,6 +238,7 @@ export const SwapDeviceModal: React.FC<SwapDeviceModalProps> = ({
             <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-0.5 flex items-center gap-2">
               <span>SN: <strong className="text-slate-800 dark:text-slate-200">{oldUnit.imei_or_serial || 'Bulk Item'}</strong></span>
               {oldUnit.battery_health != null && <span>· {oldUnit.battery_health}% Batt</span>}
+              {oldUnit.cycle_count != null && <span>· {oldUnit.cycle_count} cycles</span>}
               {oldUnit.condition && <span>· {oldUnit.condition}</span>}
             </div>
           </div>
@@ -346,6 +347,11 @@ export const SwapDeviceModal: React.FC<SwapDeviceModalProps> = ({
                             <span className="text-slate-500 flex items-center gap-0.5">
                               <Battery className="w-2.5 h-2.5" />
                               {u.battery_health}%
+                            </span>
+                          )}
+                          {u.cycle_count != null && (
+                            <span className="text-slate-400">
+                              ({u.cycle_count}c)
                             </span>
                           )}
                           <span className="text-slate-400 capitalize">· {u.condition}</span>

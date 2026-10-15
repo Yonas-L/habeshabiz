@@ -1874,21 +1874,23 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
               Hardware & Diagnostics
             </h4>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3.5 text-xs">
-              {/* Battery Health */}
-              {currentUnit.battery_health !== null && currentUnit.battery_health !== undefined && (
+              {/* Battery Health & Cycles */}
+              {(currentUnit.battery_health !== null && currentUnit.battery_health !== undefined) || (currentUnit.cycle_count !== null && currentUnit.cycle_count !== undefined) ? (
                 <div>
-                  <span className="text-[11px] text-slate-400 dark:text-slate-500">Battery Health</span>
+                  <span className="text-[11px] text-slate-400 dark:text-slate-500">Battery & Cycles</span>
                   <div className="text-sm font-bold font-mono text-slate-900 dark:text-white flex items-center gap-1.5 mt-0.5">
                     <Battery className="w-3.5 h-3.5 text-emerald-500" />
-                    <span>{currentUnit.battery_health}%</span>
-                    {currentUnit.cycle_count ? (
+                    {currentUnit.battery_health !== null && currentUnit.battery_health !== undefined ? (
+                      <span>{currentUnit.battery_health}%</span>
+                    ) : null}
+                    {currentUnit.cycle_count !== null && currentUnit.cycle_count !== undefined ? (
                       <span className="text-[10px] font-normal text-slate-400 font-sans">
                         • {currentUnit.cycle_count} cycles
                       </span>
                     ) : null}
                   </div>
                 </div>
-              )}
+              ) : null}
 
               {/* SIM Configuration */}
               <div>

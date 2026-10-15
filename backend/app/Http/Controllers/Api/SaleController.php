@@ -124,7 +124,7 @@ class SaleController extends Controller
         ];
 
         if ($request->filled('per_page') && $request->per_page !== 'all') {
-            $paginated = $query->latest('order_date')->paginate((int) $request->per_page);
+            $paginated = $query->orderByDesc('order_date')->orderByDesc('created_at')->orderByDesc('id')->paginate((int) $request->per_page);
             $items = $paginated->getCollection();
             $pagination = [
                 'current_page' => $paginated->currentPage(),
@@ -132,7 +132,7 @@ class SaleController extends Controller
                 'total' => $paginated->total(),
             ];
         } else {
-            $items = $query->latest('order_date')->get();
+            $items = $query->orderByDesc('order_date')->orderByDesc('created_at')->orderByDesc('id')->get();
             $pagination = [
                 'current_page' => 1,
                 'last_page' => 1,
@@ -394,6 +394,9 @@ class SaleController extends Controller
             'color' => ['nullable', 'string', 'max:50'],
             'imei_or_serial' => ['nullable', 'string', 'max:100'],
             'condition' => ['nullable', 'string', 'max:50'],
+            'battery_health' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'cycle_count' => ['nullable', 'integer', 'min:0'],
+            'sim_type' => ['nullable', 'string', 'max:50'],
 
             // Vendor details
             'vendor_contact_id' => ['required', 'exists:contacts,id'],
@@ -558,6 +561,9 @@ class SaleController extends Controller
                 'tenant_id' => $tenantId,
                 'variant_id' => $variantId,
                 'imei_or_serial' => $imei,
+                'battery_health' => $validated['battery_health'] ?? null,
+                'cycle_count' => $validated['cycle_count'] ?? null,
+                'sim_type' => $validated['sim_type'] ?? 'physical',
                 'condition' => $validated['condition'] ?? 'Brand New',
                 'cost_basis' => $vendorCost,
                 'selling_price' => (float) $validated['selling_price'],

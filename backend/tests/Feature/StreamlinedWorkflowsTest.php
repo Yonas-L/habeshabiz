@@ -277,3 +277,62 @@ test('pos vendor direct sale with owed creates exactly one open payable debt', f
     expect($debts->first()->status)->toBe('open');
     expect((float) $debts->first()->remaining_amount)->toBe(45000.00);
 });
+
+test('pos vendor direct sale stores cycle_count and battery_health and orders sold inventory by recency', function () {
+    $vendor = Contact::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Broker Abebe',
+        'roles' => ['vendor'],
+    ]);
+
+    // Create an older sold unit intaked yesterday and sold yesterday
+    $oldUnit = InventoryUnit::create([
+        'tenant_id' => $this->tenant->id,
+        'variant_id' => $this->variant128->id,
+        'imei_or_serial' => 'OLD-SOLD-11111',
+        'condition' => 'used_clean',
+        'battery_health' => 90,
+        'cycle_count' => 150,
+        'sim_type' => 'physical',
+        'status' => 'sold',
+        'cost_basis' => 40000,
+        'selling_price' => 50000,
+        'sold_at' => now()->subDay(),
+        'created_at' => now()->subDays(5),
+    ]);
+
+    // Perform vendor direct sale now with hardware diagnostics
+    $payload = [
+        'variant_id' => $this->variant128->id,
+        'imei_or_serial' => 'NEW-DIRECT-22222',
+        'condition' => 'used_clean',
+        'battery_health' => 96,
+        'cycle_count' => 24,
+        'sim_type' => 'esim',
+        'vendor_contact_id' => $vendor->id,
+        'vendor_cost' => 42000.00,
+        'vendor_payment_method' => 'owed',
+        'selling_price' => 54000.00,
+        'paid_amount' => 54000.00,
+        'payment_method' => 'cash',
+        'financial_account_id' => $this->bankAccount->id,
+    ];
+
+    $response = $this->actingAs($this->owner)->postJson('/api/v1/sales/vendor-direct', $payload);
+    $response->assertStatus(201)
+        ->assertJsonPath('success', true);
+
+    $unit = InventoryUnit::where('imei_or_serial', 'NEW-DIRECT-22222')->firstOrFail();
+    expect($unit->battery_health)->toBe(96);
+    expect($unit->cycle_count)->toBe(24);
+    expect($unit->sim_type)->toBe('esim');
+    expect($unit->status)->toBe('sold');
+
+    // Query sold inventory units: the newly sold unit must be first
+    $soldListResponse = $this->actingAs($this->owner)->getJson('/api/v1/inventory/units?status=sold');
+    $soldListResponse->assertStatus(200);
+    $soldUnits = $soldListResponse->json('data');
+    expect(count($soldUnits))->toBeGreaterThanOrEqual(2);
+    expect($soldUnits[0]['imei_or_serial'])->toBe('NEW-DIRECT-22222');
+});
+

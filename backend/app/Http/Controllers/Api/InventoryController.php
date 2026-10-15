@@ -100,7 +100,11 @@ class InventoryController extends Controller
             });
         }
 
-        $units = $query->latest()->get();
+        if ($request->status === 'sold') {
+            $units = $query->orderByRaw('COALESCE(sold_at, updated_at, created_at) DESC')->orderByDesc('id')->get();
+        } else {
+            $units = $query->latest()->get();
+        }
 
         // Calculate tab counts
         $serializedInStock = InventoryUnit::where('status', 'in_stock')->count();
