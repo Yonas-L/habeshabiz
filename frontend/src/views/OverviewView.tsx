@@ -22,8 +22,6 @@ import {
   ArrowDown,
   ArrowUp,
   Coins,
-  Eye,
-  EyeOff,
 } from 'lucide-react';
 import { useBalancePrivacy } from '../context/BalancePrivacyContext';
 
@@ -44,7 +42,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   onNavigateTab,
   onRefreshData,
 }) => {
-  const { isBalancesHidden, toggleHideBalances } = useBalancePrivacy();
+  const { isBalancesHidden } = useBalancePrivacy();
   const [selectedVital, setSelectedVital] = useState<VitalType | null>(null);
   const [focusedContactId, setFocusedContactId] = useState<string | null>(null);
   const [selectedDebt, setSelectedDebt] = useState<Debt | null>(null);
@@ -287,22 +285,6 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
       {/* ── 1. Capital Strip — single compact row on desktop, tactile native cards on mobile ── */}
       {/* Desktop view (>= sm) */}
-      <div className="hidden sm:flex items-center justify-between pb-1 px-0.5">
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-            Capital Overview
-          </span>
-          <button
-            type="button"
-            onClick={toggleHideBalances}
-            title={isBalancesHidden ? 'Reveal balances & financial numbers' : 'Hide balances & financial numbers'}
-            aria-label={isBalancesHidden ? 'Reveal balances & financial numbers' : 'Hide balances & financial numbers'}
-            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-          >
-            {isBalancesHidden ? <EyeOff className="w-3.5 h-3.5 text-amber-500" /> : <Eye className="w-3.5 h-3.5" />}
-          </button>
-        </div>
-      </div>
       <div className="hidden sm:grid sm:grid-cols-5 gap-px bg-slate-200/60 dark:bg-slate-800/50 rounded-xl overflow-hidden animate-stagger-2">
         {capitalMetrics.map((m) => (
           <button
@@ -339,15 +321,6 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 Working Capital
               </span>
             </div>
-            <button
-              type="button"
-              onClick={toggleHideBalances}
-              title={isBalancesHidden ? 'Reveal balances & financial numbers' : 'Hide balances & financial numbers'}
-              aria-label={isBalancesHidden ? 'Reveal balances & financial numbers' : 'Hide balances & financial numbers'}
-              className="p-1 -mr-1 rounded-lg text-slate-400 hover:text-white transition-colors cursor-pointer active:scale-95"
-            >
-              {isBalancesHidden ? <EyeOff className="w-4 h-4 text-amber-400" /> : <Eye className="w-4 h-4" />}
-            </button>
           </div>
 
           {/* Primary Balance */}
@@ -619,15 +592,6 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 return `${d.toLocaleString('default', { month: 'long' })} ${y} Performance`;
               })() : "This Month's Performance"}
             </h2>
-            <button
-              type="button"
-              onClick={toggleHideBalances}
-              title={isBalancesHidden ? 'Reveal balances & financial numbers' : 'Hide balances & financial numbers'}
-              aria-label={isBalancesHidden ? 'Reveal balances & financial numbers' : 'Hide balances & financial numbers'}
-              className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer active:scale-95 shrink-0"
-            >
-              {isBalancesHidden ? <EyeOff className="w-3.5 h-3.5 text-amber-500" /> : <Eye className="w-3.5 h-3.5" />}
-            </button>
           </div>
           {topSeller && user?.role === 'owner' && (
             <button
@@ -652,15 +616,6 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 return `${d.toLocaleString('default', { month: 'long' })} ${y} Performance`;
               })() : "This Month's Performance"}
             </h2>
-            <button
-              type="button"
-              onClick={toggleHideBalances}
-              title={isBalancesHidden ? 'Reveal balances & financial numbers' : 'Hide balances & financial numbers'}
-              aria-label={isBalancesHidden ? 'Reveal balances & financial numbers' : 'Hide balances & financial numbers'}
-              className="ml-1 p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
-            >
-              {isBalancesHidden ? <EyeOff className="w-3.5 h-3.5 text-amber-500" /> : <Eye className="w-3.5 h-3.5" />}
-            </button>
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
