@@ -180,6 +180,8 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
   const [isCreditSale, setIsCreditSale] = useState(false);
   const [isWriteOff, setIsWriteOff] = useState(false);
   const [customerAccountId, setCustomerAccountId] = useState('');
+  const [isCustomerSplit, setIsCustomerSplit] = useState(false);
+  const [customerPaymentSplits, setCustomerPaymentSplits] = useState<PaymentSplitItem[]>([]);
   const [customerMode, setCustomerMode] = useState<'walk_in' | 'new' | 'existing'>('walk_in');
   const [customerId, setCustomerId] = useState('');
   const [customerName, setCustomerName] = useState('');
@@ -278,6 +280,8 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
       }
       setIsVendorSplit(false);
       setVendorPaymentSplits([]);
+      setIsCustomerSplit(false);
+      setCustomerPaymentSplits([]);
       setIsCreatingProduct(false);
       setNewProductName('');
       setNewProductBrand('');
@@ -719,6 +723,12 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
 
   const isVendorSplitMismatch = isVendorSplit && Math.abs(vendorSplitTotal - vendorCostNum) > 0.01;
 
+  const customerSplitTotal = useMemo(() => {
+    return customerPaymentSplits.reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
+  }, [customerPaymentSplits]);
+
+  const isCustomerSplitMismatch = isCustomerSplit && Math.abs(customerSplitTotal - paidAmountNum) > 0.01;
+
   const isAnyVendorSplitOverdrawn = useMemo(() => {
     if (vendorPaymentType !== 'immediate_account' || !isVendorSplit) return false;
     if (!isOwner) return false;
@@ -803,9 +813,25 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
       }
     }
 
-    if (paidAmountNum > 0 && paymentMethod !== 'debt_offset' && !isCreditSale && !isWriteOff && !customerAccountId) {
-      toast.error('Please select the shop receiving account');
-      return;
+    if (paidAmountNum > 0 && paymentMethod !== 'debt_offset' && !isCreditSale && !isWriteOff) {
+      if (isCustomerSplit) {
+        if (
+          customerPaymentSplits.length === 0 ||
+          customerPaymentSplits.some((s) => !s.financial_account_id || (Number(s.amount) || 0) <= 0)
+        ) {
+          toast.error('Please configure all customer deposit split accounts and positive amounts');
+          return;
+        }
+        if (isCustomerSplitMismatch) {
+          toast.error(
+            `Customer payment split total (${customerSplitTotal.toLocaleString()} ETB) does not match paid amount (${paidAmountNum.toLocaleString()} ETB)`
+          );
+          return;
+        }
+      } else if (!customerAccountId) {
+        toast.error('Please select the shop receiving account');
+        return;
+      }
     }
 
     if (paymentMethod === 'debt_offset' && (!customerId || customerMode !== 'existing')) {
@@ -847,10 +873,20 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
         paid_amount: paidAmountNum,
         payment_method: (isCreditSale
           ? 'credit'
-          : (paymentMethod || 'cash')) as any,
+          : (isCustomerSplit && paidAmountNum > 0 ? 'split' : (paymentMethod || 'cash'))) as any,
         credit_sale: isCreditSale,
         intentional_shortfall: isWriteOff,
-        financial_account_id: paidAmountNum > 0 && paymentMethod !== 'debt_offset' && !isCreditSale && !isWriteOff ? customerAccountId : undefined,
+        financial_account_id:
+          paidAmountNum > 0 && paymentMethod !== 'debt_offset' && !isCreditSale && !isWriteOff && !isCustomerSplit
+            ? customerAccountId
+            : undefined,
+        payment_splits:
+          isCustomerSplit && paidAmountNum > 0 && paymentMethod !== 'debt_offset'
+            ? customerPaymentSplits.map((s) => ({
+                financial_account_id: s.financial_account_id,
+                amount: Number(s.amount) || 0,
+              }))
+            : undefined,
         customer_id: customerMode === 'existing' ? customerId || undefined : undefined,
         customer_name: customerMode === 'new' && customerName.trim() ? customerName.trim() : undefined,
         customer_phone: customerMode === 'new' && customerPhone.trim() ? customerPhone.trim() : undefined,
@@ -883,6 +919,8 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
       setIsModelSearchOpen(false);
       setIsVendorSplit(false);
       setVendorPaymentSplits([]);
+      setIsCustomerSplit(false);
+      setCustomerPaymentSplits([]);
       setIsCreditSale(false);
       setIsWriteOff(false);
       setPaymentMethod('cash');
@@ -2347,23 +2385,19 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
               </div>
 
               {paidAmountNum > 0 && paymentMethod !== 'debt_offset' && !isCreditSale && !isWriteOff && (
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
-                    Shop Deposit Account *
-                  </label>
-                  <select
-                    value={customerAccountId}
-                    required
-                    onChange={(e) => setCustomerAccountId(e.target.value)}
-                    className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none cursor-pointer"
-                  >
-                    {accounts.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.name}
-                        {isOwner && a.current_balance !== null ? ` (${Number(a.current_balance).toLocaleString()} ETB)` : ''}
-                      </option>
-                    ))}
-                  </select>
+                <div className="space-y-1.5 pt-1">
+                  <SplitPaymentSelector
+                    accounts={accounts}
+                    targetAmount={paidAmountNum}
+                    singleAccountId={customerAccountId}
+                    onSingleAccountChange={setCustomerAccountId}
+                    isSplit={isCustomerSplit}
+                    onIsSplitChange={setIsCustomerSplit}
+                    splits={customerPaymentSplits}
+                    onSplitsChange={setCustomerPaymentSplits}
+                    direction="inflow"
+                    label="Shop Deposit Account *"
+                  />
                 </div>
               )}
             </div>

@@ -199,6 +199,15 @@ class RecordSaleAction
                         'reference_number' => $s['reference_number'] ?? null,
                     ];
                 }, $rawSplits);
+
+                if ($paidAmount > 0 && ($data['payment_method'] ?? '') !== 'debt_offset') {
+                    $splitSum = (float) collect($enrichedSplits)->sum(fn ($s) => (float) ($s['amount'] ?? 0));
+                    if (abs($splitSum - $paidAmount) > 0.01) {
+                        throw ValidationException::withMessages([
+                            'payment_splits' => ['Split allocation total ('.number_format($splitSum, 2).' ETB) does not match customer paid amount ('.number_format($paidAmount, 2).' ETB).'],
+                        ]);
+                    }
+                }
             }
             $primaryAccountId = $data['financial_account_id'] ?? ($enrichedSplits ? ($enrichedSplits[0]['financial_account_id'] ?? null) : null);
 
@@ -676,6 +685,7 @@ class RecordSaleAction
                         'destination_account_id' => $account->id,
                         'type' => 'customer_payment',
                         'amount' => $splitAmount,
+                        'reference_number' => $split['reference_number'] ?? null,
                         'contact_id' => $customerId,
                         'description' => count($splits) > 1
                             ? "Payment received for Order #{$order->order_number} ({$account->name})"

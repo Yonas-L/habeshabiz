@@ -176,6 +176,8 @@ class SaleController extends Controller
             'payment_splits' => ['nullable', 'array', 'min:1'],
             'payment_splits.*.financial_account_id' => ['required', 'exists:financial_accounts,id'],
             'payment_splits.*.amount' => ['required', 'numeric', 'min:0.01'],
+            'payment_splits.*.reference_number' => ['nullable', 'string', 'max:100'],
+            'payment_splits.*.account_name' => ['nullable', 'string', 'max:100'],
             'notes' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.variant_id' => ['required', 'exists:product_variants,id'],
@@ -422,6 +424,8 @@ class SaleController extends Controller
             'payment_splits' => ['nullable', 'array', 'min:1'],
             'payment_splits.*.financial_account_id' => ['required', 'exists:financial_accounts,id'],
             'payment_splits.*.amount' => ['required', 'numeric', 'min:0.01'],
+            'payment_splits.*.reference_number' => ['nullable', 'string', 'max:100'],
+            'payment_splits.*.account_name' => ['nullable', 'string', 'max:100'],
             'customer_id' => ['nullable', 'exists:contacts,id'],
             'customer_name' => ['nullable', 'string', 'max:255'],
             'customer_phone' => ['nullable', 'string', 'max:50'],
@@ -431,6 +435,20 @@ class SaleController extends Controller
         /** @var User $user */
         $user = $request->user();
         $tenantId = $user->tenant_id;
+
+        // Validate customer payment splits if present
+        $paidAmount = (float) $validated['paid_amount'];
+        $rawCustomerSplits = $validated['payment_splits'] ?? null;
+        $hasCustomerSplits = is_array($rawCustomerSplits) && count($rawCustomerSplits) > 0;
+
+        if ($hasCustomerSplits && $paidAmount > 0) {
+            $custSplitSum = (float) collect($rawCustomerSplits)->sum(fn ($s) => (float) ($s['amount'] ?? 0));
+            if (abs($custSplitSum - $paidAmount) > 0.01) {
+                throw ValidationException::withMessages([
+                    'payment_splits' => ['Customer payment split total ('.number_format($custSplitSum, 2).' ETB) does not match paid amount ('.number_format($paidAmount, 2).' ETB).'],
+                ]);
+            }
+        }
 
         $isVendorContact = Contact::where('tenant_id', $tenantId)
             ->whereKey($validated['vendor_contact_id'])
@@ -509,7 +527,7 @@ class SaleController extends Controller
             }
         }
 
-        $order = DB::transaction(function () use ($validated, $user, $tenantId, $vendorCost, $preparedVendorSplits, $hasVendorSplits, $action) {
+        $order = DB::transaction(function () use ($validated, $user, $tenantId, $vendorCost, $preparedVendorSplits, $hasVendorSplits, $hasCustomerSplits, $rawCustomerSplits, $action) {
             // 1. Resolve Product & Variant
             $variantId = $validated['variant_id'] ?? null;
             if (! $variantId) {
@@ -615,7 +633,7 @@ class SaleController extends Controller
                 'credit_sale' => (bool) ($validated['credit_sale'] ?? ($validated['payment_method'] === 'credit')),
                 'intentional_shortfall' => (bool) ($validated['intentional_shortfall'] ?? false),
                 'payment_method' => $validated['payment_method'],
-                'financial_account_id' => $validated['financial_account_id'] ?? null,
+                'financial_account_id' => $validated['financial_account_id'] ?? ($hasCustomerSplits ? $rawCustomerSplits[0]['financial_account_id'] : null),
                 'payment_splits' => $validated['payment_splits'] ?? null,
                 'notes' => $validated['notes'] ?? 'Vendor Direct Sale',
                 'items' => [

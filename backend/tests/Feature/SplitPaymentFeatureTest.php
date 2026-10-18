@@ -425,3 +425,88 @@ test('stock intake with split funding (debtor offset + split bank accounts) appl
         ->and(count($unit->payment_splits))->toBe(2);
 });
 
+test('vendor direct sale with pay vendor later and split customer deposit increments receiving accounts and creates open vendor debt', function () {
+    $initCbe = (float) $this->accCbe->current_balance;
+    $initTelebirr = (float) $this->accTelebirr->current_balance;
+
+    $response = $this->postJson('/api/v1/sales/vendor-direct', [
+        'product_name' => 'iPhone 16 Pro Max',
+        'storage' => '256GB',
+        'color' => 'Desert Titanium',
+        'imei_or_serial' => '359999888777666',
+        'condition' => 'Brand New',
+        'vendor_contact_id' => $this->partner->id,
+        'vendor_cost' => 120000,
+        'vendor_payment_method' => 'owed',
+        'selling_price' => 140000,
+        'paid_amount' => 140000,
+        'payment_method' => 'split',
+        'payment_splits' => [
+            ['financial_account_id' => $this->accCbe->id, 'amount' => 80000, 'reference_number' => 'CBE-SPLIT-01'],
+            ['financial_account_id' => $this->accTelebirr->id, 'amount' => 60000, 'reference_number' => 'TB-SPLIT-02'],
+        ],
+        'notes' => 'Customer paid across CBE and Telebirr, pay vendor later',
+    ]);
+
+    $response->assertStatus(201);
+    $orderId = $response->json('data.id');
+
+    // Verify customer receiving accounts are incremented:
+    // CBE +80,000, Telebirr +60,000
+    expect((float) $this->accCbe->fresh()->current_balance)->toBe($initCbe + 80000.0)
+        ->and((float) $this->accTelebirr->fresh()->current_balance)->toBe($initTelebirr + 60000.0);
+
+    // Verify 2 customer_payment FinancialTransactions logged with reference numbers
+    $custTxns = FinancialTransaction::where('type', 'customer_payment')
+        ->whereIn('destination_account_id', [$this->accCbe->id, $this->accTelebirr->id])
+        ->where('created_at', '>=', now()->subMinutes(1))
+        ->get();
+    expect($custTxns)->toHaveCount(2);
+
+    $cbeTxn = $custTxns->firstWhere('destination_account_id', $this->accCbe->id);
+    expect($cbeTxn)->not->toBeNull()
+        ->and((float) $cbeTxn->amount)->toBe(80000.0)
+        ->and($cbeTxn->reference_number)->toBe('CBE-SPLIT-01');
+
+    $tbTxn = $custTxns->firstWhere('destination_account_id', $this->accTelebirr->id);
+    expect($tbTxn)->not->toBeNull()
+        ->and((float) $tbTxn->amount)->toBe(60000.0)
+        ->and($tbTxn->reference_number)->toBe('TB-SPLIT-02');
+
+    // Verify open debt created for vendor for agreed cost (120,000 ETB)
+    $vendorDebt = Debt::where('reference_type', 'brokered_sourcing')
+        ->where('reference_id', $orderId)
+        ->first();
+    expect($vendorDebt)->not->toBeNull()
+        ->and($vendorDebt->status)->toBe('open')
+        ->and((float) $vendorDebt->remaining_amount)->toBe(120000.0);
+
+    // Verify SalesOrder has payment_splits persisted
+    $order = \App\Models\SalesOrder::find($orderId);
+    expect($order)->not->toBeNull()
+        ->and($order->payment_method)->toBe('split')
+        ->and(count($order->payment_splits))->toBe(2);
+});
+
+test('vendor direct sale rejects customer payment splits if sum does not match paid amount', function () {
+    $response = $this->postJson('/api/v1/sales/vendor-direct', [
+        'product_name' => 'iPhone 16 Pro Max',
+        'storage' => '256GB',
+        'imei_or_serial' => '359999888777999',
+        'condition' => 'Brand New',
+        'vendor_contact_id' => $this->partner->id,
+        'vendor_cost' => 120000,
+        'vendor_payment_method' => 'owed',
+        'selling_price' => 140000,
+        'paid_amount' => 140000,
+        'payment_method' => 'split',
+        'payment_splits' => [
+            ['financial_account_id' => $this->accCbe->id, 'amount' => 80000],
+            ['financial_account_id' => $this->accTelebirr->id, 'amount' => 50000], // Only 130,000, mismatch!
+        ],
+    ]);
+
+    $response->assertStatus(422)
+        ->assertJsonValidationErrors(['payment_splits']);
+});
+
