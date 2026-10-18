@@ -22,7 +22,10 @@ import {
   ArrowDown,
   ArrowUp,
   Coins,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
+import { useBalancePrivacy } from '../context/BalancePrivacyContext';
 
 interface OverviewViewProps {
   data: DashboardData | null;
@@ -41,6 +44,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   onNavigateTab,
   onRefreshData,
 }) => {
+  const { isBalancesHidden, toggleHideBalances } = useBalancePrivacy();
   const [selectedVital, setSelectedVital] = useState<VitalType | null>(null);
   const [focusedContactId, setFocusedContactId] = useState<string | null>(null);
   const [selectedDebt, setSelectedDebt] = useState<Debt | null>(null);
@@ -283,6 +287,22 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
       {/* ── 1. Capital Strip — single compact row on desktop, tactile native cards on mobile ── */}
       {/* Desktop view (>= sm) */}
+      <div className="hidden sm:flex items-center justify-between pb-1 px-0.5">
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+            Capital Overview
+          </span>
+          <button
+            type="button"
+            onClick={toggleHideBalances}
+            title={isBalancesHidden ? 'Reveal balances & financial numbers' : 'Hide balances & financial numbers'}
+            aria-label={isBalancesHidden ? 'Reveal balances & financial numbers' : 'Hide balances & financial numbers'}
+            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+          >
+            {isBalancesHidden ? <EyeOff className="w-3.5 h-3.5 text-amber-500" /> : <Eye className="w-3.5 h-3.5" />}
+          </button>
+        </div>
+      </div>
       <div className="hidden sm:grid sm:grid-cols-5 gap-px bg-slate-200/60 dark:bg-slate-800/50 rounded-xl overflow-hidden animate-stagger-2">
         {capitalMetrics.map((m) => (
           <button
@@ -319,6 +339,15 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 Working Capital
               </span>
             </div>
+            <button
+              type="button"
+              onClick={toggleHideBalances}
+              title={isBalancesHidden ? 'Reveal balances & financial numbers' : 'Hide balances & financial numbers'}
+              aria-label={isBalancesHidden ? 'Reveal balances & financial numbers' : 'Hide balances & financial numbers'}
+              className="p-1 -mr-1 rounded-lg text-slate-400 hover:text-white transition-colors cursor-pointer active:scale-95"
+            >
+              {isBalancesHidden ? <EyeOff className="w-4 h-4 text-amber-400" /> : <Eye className="w-4 h-4" />}
+            </button>
           </div>
 
           {/* Primary Balance */}
@@ -441,7 +470,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               {capital_overview.payables > 0 && (
                 <div className="flex items-center gap-1 text-rose-400">
                   <span className="w-1.5 h-1.5 rounded-full bg-rose-400 shrink-0" />
-                  <span>Owe −{capital_overview.payables.toLocaleString()}</span>
+                  <span>Owe −{isBalancesHidden ? '••••••' : capital_overview.payables.toLocaleString()}</span>
                 </div>
               )}
             </div>
@@ -454,7 +483,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           <button
             onClick={() => openVital('inventory')}
             className="flex flex-col items-center text-center group cursor-pointer active:scale-90 transition-transform"
-            title={`Stock: ${capital_overview.stock_value.toLocaleString()} ETB`}
+            title={`Stock: ${isBalancesHidden ? '••••••' : capital_overview.stock_value.toLocaleString()} ETB`}
           >
             <div className="w-13 h-13 rounded-2xl bg-slate-900 dark:bg-black border border-slate-800/80 dark:border-slate-800 shadow-xs flex items-center justify-center text-emerald-400 group-hover:bg-slate-800 dark:group-hover:bg-slate-900 transition-colors mx-auto">
               <Package className="w-7 h-7 text-emerald-400 stroke-[2]" />
@@ -471,7 +500,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           <button
             onClick={() => openVital('cash')}
             className="flex flex-col items-center text-center group cursor-pointer active:scale-90 transition-transform"
-            title={`Bank: ${capital_overview.cash_and_banks.toLocaleString()} ETB`}
+            title={`Bank: ${isBalancesHidden ? '••••••' : capital_overview.cash_and_banks.toLocaleString()} ETB`}
           >
             <div className="w-13 h-13 rounded-2xl bg-slate-900 dark:bg-black border border-slate-800/80 dark:border-slate-800 shadow-xs flex items-center justify-center text-emerald-400 group-hover:bg-slate-800 dark:group-hover:bg-slate-900 transition-colors mx-auto">
               <Landmark className="w-7 h-7 text-emerald-400 stroke-[2]" />
@@ -488,7 +517,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           <button
             onClick={() => openVital('receivables')}
             className="flex flex-col items-center text-center group cursor-pointer active:scale-90 transition-transform"
-            title={`Owed to You: ${capital_overview.receivables.toLocaleString()} ETB`}
+            title={`Owed to You: ${isBalancesHidden ? '••••••' : capital_overview.receivables.toLocaleString()} ETB`}
           >
             <div className="w-13 h-13 rounded-2xl bg-slate-900 dark:bg-black border border-slate-800/80 dark:border-slate-800 shadow-xs flex items-center justify-center text-emerald-400 group-hover:bg-slate-800 dark:group-hover:bg-slate-900 transition-colors mx-auto">
               <ArrowDown className="w-7 h-7 text-emerald-400 stroke-[2.2]" />
@@ -505,7 +534,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           <button
             onClick={() => openVital('payables')}
             className="flex flex-col items-center text-center group cursor-pointer active:scale-90 transition-transform"
-            title={`You Owe: ${capital_overview.payables.toLocaleString()} ETB`}
+            title={`You Owe: ${isBalancesHidden ? '••••••' : capital_overview.payables.toLocaleString()} ETB`}
           >
             <div className="w-13 h-13 rounded-2xl bg-slate-900 dark:bg-black border border-slate-800/80 dark:border-slate-800 shadow-xs flex items-center justify-center text-emerald-400 group-hover:bg-slate-800 dark:group-hover:bg-slate-900 transition-colors mx-auto">
               <ArrowUp className="w-7 h-7 text-emerald-400 stroke-[2.2]" />
@@ -522,7 +551,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           <button
             onClick={() => openVital('reserves')}
             className="flex flex-col items-center text-center group cursor-pointer active:scale-90 transition-transform"
-            title={`Other Assets: ${capital_overview.custom_assets.toLocaleString()} ETB`}
+            title={`Other Assets: ${isBalancesHidden ? '••••••' : capital_overview.custom_assets.toLocaleString()} ETB`}
           >
             <div className="w-13 h-13 rounded-2xl bg-slate-900 dark:bg-black border border-slate-800/80 dark:border-slate-800 shadow-xs flex items-center justify-center text-emerald-400 group-hover:bg-slate-800 dark:group-hover:bg-slate-900 transition-colors mx-auto">
               <Coins className="w-7 h-7 text-emerald-400 stroke-[2]" />
@@ -590,6 +619,15 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 return `${d.toLocaleString('default', { month: 'long' })} ${y} Performance`;
               })() : "This Month's Performance"}
             </h2>
+            <button
+              type="button"
+              onClick={toggleHideBalances}
+              title={isBalancesHidden ? 'Reveal balances & financial numbers' : 'Hide balances & financial numbers'}
+              aria-label={isBalancesHidden ? 'Reveal balances & financial numbers' : 'Hide balances & financial numbers'}
+              className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer active:scale-95 shrink-0"
+            >
+              {isBalancesHidden ? <EyeOff className="w-3.5 h-3.5 text-amber-500" /> : <Eye className="w-3.5 h-3.5" />}
+            </button>
           </div>
           {topSeller && user?.role === 'owner' && (
             <button
@@ -614,6 +652,15 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 return `${d.toLocaleString('default', { month: 'long' })} ${y} Performance`;
               })() : "This Month's Performance"}
             </h2>
+            <button
+              type="button"
+              onClick={toggleHideBalances}
+              title={isBalancesHidden ? 'Reveal balances & financial numbers' : 'Hide balances & financial numbers'}
+              aria-label={isBalancesHidden ? 'Reveal balances & financial numbers' : 'Hide balances & financial numbers'}
+              className="ml-1 p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
+            >
+              {isBalancesHidden ? <EyeOff className="w-3.5 h-3.5 text-amber-500" /> : <Eye className="w-3.5 h-3.5" />}
+            </button>
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
@@ -833,13 +880,13 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                       </div>
                       <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
                         {group.openCount} {group.openCount === 1 ? 'obligation' : 'obligations'}
-                        {group.offsetAmount > 0.01 && ` · Offset −${group.offsetAmount.toLocaleString()} ETB`}
+                        {group.offsetAmount > 0.01 && ` · Offset −${isBalancesHidden ? '••••••' : group.offsetAmount.toLocaleString()} ETB`}
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0 pl-2">
                     <span className="font-semibold text-emerald-600 dark:text-emerald-400 font-mono tracking-tight">
-                      +{group.netRemaining.toLocaleString()}
+                      {isBalancesHidden ? '+••••••' : `+${group.netRemaining.toLocaleString()}`}
                     </span>
                     <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0" />
                   </div>
@@ -899,13 +946,13 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                       </span>
                       <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
                         {group.openCount} {group.openCount === 1 ? 'obligation' : 'obligations'}
-                        {group.offsetAmount > 0.01 && ` · Offset −${group.offsetAmount.toLocaleString()} ETB`}
+                        {group.offsetAmount > 0.01 && ` · Offset −${isBalancesHidden ? '••••••' : group.offsetAmount.toLocaleString()} ETB`}
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0 pl-2">
                     <span className="font-semibold text-rose-600 dark:text-rose-400 font-mono tracking-tight">
-                      −{group.netRemaining.toLocaleString()}
+                      {isBalancesHidden ? '−••••••' : `−${group.netRemaining.toLocaleString()}`}
                     </span>
                     <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0" />
                   </div>

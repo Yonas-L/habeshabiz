@@ -44,6 +44,7 @@ import { LdrsSpinner } from './components/loading/LdrsSpinner';
 import { TopProgressBar } from './components/loading/TopProgressBar';
 import { Toaster, toast } from 'sonner';
 import { ArrowRight } from 'lucide-react';
+import { BalancePrivacyProvider } from './context/BalancePrivacyContext';
 
 export const getCurrentMonth = (): string => {
   const now = new Date();
@@ -653,9 +654,10 @@ export default function App() {
   const openDebtsCount = (dashboardData?.counts?.open_receivables ?? 0) + (dashboardData?.counts?.open_payables ?? 0);
 
   return (
-    <div className="min-h-screen bg-[#f6f8fa] dark:bg-[#0b0f17] text-slate-900 dark:text-slate-100 flex font-sans selection:bg-slate-900 selection:text-white transition-colors duration-200">
-      <TopProgressBar isLoading={isPageLoading} />
-      <Toaster position="bottom-right" richColors closeButton theme={theme} />
+    <BalancePrivacyProvider>
+      <div className="min-h-screen bg-[#f6f8fa] dark:bg-[#0b0f17] text-slate-900 dark:text-slate-100 flex font-sans selection:bg-slate-900 selection:text-white transition-colors duration-200">
+        <TopProgressBar isLoading={isPageLoading} />
+        <Toaster position="bottom-right" richColors closeButton theme={theme} />
 
       {/* Sidebar (Desktop & Mobile Drawer) */}
       <Sidebar
@@ -842,5 +844,6 @@ export default function App() {
         openDebtsCount={openDebtsCount}
       />
     </div>
+    </BalancePrivacyProvider>
   );
 }

@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { NavTab } from './Sidebar';
 import type { User } from '../api/client';
-import { Menu, Plus, Calendar, Sun, Moon, ChevronLeft, ChevronRight, Check } from 'lucide-react';
+import { Menu, Plus, Calendar, Sun, Moon, ChevronLeft, ChevronRight, Check, Eye, EyeOff } from 'lucide-react';
+import { useBalancePrivacy } from '../context/BalancePrivacyContext';
  
 interface TopbarProps {
   activeTab: NavTab;
@@ -52,6 +53,7 @@ export const Topbar: React.FC<TopbarProps> = ({
   onOpenProfile,
 }) => {
   const current = tabTitles[activeTab] || tabTitles.overview;
+  const { isBalancesHidden, toggleHideBalances } = useBalancePrivacy();
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
 
@@ -233,6 +235,27 @@ export const Topbar: React.FC<TopbarProps> = ({
             </div>
           )}
         </div>
+
+        {/* Dashboard Balance Privacy Toggle (Eye / EyeOff) */}
+        {activeTab === 'overview' && (
+          <button
+            type="button"
+            onClick={toggleHideBalances}
+            title={isBalancesHidden ? 'Reveal balances & financial numbers' : 'Hide balances & financial numbers'}
+            aria-label={isBalancesHidden ? 'Reveal balances & financial numbers' : 'Hide balances & financial numbers'}
+            className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl border flex items-center justify-center transition-all shadow-xs active:scale-95 cursor-pointer shrink-0 ${
+              isBalancesHidden
+                ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-600 dark:text-amber-400'
+                : 'bg-white dark:bg-[#131926] border-slate-200/80 dark:border-slate-800/90 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            {isBalancesHidden ? (
+              <EyeOff className="w-4 h-4 text-amber-500" />
+            ) : (
+              <Eye className="w-4 h-4 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300" />
+            )}
+          </button>
+        )}
 
         {/* Theme Toggle Button (Sun / Moon) */}
         {onToggleTheme && (

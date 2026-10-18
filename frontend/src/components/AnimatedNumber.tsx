@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { useBalancePrivacy } from '../context/BalancePrivacyContext';
 
 interface AnimatedNumberProps {
   value: number;
@@ -8,6 +9,7 @@ interface AnimatedNumberProps {
   suffix?: string;
   className?: string;
   animateOnMount?: boolean;
+  hidden?: boolean;
 }
 
 export const AnimatedNumber: React.FC<AnimatedNumberProps> = ({
@@ -18,7 +20,18 @@ export const AnimatedNumber: React.FC<AnimatedNumberProps> = ({
   suffix = '',
   className = '',
   animateOnMount = true,
+  hidden,
 }) => {
+  const { isBalancesHidden } = useBalancePrivacy();
+  const shouldHide = hidden !== undefined ? hidden : isBalancesHidden;
+
+  if (shouldHide) {
+    return (
+      <span className={`tabular-nums font-mono tracking-wider select-none opacity-80 ${className}`}>
+        {prefix}••••••{suffix}
+      </span>
+    );
+  }
   const numericValue = typeof value === 'number' && !isNaN(value) ? value : 0;
 
   // Check for user preference for reduced motion
