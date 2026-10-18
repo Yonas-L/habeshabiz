@@ -510,3 +510,182 @@ test('vendor direct sale rejects customer payment splits if sum does not match p
         ->assertJsonValidationErrors(['payment_splits']);
 });
 
+test('vendor direct sale supports partial vendor payout (half bank split, half owed debt) and customer split deposit', function () {
+    $initCbe = (float) $this->accCbe->current_balance;
+    $initTelebirr = (float) $this->accTelebirr->current_balance;
+
+    $response = $this->postJson('/api/v1/sales/vendor-direct', [
+        'product_name' => 'iPhone 15 Pro',
+        'storage' => '128GB',
+        'imei_or_serial' => '351234567890123',
+        'condition' => 'Brand New',
+        'vendor_contact_id' => $this->partner->id,
+        'vendor_cost' => 100000,
+        'vendor_payment_method' => 'partial',
+        'vendor_paid_amount' => 50000,
+        'vendor_payment_splits' => [
+            ['financial_account_id' => $this->accCbe->id, 'amount' => 30000],
+            ['financial_account_id' => $this->accTelebirr->id, 'amount' => 20000],
+        ],
+        'selling_price' => 120000,
+        'paid_amount' => 120000,
+        'payment_method' => 'split',
+        'payment_splits' => [
+            ['financial_account_id' => $this->accCbe->id, 'amount' => 70000],
+            ['financial_account_id' => $this->accTelebirr->id, 'amount' => 50000],
+        ],
+    ]);
+
+    $response->assertStatus(201);
+    $orderId = $response->json('data.id');
+
+    // Vendor deducted: CBE -30,000, Telebirr -20,000
+    // Customer deposited: CBE +70,000, Telebirr +50,000
+    // Net: CBE +40,000, Telebirr +30,000
+    expect((float) $this->accCbe->fresh()->current_balance)->toBe($initCbe + 40000.0)
+        ->and((float) $this->accTelebirr->fresh()->current_balance)->toBe($initTelebirr + 30000.0);
+
+    // Vendor brokered debt has partial status with remaining balance
+    $brokeredDebt = Debt::where('reference_type', 'brokered_sourcing')
+        ->where('reference_id', $orderId)
+        ->first();
+    expect($brokeredDebt)->not->toBeNull()
+        ->and($brokeredDebt->status)->toBe('partially_paid')
+        ->and((float) $brokeredDebt->original_amount)->toBe(100000.0)
+        ->and((float) $brokeredDebt->paid_amount)->toBe(50000.0)
+        ->and((float) $brokeredDebt->remaining_amount)->toBe(50000.0);
+
+    // SalesOrder reflects partial vendor payment
+    $order = SalesOrder::find($orderId);
+    expect($order->vendor_payment_status)->toBe('partially_paid')
+        ->and($order->payment_status)->toBe('paid');
+});
+
+test('sale with bilateral debt offset and cash transfer credits bank account with cash portion only and settles open payable', function () {
+    $initCbe = (float) $this->accCbe->current_balance;
+    $initTelebirr = (float) $this->accTelebirr->current_balance;
+
+    // Existing open payable to customer/partner: 30,000 ETB
+    $payableDebt = Debt::create([
+        'tenant_id' => $this->tenant->id,
+        'contact_id' => $this->partner->id,
+        'type' => 'payable',
+        'original_amount' => 30000,
+        'paid_amount' => 0,
+        'remaining_amount' => 30000,
+        'status' => 'open',
+    ]);
+
+    $product = Product::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'MacBook Air M2',
+        'category' => 'laptop',
+        'has_serials' => false,
+        'is_active' => true,
+    ]);
+    $variant = ProductVariant::create([
+        'product_id' => $product->id,
+        'storage' => '256GB SSD',
+        'ram' => '8GB',
+        'default_selling_price' => 100000,
+    ]);
+    \App\Models\InventoryStock::create([
+        'tenant_id' => $this->tenant->id,
+        'variant_id' => $variant->id,
+        'quantity_on_hand' => 5,
+        'average_cost' => 70000,
+    ]);
+
+    // Sale for 100,000: 30,000 debt offset + 70,000 cash split (CBE 40k, Telebirr 30k)
+    $response = $this->postJson('/api/v1/sales', [
+        'customer_id' => $this->partner->id,
+        'payment_method' => 'debt_offset',
+        'debt_offset_amount' => 30000,
+        'cash_amount' => 70000,
+        'paid_amount' => 100000,
+        'payment_splits' => [
+            ['financial_account_id' => $this->accCbe->id, 'amount' => 40000],
+            ['financial_account_id' => $this->accTelebirr->id, 'amount' => 30000],
+        ],
+        'items' => [
+            [
+                'variant_id' => $variant->id,
+                'quantity' => 1,
+                'unit_price' => 100000,
+                'sourcing_type' => 'internal_stock',
+            ],
+        ],
+    ]);
+
+    $response->assertStatus(201);
+
+    // Existing payable is fully settled
+    expect($payableDebt->fresh()->status)->toBe('settled')
+        ->and((float) $payableDebt->fresh()->remaining_amount)->toBe(0.0)
+        ->and((float) $payableDebt->fresh()->paid_amount)->toBe(30000.0);
+
+    // Only the cash transfer portion (70,000 ETB) was deposited across accounts
+    expect((float) $this->accCbe->fresh()->current_balance)->toBe($initCbe + 40000.0)
+        ->and((float) $this->accTelebirr->fresh()->current_balance)->toBe($initTelebirr + 30000.0);
+});
+
+test('credit sale with down payment deposits down payment into receiving account', function () {
+    $initCbe = (float) $this->accCbe->current_balance;
+
+    $product = Product::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Galaxy S24 Ultra',
+        'category' => 'phone_tablet',
+        'has_serials' => false,
+        'is_active' => true,
+    ]);
+    $variant = ProductVariant::create([
+        'product_id' => $product->id,
+        'storage' => '512GB',
+        'default_selling_price' => 80000,
+    ]);
+    \App\Models\InventoryStock::create([
+        'tenant_id' => $this->tenant->id,
+        'variant_id' => $variant->id,
+        'quantity_on_hand' => 3,
+        'average_cost' => 60000,
+    ]);
+
+    // Credit sale: 80,000 total, 25,000 down payment deposited to CBE, 55,000 credit
+    $response = $this->postJson('/api/v1/sales', [
+        'customer_id' => $this->partner->id,
+        'payment_method' => 'credit',
+        'credit_sale' => true,
+        'paid_amount' => 25000,
+        'financial_account_id' => $this->accCbe->id,
+        'items' => [
+            [
+                'variant_id' => $variant->id,
+                'quantity' => 1,
+                'unit_price' => 80000,
+                'sourcing_type' => 'internal_stock',
+            ],
+        ],
+    ]);
+
+    $response->assertStatus(201);
+    $orderId = $response->json('data.id');
+
+    // Down payment credited to CBE
+    expect((float) $this->accCbe->fresh()->current_balance)->toBe($initCbe + 25000.0);
+
+    // Receivable debt created for 55,000
+    $receivable = Debt::where('reference_type', 'sales_order')
+        ->where('reference_id', $orderId)
+        ->first();
+    expect($receivable)->not->toBeNull()
+        ->and($receivable->status)->toBe('open')
+        ->and((float) $receivable->original_amount)->toBe(55000.0)
+        ->and((float) $receivable->remaining_amount)->toBe(55000.0);
+
+    $order = SalesOrder::find($orderId);
+    expect($order->payment_status)->toBe('partially_paid')
+        ->and((float) $order->paid_amount)->toBe(25000.0);
+});
+
+

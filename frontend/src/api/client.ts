@@ -1326,12 +1326,15 @@ export const api = {
     sim_type?: string | null;
     vendor_contact_id: string;
     vendor_cost: number;
-    vendor_payment_method: 'paid_now' | 'owed';
+    vendor_payment_method: 'paid_now' | 'owed' | 'partial';
+    vendor_paid_amount?: number;
     vendor_payment_account_id?: string | null;
     vendor_payment_splits?: { financial_account_id: string; amount: number; reference_number?: string }[];
     selling_price: number;
     paid_amount: number;
     payment_method: 'cash' | 'telebirr' | 'cbe' | 'bank_transfer' | 'cash_transfer' | 'credit' | 'debt_offset' | 'split';
+    debt_offset_amount?: number;
+    cash_amount?: number;
     financial_account_id?: string | null;
     payment_splits?: { financial_account_id: string; amount: number; reference_number?: string }[];
     customer_id?: string | null;

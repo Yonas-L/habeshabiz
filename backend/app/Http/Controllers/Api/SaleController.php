@@ -178,6 +178,8 @@ class SaleController extends Controller
             'payment_splits.*.amount' => ['required', 'numeric', 'min:0.01'],
             'payment_splits.*.reference_number' => ['nullable', 'string', 'max:100'],
             'payment_splits.*.account_name' => ['nullable', 'string', 'max:100'],
+            'debt_offset_amount' => ['nullable', 'numeric', 'min:0'],
+            'cash_amount' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.variant_id' => ['required', 'exists:product_variants,id'],
@@ -403,10 +405,11 @@ class SaleController extends Controller
             // Vendor details
             'vendor_contact_id' => ['required', 'exists:contacts,id'],
             'vendor_cost' => ['required', 'numeric', 'min:0'],
-            'vendor_payment_method' => ['required', 'string', 'in:owed,paid_now'],
+            'vendor_payment_method' => ['required', 'string', 'in:owed,paid_now,partial'],
+            'vendor_paid_amount' => ['nullable', 'numeric', 'min:0'],
             'vendor_payment_account_id' => [
                 'nullable',
-                Rule::requiredIf(fn () => $request->input('vendor_payment_method') === 'paid_now' && empty($request->input('vendor_payment_splits'))),
+                Rule::requiredIf(fn () => in_array($request->input('vendor_payment_method'), ['paid_now', 'partial']) && (float) ($request->input('vendor_paid_amount', 1)) > 0 && empty($request->input('vendor_payment_splits'))),
                 'exists:financial_accounts,id',
             ],
             'vendor_payment_splits' => ['nullable', 'array', 'min:1'],
@@ -426,6 +429,8 @@ class SaleController extends Controller
             'payment_splits.*.amount' => ['required', 'numeric', 'min:0.01'],
             'payment_splits.*.reference_number' => ['nullable', 'string', 'max:100'],
             'payment_splits.*.account_name' => ['nullable', 'string', 'max:100'],
+            'debt_offset_amount' => ['nullable', 'numeric', 'min:0'],
+            'cash_amount' => ['nullable', 'numeric', 'min:0'],
             'customer_id' => ['nullable', 'exists:contacts,id'],
             'customer_name' => ['nullable', 'string', 'max:255'],
             'customer_phone' => ['nullable', 'string', 'max:50'],
@@ -440,12 +445,13 @@ class SaleController extends Controller
         $paidAmount = (float) $validated['paid_amount'];
         $rawCustomerSplits = $validated['payment_splits'] ?? null;
         $hasCustomerSplits = is_array($rawCustomerSplits) && count($rawCustomerSplits) > 0;
+        $cashAmount = isset($validated['cash_amount']) ? (float) $validated['cash_amount'] : (($validated['payment_method'] === 'debt_offset') ? 0.0 : $paidAmount);
 
-        if ($hasCustomerSplits && $paidAmount > 0) {
+        if ($hasCustomerSplits && $cashAmount > 0) {
             $custSplitSum = (float) collect($rawCustomerSplits)->sum(fn ($s) => (float) ($s['amount'] ?? 0));
-            if (abs($custSplitSum - $paidAmount) > 0.01) {
+            if (abs($custSplitSum - $cashAmount) > 0.01) {
                 throw ValidationException::withMessages([
-                    'payment_splits' => ['Customer payment split total ('.number_format($custSplitSum, 2).' ETB) does not match paid amount ('.number_format($paidAmount, 2).' ETB).'],
+                    'payment_splits' => ['Customer payment split total ('.number_format($custSplitSum, 2).' ETB) does not match bank cash amount ('.number_format($cashAmount, 2).' ETB).'],
                 ]);
             }
         }
@@ -467,18 +473,29 @@ class SaleController extends Controller
             ]);
         }
 
-        // Check overdraft and prepare vendor splits if vendor is paid now
+        // Check overdraft and prepare vendor splits if vendor is paid now / partial
         $vendorCost = (float) $validated['vendor_cost'];
+        $vendorPaymentMethod = $validated['vendor_payment_method'];
+        $rawVendorPaidAmount = $validated['vendor_paid_amount'] ?? null;
+
+        $vendorPaidAmount = 0.0;
+        if ($vendorPaymentMethod === 'paid_now') {
+            $vendorPaidAmount = $rawVendorPaidAmount !== null ? (float) $rawVendorPaidAmount : $vendorCost;
+        } elseif ($vendorPaymentMethod === 'partial') {
+            $vendorPaidAmount = (float) ($rawVendorPaidAmount ?? 0);
+        }
+        $vendorPaidAmount = min($vendorCost, max(0.0, $vendorPaidAmount));
+
         $rawVendorSplits = $validated['vendor_payment_splits'] ?? null;
         $hasVendorSplits = is_array($rawVendorSplits) && count($rawVendorSplits) > 0;
         $preparedVendorSplits = [];
 
-        if ($validated['vendor_payment_method'] === 'paid_now' && $vendorCost > 0) {
+        if ($vendorPaidAmount > 0) {
             if ($hasVendorSplits) {
                 $splitSum = (float) collect($rawVendorSplits)->sum(fn ($s) => (float) ($s['amount'] ?? 0));
-                if (abs($splitSum - $vendorCost) > 0.01) {
+                if (abs($splitSum - $vendorPaidAmount) > 0.01) {
                     throw ValidationException::withMessages([
-                        'vendor_payment_splits' => ['Split allocation total ('.number_format($splitSum, 2).' ETB) does not match vendor cost ('.number_format($vendorCost, 2).' ETB).'],
+                        'vendor_payment_splits' => ['Split allocation total ('.number_format($splitSum, 2).' ETB) does not match vendor paid amount ('.number_format($vendorPaidAmount, 2).' ETB).'],
                     ]);
                 }
 
@@ -505,9 +522,14 @@ class SaleController extends Controller
                     ];
                 }
             } else {
+                if (empty($validated['vendor_payment_account_id'])) {
+                    throw ValidationException::withMessages([
+                        'vendor_payment_account_id' => ['Please select a vendor payout account or provide split accounts.'],
+                    ]);
+                }
                 $vAcc = FinancialAccount::where('tenant_id', $tenantId)->findOrFail($validated['vendor_payment_account_id']);
-                $vFee = $vAcc->calculateOutgoingFee($vendorCost);
-                $vTotal = $vendorCost + $vFee;
+                $vFee = $vAcc->calculateOutgoingFee($vendorPaidAmount);
+                $vTotal = $vendorPaidAmount + $vFee;
 
                 if ((float) $vAcc->current_balance < $vTotal) {
                     throw ValidationException::withMessages([
@@ -519,7 +541,7 @@ class SaleController extends Controller
                     'account' => $vAcc,
                     'financial_account_id' => $vAcc->id,
                     'account_name' => $vAcc->name,
-                    'amount' => $vendorCost,
+                    'amount' => $vendorPaidAmount,
                     'fee' => $vFee,
                     'total' => $vTotal,
                     'reference_number' => null,
@@ -527,7 +549,7 @@ class SaleController extends Controller
             }
         }
 
-        $order = DB::transaction(function () use ($validated, $user, $tenantId, $vendorCost, $preparedVendorSplits, $hasVendorSplits, $hasCustomerSplits, $rawCustomerSplits, $action) {
+        $order = DB::transaction(function () use ($validated, $user, $tenantId, $vendorCost, $vendorPaidAmount, $preparedVendorSplits, $hasVendorSplits, $hasCustomerSplits, $rawCustomerSplits, $action) {
             // 1. Resolve Product & Variant
             $variantId = $validated['variant_id'] ?? null;
             if (! $variantId) {
@@ -588,7 +610,7 @@ class SaleController extends Controller
                 'status' => 'sold',
                 'source_type' => 'vendor_direct',
                 'supplier_contact_id' => $validated['vendor_contact_id'],
-                'funding_source' => $validated['vendor_payment_method'] === 'paid_now' ? 'bank' : 'payable_owed',
+                'funding_source' => $vendorPaidAmount >= ($vendorCost - 0.01) ? 'bank' : ($vendorPaidAmount > 0.01 ? 'split' : 'payable_owed'),
                 'payment_account_id' => count($preparedVendorSplits) > 0 ? $preparedVendorSplits[0]['financial_account_id'] : ($validated['vendor_payment_account_id'] ?? null),
                 'payment_splits' => count($preparedVendorSplits) > 1 ? array_map(fn ($p) => [
                     'financial_account_id' => $p['financial_account_id'],
@@ -601,7 +623,7 @@ class SaleController extends Controller
             ]);
 
             // 3. Handle Vendor Payment
-            if ($validated['vendor_payment_method'] === 'paid_now' && $vendorCost > 0) {
+            if ($vendorPaidAmount > 0) {
                 foreach ($preparedVendorSplits as $p) {
                     $p['account']->decrement('current_balance', $p['total']);
 
@@ -633,6 +655,8 @@ class SaleController extends Controller
                 'credit_sale' => (bool) ($validated['credit_sale'] ?? ($validated['payment_method'] === 'credit')),
                 'intentional_shortfall' => (bool) ($validated['intentional_shortfall'] ?? false),
                 'payment_method' => $validated['payment_method'],
+                'debt_offset_amount' => $validated['debt_offset_amount'] ?? null,
+                'cash_amount' => $validated['cash_amount'] ?? null,
                 'financial_account_id' => $validated['financial_account_id'] ?? ($hasCustomerSplits ? $rawCustomerSplits[0]['financial_account_id'] : null),
                 'payment_splits' => $validated['payment_splits'] ?? null,
                 'notes' => $validated['notes'] ?? 'Vendor Direct Sale',
@@ -645,7 +669,8 @@ class SaleController extends Controller
                         'sourcing_type' => 'brokered_neighbour',
                         'vendor_contact_id' => $validated['vendor_contact_id'],
                         'vendor_cost' => $vendorCost,
-                        'vendor_paid_now' => ($validated['vendor_payment_method'] === 'paid_now'),
+                        'vendor_paid_now' => ($vendorPaidAmount > 0),
+                        'vendor_paid_amount' => $vendorPaidAmount,
                         'vendor_payment_account_id' => count($preparedVendorSplits) > 0 ? $preparedVendorSplits[0]['financial_account_id'] : ($validated['vendor_payment_account_id'] ?? null),
                         'vendor_payment_splits' => $hasVendorSplits ? array_map(fn ($p) => [
                             'financial_account_id' => $p['financial_account_id'],
@@ -662,7 +687,7 @@ class SaleController extends Controller
                 'is_vendor_sourced' => true,
                 'vendor_contact_id' => $validated['vendor_contact_id'],
                 'vendor_cost_basis' => $vendorCost,
-                'vendor_payment_status' => $validated['vendor_payment_method'] === 'paid_now' ? 'paid' : 'owed',
+                'vendor_payment_status' => $vendorPaidAmount >= ($vendorCost - 0.01) ? 'paid' : ($vendorPaidAmount > 0.01 ? 'partially_paid' : 'owed'),
             ]);
 
             return $order->fresh([

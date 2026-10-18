@@ -94,6 +94,8 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
   const [customerName, setCustomerName] = useState<string>('');
   const [customerPhone, setCustomerPhone] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
+  const [debtOffsetAmount, setDebtOffsetAmount] = useState<string>('');
+  const [cashTransferAmount, setCashTransferAmount] = useState<string>('');
 
   // Exchange / Trade-In State
   const [exchangeDevice, setExchangeDevice] = useState<ExchangeDevicePayload | null>(null);
@@ -220,9 +222,20 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
   const tradeInAllowance = exchangeDevice ? Number(exchangeDevice.trade_in_value || 0) : 0;
   const netCashDue = Math.max(0, totalAfterDiscount - tradeInAllowance);
   const paidNum = parseFloat(paidAmount) || 0;
-  const balanceDue = Math.max(0, netCashDue - paidNum);
+
+  const isDebtOffset = paymentMethod === 'debt_offset' && !isCreditSale && !isWriteOff;
+  const debtOffsetNum = isDebtOffset
+    ? (debtOffsetAmount !== '' ? parseFloat(debtOffsetAmount) || 0 : netCashDue)
+    : 0;
+  const cashTransferNum = isDebtOffset
+    ? (cashTransferAmount !== '' ? parseFloat(cashTransferAmount) || 0 : Math.max(0, netCashDue - debtOffsetNum))
+    : 0;
+  const effectiveCashInflow = isDebtOffset ? cashTransferNum : paidNum;
+  const totalCustomerPaid = isDebtOffset ? (debtOffsetNum + cashTransferNum) : paidNum;
+
+  const balanceDue = Math.max(0, netCashDue - totalCustomerPaid);
   const isCredit = balanceDue > 0;
-  const hasUnmarkedBalance = balanceDue > 0 && !isCreditSale && !isWriteOff;
+  const hasUnmarkedBalance = isDebtOffset ? balanceDue > 0.01 : (balanceDue > 0 && !isCreditSale && !isWriteOff);
 
   // Upsell bonus calculation
   const currentVariant = useMemo(() => {
@@ -452,6 +465,8 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
     setCustomerMode('walk_in');
     setNotes('');
     setProductSearch('');
+    setDebtOffsetAmount('');
+    setCashTransferAmount('');
     setExchangeDevice(null);
   };
 
@@ -513,11 +528,11 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
       return;
     }
 
-    if (paidNum > 0 && paymentMethod !== 'debt_offset' && !isCreditSale && !isWriteOff) {
+    if (effectiveCashInflow > 0) {
       if (isSplitPayment) {
         const splitSum = paymentSplits.reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
-        if (Math.abs(splitSum - paidNum) > 0.01) {
-          toast.error(`Split amounts (${splitSum.toLocaleString()} ETB) must equal paid amount (${paidNum.toLocaleString()} ETB)`);
+        if (Math.abs(splitSum - effectiveCashInflow) > 0.01) {
+          toast.error(`Split amounts (${splitSum.toLocaleString()} ETB) must equal bank cash deposit (${effectiveCashInflow.toLocaleString()} ETB)`);
           return;
         }
         if (paymentSplits.length === 0 || paymentSplits.some((s) => !s.financial_account_id || s.amount <= 0)) {
@@ -575,14 +590,16 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
         customer_name: customerMode === 'new' && customerName.trim() ? customerName.trim() : null,
         customer_phone: customerMode === 'new' && customerPhone.trim() ? customerPhone.trim() : null,
         discount_amount: calculatedDiscountAmount,
-        paid_amount: paidNum,
+        paid_amount: totalCustomerPaid,
+        debt_offset_amount: isDebtOffset ? debtOffsetNum : undefined,
+        cash_amount: isDebtOffset ? cashTransferNum : undefined,
         payment_method: isCreditSale
           ? 'credit'
-          : (isSplitPayment && paidNum > 0 ? 'split' : (paymentMethod || 'cash')),
+          : (isSplitPayment && effectiveCashInflow > 0 ? 'split' : (paymentMethod || 'cash')),
         credit_sale: isCreditSale,
         intentional_shortfall: isWriteOff,
-        financial_account_id: paidNum > 0 && paymentMethod !== 'debt_offset' && !isSplitPayment ? financialAccountId : null,
-        payment_splits: isSplitPayment && paidNum > 0 && paymentMethod !== 'debt_offset' ? paymentSplits : undefined,
+        financial_account_id: effectiveCashInflow > 0 && !isSplitPayment ? financialAccountId : null,
+        payment_splits: isSplitPayment && effectiveCashInflow > 0 ? paymentSplits : undefined,
         notes: notes || null,
         items: itemsPayload,
       };
@@ -1304,24 +1321,103 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                 </div>
               </div>
 
-              {/* Bilateral Debt Offset Banner */}
-              {paymentMethod === 'debt_offset' && !isCreditSale && !isWriteOff && (
-                <div className="p-2.5 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-200/60 dark:border-indigo-800/40 text-xs text-indigo-900 dark:text-indigo-200 flex items-start gap-2">
-                  <ArrowLeftRight className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-semibold block">Bilateral Debt Offset</span>
-                    <span className="text-[11px] text-indigo-700 dark:text-indigo-300">
-                      Sale proceeds will deduct from the customer's open payable debt. Zero bank cash movement.
-                    </span>
+              {/* Bilateral Debt Offset Configuration */}
+              {isDebtOffset && (
+                <div className="p-3 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-200/60 dark:border-indigo-800/40 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-950 dark:text-indigo-200">
+                      <ArrowLeftRight className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                      <span>Debt Offset & Payment Split</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDebtOffsetAmount(String(netCashDue));
+                          setCashTransferAmount('0');
+                        }}
+                        className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all cursor-pointer ${
+                          debtOffsetNum >= netCashDue - 0.01
+                            ? 'bg-slate-900 text-indigo-300 font-bold dark:bg-slate-900'
+                            : 'bg-white/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700'
+                        }`}
+                      >
+                        Full Offset (100%)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const half = Math.round(netCashDue / 2);
+                          setDebtOffsetAmount(String(half));
+                          setCashTransferAmount(String(netCashDue - half));
+                        }}
+                        className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all cursor-pointer ${
+                          Math.abs(debtOffsetNum - Math.round(netCashDue / 2)) < 0.01 && debtOffsetNum < netCashDue - 0.01
+                            ? 'bg-slate-900 text-indigo-300 font-bold dark:bg-slate-900'
+                            : 'bg-white/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700'
+                        }`}
+                      >
+                        Half (50% / 50%)
+                      </button>
+                    </div>
                   </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] font-semibold text-indigo-900 dark:text-indigo-300 mb-1">
+                        Debt Offset Amount (ETB)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder={netCashDue.toLocaleString()}
+                        value={debtOffsetAmount}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setDebtOffsetAmount(v);
+                          const offVal = parseFloat(v) || 0;
+                          const remCash = Math.max(0, netCashDue - offVal);
+                          setCashTransferAmount(String(remCash));
+                        }}
+                        className="w-full h-8 px-2.5 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-white dark:bg-slate-900 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-indigo-900 dark:text-indigo-300 mb-1">
+                        Cash / Transfer Amount (ETB)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="0"
+                        value={cashTransferAmount}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setCashTransferAmount(v);
+                        }}
+                        className="w-full h-8 px-2.5 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-white dark:bg-slate-900 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {effectiveCashInflow <= 0 ? (
+                    <div className="text-[11px] text-indigo-700 dark:text-indigo-300">
+                      Sale proceeds will deduct from the customer's open payable debt. Zero bank cash movement.
+                    </div>
+                  ) : (
+                    <div className="text-[11px] text-indigo-700 dark:text-indigo-300 flex items-center justify-between">
+                      <span>Offset: <strong className="font-mono">{debtOffsetNum.toLocaleString()} ETB</strong></span>
+                      <span>Bank/Cash deposit: <strong className="font-mono text-emerald-600 dark:text-emerald-400">{effectiveCashInflow.toLocaleString()} ETB</strong></span>
+                    </div>
+                  )}
                 </div>
               )}
 
-              {/* Receiving Account (Only for real cash/bank deposits) */}
-              {paymentMethod !== 'debt_offset' && !isCreditSale && !isWriteOff && (
+              {/* Receiving Account (Shown whenever real money enters the shop: Cash, Credit down payment, Price Concession, or Debt Offset cash portion) */}
+              {effectiveCashInflow > 0 && (
                 <SplitPaymentSelector
                   accounts={treasuryAccounts}
-                  targetAmount={parseFloat(paidAmount) || 0}
+                  targetAmount={effectiveCashInflow}
                   singleAccountId={financialAccountId}
                   onSingleAccountChange={setFinancialAccountId}
                   isSplit={isSplitPayment}

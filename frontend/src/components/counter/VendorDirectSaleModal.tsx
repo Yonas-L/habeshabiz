@@ -167,6 +167,7 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
   const [vendorContactId, setVendorContactId] = useState('');
   const [vendorCost, setVendorCost] = useState('');
   const [vendorPaymentType, setVendorPaymentType] = useState<'immediate_account' | 'payable_debt'>('immediate_account');
+  const [vendorPaidAmount, setVendorPaidAmount] = useState('');
   const [vendorAccountId, setVendorAccountId] = useState('');
   const [isVendorSplit, setIsVendorSplit] = useState(false);
   const [vendorPaymentSplits, setVendorPaymentSplits] = useState<PaymentSplitItem[]>([]);
@@ -177,6 +178,8 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
   const [sellingPrice, setSellingPrice] = useState('');
   const [paidAmount, setPaidAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [debtOffsetAmount, setDebtOffsetAmount] = useState('');
+  const [cashTransferAmount, setCashTransferAmount] = useState('');
   const [isCreditSale, setIsCreditSale] = useState(false);
   const [isWriteOff, setIsWriteOff] = useState(false);
   const [customerAccountId, setCustomerAccountId] = useState('');
@@ -692,45 +695,66 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
   const marginPct = sellingPriceNum > 0 ? (grossProfit / sellingPriceNum) * 100 : 0;
   const isLossDeal = sellingPriceNum > 0 && vendorCostNum > 0 && grossProfit < 0;
 
+  // Vendor payout calculations
+  const effectiveVendorPaidAmount = useMemo(() => {
+    if (vendorPaymentType === 'payable_debt') return 0;
+    if (vendorPaidAmount !== '') return parseFormattedNumber(vendorPaidAmount) || 0;
+    return vendorCostNum;
+  }, [vendorPaymentType, vendorPaidAmount, vendorCostNum]);
+
+  const remainingVendorDebt = Math.max(0, vendorCostNum - effectiveVendorPaidAmount);
+  const isPartialVendorPayout = vendorPaymentType === 'immediate_account' && effectiveVendorPaidAmount > 0 && remainingVendorDebt > 0;
+
   // Selected vendor payment account & overdraft check
   const selectedVendorAccount = useMemo(() => {
     return accounts.find((a) => a.id === vendorAccountId) || null;
   }, [accounts, vendorAccountId]);
 
   const vendorFee = useMemo(() => {
-    if (vendorPaymentType !== 'immediate_account' || !selectedVendorAccount) return 0;
+    if (vendorPaymentType !== 'immediate_account' || !selectedVendorAccount || effectiveVendorPaidAmount <= 0) return 0;
     if (!selectedVendorAccount.default_fee_type || selectedVendorAccount.default_fee_type === 'none') return 0;
     const rate = Number(selectedVendorAccount.default_fee_amount) || 0;
     if (rate <= 0) return 0;
     if (selectedVendorAccount.default_fee_type === 'fixed') return rate;
     if (selectedVendorAccount.default_fee_type === 'percentage') {
-      return Math.round(((vendorCostNum * rate) / 100) * 100) / 100;
+      return Math.round(((effectiveVendorPaidAmount * rate) / 100) * 100) / 100;
     }
     return 0;
-  }, [vendorPaymentType, selectedVendorAccount, vendorCostNum]);
+  }, [vendorPaymentType, selectedVendorAccount, effectiveVendorPaidAmount]);
 
-  const totalVendorDeduction = vendorCostNum + vendorFee;
+  const totalVendorDeduction = effectiveVendorPaidAmount + vendorFee;
 
   const isVendorAccountOverdrawn = useMemo(() => {
-    if (vendorPaymentType !== 'immediate_account') return false;
+    if (vendorPaymentType !== 'immediate_account' || effectiveVendorPaidAmount <= 0) return false;
     if (!isOwner || !selectedVendorAccount || selectedVendorAccount.current_balance === null) return false;
     return totalVendorDeduction > Number(selectedVendorAccount.current_balance);
-  }, [vendorPaymentType, isOwner, selectedVendorAccount, totalVendorDeduction]);
+  }, [vendorPaymentType, effectiveVendorPaidAmount, isOwner, selectedVendorAccount, totalVendorDeduction]);
 
   const vendorSplitTotal = useMemo(() => {
     return vendorPaymentSplits.reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
   }, [vendorPaymentSplits]);
 
-  const isVendorSplitMismatch = isVendorSplit && Math.abs(vendorSplitTotal - vendorCostNum) > 0.01;
+  const isVendorSplitMismatch = isVendorSplit && effectiveVendorPaidAmount > 0 && Math.abs(vendorSplitTotal - effectiveVendorPaidAmount) > 0.01;
+
+  // Customer debt offset & cash inflow calculations
+  const isDebtOffset = paymentMethod === 'debt_offset' && !isCreditSale && !isWriteOff;
+  const debtOffsetNum = isDebtOffset
+    ? (debtOffsetAmount !== '' ? parseFormattedNumber(debtOffsetAmount) || 0 : sellingPriceNum)
+    : 0;
+  const cashTransferNum = isDebtOffset
+    ? (cashTransferAmount !== '' ? parseFormattedNumber(cashTransferAmount) || 0 : Math.max(0, sellingPriceNum - debtOffsetNum))
+    : 0;
+  const effectiveCustomerCashInflow = isDebtOffset ? cashTransferNum : paidAmountNum;
+  const totalCustomerPaid = isDebtOffset ? (debtOffsetNum + cashTransferNum) : paidAmountNum;
 
   const customerSplitTotal = useMemo(() => {
     return customerPaymentSplits.reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
   }, [customerPaymentSplits]);
 
-  const isCustomerSplitMismatch = isCustomerSplit && Math.abs(customerSplitTotal - paidAmountNum) > 0.01;
+  const isCustomerSplitMismatch = isCustomerSplit && effectiveCustomerCashInflow > 0 && Math.abs(customerSplitTotal - effectiveCustomerCashInflow) > 0.01;
 
   const isAnyVendorSplitOverdrawn = useMemo(() => {
-    if (vendorPaymentType !== 'immediate_account' || !isVendorSplit) return false;
+    if (vendorPaymentType !== 'immediate_account' || !isVendorSplit || effectiveVendorPaidAmount <= 0) return false;
     if (!isOwner) return false;
     return vendorPaymentSplits.some((split) => {
       const acc = accounts.find((a) => a.id === split.financial_account_id);
@@ -743,7 +767,7 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
       }
       return (amt + fee) > Number(acc.current_balance);
     });
-  }, [vendorPaymentType, isVendorSplit, isOwner, vendorPaymentSplits, accounts]);
+  }, [vendorPaymentType, isVendorSplit, effectiveVendorPaidAmount, isOwner, vendorPaymentSplits, accounts]);
 
   // Auto-sync paidAmount when sellingPrice changes (if paid was equal or empty)
   const handleSellingPriceChange = (val: string) => {
@@ -795,10 +819,10 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
       return;
     }
 
-    if (vendorPaymentType === 'immediate_account') {
+    if (vendorPaymentType === 'immediate_account' && effectiveVendorPaidAmount > 0) {
       if (isVendorSplit) {
         if (isVendorSplitMismatch) {
-          toast.error(`Vendor payment split total (${vendorSplitTotal.toLocaleString()} ETB) does not match vendor cost (${vendorCostNum.toLocaleString()} ETB)`);
+          toast.error(`Vendor payment split total (${vendorSplitTotal.toLocaleString()} ETB) does not match vendor paid amount (${effectiveVendorPaidAmount.toLocaleString()} ETB)`);
           return;
         }
         if (isAnyVendorSplitOverdrawn) {
@@ -806,6 +830,10 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
           return;
         }
       } else {
+        if (!vendorAccountId) {
+          toast.error('Please select the vendor payout account');
+          return;
+        }
         if (isVendorAccountOverdrawn) {
           toast.error('Insufficient balance in selected payout account');
           return;
@@ -813,7 +841,7 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
       }
     }
 
-    if (paidAmountNum > 0 && paymentMethod !== 'debt_offset' && !isCreditSale && !isWriteOff) {
+    if (effectiveCustomerCashInflow > 0) {
       if (isCustomerSplit) {
         if (
           customerPaymentSplits.length === 0 ||
@@ -824,7 +852,7 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
         }
         if (isCustomerSplitMismatch) {
           toast.error(
-            `Customer payment split total (${customerSplitTotal.toLocaleString()} ETB) does not match paid amount (${paidAmountNum.toLocaleString()} ETB)`
+            `Customer payment split total (${customerSplitTotal.toLocaleString()} ETB) does not match bank cash deposit (${effectiveCustomerCashInflow.toLocaleString()} ETB)`
           );
           return;
         }
@@ -847,6 +875,10 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
       submittingRef.current = true;
       setSubmitting(true);
 
+      const vendorMethod = effectiveVendorPaidAmount >= vendorCostNum - 0.01
+        ? ('paid_now' as const)
+        : (effectiveVendorPaidAmount > 0.01 ? ('partial' as const) : ('owed' as const));
+
       const payload = {
         product_id: finalProductId,
         product_name: finalProductName,
@@ -861,27 +893,30 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
         sim_type: isPhone ? simType : undefined,
         vendor_contact_id: vendorContactId,
         vendor_cost: vendorCostNum,
-        vendor_payment_method: vendorPaymentType === 'immediate_account' ? ('paid_now' as const) : ('owed' as const),
-        vendor_payment_account_id: vendorPaymentType === 'immediate_account' ? (isVendorSplit ? undefined : vendorAccountId) : undefined,
-        vendor_payment_splits: (vendorPaymentType === 'immediate_account' && isVendorSplit)
+        vendor_payment_method: vendorMethod,
+        vendor_paid_amount: effectiveVendorPaidAmount,
+        vendor_payment_account_id: effectiveVendorPaidAmount > 0 && !isVendorSplit ? vendorAccountId : undefined,
+        vendor_payment_splits: (effectiveVendorPaidAmount > 0 && isVendorSplit)
           ? vendorPaymentSplits.map((s) => ({
               financial_account_id: s.financial_account_id,
               amount: Number(s.amount) || 0,
             }))
           : undefined,
         selling_price: sellingPriceNum,
-        paid_amount: paidAmountNum,
+        paid_amount: totalCustomerPaid,
+        debt_offset_amount: isDebtOffset ? debtOffsetNum : undefined,
+        cash_amount: isDebtOffset ? cashTransferNum : undefined,
         payment_method: (isCreditSale
           ? 'credit'
-          : (isCustomerSplit && paidAmountNum > 0 ? 'split' : (paymentMethod || 'cash'))) as any,
+          : (isCustomerSplit && effectiveCustomerCashInflow > 0 ? 'split' : (paymentMethod || 'cash'))) as any,
         credit_sale: isCreditSale,
         intentional_shortfall: isWriteOff,
         financial_account_id:
-          paidAmountNum > 0 && paymentMethod !== 'debt_offset' && !isCreditSale && !isWriteOff && !isCustomerSplit
+          effectiveCustomerCashInflow > 0 && !isCustomerSplit
             ? customerAccountId
             : undefined,
         payment_splits:
-          isCustomerSplit && paidAmountNum > 0 && paymentMethod !== 'debt_offset'
+          isCustomerSplit && effectiveCustomerCashInflow > 0
             ? customerPaymentSplits.map((s) => ({
                 financial_account_id: s.financial_account_id,
                 amount: Number(s.amount) || 0,
@@ -906,6 +941,9 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
       setSellingPrice('');
       setPaidAmount('');
       setVendorCost('');
+      setVendorPaidAmount('');
+      setDebtOffsetAmount('');
+      setCashTransferAmount('');
       setRam('');
       setBatteryHealth('100');
       setCycleCount('');
@@ -2144,43 +2182,99 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
               </button>
             </div>
 
-            {/* Payout Account selection if Pay Now */}
+            {/* Payout Account selection if Pay Now / Partial */}
             {vendorPaymentType === 'immediate_account' && (
-              <div className="space-y-1.5 pt-1">
-                <SplitPaymentSelector
-                  accounts={accounts}
-                  targetAmount={vendorCostNum}
-                  singleAccountId={vendorAccountId}
-                  onSingleAccountChange={setVendorAccountId}
-                  isSplit={isVendorSplit}
-                  onIsSplitChange={setIsVendorSplit}
-                  splits={vendorPaymentSplits}
-                  onSplitsChange={setVendorPaymentSplits}
-                  direction="outflow"
-                  label="Vendor Payout Account *"
-                />
-                {!isVendorSplit && isVendorAccountOverdrawn && (
-                  <div className="text-[11px] text-rose-600 dark:text-rose-400 flex items-center gap-1">
-                    <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
-                    <span>Insufficient balance in selected payout account</span>
+              <div className="space-y-2 pt-1">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+                      Amount to Pay Vendor Now (ETB) *
+                    </label>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setVendorPaidAmount(formatCurrencyInput(String(vendorCostNum)))}
+                        className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all cursor-pointer ${
+                          effectiveVendorPaidAmount >= vendorCostNum - 0.01
+                            ? 'bg-slate-900 text-emerald-400 font-bold dark:bg-slate-900'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                        }`}
+                      >
+                        Full (100%)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setVendorPaidAmount(formatCurrencyInput(String(Math.round(vendorCostNum / 2))))}
+                        className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all cursor-pointer ${
+                          Math.abs(effectiveVendorPaidAmount - Math.round(vendorCostNum / 2)) < 0.01 && effectiveVendorPaidAmount < vendorCostNum - 0.01
+                            ? 'bg-slate-900 text-emerald-400 font-bold dark:bg-slate-900'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                        }`}
+                      >
+                        Half (50%)
+                      </button>
+                    </div>
+                  </div>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder={vendorCostNum > 0 ? vendorCostNum.toLocaleString() : '0.00'}
+                    value={vendorPaidAmount}
+                    onChange={(e) => setVendorPaidAmount(formatCurrencyInput(e.target.value))}
+                    className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none"
+                  />
+                </div>
+
+                {/* Partial Payout Summary Badge */}
+                {isPartialVendorPayout && (
+                  <div className="p-2.5 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-900/40 text-[11px] flex items-center justify-between">
+                    <span className="text-amber-800 dark:text-amber-300 font-medium">
+                      Paying <strong className="font-mono font-bold text-amber-900 dark:text-amber-200">{effectiveVendorPaidAmount.toLocaleString()} ETB</strong> now
+                    </span>
+                    <span className="text-slate-500 dark:text-slate-400">
+                      Remaining <strong className="font-mono font-bold text-rose-600 dark:text-rose-400">{remainingVendorDebt.toLocaleString()} ETB</strong> recorded as vendor debt
+                    </span>
                   </div>
                 )}
-                {isVendorSplit && isAnyVendorSplitOverdrawn && (
-                  <div className="text-[11px] text-rose-600 dark:text-rose-400 flex items-center gap-1">
-                    <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
-                    <span>Insufficient balance in one or more split payout accounts</span>
-                  </div>
-                )}
-                {!isVendorSplit && selectedVendorAccount && selectedVendorAccount.default_fee_type && selectedVendorAccount.default_fee_type !== 'none' && Number(selectedVendorAccount.default_fee_amount) > 0 && vendorCostNum > 0 && (
-                  <div className="flex items-center justify-between text-[11px] px-2.5 py-1.5 rounded-lg bg-amber-50/90 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-900/40 text-amber-800 dark:text-amber-300">
-                    <span className="flex items-center gap-1">
-                      <span className="font-bold">Outgoing Fee ({Number(selectedVendorAccount.default_fee_amount)}{selectedVendorAccount.default_fee_type === 'percentage' ? '%' : ' ETB'}):</span>
-                      <span>+{vendorFee.toLocaleString()} ETB</span>
-                    </span>
-                    <span className="font-semibold text-slate-600 dark:text-slate-300">
-                      Total deducted: <span className="font-bold font-mono text-slate-900 dark:text-white">{totalVendorDeduction.toLocaleString()} ETB</span>
-                    </span>
-                  </div>
+
+                {effectiveVendorPaidAmount > 0 && (
+                  <>
+                    <SplitPaymentSelector
+                      accounts={accounts}
+                      targetAmount={effectiveVendorPaidAmount}
+                      singleAccountId={vendorAccountId}
+                      onSingleAccountChange={setVendorAccountId}
+                      isSplit={isVendorSplit}
+                      onIsSplitChange={setIsVendorSplit}
+                      splits={vendorPaymentSplits}
+                      onSplitsChange={setVendorPaymentSplits}
+                      direction="outflow"
+                      label="Vendor Payout Account *"
+                    />
+                    {!isVendorSplit && isVendorAccountOverdrawn && (
+                      <div className="text-[11px] text-rose-600 dark:text-rose-400 flex items-center gap-1">
+                        <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
+                        <span>Insufficient balance in selected payout account</span>
+                      </div>
+                    )}
+                    {isVendorSplit && isAnyVendorSplitOverdrawn && (
+                      <div className="text-[11px] text-rose-600 dark:text-rose-400 flex items-center gap-1">
+                        <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
+                        <span>Insufficient balance in one or more split payout accounts</span>
+                      </div>
+                    )}
+                    {!isVendorSplit && selectedVendorAccount && selectedVendorAccount.default_fee_type && selectedVendorAccount.default_fee_type !== 'none' && Number(selectedVendorAccount.default_fee_amount) > 0 && effectiveVendorPaidAmount > 0 && (
+                      <div className="flex items-center justify-between text-[11px] px-2.5 py-1.5 rounded-lg bg-amber-50/90 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-900/40 text-amber-800 dark:text-amber-300">
+                        <span className="flex items-center gap-1">
+                          <span className="font-bold">Outgoing Fee ({Number(selectedVendorAccount.default_fee_amount)}{selectedVendorAccount.default_fee_type === 'percentage' ? '%' : ' ETB'}):</span>
+                          <span>+{vendorFee.toLocaleString()} ETB</span>
+                        </span>
+                        <span className="font-semibold text-slate-600 dark:text-slate-300">
+                          Total deducted: <span className="font-bold font-mono text-slate-900 dark:text-white">{totalVendorDeduction.toLocaleString()} ETB</span>
+                        </span>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -2332,12 +2426,12 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
             </div>
 
             {/* Payment Method Selector & Shop Receiving Account */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            <div className="space-y-3 pt-1">
               <div>
                 <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
                   Payment Method
                 </label>
-                <div className="grid grid-cols-2 gap-1.5">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                   {[
                     { value: 'cash', label: 'Cash transfer', icon: Banknote },
                     { value: 'debt_offset', label: 'Debt offset', icon: ArrowLeftRight },
@@ -2370,7 +2464,7 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
                             setPaidAmount('0');
                           }
                         }}
-                        className={`h-9 px-2 rounded-xl border text-left flex items-center gap-1.5 text-xs font-semibold transition-all cursor-pointer ${
+                        className={`h-9 px-2.5 rounded-xl border text-left flex items-center gap-1.5 text-xs font-semibold transition-all cursor-pointer ${
                           isSelected
                             ? 'border-slate-800 bg-slate-900 dark:bg-slate-900 text-emerald-400 dark:text-emerald-400 font-bold shadow-xs ring-1 ring-emerald-500/20'
                             : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50'
@@ -2384,11 +2478,103 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
                 </div>
               </div>
 
-              {paidAmountNum > 0 && paymentMethod !== 'debt_offset' && !isCreditSale && !isWriteOff && (
+              {/* Bilateral Debt Offset Configuration */}
+              {isDebtOffset && (
+                <div className="p-3 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-200/60 dark:border-indigo-800/40 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-950 dark:text-indigo-200">
+                      <ArrowLeftRight className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                      <span>Debt Offset & Payment Split</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDebtOffsetAmount(formatCurrencyInput(String(sellingPriceNum)));
+                          setCashTransferAmount('0');
+                        }}
+                        className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all cursor-pointer ${
+                          debtOffsetNum >= sellingPriceNum - 0.01
+                            ? 'bg-slate-900 text-indigo-300 font-bold dark:bg-slate-900'
+                            : 'bg-white/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700'
+                        }`}
+                      >
+                        Full Offset (100%)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const half = Math.round(sellingPriceNum / 2);
+                          setDebtOffsetAmount(formatCurrencyInput(String(half)));
+                          setCashTransferAmount(formatCurrencyInput(String(sellingPriceNum - half)));
+                        }}
+                        className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all cursor-pointer ${
+                          Math.abs(debtOffsetNum - Math.round(sellingPriceNum / 2)) < 0.01 && debtOffsetNum < sellingPriceNum - 0.01
+                            ? 'bg-slate-900 text-indigo-300 font-bold dark:bg-slate-900'
+                            : 'bg-white/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700'
+                        }`}
+                      >
+                        Half (50% / 50%)
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] font-semibold text-indigo-900 dark:text-indigo-300 mb-1">
+                        Debt Offset Amount (ETB)
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        placeholder={sellingPriceNum > 0 ? sellingPriceNum.toLocaleString() : '0.00'}
+                        value={debtOffsetAmount}
+                        onChange={(e) => {
+                          const v = formatCurrencyInput(e.target.value);
+                          setDebtOffsetAmount(v);
+                          const offVal = parseFormattedNumber(v) || 0;
+                          const remCash = Math.max(0, sellingPriceNum - offVal);
+                          setCashTransferAmount(formatCurrencyInput(String(remCash)));
+                        }}
+                        className="w-full h-8 px-2.5 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-white dark:bg-slate-900 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-indigo-900 dark:text-indigo-300 mb-1">
+                        Cash / Transfer Amount (ETB)
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="0.00"
+                        value={cashTransferAmount}
+                        onChange={(e) => {
+                          setCashTransferAmount(formatCurrencyInput(e.target.value));
+                        }}
+                        className="w-full h-8 px-2.5 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-white dark:bg-slate-900 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {effectiveCustomerCashInflow <= 0 ? (
+                    <div className="text-[11px] text-indigo-700 dark:text-indigo-300">
+                      Sale proceeds will deduct from the customer's open payable debt. Zero bank cash movement.
+                    </div>
+                  ) : (
+                    <div className="text-[11px] text-indigo-700 dark:text-indigo-300 flex items-center justify-between">
+                      <span>Offset: <strong className="font-mono">{debtOffsetNum.toLocaleString()} ETB</strong></span>
+                      <span>Bank/Cash deposit: <strong className="font-mono text-emerald-600 dark:text-emerald-400">{effectiveCustomerCashInflow.toLocaleString()} ETB</strong></span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Shop Deposit Account (Universal for all payment inflows) */}
+              {effectiveCustomerCashInflow > 0 && (
                 <div className="space-y-1.5 pt-1">
                   <SplitPaymentSelector
                     accounts={accounts}
-                    targetAmount={paidAmountNum}
+                    targetAmount={effectiveCustomerCashInflow}
                     singleAccountId={customerAccountId}
                     onSingleAccountChange={setCustomerAccountId}
                     isSplit={isCustomerSplit}

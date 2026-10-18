@@ -157,6 +157,20 @@ class RecordSaleAction
                 $exchangeAllowance = (float) $exchangeData['trade_in_value'];
             }
 
+            $isDebtOffset = ($data['payment_method'] ?? '') === 'debt_offset';
+            $debtOffsetAmount = isset($data['debt_offset_amount'])
+                ? (float) $data['debt_offset_amount']
+                : ($isDebtOffset ? (isset($data['cash_amount']) ? max(0.0, $paidAmount - (float) $data['cash_amount']) : $paidAmount) : 0.0);
+            $bankCashReceived = isset($data['cash_amount'])
+                ? (float) $data['cash_amount']
+                : ($isDebtOffset ? max(0.0, $paidAmount - $debtOffsetAmount) : $paidAmount);
+
+            // Total paid satisfies order = debt offset + bank cash
+            $effectivePaid = $isDebtOffset ? ($debtOffsetAmount + $bankCashReceived) : $paidAmount;
+            if ($effectivePaid > 0 && $paidAmount <= 0) {
+                $paidAmount = $effectivePaid;
+            }
+
             // Net payable is order total minus discount minus trade-in exchange allowance
             $netPayable = max(0, $totalAmount - $discount - $exchangeAllowance);
             $creditSale = (bool) ($data['credit_sale'] ?? (($data['payment_method'] ?? null) === 'credit'));
@@ -200,11 +214,11 @@ class RecordSaleAction
                     ];
                 }, $rawSplits);
 
-                if ($paidAmount > 0 && ($data['payment_method'] ?? '') !== 'debt_offset') {
+                if ($bankCashReceived > 0) {
                     $splitSum = (float) collect($enrichedSplits)->sum(fn ($s) => (float) ($s['amount'] ?? 0));
-                    if (abs($splitSum - $paidAmount) > 0.01) {
+                    if (abs($splitSum - $bankCashReceived) > 0.01) {
                         throw ValidationException::withMessages([
-                            'payment_splits' => ['Split allocation total ('.number_format($splitSum, 2).' ETB) does not match customer paid amount ('.number_format($paidAmount, 2).' ETB).'],
+                            'payment_splits' => ['Split allocation total ('.number_format($splitSum, 2).' ETB) does not match customer bank cash amount ('.number_format($bankCashReceived, 2).' ETB).'],
                         ]);
                     }
                 }
@@ -331,28 +345,38 @@ class RecordSaleAction
                     }
 
                     $payableAmount = $vendorCost * $qty;
-                    $isPaidNow = ! empty($itemData['vendor_paid_now']);
+                    $vendorPaidNow = ! empty($itemData['vendor_paid_now']);
+                    $vendorPaidAmount = isset($itemData['vendor_paid_amount'])
+                        ? (float) $itemData['vendor_paid_amount']
+                        : ($vendorPaidNow ? $payableAmount : 0.0);
+
+                    $paidNow = min($payableAmount, max(0.0, $vendorPaidAmount));
+                    $remOwed = max(0.0, $payableAmount - $paidNow);
+                    $debtStatus = $remOwed <= 0.009 ? 'settled' : ($paidNow > 0.009 ? 'partially_paid' : 'open');
                     $vendorAccountId = $itemData['vendor_payment_account_id'] ?? null;
+                    $vendorSplits = $itemData['vendor_payment_splits'] ?? null;
+                    $hasSplits = is_array($vendorSplits) && count($vendorSplits) > 0;
 
-                    if ($isPaidNow) {
-                        $vendorSplits = $itemData['vendor_payment_splits'] ?? null;
-                        $hasSplits = is_array($vendorSplits) && count($vendorSplits) > 0;
+                    $brokeredDebt = Debt::create([
+                        'tenant_id' => $tenantId,
+                        'contact_id' => $vendorContactId,
+                        'type' => 'payable',
+                        'reference_type' => 'brokered_sourcing',
+                        'reference_id' => $order->id,
+                        'original_amount' => $payableAmount,
+                        'paid_amount' => $paidNow,
+                        'remaining_amount' => $remOwed,
+                        'due_date' => $remOwed > 0 ? now()->addDays(7) : now(),
+                        'status' => $debtStatus,
+                        'payment_splits' => $hasSplits ? $vendorSplits : null,
+                        'notes' => $remOwed <= 0.009
+                            ? "Brokered sourcing for Order #{$order->order_number} (Paid on spot)"
+                            : ($paidNow > 0.009
+                                ? "Brokered sourcing for Order #{$order->order_number} (Partial down payment: ".number_format($paidNow, 2)." ETB, Remaining: ".number_format($remOwed, 2)." ETB)"
+                                : "Brokered sourcing for Order #{$order->order_number}"),
+                    ]);
 
-                        $brokeredDebt = Debt::create([
-                            'tenant_id' => $tenantId,
-                            'contact_id' => $vendorContactId,
-                            'type' => 'payable',
-                            'reference_type' => 'brokered_sourcing',
-                            'reference_id' => $order->id,
-                            'original_amount' => $payableAmount,
-                            'paid_amount' => $payableAmount,
-                            'remaining_amount' => 0.0,
-                            'due_date' => now(),
-                            'status' => 'settled',
-                            'payment_splits' => $hasSplits ? $vendorSplits : null,
-                            'notes' => "Brokered sourcing for Order #{$order->order_number} (Paid on spot)",
-                        ]);
-
+                    if ($paidNow > 0) {
                         if ($hasSplits) {
                             $splitGroupId = count($vendorSplits) > 1 ? (string) Str::uuid() : null;
                             foreach ($vendorSplits as $vSplit) {
@@ -381,28 +405,15 @@ class RecordSaleAction
                                 'tenant_id' => $tenantId,
                                 'debt_id' => $brokeredDebt->id,
                                 'financial_account_id' => $vendorAccountId,
-                                'amount' => $payableAmount,
+                                'amount' => $paidNow,
                                 'payment_date' => now(),
                                 'notes' => 'Settled immediately at POS sale',
                                 'created_by' => $data['salesperson_id'] ?? auth()->id(),
                             ]);
                         }
-                    } else {
-                        // Automatically create an outstanding payable to the peer vendor
-                        $brokeredDebt = Debt::create([
-                            'tenant_id' => $tenantId,
-                            'contact_id' => $vendorContactId,
-                            'type' => 'payable',
-                            'reference_type' => 'brokered_sourcing',
-                            'reference_id' => $order->id,
-                            'original_amount' => $payableAmount,
-                            'paid_amount' => 0.0,
-                            'remaining_amount' => $payableAmount,
-                            'due_date' => now()->addDays(7),
-                            'status' => 'open',
-                            'notes' => "Brokered sourcing for Order #{$order->order_number}",
-                        ]);
+                    }
 
+                    if ($remOwed > 0) {
                         Debt::applyOpenAdvancesToPayable($brokeredDebt);
                     }
                 } else {
@@ -622,8 +633,8 @@ class RecordSaleAction
             }
 
             // Debt offset settlement against customer/vendor's open payable debt
-            if (($data['payment_method'] ?? '') === 'debt_offset' && ! empty($customerId) && $paidAmount > 0) {
-                $remOffset = $paidAmount;
+            if ($debtOffsetAmount > 0 && ! empty($customerId)) {
+                $remOffset = $debtOffsetAmount;
                 $openPayables = Debt::where('tenant_id', $tenantId)
                     ->where('contact_id', $customerId)
                     ->where('type', 'payable')
@@ -656,15 +667,15 @@ class RecordSaleAction
                 }
             }
 
-            // Credit financial account(s) if initial payment was made
-            if ($paidAmount > 0 && ($data['payment_method'] ?? '') !== 'debt_offset') {
+            // Credit financial account(s) if bank cash was received
+            if ($bankCashReceived > 0) {
                 if ($enrichedSplits) {
                     $splits = $enrichedSplits;
                 } elseif (! empty($primaryAccountId)) {
                     $splits = [
                         [
                             'financial_account_id' => $primaryAccountId,
-                            'amount' => $paidAmount,
+                            'amount' => $bankCashReceived,
                         ],
                     ];
                 } else {
