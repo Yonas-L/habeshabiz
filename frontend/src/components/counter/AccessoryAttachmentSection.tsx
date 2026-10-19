@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import type { Product, Contact, FinancialAccount, User } from '../../api/client';
 import { Plus, X, Package, Truck, Sparkles } from 'lucide-react';
 import { formatCurrencyInput, parseFormattedNumber } from '../../utils/numberUtils';
+import { SplitPaymentSelector, type PaymentSplitItem } from '../common/SplitPaymentSelector';
 
 export interface AttachedAccessoryItem {
   id: string; // client temporary uuid
@@ -17,6 +18,8 @@ export interface AttachedAccessoryItem {
   vendor_payment_method: 'owed' | 'paid_now';
   vendor_paid_amount?: number;
   vendor_payment_account_id?: string;
+  vendor_is_split?: boolean;
+  vendor_payment_splits?: PaymentSplitItem[];
   // Financials:
   cost: number;
   price: number;
@@ -351,30 +354,30 @@ export const AccessoryAttachmentSection: React.FC<AccessoryAttachmentSectionProp
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-slate-200/50 dark:border-slate-800/50">
-                      <div>
-                        <label className="block text-[10px] font-medium text-slate-500 mb-0.5">
-                          Vendor Cost (ETB)
-                        </label>
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          value={acc.cost > 0 ? formatCurrencyInput(acc.cost) : ''}
-                          onChange={(e) =>
-                            handleUpdate(acc.id, {
-                              cost: parseFormattedNumber(e.target.value) ?? 0,
-                            })
-                          }
-                          placeholder="0"
-                          className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-2.5 py-1 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                        />
-                      </div>
+                    <div className="pt-1.5 border-t border-slate-200/50 dark:border-slate-800/50 space-y-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[10px] font-medium text-slate-500 mb-0.5">
+                            Vendor Cost (ETB)
+                          </label>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={acc.cost > 0 ? formatCurrencyInput(acc.cost) : ''}
+                            onChange={(e) =>
+                              handleUpdate(acc.id, {
+                                cost: parseFormattedNumber(e.target.value) ?? 0,
+                              })
+                            }
+                            placeholder="0"
+                            className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-2.5 py-1 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          />
+                        </div>
 
-                      <div>
-                        <label className="block text-[10px] font-medium text-slate-500 mb-0.5">
-                          Vendor Payout
-                        </label>
-                        <div className="flex gap-1.5 items-center">
+                        <div>
+                          <label className="block text-[10px] font-medium text-slate-500 mb-0.5">
+                            Vendor Settlement Terms
+                          </label>
                           <select
                             value={acc.vendor_payment_method}
                             onChange={(e) =>
@@ -382,32 +385,30 @@ export const AccessoryAttachmentSection: React.FC<AccessoryAttachmentSectionProp
                                 vendor_payment_method: e.target.value as 'owed' | 'paid_now',
                               })
                             }
-                            className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-2 py-1 text-xs text-slate-900 dark:text-white focus:outline-none"
+                            className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-2.5 py-1 text-xs text-slate-900 dark:text-white focus:outline-none"
                           >
                             <option value="owed">Pay Later (Owed)</option>
-                            <option value="paid_now">Pay Now</option>
+                            <option value="paid_now">Pay Now (Deduct from Accounts)</option>
                           </select>
-
-                          {acc.vendor_payment_method === 'paid_now' && (
-                            <select
-                              value={acc.vendor_payment_account_id || ''}
-                              onChange={(e) =>
-                                handleUpdate(acc.id, {
-                                  vendor_payment_account_id: e.target.value,
-                                })
-                              }
-                              className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-2 py-1 text-xs text-slate-900 dark:text-white focus:outline-none"
-                            >
-                              <option value="">Select Account</option>
-                              {accounts.map((accItem) => (
-                                <option key={accItem.id} value={accItem.id}>
-                                  {accItem.name} ({Number(accItem.current_balance || 0).toLocaleString()} ETB)
-                                </option>
-                              ))}
-                            </select>
-                          )}
                         </div>
                       </div>
+
+                      {acc.vendor_payment_method === 'paid_now' && (
+                        <div className="pt-1">
+                          <SplitPaymentSelector
+                            accounts={accounts}
+                            targetAmount={Number(acc.cost || 0) * (acc.quantity || 1)}
+                            singleAccountId={acc.vendor_payment_account_id || ''}
+                            onSingleAccountChange={(accId) => handleUpdate(acc.id, { vendor_payment_account_id: accId })}
+                            isSplit={!!acc.vendor_is_split}
+                            onIsSplitChange={(isSplit) => handleUpdate(acc.id, { vendor_is_split: isSplit })}
+                            splits={acc.vendor_payment_splits || []}
+                            onSplitsChange={(splits) => handleUpdate(acc.id, { vendor_payment_splits: splits })}
+                            label="Deduct Vendor Payout From"
+                            direction="outflow"
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

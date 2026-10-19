@@ -953,20 +953,37 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
         customer_phone: customerMode === 'new' && customerPhone.trim() ? customerPhone.trim() : undefined,
         notes: notes.trim() || undefined,
         accessories: attachedAccessories.length > 0
-          ? attachedAccessories.map((a) => ({
-              variant_id: a.variant_id || undefined,
-              inventory_unit_id: a.inventory_unit_id || undefined,
-              is_accessory: true,
-              accessory_name: a.name || undefined,
-              quantity: a.quantity || 1,
-              unit_price: Number(a.price) || 0,
-              sourcing_type: a.source === 'vendor' ? ('brokered_neighbour' as const) : ('internal_stock' as const),
-              vendor_contact_id: a.source === 'vendor' ? (a.vendor_contact_id || undefined) : undefined,
-              vendor_cost: a.source === 'vendor' ? (Number(a.cost) || 0) : undefined,
-              vendor_paid_now: a.source === 'vendor' && a.vendor_payment_method === 'paid_now',
-              vendor_paid_amount: a.source === 'vendor' && a.vendor_payment_method === 'paid_now' ? (Number(a.cost) || 0) : undefined,
-              vendor_payment_account_id: a.source === 'vendor' && a.vendor_payment_method === 'paid_now' ? (a.vendor_payment_account_id || undefined) : undefined,
-            }))
+          ? attachedAccessories.map((a) => {
+              const isVendor = a.source === 'vendor';
+              const vendorPaidNow = isVendor && a.vendor_payment_method === 'paid_now';
+              const isSplit = vendorPaidNow && !!a.vendor_is_split && (a.vendor_payment_splits?.length ?? 0) > 0;
+              const validSplits = isSplit
+                ? a.vendor_payment_splits!.map((s) => ({
+                    financial_account_id: s.financial_account_id,
+                    amount: Number(s.amount) || 0,
+                  }))
+                : undefined;
+
+              return {
+                variant_id: a.variant_id || undefined,
+                inventory_unit_id: a.inventory_unit_id || undefined,
+                is_accessory: true,
+                accessory_name: a.name || undefined,
+                quantity: a.quantity || 1,
+                unit_price: Number(a.price) || 0,
+                sourcing_type: isVendor ? ('brokered_neighbour' as const) : ('internal_stock' as const),
+                vendor_contact_id: isVendor ? (a.vendor_contact_id || undefined) : undefined,
+                vendor_cost: isVendor ? (Number(a.cost) || 0) : undefined,
+                vendor_paid_now: vendorPaidNow,
+                vendor_paid_amount: vendorPaidNow ? (Number(a.cost) || 0) * (a.quantity || 1) : undefined,
+                vendor_payment_account_id: vendorPaidNow
+                  ? isSplit
+                    ? validSplits![0]?.financial_account_id || undefined
+                    : a.vendor_payment_account_id || undefined
+                  : undefined,
+                vendor_payment_splits: validSplits,
+              };
+            })
           : undefined,
       };
 

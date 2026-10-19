@@ -197,6 +197,9 @@ class SaleController extends Controller
             'items.*.vendor_paid_amount' => ['nullable', 'numeric', 'min:0'],
             'items.*.vendor_payment_account_id' => ['nullable', 'exists:financial_accounts,id'],
             'items.*.vendor_payment_splits' => ['nullable', 'array'],
+            'items.*.vendor_payment_splits.*.financial_account_id' => ['required_with:items.*.vendor_payment_splits', 'exists:financial_accounts,id'],
+            'items.*.vendor_payment_splits.*.amount' => ['required_with:items.*.vendor_payment_splits', 'numeric', 'min:0.01'],
+            'items.*.vendor_payment_splits.*.reference_number' => ['nullable', 'string', 'max:100'],
 
             // Optional exchange/trade-in device
             'exchange' => ['nullable', 'array'],
@@ -458,6 +461,9 @@ class SaleController extends Controller
             'accessories.*.vendor_paid_amount' => ['nullable', 'numeric', 'min:0'],
             'accessories.*.vendor_payment_account_id' => ['nullable', 'exists:financial_accounts,id'],
             'accessories.*.vendor_payment_splits' => ['nullable', 'array'],
+            'accessories.*.vendor_payment_splits.*.financial_account_id' => ['required_with:accessories.*.vendor_payment_splits', 'exists:financial_accounts,id'],
+            'accessories.*.vendor_payment_splits.*.amount' => ['required_with:accessories.*.vendor_payment_splits', 'numeric', 'min:0.01'],
+            'accessories.*.vendor_payment_splits.*.reference_number' => ['nullable', 'string', 'max:100'],
         ]);
 
         /** @var User $user */
@@ -569,6 +575,49 @@ class SaleController extends Controller
                     'total' => $vTotal,
                     'reference_number' => null,
                 ];
+            }
+        }
+
+        if (! empty($validated['accessories'])) {
+            foreach ($validated['accessories'] as $accIdx => $acc) {
+                $accPaidNow = ! empty($acc['vendor_paid_now']);
+                $accSourcing = $acc['sourcing_type'] ?? 'internal_stock';
+                if ($accSourcing === 'brokered_neighbour' && $accPaidNow) {
+                    $accVendorCost = (float) ($acc['vendor_cost'] ?? 0);
+                    $accQty = (int) ($acc['quantity'] ?? 1);
+                    $accTotalCost = $accVendorCost * $accQty;
+                    $accPaidAmt = isset($acc['vendor_paid_amount']) ? (float) $acc['vendor_paid_amount'] : $accTotalCost;
+
+                    if ($accPaidAmt > 0) {
+                        $accSplits = $acc['vendor_payment_splits'] ?? null;
+                        if (is_array($accSplits) && count($accSplits) > 0) {
+                            $accSplitSum = (float) collect($accSplits)->sum(fn ($s) => (float) ($s['amount'] ?? 0));
+                            if (abs($accSplitSum - $accPaidAmt) > 0.01) {
+                                throw ValidationException::withMessages([
+                                    "accessories.{$accIdx}.vendor_payment_splits" => ['Accessory payout split total does not match payout amount.'],
+                                ]);
+                            }
+                            foreach ($accSplits as $s) {
+                                $vAcc = FinancialAccount::where('tenant_id', $tenantId)->findOrFail($s['financial_account_id']);
+                                $vAmt = (float) $s['amount'];
+                                $vFee = $vAcc->calculateOutgoingFee($vAmt);
+                                if ((float) $vAcc->current_balance < ($vAmt + $vFee)) {
+                                    throw ValidationException::withMessages([
+                                        "accessories.{$accIdx}.vendor_payment_splits" => ["Insufficient balance in account '{$vAcc->name}' for accessory payout."],
+                                    ]);
+                                }
+                            }
+                        } elseif (! empty($acc['vendor_payment_account_id'])) {
+                            $vAcc = FinancialAccount::where('tenant_id', $tenantId)->findOrFail($acc['vendor_payment_account_id']);
+                            $vFee = $vAcc->calculateOutgoingFee($accPaidAmt);
+                            if ((float) $vAcc->current_balance < ($accPaidAmt + $vFee)) {
+                                throw ValidationException::withMessages([
+                                    "accessories.{$accIdx}.vendor_payment_account_id" => ["Insufficient balance in account '{$vAcc->name}' for accessory payout."],
+                                ]);
+                            }
+                        }
+                    }
+                }
             }
         }
 

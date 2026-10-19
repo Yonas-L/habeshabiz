@@ -191,3 +191,63 @@ it('records a vendor direct sale with an on-the-fly brokered accessory and paid 
     // Initial 20,000 - 400 (acc payout) + 125,500 (customer payment) = 145,100
     expect((float) $this->account->fresh()->current_balance)->toEqual(145100.00);
 });
+
+it('records a sale with vendored accessory paid now via split accounts and displays correctly on partner statement', function (): void {
+    $secondAccount = FinancialAccount::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Cash in Safe',
+        'type' => 'cash',
+        'currency' => 'ETB',
+        'current_balance' => 10000,
+        'is_active' => true,
+    ]);
+
+    $payload = [
+        'product_name' => 'iPhone 16 Pro',
+        'storage' => '128GB',
+        'color' => 'Desert Titanium',
+        'vendor_contact_id' => $this->vendor->id,
+        'vendor_cost' => 100000,
+        'vendor_payment_method' => 'owed',
+        'selling_price' => 110000,
+        'paid_amount' => 110000,
+        'payment_method' => 'cash',
+        'financial_account_id' => $this->account->id,
+        'accessories' => [
+            [
+                'is_accessory' => true,
+                'accessory_name' => 'MagSafe 25W Charger',
+                'quantity' => 1,
+                'unit_price' => 0, // Free gift
+                'sourcing_type' => 'brokered_neighbour',
+                'vendor_contact_id' => $this->vendor->id,
+                'vendor_cost' => 3000,
+                'vendor_paid_now' => true,
+                'vendor_paid_amount' => 3000,
+                'vendor_payment_splits' => [
+                    ['financial_account_id' => $this->account->id, 'amount' => 1000],
+                    ['financial_account_id' => $secondAccount->id, 'amount' => 2000],
+                ],
+            ],
+        ],
+    ];
+
+    $res = $this->actingAs($this->owner)
+        ->postJson('/api/v1/sales/vendor-direct', $payload)
+        ->assertCreated();
+
+    // CBE balance: 20,000 - 1,000 (split 1) + 110,000 (customer sale) = 129,000
+    expect((float) $this->account->fresh()->current_balance)->toEqual(129000.00);
+    // Cash in Safe balance: 10,000 - 2,000 (split 2) = 8,000
+    expect((float) $secondAccount->fresh()->current_balance)->toEqual(8000.00);
+
+    // Verify partner statement
+    $statementAction = app(\App\Actions\GeneratePartnerStatementAction::class);
+    $statement = $statementAction->execute($this->vendor);
+
+    $ledger = collect($statement['ledger']);
+    $accRow = $ledger->first(fn ($r) => str_contains($r['context'], 'MagSafe 25W Charger'));
+
+    expect($accRow)->not->toBeNull()
+        ->and($accRow['context'])->toContain('Vendored Accessory: MagSafe 25W Charger');
+});

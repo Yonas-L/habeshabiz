@@ -605,26 +605,37 @@
                 <tr>
                     <td class="col-index">{{ $idx + 1 }}</td>
                     <td>
-                        <div>
-                            <span class="item-name">{{ $variant?->product?->name ?? $item->variant?->product?->name ?? 'Hardware Device' }}</span>
-                            @if($specStr)
+                        @php
+                            $isAccessory = !empty($item->is_accessory) || !empty($item->accessory_name);
+                            $isVendoredAcc = $isAccessory && ($item->sourcing_type === 'brokered_neighbour' || !empty($item->vendor_contact_id));
+                            $itemName = $item->accessory_name ?? ($isVendoredAcc ? 'Vendored Accessory' : ($isAccessory ? 'Accessory' : ($variant?->product?->name ?? $item->variant?->product?->name ?? 'Hardware Device')));
+                        @endphp
+                        <div style="display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
+                            <span class="item-name">{{ $itemName }}</span>
+                            @if($isAccessory)
+                                <span style="display: inline-block; font-size: 7.5pt; font-weight: 700; text-transform: uppercase; padding: 1px 5px; border-radius: 4px; background-color: {{ $isVendoredAcc ? '#fef3c7' : '#e0e7ff' }}; color: {{ $isVendoredAcc ? '#92400e' : '#3730a3' }};">
+                                    {{ $isVendoredAcc ? 'Vendored Accessory' : 'Accessory' }}
+                                </span>
+                            @elseif($specStr)
                                 <span class="item-spec">({{ $specStr }})</span>
                             @endif
                         </div>
-                        <div class="item-hardware-tags">
-                            @if(!empty($unit?->imei_or_serial))
-                                <span class="sn-badge">SN: {{ $unit->imei_or_serial }}</span>
-                            @endif
-                            @if(!is_null($unit?->battery_health))
-                                <span>· {{ $unit->battery_health }}% Batt</span>
-                            @endif
-                            @if(!empty($unit?->sim_type))
-                                <span>· {{ ucfirst(str_replace('_', ' ', $unit->sim_type)) }}</span>
-                            @endif
-                            @if(!empty($unit?->condition))
-                                <span>· {{ ucfirst(str_replace('_', ' ', $unit->condition)) }}</span>
-                            @endif
-                        </div>
+                        @if(!$isAccessory)
+                            <div class="item-hardware-tags">
+                                @if(!empty($unit?->imei_or_serial))
+                                    <span class="sn-badge">SN: {{ $unit->imei_or_serial }}</span>
+                                @endif
+                                @if(!is_null($unit?->battery_health))
+                                    <span>· {{ $unit->battery_health }}% Batt</span>
+                                @endif
+                                @if(!empty($unit?->sim_type))
+                                    <span>· {{ ucfirst(str_replace('_', ' ', $unit->sim_type)) }}</span>
+                                @endif
+                                @if(!empty($unit?->condition))
+                                    <span>· {{ ucfirst(str_replace('_', ' ', $unit->condition)) }}</span>
+                                @endif
+                            </div>
+                        @endif
                     </td>
                     <td class="col-qty">{{ $item->quantity }}</td>
                     <td class="col-price">{{ number_format($lineUnitPrice, 2) }}</td>

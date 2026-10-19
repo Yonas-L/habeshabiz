@@ -298,12 +298,17 @@ export const SalesOrderDrawer: React.FC<SalesOrderDrawerProps> = ({
         const imeiText = unit?.imei_or_serial ? `\n   SN: ${unit.imei_or_serial}` : '';
         const batteryText = unit?.battery_health ? ` · ${unit.battery_health}% Batt` : '';
         const cycleText = unit?.cycle_count !== null && unit?.cycle_count !== undefined ? ` · ${unit.cycle_count} cycles` : '';
+        const isAccessory = item.is_accessory || Boolean(item.accessory_name);
+        const isVendoredAcc = isAccessory && (item.sourcing_type === 'brokered_neighbour' || Boolean(item.vendor_contact_id));
+        const itemName = item.accessory_name || (isVendoredAcc ? 'Vendored Accessory' : isAccessory ? 'Accessory' : (variant?.product?.name || item.variant?.product?.name || 'Device'));
+        const tagPrefix = isVendoredAcc ? ' [Vendored Accessory]' : isAccessory ? ' [Accessory]' : '';
         const spec = [variant?.storage, variant?.color].filter(Boolean).join(' · ');
-        const specText = spec ? ` - ${spec}` : '';
+        const specText = spec && !isAccessory ? ` - ${spec}` : '';
         const receiptUnitPrice = order.items.length === 1
           ? settledSaleValue / Math.max(1, Number(item.quantity || 1))
           : Number(item.unit_price);
-        return `${index + 1}. ${item.quantity}x ${variant?.product?.name || item.variant?.product?.name || 'Device'}${specText}${tagText}${imeiText}${batteryText}${cycleText}\n   ${receiptUnitPrice.toLocaleString()} ETB`;
+        const hardwareSpecs = !isAccessory ? `${tagText}${imeiText}${batteryText}${cycleText}` : '';
+        return `${index + 1}. ${item.quantity}x ${itemName}${tagPrefix}${specText}${hardwareSpecs}\n   ${receiptUnitPrice.toLocaleString()} ETB`;
       })
       .join('\n\n');
 
@@ -756,8 +761,10 @@ Thank you for choosing Habeshabiz Electronics!
                   {order.items.map((item, idx) => {
                     const unit = item.inventory_unit;
                     const variant = unit?.variant || item.variant;
+                    const isAccessory = item.is_accessory || Boolean(item.accessory_name);
+                    const isVendoredAcc = isAccessory && (item.sourcing_type === 'brokered_neighbour' || Boolean(item.vendor_contact_id));
                     const specString = [variant?.storage, variant?.color].filter(Boolean).join(' · ');
-                    const pName = variant?.product?.name || item.variant?.product?.name || 'Device';
+                    const pName = item.accessory_name || (isVendoredAcc ? 'Vendored Accessory' : isAccessory ? 'Accessory' : (variant?.product?.name || item.variant?.product?.name || 'Device'));
                     const conditionStr = formatCondition(unit?.condition);
                     const simStr = formatSimType(unit?.sim_type);
                     const lineUnitPrice =
@@ -772,29 +779,40 @@ Thank you for choosing Habeshabiz Electronics!
                         <td className="py-2.5 px-2 space-y-1">
                           <div className="font-bold text-slate-900 dark:text-white text-xs flex items-center flex-wrap gap-1.5">
                             <span>{pName}</span>
-                            {specString && <span className="font-normal text-slate-400">({specString})</span>}
+                            {specString && !isAccessory && <span className="font-normal text-slate-400">({specString})</span>}
+                            {isAccessory && (
+                              <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
+                                isVendoredAcc
+                                  ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50 dark:border-amber-800/50'
+                                  : 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border border-indigo-200/50 dark:border-indigo-800/50'
+                              }`}>
+                                {isVendoredAcc ? 'Vendored Accessory' : 'Accessory'}
+                              </span>
+                            )}
                           </div>
 
-                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-slate-400 font-mono">
-                            {unit?.imei_or_serial && (
-                              <button
-                                type="button"
-                                onClick={() => handleCopyImei(unit.imei_or_serial!)}
-                                className="inline-flex items-center gap-1 hover:text-slate-800 dark:hover:text-slate-100 transition-colors text-emerald-600 dark:text-emerald-400 font-bold"
-                              >
-                                <span>SN: {unit.imei_or_serial}</span>
-                                {copiedImei === unit.imei_or_serial ? (
-                                  <Check className="w-2.5 h-2.5 text-emerald-600" />
-                                ) : (
-                                  <Copy className="w-2.5 h-2.5 opacity-60" />
-                                )}
-                              </button>
-                            )}
-                            {unit?.battery_health != null && <span>· {unit.battery_health}% Batt</span>}
-                            {unit?.cycle_count != null && <span>· {unit.cycle_count} cycles</span>}
-                            {simStr && <span>· {simStr}</span>}
-                            {conditionStr && <span>· {conditionStr}</span>}
-                          </div>
+                          {!isAccessory && (
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-slate-400 font-mono">
+                              {unit?.imei_or_serial && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyImei(unit.imei_or_serial!)}
+                                  className="inline-flex items-center gap-1 hover:text-slate-800 dark:hover:text-slate-100 transition-colors text-emerald-600 dark:text-emerald-400 font-bold"
+                                >
+                                  <span>SN: {unit.imei_or_serial}</span>
+                                  {copiedImei === unit.imei_or_serial ? (
+                                    <Check className="w-2.5 h-2.5 text-emerald-600" />
+                                  ) : (
+                                    <Copy className="w-2.5 h-2.5 opacity-60" />
+                                  )}
+                                </button>
+                              )}
+                              {unit?.battery_health != null && <span>· {unit.battery_health}% Batt</span>}
+                              {unit?.cycle_count != null && <span>· {unit.cycle_count} cycles</span>}
+                              {simStr && <span>· {simStr}</span>}
+                              {conditionStr && <span>· {conditionStr}</span>}
+                            </div>
+                          )}
 
                           {/* Swapped Defect History */}
                           {Boolean(unit?.swapped_from_unit || unit?.swapped_from_unit_id) && (
@@ -840,8 +858,10 @@ Thank you for choosing Habeshabiz Electronics!
               {order.items.map((item, idx) => {
                 const unit = item.inventory_unit;
                 const variant = unit?.variant || item.variant;
+                const isAccessory = item.is_accessory || Boolean(item.accessory_name);
+                const isVendoredAcc = isAccessory && (item.sourcing_type === 'brokered_neighbour' || Boolean(item.vendor_contact_id));
                 const specString = [variant?.storage, variant?.color].filter(Boolean).join(' · ');
-                const pName = variant?.product?.name || item.variant?.product?.name || 'Device';
+                const pName = item.accessory_name || (isVendoredAcc ? 'Vendored Accessory' : isAccessory ? 'Accessory' : (variant?.product?.name || item.variant?.product?.name || 'Device'));
                 const conditionStr = formatCondition(unit?.condition);
                 const lineUnitPrice =
                   order.items.length === 1
@@ -856,10 +876,19 @@ Thank you for choosing Habeshabiz Electronics!
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <div className="font-bold text-slate-900 dark:text-white text-xs">
-                          {pName}
+                        <div className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5 flex-wrap">
+                          <span>{pName}</span>
+                          {isAccessory && (
+                            <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
+                              isVendoredAcc
+                                ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50 dark:border-amber-800/50'
+                                : 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border border-indigo-200/50 dark:border-indigo-800/50'
+                            }`}>
+                              {isVendoredAcc ? 'Vendored Accessory' : 'Accessory'}
+                            </span>
+                          )}
                         </div>
-                        {specString && (
+                        {specString && !isAccessory && (
                           <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
                             {specString}
                           </div>
@@ -876,33 +905,35 @@ Thank you for choosing Habeshabiz Electronics!
                     </div>
 
                     {/* Hardware info row with 1-tap IMEI copy */}
-                    <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-200/50 dark:border-slate-800/60 text-[10px] font-mono">
-                      {unit?.imei_or_serial && (
-                        <button
-                          type="button"
-                          onClick={() => handleCopyImei(unit.imei_or_serial!)}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-emerald-600 dark:text-emerald-400 font-bold active:scale-95"
-                        >
-                          <span>SN: {unit.imei_or_serial}</span>
-                          {copiedImei === unit.imei_or_serial ? <Check className="w-2.5 h-2.5 text-emerald-600" /> : <Copy className="w-2.5 h-2.5 opacity-60" />}
-                        </button>
-                      )}
-                      {unit?.battery_health != null && (
-                        <span className="px-1.5 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300">
-                          {unit.battery_health}% Batt
-                        </span>
-                      )}
-                      {unit?.cycle_count != null && (
-                        <span className="px-1.5 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300">
-                          {unit.cycle_count} cycles
-                        </span>
-                      )}
-                      {conditionStr && (
-                        <span className="px-1.5 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400">
-                          {conditionStr}
-                        </span>
-                      )}
-                    </div>
+                    {!isAccessory && (
+                      <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-200/50 dark:border-slate-800/60 text-[10px] font-mono">
+                        {unit?.imei_or_serial && (
+                          <button
+                            type="button"
+                            onClick={() => handleCopyImei(unit.imei_or_serial!)}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-emerald-600 dark:text-emerald-400 font-bold active:scale-95"
+                          >
+                            <span>SN: {unit.imei_or_serial}</span>
+                            {copiedImei === unit.imei_or_serial ? <Check className="w-2.5 h-2.5 text-emerald-600" /> : <Copy className="w-2.5 h-2.5 opacity-60" />}
+                          </button>
+                        )}
+                        {unit?.battery_health != null && (
+                          <span className="px-1.5 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300">
+                            {unit.battery_health}% Batt
+                          </span>
+                        )}
+                        {unit?.cycle_count != null && (
+                          <span className="px-1.5 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300">
+                            {unit.cycle_count} cycles
+                          </span>
+                        )}
+                        {conditionStr && (
+                          <span className="px-1.5 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400">
+                            {conditionStr}
+                          </span>
+                        )}
+                      </div>
+                    )}
 
                     {/* Swapped Warranty History */}
                     {Boolean(unit?.swapped_from_unit || unit?.swapped_from_unit_id) && (
@@ -1045,20 +1076,38 @@ Thank you for choosing Habeshabiz Electronics!
                 <div className="px-4 pb-4 border-t border-slate-200/60 dark:border-slate-800/60 space-y-2 pt-3 animate-collapse-open">
                   {order.items.map((item, idx) => {
                     const isBrokered = item.sourcing_type === 'brokered_neighbour';
+                    const isAccessory = item.is_accessory || Boolean(item.accessory_name);
+                    const isVendoredAcc = isAccessory && (isBrokered || Boolean(item.vendor_contact_id));
+                    const pName = item.accessory_name || (isVendoredAcc ? 'Vendored Accessory' : isAccessory ? 'Accessory' : (item.inventory_unit?.variant?.product?.name || item.variant?.product?.name || 'Device'));
+                    const itemProfit = Number(item.profit || 0);
+
                     return (
                       <div
                         key={idx}
                         className="flex items-center justify-between gap-3 text-xs py-1.5 border-b border-slate-100 dark:border-slate-800/60 last:border-0"
                       >
                         <div className="min-w-0">
-                          <span className="font-semibold text-slate-800 dark:text-slate-200 truncate block">
-                            {item.inventory_unit?.variant?.product?.name || item.variant?.product?.name || 'Device'}
-                          </span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-semibold text-slate-800 dark:text-slate-200 truncate block">
+                              {pName}
+                            </span>
+                            {isAccessory && (
+                              <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
+                                isVendoredAcc
+                                  ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50 dark:border-amber-800/50'
+                                  : 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border border-indigo-200/50 dark:border-indigo-800/50'
+                              }`}>
+                                {isVendoredAcc ? 'Vendored Accessory' : 'Accessory'}
+                              </span>
+                            )}
+                          </div>
                           {isBrokered ? (
                             <span className="text-[10px] text-amber-600 dark:text-amber-400 flex items-center gap-1">
                               <ArrowRightLeft className="w-3 h-3" />
                               {item.vendor_contact?.name || 'Neighbour Vendor'}
                             </span>
+                          ) : isAccessory ? (
+                            <span className="text-[10px] text-slate-400">Shop stock accessory</span>
                           ) : (item.inventory_unit?.source_type === 'exchange' || Boolean(item.inventory_unit?.exchange_sales_order_id)) ? (
                             <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
                               Exchanged unit stock
@@ -1078,10 +1127,18 @@ Thank you for choosing Habeshabiz Electronics!
                           )}
                           <div
                             className={`font-bold ${
-                              Number(item.profit || 0) > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'
+                              itemProfit > 0
+                                ? 'text-emerald-600 dark:text-emerald-400'
+                                : itemProfit < 0
+                                ? 'text-rose-600 dark:text-rose-400'
+                                : 'text-slate-400'
                             }`}
                           >
-                            +{Number(item.profit || 0).toLocaleString()} ETB
+                            {itemProfit > 0
+                              ? `+${itemProfit.toLocaleString()} ETB`
+                              : itemProfit < 0
+                              ? `−${Math.abs(itemProfit).toLocaleString()} ETB`
+                              : '0 ETB'}
                           </div>
                         </div>
                       </div>

@@ -31,9 +31,10 @@ class GeneratePartnerStatementAction
         $text = preg_replace('/(?:in|for|from)?\s*Order\s*#[A-Za-z0-9_-]+/i', '', $text);
         $text = preg_replace('/#ORD-[A-Za-z0-9_-]+/i', '', $text);
         $text = preg_replace('/\bORD-[A-Za-z0-9_-]+\b/i', '', $text);
-        $text = preg_replace('/\s+by\s+[A-Za-z0-9\s]+$/i', '', $text);
         $text = preg_replace('/^Sales\s+bonus\s*(?:for)?/i', 'Sold product', $text);
         $text = preg_replace('/Vendor stock payout for\s*/i', 'Sold: ', $text);
+        $text = preg_replace('/Brokered sourcing\s*\(([^)]+)\)\s*(?:for\s*)?/i', '$1 · ', $text);
+        $text = preg_replace('/Brokered sourcing\s*(?:for\s*)?/i', '', $text);
         $text = preg_replace('/\.?\s*Agreed vendor cut\.?/i', '', $text);
         $text = preg_replace('/\s+/', ' ', $text);
 
@@ -97,9 +98,13 @@ class GeneratePartnerStatementAction
 
             if ($debt->type === 'payable') {
                 if ($debt->reference_type === 'consignment_sale') {
-                    $itemDesc = 'Consignment Device';
+                    $itemDesc = 'Consignment Item';
                     if ($order && $order->items->isNotEmpty()) {
                         $itemDesc = $order->items->map(function ($it) {
+                            $isAcc = ! empty($it->is_accessory) || ! empty($it->accessory_name);
+                            if ($isAcc) {
+                                return $it->accessory_name ? "Accessory: {$it->accessory_name}" : 'Accessory';
+                            }
                             $pName = $it->inventoryUnit?->variant?->product?->name ?? $it->variant?->product?->name ?? 'Device';
                             $sn = $it->inventoryUnit?->imei_or_serial ? " (SN: {$it->inventoryUnit->imei_or_serial})" : '';
                             $qty = $it->quantity > 1 ? " x{$it->quantity}" : '';
@@ -127,6 +132,10 @@ class GeneratePartnerStatementAction
                     $itemDesc = 'Sold Product';
                     if ($order && $order->items->isNotEmpty()) {
                         $itemDesc = $order->items->map(function ($it) {
+                            $isAcc = ! empty($it->is_accessory) || ! empty($it->accessory_name);
+                            if ($isAcc) {
+                                return $it->accessory_name ? "Accessory: {$it->accessory_name}" : 'Accessory';
+                            }
                             $pName = $it->inventoryUnit?->variant?->product?->name ?? $it->variant?->product?->name ?? 'Device';
                             $sn = $it->inventoryUnit?->imei_or_serial ? " (SN: {$it->inventoryUnit->imei_or_serial})" : '';
                             $qty = $it->quantity > 1 ? " x{$it->quantity}" : '';
@@ -153,9 +162,16 @@ class GeneratePartnerStatementAction
                 } elseif ($debt->reference_type === 'brokered_sourcing') {
                     $itemDesc = 'Brokered Item';
                     if ($order && $order->items->isNotEmpty()) {
-                        $itemDesc = $order->items->map(function ($it) {
+                        $vendorItems = $order->items->filter(fn ($it) => (string) $it->vendor_contact_id === (string) $contact->id);
+                        $itemsToMap = $vendorItems->isNotEmpty() ? $vendorItems : $order->items;
+
+                        $itemDesc = $itemsToMap->map(function ($it) {
+                            $isAcc = ! empty($it->is_accessory) || ! empty($it->accessory_name);
+                            if ($isAcc) {
+                                return $it->accessory_name ? "Vendored Accessory: {$it->accessory_name}" : 'Vendored Accessory';
+                            }
                             $pName = $it->inventoryUnit?->variant?->product?->name ?? $it->variant?->product?->name ?? 'Device';
-                            $sn = $it->inventoryUnit?->imei_or_serial ? " (SN: {$it->inventoryUnit->imei_or_serial})" : ' x1';
+                            $sn = $it->inventoryUnit?->imei_or_serial ? " (SN: {$it->inventoryUnit->imei_or_serial})" : '';
                             $qty = $it->quantity > 1 ? " x{$it->quantity}" : '';
 
                             return "{$pName}{$sn}{$qty}";
@@ -251,6 +267,10 @@ class GeneratePartnerStatementAction
                     $itemDesc = 'Sales Credit';
                     if ($order && $order->items->isNotEmpty()) {
                         $itemDesc = $order->items->map(function ($it) {
+                            $isAcc = ! empty($it->is_accessory) || ! empty($it->accessory_name);
+                            if ($isAcc) {
+                                return $it->accessory_name ? "Accessory: {$it->accessory_name}" : 'Accessory';
+                            }
                             $pName = $it->inventoryUnit?->variant?->product?->name ?? $it->variant?->product?->name ?? 'Device';
                             $sn = $it->inventoryUnit?->imei_or_serial ? " (SN: {$it->inventoryUnit->imei_or_serial})" : '';
                             $qty = $it->quantity > 1 ? " x{$it->quantity}" : ' x1';
@@ -594,6 +614,10 @@ class GeneratePartnerStatementAction
             $orderDate = Carbon::parse($co->order_date ?? $co->created_at);
             $itemDesc = $co->items->isNotEmpty()
                 ? $co->items->map(function ($it) {
+                    $isAcc = ! empty($it->is_accessory) || ! empty($it->accessory_name);
+                    if ($isAcc) {
+                        return $it->accessory_name ? "Accessory: {$it->accessory_name}" : 'Accessory';
+                    }
                     $pName = $it->inventoryUnit?->variant?->product?->name ?? $it->variant?->product?->name ?? 'Item';
                     $sn = $it->inventoryUnit?->imei_or_serial ? " (SN: {$it->inventoryUnit->imei_or_serial})" : '';
                     $qty = $it->quantity > 1 ? " x{$it->quantity}" : '';

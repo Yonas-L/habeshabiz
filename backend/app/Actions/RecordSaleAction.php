@@ -358,7 +358,10 @@ class RecordSaleAction
                     $vendorSplits = $itemData['vendor_payment_splits'] ?? null;
                     $hasSplits = is_array($vendorSplits) && count($vendorSplits) > 0;
 
-                    $accLabel = ! empty($itemData['accessory_name']) ? " ({$itemData['accessory_name']})" : '';
+                    $isAcc = ! empty($itemData['is_accessory']) || ! empty($itemData['accessory_name']);
+                    $accLabel = ! empty($itemData['accessory_name'])
+                        ? " (Vendored Accessory: {$itemData['accessory_name']})"
+                        : ($isAcc ? ' (Vendored Accessory)' : '');
                     $brokeredDebt = Debt::create([
                         'tenant_id' => $tenantId,
                         'contact_id' => $vendorContactId,

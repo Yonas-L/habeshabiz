@@ -591,6 +591,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
         vendor_paid_now?: boolean;
         vendor_paid_amount?: number;
         vendor_payment_account_id?: string | null;
+        vendor_payment_splits?: { financial_account_id: string; amount: number; reference_number?: string }[];
       }> = [];
 
       if (selectedUnitIds.length > 0) {
@@ -623,6 +624,16 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
 
       // Append attached accessories
       attachedAccessories.forEach((acc) => {
+        const isVendor = acc.source === 'vendor';
+        const vendorPaidNow = isVendor && acc.vendor_payment_method === 'paid_now';
+        const isSplit = vendorPaidNow && !!acc.vendor_is_split && (acc.vendor_payment_splits?.length ?? 0) > 0;
+        const validSplits = isSplit
+          ? acc.vendor_payment_splits!.map((s) => ({
+              financial_account_id: s.financial_account_id,
+              amount: Number(s.amount) || 0,
+            }))
+          : undefined;
+
         itemsPayload.push({
           variant_id: acc.variant_id || null,
           inventory_unit_id: acc.inventory_unit_id || null,
@@ -630,12 +641,17 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
           accessory_name: acc.name || null,
           quantity: acc.quantity || 1,
           unit_price: Number(acc.price) || 0,
-          sourcing_type: acc.source === 'vendor' ? 'brokered_neighbour' : 'internal_stock',
-          vendor_contact_id: acc.source === 'vendor' ? (acc.vendor_contact_id || null) : null,
-          vendor_cost: acc.source === 'vendor' ? (Number(acc.cost) || 0) : null,
-          vendor_paid_now: acc.source === 'vendor' && acc.vendor_payment_method === 'paid_now',
-          vendor_paid_amount: acc.source === 'vendor' && acc.vendor_payment_method === 'paid_now' ? (Number(acc.cost) || 0) : 0,
-          vendor_payment_account_id: acc.source === 'vendor' && acc.vendor_payment_method === 'paid_now' ? (acc.vendor_payment_account_id || null) : null,
+          sourcing_type: isVendor ? 'brokered_neighbour' : 'internal_stock',
+          vendor_contact_id: isVendor ? (acc.vendor_contact_id || null) : null,
+          vendor_cost: isVendor ? (Number(acc.cost) || 0) : null,
+          vendor_paid_now: vendorPaidNow,
+          vendor_paid_amount: vendorPaidNow ? (Number(acc.cost) || 0) * (acc.quantity || 1) : 0,
+          vendor_payment_account_id: vendorPaidNow
+            ? isSplit
+              ? validSplits![0]?.financial_account_id || null
+              : acc.vendor_payment_account_id || null
+            : null,
+          vendor_payment_splits: validSplits,
         });
       });
 

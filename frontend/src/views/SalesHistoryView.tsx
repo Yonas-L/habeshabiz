@@ -458,7 +458,9 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
                       <td className="py-2.5 px-3.5">
                         <div className="space-y-1 max-w-[240px]">
                           {order.items.map((item, idx) => {
-                            const pName = item.inventory_unit?.variant?.product?.name || item.variant?.product?.name || 'Device';
+                            const isAccessory = item.is_accessory || Boolean(item.accessory_name);
+                            const isVendoredAcc = isAccessory && (order.is_vendor_sourced || item.sourcing_type === 'brokered_neighbour' || Boolean(item.vendor_contact_id));
+                            const pName = item.accessory_name || (isVendoredAcc ? 'Vendored Accessory' : isAccessory ? 'Accessory' : (item.inventory_unit?.variant?.product?.name || item.variant?.product?.name || 'Device'));
                             const spec = [item.inventory_unit?.variant?.storage || item.variant?.storage, item.inventory_unit?.variant?.color || item.variant?.color].filter(Boolean).join(' • ');
                             const unit = item.inventory_unit;
                             const isReturned = unit?.status === 'returned';
@@ -475,12 +477,20 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
                                     </span>
                                   )}
                                   <span className="truncate">{pName}</span>
-                                  {isVendored && (
+                                  {isAccessory ? (
+                                    <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold shrink-0 ${
+                                      isVendoredAcc
+                                        ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50 dark:border-amber-800/50'
+                                        : 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border border-indigo-200/50 dark:border-indigo-800/50'
+                                    }`}>
+                                      {isVendoredAcc ? 'Vendored Accessory' : 'Accessory'}
+                                    </span>
+                                  ) : isVendored ? (
                                     <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50 dark:border-amber-800/50 shrink-0">
                                       <Handshake className="w-2.5 h-2.5" />
                                       Vendor
                                     </span>
-                                  )}
+                                  ) : null}
                                   {isSwapped && (
                                     <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50 shrink-0">
                                       <ArrowLeftRight className="w-2.5 h-2.5" />
@@ -500,7 +510,7 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
                                     </span>
                                   )}
                                 </div>
-                                {spec && (
+                                {!isAccessory && spec && (
                                   <div className="text-[10px] text-slate-400 truncate mt-0.5">
                                     {spec}
                                   </div>
@@ -733,7 +743,9 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
                   {/* Sold Items Summary */}
                   <div className="space-y-1.5 pt-2 border-t border-slate-100/80 dark:border-slate-800/50">
                     {order.items.map((item, idx) => {
-                      const pName = item.inventory_unit?.variant?.product?.name || item.variant?.product?.name || 'Device';
+                      const isAccessory = item.is_accessory || Boolean(item.accessory_name);
+                      const isVendoredAcc = isAccessory && (order.is_vendor_sourced || item.sourcing_type === 'brokered_neighbour' || Boolean(item.vendor_contact_id));
+                      const pName = item.accessory_name || (isVendoredAcc ? 'Vendored Accessory' : isAccessory ? 'Accessory' : (item.inventory_unit?.variant?.product?.name || item.variant?.product?.name || 'Device'));
                       const spec = [item.inventory_unit?.variant?.storage || item.variant?.storage, item.inventory_unit?.variant?.color || item.variant?.color].filter(Boolean).join(' • ');
                       const imei = item.inventory_unit?.imei_or_serial;
                       const isVendored = order.is_vendor_sourced || item.sourcing_type === 'brokered_neighbour' || item.inventory_unit?.source_type === 'vendor_direct';
@@ -745,16 +757,24 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
                               <span className="font-medium text-slate-800 dark:text-slate-200 truncate block">
                                 {item.quantity > 1 ? `${item.quantity}× ` : ''}{pName}
                               </span>
-                              {isVendored && (
+                              {isAccessory ? (
+                                <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold shrink-0 ${
+                                  isVendoredAcc
+                                    ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50 dark:border-amber-800/50'
+                                    : 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border border-indigo-200/50 dark:border-indigo-800/50'
+                                }`}>
+                                  {isVendoredAcc ? 'Vendored Accessory' : 'Accessory'}
+                                </span>
+                              ) : isVendored ? (
                                 <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50 dark:border-amber-800/50 shrink-0">
                                   <Handshake className="w-2.5 h-2.5" />
                                   Vendor
                                 </span>
-                              )}
+                              ) : null}
                             </div>
-                            {spec && <span className="text-[10px] text-slate-400 block">{spec}</span>}
+                            {!isAccessory && spec && <span className="text-[10px] text-slate-400 block">{spec}</span>}
                           </div>
-                          {imei && (
+                          {!isAccessory && imei && (
                             <span className="font-mono text-[11px] font-bold text-emerald-600 dark:text-emerald-400 shrink-0">
                               {imei}
                             </span>
