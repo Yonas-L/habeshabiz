@@ -9,13 +9,13 @@ import {
   X,
   TrendingUp,
   Plus,
-  Pencil,
   Trash2,
   Landmark,
 } from 'lucide-react';
 import { MiniSparkline, MiniBarHistogram } from '../components/Charts';
 import { AnimatedNumber } from '../components/AnimatedNumber';
 import { ManageAccountModal } from '../components/treasury/ManageAccountModal';
+import { AddBalanceModal } from '../components/treasury/AddBalanceModal';
 import { AccountLedgerDrawer } from '../components/drawers/AccountLedgerDrawer';
 import { AccountLogo } from '../utils/bankLogos';
 import { CustomPageLoader } from '../components/loading/CustomPageLoader';
@@ -244,10 +244,10 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
     }
   };
 
-  const handleOpenEdit = (acc: FinancialAccount) => {
-    setEditingAccount(acc);
-    setAccountDefaultType(acc.type);
-    setShowAccountModal(true);
+  const [selectedAccountForBalance, setSelectedAccountForBalance] = useState<FinancialAccount | null>(null);
+
+  const handleOpenAddBalance = (acc: FinancialAccount) => {
+    setSelectedAccountForBalance(acc);
   };
 
   const handleOpenCreate = (type = 'bank') => {
@@ -501,12 +501,12 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleOpenEdit(acc);
+                        handleOpenAddBalance(acc);
                       }}
-                      title="Edit account"
-                      className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                      title="Add balance"
+                      className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors cursor-pointer"
                     >
-                      <Pencil className="w-3.5 h-3.5" />
+                      <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
                     </button>
                     <button
                       onClick={(e) => {
@@ -698,11 +698,11 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
 
                       <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                         <button
-                          onClick={(e) => { e.stopPropagation(); handleOpenEdit(acc); }}
-                          title="Edit account"
-                          className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                          onClick={(e) => { e.stopPropagation(); handleOpenAddBalance(acc); }}
+                          title="Add balance"
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors cursor-pointer"
                         >
-                          <Pencil className="w-3.5 h-3.5" />
+                          <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
                         </button>
                         <button
                           onClick={(e) => { e.stopPropagation(); setDeletingAccount(acc); }}
@@ -801,9 +801,20 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
         onOpenTransfer={(accountId) => {
           handleOpenTransfer(accountId);
         }}
-        onOpenEdit={(acc) => {
-          handleOpenEdit(acc);
+        onOpenAddBalance={(acc) => {
+          handleOpenAddBalance(acc);
         }}
+        onAccountUpdated={() => {
+          loadAccounts();
+        }}
+      />
+
+      {/* Dedicated Add Balance Modal */}
+      <AddBalanceModal
+        isOpen={selectedAccountForBalance !== null}
+        onClose={() => setSelectedAccountForBalance(null)}
+        onSaved={loadAccounts}
+        account={selectedAccountForBalance}
       />
 
       {/* Delete Confirmation Modal */}

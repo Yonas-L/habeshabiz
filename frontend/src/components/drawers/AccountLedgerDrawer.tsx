@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import type { FinancialAccount, AccountActivitiesResponse } from '../../api/client';
 import { api } from '../../api/client';
 import { SlideOverDrawer } from './SlideOverDrawer';
-import { AccountLogo } from '../../utils/bankLogos';
+import { AccountLogo, PRESET_BANK_LOGOS, PRESET_RESERVE_LOGOS } from '../../utils/bankLogos';
 import { AnimatedNumber } from '../AnimatedNumber';
 import { toast } from 'sonner';
 import { formatLocalDate } from '../../utils/dateUtils';
@@ -23,14 +23,18 @@ import {
   Layers,
   TrendingUp,
   Pencil,
+  Plus,
+  ImagePlus,
 } from 'lucide-react';
+import { LdrsSpinner } from '../loading/LdrsSpinner';
 
 interface AccountLedgerDrawerProps {
   account: FinancialAccount | null;
   isOpen: boolean;
   onClose: () => void;
   onOpenTransfer?: (accountId: string) => void;
-  onOpenEdit?: (account: FinancialAccount) => void;
+  onOpenAddBalance?: (account: FinancialAccount) => void;
+  onAccountUpdated?: (account: FinancialAccount) => void;
 }
 
 type DatePreset = 'all' | 'today' | 'this_month' | 'last_30_days' | 'custom';
@@ -40,8 +44,24 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
   isOpen,
   onClose,
   onOpenTransfer,
-  onOpenEdit,
+  onOpenAddBalance,
+  onAccountUpdated,
 }) => {
+  const [currentAccount, setCurrentAccount] = useState<FinancialAccount | null>(account);
+
+  // Inline Account Editing State inside Drawer
+  const [isEditingDetails, setIsEditingDetails] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editAccountNumber, setEditAccountNumber] = useState('');
+  const [editType, setEditType] = useState('bank');
+  const [editCurrency, setEditCurrency] = useState('ETB');
+  const [editLogo, setEditLogo] = useState<string | null>(null);
+  const [editFeeType, setEditFeeType] = useState<'none' | 'percentage' | 'fixed'>('none');
+  const [editFeeAmount, setEditFeeAmount] = useState('');
+  const [editIsActive, setEditIsActive] = useState(true);
+  const [savingDetails, setSavingDetails] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<AccountActivitiesResponse | null>(null);
 
@@ -80,11 +100,95 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
     }
   };
 
+  // Sync local currentAccount when prop changes
+  useEffect(() => {
+    setCurrentAccount(account);
+    setIsEditingDetails(false);
+  }, [account]);
+
+  const startEditingDetails = () => {
+    if (!currentAccount) return;
+    setEditName(currentAccount.name || '');
+    setEditAccountNumber(currentAccount.account_number || '');
+    setEditType(currentAccount.type || 'bank');
+    setEditCurrency(currentAccount.currency || 'ETB');
+    setEditLogo(currentAccount.logo || null);
+    setEditFeeType(
+      currentAccount.default_fee_type === 'percentage' || currentAccount.default_fee_type === 'fixed'
+        ? currentAccount.default_fee_type
+        : 'none'
+    );
+    setEditFeeAmount(
+      currentAccount.default_fee_amount != null && Number(currentAccount.default_fee_amount) > 0
+        ? String(Number(currentAccount.default_fee_amount))
+        : ''
+    );
+    setEditIsActive(currentAccount.is_active !== false);
+    setIsEditingDetails(true);
+  };
+
+  const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 200 * 1024) {
+      toast.error('Logo too large', { description: 'Please use an image under 200KB.' });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setEditLogo(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const handleSaveDetails = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentAccount) return;
+    if (!editName.trim()) {
+      toast.error('Please enter an account name');
+      return;
+    }
+
+    try {
+      setSavingDetails(true);
+      const parsedFee = editFeeType !== 'none' && editFeeAmount ? parseFloat(editFeeAmount) : 0;
+      const res = await api.updateAccount(currentAccount.id, {
+        name: editName.trim(),
+        type: editType,
+        account_number: editAccountNumber.trim() || null,
+        currency: editCurrency || 'ETB',
+        logo: editLogo ?? null,
+        default_fee_type: editFeeType,
+        default_fee_amount: parsedFee,
+        is_active: editIsActive,
+      });
+
+      const updated = (res as any)?.data || {
+        ...currentAccount,
+        name: editName.trim(),
+        type: editType,
+        account_number: editAccountNumber.trim() || null,
+        currency: editCurrency || 'ETB',
+        logo: editLogo ?? null,
+        default_fee_type: editFeeType,
+        default_fee_amount: parsedFee,
+        is_active: editIsActive,
+      };
+
+      setCurrentAccount(updated);
+      setIsEditingDetails(false);
+      toast.success('Account details updated successfully', { description: updated.name });
+      if (onAccountUpdated) onAccountUpdated(updated);
+    } catch (err: any) {
+      toast.error('Failed to update account', { description: err.message });
+    } finally {
+      setSavingDetails(false);
+    }
+  };
+
   const fetchActivities = useCallback(async () => {
-    if (!account) return;
+    if (!currentAccount) return;
     try {
       setLoading(true);
-      const res = await api.getAccountActivities(account.id, {
+      const res = await api.getAccountActivities(currentAccount.id, {
         type: typeFilter !== 'all' ? typeFilter : undefined,
         search: search.trim() || undefined,
         start_date: startDate || undefined,
@@ -96,10 +200,10 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [account, typeFilter, search, startDate, endDate]);
+  }, [currentAccount, typeFilter, search, startDate, endDate]);
 
   useEffect(() => {
-    if (isOpen && account) {
+    if (isOpen && currentAccount) {
       fetchActivities();
     } else {
       setData(null);
@@ -110,20 +214,20 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
       setEndDate('');
       setExpandedId(null);
     }
-  }, [isOpen, account]);
+  }, [isOpen, currentAccount]);
 
   // Debounced refetch on filter change
   useEffect(() => {
-    if (!isOpen || !account) return;
+    if (!isOpen || !currentAccount) return;
     const timeout = setTimeout(() => {
       fetchActivities();
     }, 200);
     return () => clearTimeout(timeout);
-  }, [fetchActivities]);
+  }, [fetchActivities, isOpen, currentAccount]);
 
   const handleCopyAccountNum = () => {
-    if (!account?.account_number) return;
-    navigator.clipboard.writeText(account.account_number);
+    if (!currentAccount?.account_number) return;
+    navigator.clipboard.writeText(currentAccount.account_number);
     setCopiedAccountNum(true);
     toast.success('Account number copied to clipboard');
     setTimeout(() => setCopiedAccountNum(false), 2000);
@@ -179,7 +283,7 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    const cleanAccountName = (account?.name || 'account').toLowerCase().replace(/[^a-z0-9]/g, '-');
+    const cleanAccountName = (currentAccount?.name || 'account').toLowerCase().replace(/[^a-z0-9]/g, '-');
     link.setAttribute('download', `${cleanAccountName}-activity-ledger-${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
@@ -187,10 +291,15 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
     toast.success('Activity ledger CSV downloaded');
   };
 
-  if (!account) return null;
+  if (!currentAccount) return null;
+
+  const isAsset = Boolean(
+    currentAccount.is_custom_asset ||
+    ['asset_gold', 'asset_fx', 'custom'].includes(currentAccount.type || '')
+  );
 
   const summary = data?.summary || {
-    current_balance: Number(account.current_balance),
+    current_balance: Number(currentAccount.current_balance),
     total_inflow: 0,
     total_outflow: 0,
     net_flow: 0,
@@ -201,18 +310,18 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
     filtered_count: 0,
   };
 
-  const isInactive = account.is_active === false;
+  const isInactive = currentAccount.is_active === false;
 
   return (
     <SlideOverDrawer
       isOpen={isOpen}
       onClose={onClose}
       widthClass="sm:max-w-3xl lg:max-w-4xl"
-      title={account.name}
+      title={currentAccount.name}
       subtitle={
-        account.account_number
-          ? `Acc: ${account.account_number} · ${account.type.replace(/_/g, ' ')}`
-          : `${account.type.replace(/_/g, ' ').toUpperCase()} Account`
+        currentAccount.account_number
+          ? `Acc: ${currentAccount.account_number} · ${currentAccount.type.replace(/_/g, ' ')}`
+          : `${currentAccount.type.replace(/_/g, ' ').toUpperCase()} Account`
       }
       badge={
         <span
@@ -232,61 +341,315 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
             onClick={exportToCSV}
             disabled={!data || data.activities.length === 0}
             title="Export filtered activities to CSV"
-            className="h-8 px-2.5 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 text-xs font-semibold transition-all flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 shadow-xs"
+            className="h-8 px-2.5 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 text-xs font-semibold transition-all flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 shadow-xs cursor-pointer"
           >
             <Download className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
             <span className="hidden sm:inline">Export CSV</span>
           </button>
 
-          {onOpenTransfer && (
+          {onOpenTransfer && !isAsset && (
             <button
-              onClick={() => onOpenTransfer(account.id)}
-              className="h-8 px-2.5 rounded-xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-200 text-xs font-semibold transition-all flex items-center gap-1.5 active:scale-95 shadow-xs"
+              onClick={() => onOpenTransfer(currentAccount.id)}
+              className="h-8 px-2.5 rounded-xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-200 text-xs font-semibold transition-all flex items-center gap-1.5 active:scale-95 shadow-xs cursor-pointer"
             >
               <ArrowRightLeft className="w-3.5 h-3.5" />
               <span>Transfer</span>
             </button>
           )}
 
-          {onOpenEdit && (
+          {onOpenAddBalance && (
             <button
-              onClick={() => onOpenEdit(account)}
-              title="Edit Account Details"
-              className="w-8 h-8 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800/80 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors flex items-center justify-center active:scale-95 shadow-xs"
+              onClick={() => onOpenAddBalance(currentAccount)}
+              className="h-8 px-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-all flex items-center gap-1.5 active:scale-95 shadow-xs cursor-pointer"
+              title="Add Balance"
             >
-              <Pencil className="w-3.5 h-3.5" />
+              <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+              <span>Add Balance</span>
             </button>
           )}
+
+          <button
+            onClick={() => {
+              if (isEditingDetails) {
+                setIsEditingDetails(false);
+              } else {
+                startEditingDetails();
+              }
+            }}
+            title={isEditingDetails ? "Close Edit" : "Edit Account Details"}
+            className={`h-8 px-2.5 rounded-xl border transition-all flex items-center gap-1.5 active:scale-95 shadow-xs cursor-pointer text-xs font-semibold ${
+              isEditingDetails
+                ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300'
+                : 'border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700'
+            }`}
+          >
+            <Pencil className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">{isEditingDetails ? 'Editing' : 'Edit Details'}</span>
+          </button>
         </div>
       }
     >
       <div className="space-y-6">
+        {/* Inline Edit Form Panel inside Drawer */}
+        {isEditingDetails && (
+          <form
+            onSubmit={handleSaveDetails}
+            className="rounded-2xl border border-emerald-500/40 dark:border-emerald-500/30 bg-slate-50/90 dark:bg-slate-900/90 p-4 sm:p-5 space-y-4 shadow-sm animate-page-enter"
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200/80 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200/60 dark:border-emerald-800/60 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                  <Pencil className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white leading-tight">
+                    {isAsset ? 'Edit Reserve Details' : 'Edit Account Details'}
+                  </h4>
+                  <p className="text-[10px] text-slate-400">Update name, number, logo, and fees directly</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEditingDetails(false)}
+                  className="h-8 px-3 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingDetails}
+                  className="h-8 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {savingDetails ? (
+                    <>
+                      <LdrsSpinner size="12" color="#ffffff" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Save Changes</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Form Fields Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
+              {/* Account Name */}
+              <div className="sm:col-span-2">
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Account / Reserve Name *
+                </label>
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="e.g. Commercial Bank of Ethiopia (Main)"
+                  className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20"
+                  required
+                />
+              </div>
+
+              {/* Account Number (for bank / mobile / custom) */}
+              {!isAsset && (
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                    Account Number / Wallet ID
+                  </label>
+                  <input
+                    type="text"
+                    value={editAccountNumber}
+                    onChange={(e) => setEditAccountNumber(e.target.value)}
+                    placeholder="e.g. 1000293848201"
+                    className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-mono font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20"
+                  />
+                </div>
+              )}
+
+              {/* Account Type */}
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Category Type
+                </label>
+                <select
+                  value={editType}
+                  onChange={(e) => setEditType(e.target.value)}
+                  className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500"
+                >
+                  <option value="bank">Bank Account</option>
+                  <option value="mobile_money">Mobile Money (Telebirr, M-Pesa)</option>
+                  <option value="cash">Cash Drawer / Safe</option>
+                  <option value="asset_fx">Foreign Currency Reserve (USD, EUR, etc.)</option>
+                  <option value="asset_gold">Gold Reserve (Physical Gold / Ingots)</option>
+                  <option value="custom">Custom Asset Reserve</option>
+                </select>
+              </div>
+
+              {/* Currency */}
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Currency
+                </label>
+                <select
+                  value={editCurrency}
+                  onChange={(e) => setEditCurrency(e.target.value)}
+                  className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500"
+                >
+                  <option value="ETB">ETB — Ethiopian Birr</option>
+                  <option value="USD">USD — US Dollar</option>
+                  <option value="EUR">EUR — Euro</option>
+                  <option value="USDT">USDT — Tether</option>
+                  <option value="GBP">GBP — British Pound</option>
+                  <option value="GOLD">GOLD — Physical Gold (g)</option>
+                  <option value="AED">AED — UAE Dirham</option>
+                  <option value="SAR">SAR — Saudi Riyal</option>
+                  <option value="CAD">CAD — Canadian Dollar</option>
+                </select>
+              </div>
+
+              {/* Outgoing Transaction Fee */}
+              {!isAsset && (
+                <div className="sm:col-span-2 grid grid-cols-2 gap-3 p-3 rounded-xl bg-white/70 dark:bg-slate-800/40 border border-slate-200/70 dark:border-slate-750">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                      Outgoing Fee Type
+                    </label>
+                    <select
+                      value={editFeeType}
+                      onChange={(e) => setEditFeeType(e.target.value as any)}
+                      className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500"
+                    >
+                      <option value="none">No Outgoing Fee</option>
+                      <option value="percentage">Percentage (%)</option>
+                      <option value="fixed">Fixed Amount (ETB)</option>
+                    </select>
+                  </div>
+                  {editFeeType !== 'none' && (
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                        Fee Rate / Amount
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={editFeeAmount}
+                        onChange={(e) => setEditFeeAmount(e.target.value)}
+                        placeholder={editFeeType === 'percentage' ? 'e.g. 1.5' : 'e.g. 10'}
+                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Logo Selection Section */}
+              <div className="sm:col-span-2 space-y-2">
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Account Logo / Badge Preset
+                </label>
+                <div className="flex flex-wrap items-center gap-1.5 max-h-32 overflow-y-auto p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/60 custom-scrollbar">
+                  {(isAsset ? PRESET_RESERVE_LOGOS : PRESET_BANK_LOGOS).map((p) => {
+                    const isSelected = editLogo === p.dataUri;
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setEditLogo(p.dataUri)}
+                        className={`p-1.5 rounded-xl border flex items-center gap-1.5 transition-all cursor-pointer ${
+                          isSelected
+                            ? 'border-emerald-500 bg-emerald-50/80 dark:bg-emerald-950/60 ring-2 ring-emerald-500/30'
+                            : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-white dark:bg-slate-800'
+                        }`}
+                        title={p.name}
+                      >
+                        <img src={p.dataUri} alt={p.shortCode} className="w-5 h-5 rounded-md object-cover" />
+                        <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300">
+                          {p.shortCode}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    ref={logoInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoFileChange}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => logoInputRef.current?.click()}
+                    className="h-7 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 text-[11px] font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    <ImagePlus className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Upload Custom Logo</span>
+                  </button>
+                  {editLogo && (
+                    <button
+                      type="button"
+                      onClick={() => setEditLogo(null)}
+                      className="text-[11px] text-rose-500 hover:text-rose-600 font-semibold cursor-pointer"
+                    >
+                      Clear Logo
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Active Status */}
+              <div className="sm:col-span-2 pt-1 flex items-center justify-between border-t border-slate-200/60 dark:border-slate-800">
+                <div>
+                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">Account Live Status</span>
+                  <p className="text-[10px] text-slate-400">Inactive accounts are hidden from payment selectors</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editIsActive}
+                    onChange={(e) => setEditIsActive(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-slate-600 peer-checked:bg-emerald-600"></div>
+                </label>
+              </div>
+            </div>
+          </form>
+        )}
+
         {/* Account Identity Card */}
         <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-gradient-to-br from-white via-slate-50/50 to-slate-100/50 dark:from-[#131926] dark:via-[#111723] dark:to-[#0d121c] p-5 shadow-xs">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3.5">
-              <AccountLogo account={account} size="xl" className="shadow-md ring-2 ring-white dark:ring-slate-700" />
+              <AccountLogo account={currentAccount} size="xl" className="shadow-md ring-2 ring-white dark:ring-slate-700" />
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">{account.name}</h3>
+                  <h3 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">{currentAccount.name}</h3>
                   <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                    {account.type.replace(/_/g, ' ')}
+                    {currentAccount.type.replace(/_/g, ' ')}
                   </span>
-                  {account.default_fee_type && account.default_fee_type !== 'none' && Number(account.default_fee_amount) > 0 && (
+                  {currentAccount.default_fee_type && currentAccount.default_fee_type !== 'none' && Number(currentAccount.default_fee_amount) > 0 && (
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200/60 dark:border-amber-900/40">
-                      Outgoing Fee: {Number(account.default_fee_amount)}{account.default_fee_type === 'percentage' ? '%' : ' ETB'}
+                      Outgoing Fee: {Number(currentAccount.default_fee_amount)}{currentAccount.default_fee_type === 'percentage' ? '%' : ' ETB'}
                     </span>
                   )}
                 </div>
 
                 <div className="flex items-center gap-3 mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  {account.account_number ? (
+                  {currentAccount.account_number ? (
                     <button
                       onClick={handleCopyAccountNum}
                       className="group inline-flex items-center gap-1 font-mono hover:text-slate-900 dark:hover:text-slate-200 transition-colors"
                       title="Click to copy account number"
                     >
-                      <span>{account.account_number}</span>
+                      <span>{currentAccount.account_number}</span>
                       {copiedAccountNum ? (
                         <Check className="w-3.5 h-3.5 text-emerald-500" />
                       ) : (
@@ -297,7 +660,7 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
                     <span>Internal Treasury Account</span>
                   )}
                   <span>·</span>
-                  <span className="font-semibold text-slate-700 dark:text-slate-300">Currency: {account.currency || 'ETB'}</span>
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">Currency: {currentAccount.currency || 'ETB'}</span>
                 </div>
               </div>
             </div>
@@ -314,11 +677,11 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
           </div>
 
           {/* Asset details / holdings if reserve asset */}
-          {account.asset_details && (
+          {currentAccount.asset_details && (
             (() => {
-              const details = account.asset_details as Record<string, any>;
+              const details = currentAccount.asset_details as Record<string, any>;
               const rawHoldings = Array.isArray(details.holdings) ? details.holdings : null;
-              const curr = account.currency === 'GOLD' ? 'g' : (account.currency || details.currency || 'USD');
+              const curr = currentAccount.currency === 'GOLD' ? 'g' : (currentAccount.currency || details.currency || 'USD');
               const totalForeign = details.total_foreign_amount != null
                 ? Number(details.total_foreign_amount)
                 : rawHoldings

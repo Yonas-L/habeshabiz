@@ -170,10 +170,10 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
           setCurrency(editAccount.currency || 'ETB');
           setIsCustomCurrency(false);
           setOpeningBalance(
-            editAccount.current_balance != null ? String(editAccount.current_balance) : '0'
+            editAccount.current_balance != null ? formatCurrencyInput(editAccount.current_balance) : '0'
           );
           setBalanceAdjustment(
-            editAccount.current_balance != null ? String(editAccount.current_balance) : '0'
+            editAccount.current_balance != null ? formatCurrencyInput(editAccount.current_balance) : '0'
           );
           setFeeType(
             editAccount.default_fee_type === 'percentage' || editAccount.default_fee_type === 'fixed'
@@ -384,7 +384,9 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
             logo: logo ?? null,
             default_fee_type: feeType,
             default_fee_amount: parsedFee,
-            ...(balanceAdjustment !== '' ? { current_balance: parseFloat(balanceAdjustment) } : {}),
+            ...(balanceAdjustment !== '' && parseFormattedNumber(balanceAdjustment) !== null
+              ? { current_balance: parseFormattedNumber(balanceAdjustment)! }
+              : {}),
           });
           toast.success('Account updated', { description: name });
         } else {
@@ -393,7 +395,7 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
             type: accountType,
             account_number: accountNumber.trim() || undefined,
             currency: currency || 'ETB',
-            opening_balance: openingBalance ? parseFloat(openingBalance) : 0,
+            opening_balance: parseFormattedNumber(openingBalance) || 0,
             default_fee_type: feeType,
             default_fee_amount: parsedFee,
             is_custom_asset: false,
@@ -444,8 +446,8 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
               <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
                 {isEditing
                   ? isAssetType
-                    ? 'Edit Reserve'
-                    : 'Edit Account'
+                    ? 'Add Reserve Balance'
+                    : 'Add Balance'
                   : isAssetType
                   ? 'Add Reserve'
                   : 'Add Account'}
@@ -953,15 +955,17 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
                     {isEditing ? 'Current Balance' : 'Opening Balance'}
                   </label>
                   <input
-                    type="number"
-                    step="0.01"
-                    min="0"
+                    type="text"
+                    inputMode="decimal"
                     value={isEditing ? balanceAdjustment : openingBalance}
-                    onChange={(e) =>
-                      isEditing
-                        ? setBalanceAdjustment(e.target.value)
-                        : setOpeningBalance(e.target.value)
-                    }
+                    onChange={(e) => {
+                      const formatted = formatCurrencyInput(e.target.value);
+                      if (isEditing) {
+                        setBalanceAdjustment(formatted);
+                      } else {
+                        setOpeningBalance(formatted);
+                      }
+                    }}
                     placeholder="0.00"
                     className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs font-mono font-bold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20"
                   />

@@ -6,6 +6,7 @@ import { SlideOverDrawer } from './SlideOverDrawer';
 import { ProgressiveSection } from './ProgressiveSection';
 import { AnimatedNumber } from '../AnimatedNumber';
 import { ManageAccountModal } from '../treasury/ManageAccountModal';
+import { AddBalanceModal } from '../treasury/AddBalanceModal';
 import { PartySettleModal } from '../debts/PartySettleModal';
 import {
   Landmark,
@@ -15,7 +16,6 @@ import {
   ArrowRight,
   Clock,
   Plus,
-  Pencil,
   Trash2,
   Loader2,
   ChevronDown,
@@ -336,15 +336,15 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
     </div>
   );
 
+  const [selectedAccountForBalance, setSelectedAccountForBalance] = useState<FinancialAccount | null>(null);
+
+  const handleOpenAddBalance = (acc: FinancialAccount) => {
+    setSelectedAccountForBalance(acc);
+  };
+
   const handleOpenCreate = (type = 'bank') => {
     setEditingAccount(null);
     setAccountDefaultType(type);
-    setShowAccountModal(true);
-  };
-
-  const handleOpenEdit = (acc: FinancialAccount) => {
-    setEditingAccount(acc);
-    setAccountDefaultType(acc.type);
     setShowAccountModal(true);
   };
 
@@ -529,11 +529,11 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                     <div className="flex items-center gap-1 pl-1.5 border-l border-slate-100 dark:border-slate-800">
                       <button
                         type="button"
-                        onClick={() => handleOpenEdit(acc)}
-                        title="Edit Account"
-                        className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                        onClick={() => handleOpenAddBalance(acc)}
+                        title="Add Balance"
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors cursor-pointer"
                       >
-                        <Pencil className="w-3.5 h-3.5" />
+                        <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
                       </button>
                       <button
                         type="button"
@@ -1161,11 +1161,11 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                           <div className="flex items-center gap-1 pl-1.5 border-l border-slate-100 dark:border-slate-800">
                             <button
                               type="button"
-                              onClick={() => handleOpenEdit(acc)}
-                              title="Edit Reserve Asset"
-                              className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                              onClick={() => handleOpenAddBalance(acc)}
+                              title="Add Balance"
+                              className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors cursor-pointer"
                             >
-                              <Pencil className="w-3.5 h-3.5" />
+                              <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
                             </button>
                             <button
                               type="button"
@@ -1188,7 +1188,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
       )}
     </SlideOverDrawer>
 
-    {/* Account Management Modal */}
+    {/* Account Management Modal (Create New) */}
     <ManageAccountModal
       isOpen={showAccountModal}
       onClose={() => {
@@ -1202,6 +1202,17 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
       }}
       editAccount={editingAccount}
       defaultType={accountDefaultType}
+    />
+
+    {/* Dedicated Add Balance Modal */}
+    <AddBalanceModal
+      isOpen={selectedAccountForBalance !== null}
+      onClose={() => setSelectedAccountForBalance(null)}
+      onSaved={() => {
+        setSelectedAccountForBalance(null);
+        if (onRefreshData) onRefreshData();
+      }}
+      account={selectedAccountForBalance}
     />
 
     {/* Party Waterfall Settlement Modal */}
