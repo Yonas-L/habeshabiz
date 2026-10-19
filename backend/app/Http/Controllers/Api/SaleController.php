@@ -182,14 +182,21 @@ class SaleController extends Controller
             'cash_amount' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
-            'items.*.variant_id' => ['required', 'exists:product_variants,id'],
+            'items.*.variant_id' => ['nullable', 'exists:product_variants,id'],
             'items.*.inventory_unit_id' => ['nullable', 'exists:inventory_units,id'],
+            'items.*.is_accessory' => ['nullable', 'boolean'],
+            'items.*.accessory_name' => ['nullable', 'string', 'max:150'],
+            'items.*.parent_item_id' => ['nullable', 'exists:sales_order_items,id'],
             'items.*.quantity' => ['nullable', 'integer', 'min:1'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
             'items.*.setted_price' => ['nullable', 'numeric', 'min:0'],
             'items.*.sourcing_type' => ['nullable', 'string', 'in:internal_stock,brokered_neighbour'],
             'items.*.vendor_contact_id' => ['nullable', 'exists:contacts,id'],
             'items.*.vendor_cost' => ['nullable', 'numeric', 'min:0'],
+            'items.*.vendor_paid_now' => ['nullable', 'boolean'],
+            'items.*.vendor_paid_amount' => ['nullable', 'numeric', 'min:0'],
+            'items.*.vendor_payment_account_id' => ['nullable', 'exists:financial_accounts,id'],
+            'items.*.vendor_payment_splits' => ['nullable', 'array'],
 
             // Optional exchange/trade-in device
             'exchange' => ['nullable', 'array'],
@@ -435,6 +442,22 @@ class SaleController extends Controller
             'customer_name' => ['nullable', 'string', 'max:255'],
             'customer_phone' => ['nullable', 'string', 'max:50'],
             'notes' => ['nullable', 'string'],
+
+            // Optional attached accessories (stocked or vendor brokered)
+            'accessories' => ['nullable', 'array'],
+            'accessories.*.is_accessory' => ['nullable', 'boolean'],
+            'accessories.*.accessory_name' => ['nullable', 'string', 'max:150'],
+            'accessories.*.variant_id' => ['nullable', 'exists:product_variants,id'],
+            'accessories.*.inventory_unit_id' => ['nullable', 'exists:inventory_units,id'],
+            'accessories.*.quantity' => ['nullable', 'integer', 'min:1'],
+            'accessories.*.unit_price' => ['required', 'numeric', 'min:0'],
+            'accessories.*.sourcing_type' => ['nullable', 'string', 'in:internal_stock,brokered_neighbour'],
+            'accessories.*.vendor_contact_id' => ['nullable', 'exists:contacts,id'],
+            'accessories.*.vendor_cost' => ['nullable', 'numeric', 'min:0'],
+            'accessories.*.vendor_paid_now' => ['nullable', 'boolean'],
+            'accessories.*.vendor_paid_amount' => ['nullable', 'numeric', 'min:0'],
+            'accessories.*.vendor_payment_account_id' => ['nullable', 'exists:financial_accounts,id'],
+            'accessories.*.vendor_payment_splits' => ['nullable', 'array'],
         ]);
 
         /** @var User $user */
@@ -660,26 +683,57 @@ class SaleController extends Controller
                 'financial_account_id' => $validated['financial_account_id'] ?? ($hasCustomerSplits ? $rawCustomerSplits[0]['financial_account_id'] : null),
                 'payment_splits' => $validated['payment_splits'] ?? null,
                 'notes' => $validated['notes'] ?? 'Vendor Direct Sale',
-                'items' => [
-                    [
-                        'variant_id' => $variantId,
-                        'inventory_unit_id' => $unit->id,
-                        'quantity' => 1,
-                        'unit_price' => (float) $validated['selling_price'],
-                        'sourcing_type' => 'brokered_neighbour',
-                        'vendor_contact_id' => $validated['vendor_contact_id'],
-                        'vendor_cost' => $vendorCost,
-                        'vendor_paid_now' => ($vendorPaidAmount > 0),
-                        'vendor_paid_amount' => $vendorPaidAmount,
-                        'vendor_payment_account_id' => count($preparedVendorSplits) > 0 ? $preparedVendorSplits[0]['financial_account_id'] : ($validated['vendor_payment_account_id'] ?? null),
-                        'vendor_payment_splits' => $hasVendorSplits ? array_map(fn ($p) => [
-                            'financial_account_id' => $p['financial_account_id'],
-                            'amount' => $p['amount'],
-                            'fee' => $p['fee'],
-                            'reference_number' => $p['reference_number'] ?? null,
-                        ], $preparedVendorSplits) : null,
-                    ],
-                ],
+                'items' => (function () use ($variantId, $unit, $validated, $vendorCost, $vendorPaidAmount, $preparedVendorSplits, $hasVendorSplits, $tenantId, $user) {
+                    $orderItems = [
+                        [
+                            'variant_id' => $variantId,
+                            'inventory_unit_id' => $unit->id,
+                            'is_accessory' => false,
+                            'quantity' => 1,
+                            'unit_price' => (float) $validated['selling_price'],
+                            'sourcing_type' => 'brokered_neighbour',
+                            'vendor_contact_id' => $validated['vendor_contact_id'],
+                            'vendor_cost' => $vendorCost,
+                            'vendor_paid_now' => ($vendorPaidAmount > 0),
+                            'vendor_paid_amount' => $vendorPaidAmount,
+                            'vendor_payment_account_id' => count($preparedVendorSplits) > 0 ? $preparedVendorSplits[0]['financial_account_id'] : ($validated['vendor_payment_account_id'] ?? null),
+                            'vendor_payment_splits' => $hasVendorSplits ? array_map(fn ($p) => [
+                                'financial_account_id' => $p['financial_account_id'],
+                                'amount' => $p['amount'],
+                                'fee' => $p['fee'],
+                                'reference_number' => $p['reference_number'] ?? null,
+                            ], $preparedVendorSplits) : null,
+                            'payout_already_processed' => true,
+                        ],
+                    ];
+
+                    if (! empty($validated['accessories']) && is_array($validated['accessories'])) {
+                        foreach ($validated['accessories'] as $acc) {
+                            $accSourcing = $acc['sourcing_type'] ?? 'internal_stock';
+                            $accVendorCost = isset($acc['vendor_cost']) ? (float) $acc['vendor_cost'] : null;
+                            $accPaidNow = ! empty($acc['vendor_paid_now']);
+                            $accPaidAmt = isset($acc['vendor_paid_amount']) ? (float) $acc['vendor_paid_amount'] : ($accPaidNow ? $accVendorCost : 0.0);
+
+                            $orderItems[] = [
+                                'variant_id' => $acc['variant_id'] ?? null,
+                                'inventory_unit_id' => $acc['inventory_unit_id'] ?? null,
+                                'is_accessory' => true,
+                                'accessory_name' => $acc['accessory_name'] ?? null,
+                                'quantity' => (int) ($acc['quantity'] ?? 1),
+                                'unit_price' => (float) ($acc['unit_price'] ?? 0),
+                                'sourcing_type' => $accSourcing,
+                                'vendor_contact_id' => $acc['vendor_contact_id'] ?? null,
+                                'vendor_cost' => $accVendorCost,
+                                'vendor_paid_now' => $accPaidNow,
+                                'vendor_paid_amount' => $accPaidAmt,
+                                'vendor_payment_account_id' => $acc['vendor_payment_account_id'] ?? null,
+                                'vendor_payment_splits' => $acc['vendor_payment_splits'] ?? null,
+                            ];
+                        }
+                    }
+
+                    return $orderItems;
+                })(),
             ];
 
             $order = $action->execute($saleData);

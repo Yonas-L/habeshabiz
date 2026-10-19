@@ -33,6 +33,7 @@ import {
 import { SplitPaymentSelector, type PaymentSplitItem } from '../components/common/SplitPaymentSelector';
 import { ExchangeDeviceModal, type ExchangeDevicePayload } from '../components/counter/ExchangeDeviceModal';
 import { VendorDirectSaleModal } from '../components/counter/VendorDirectSaleModal';
+import { AccessoryAttachmentSection, type AttachedAccessoryItem } from '../components/counter/AccessoryAttachmentSection';
 import type { ProductCategory } from '../api/client';
 
 interface CounterViewProps {
@@ -101,6 +102,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
   const [exchangeDevice, setExchangeDevice] = useState<ExchangeDevicePayload | null>(null);
   const [isExchangeModalOpen, setIsExchangeModalOpen] = useState(false);
   const [isVendorDirectModalOpen, setIsVendorDirectModalOpen] = useState(false);
+  const [attachedAccessories, setAttachedAccessories] = useState<AttachedAccessoryItem[]>([]);
 
   const [submitting, setSubmitting] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -207,21 +209,46 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
   // Pricing & Discount calculations
   const unitPriceNum = parseFloat(unitSellingPrice) || 0;
   const grossSubtotal = unitPriceNum * quantity;
+
+  // Accessories calculations
+  const accessoriesTotal = useMemo(
+    () => attachedAccessories.reduce((sum, a) => sum + (Number(a.price) || 0) * (Number(a.quantity) || 1), 0),
+    [attachedAccessories]
+  );
+  const accessoriesCostTotal = useMemo(
+    () => attachedAccessories.reduce((sum, a) => sum + (Number(a.cost) || 0) * (Number(a.quantity) || 1), 0),
+    [attachedAccessories]
+  );
+  const combinedGross = grossSubtotal + accessoriesTotal;
+
   const rawDiscountVal = parseFloat(discountValue) || 0;
 
   const calculatedDiscountAmount = useMemo(() => {
-    if (rawDiscountVal <= 0 || grossSubtotal <= 0) return 0;
+    if (rawDiscountVal <= 0 || combinedGross <= 0) return 0;
     if (discountType === 'percent') {
       const pct = Math.min(100, Math.max(0, rawDiscountVal));
-      return (grossSubtotal * pct) / 100;
+      return (combinedGross * pct) / 100;
     }
-    return Math.min(grossSubtotal, Math.max(0, rawDiscountVal));
-  }, [discountType, rawDiscountVal, grossSubtotal]);
+    return Math.min(combinedGross, Math.max(0, rawDiscountVal));
+  }, [discountType, rawDiscountVal, combinedGross]);
 
-  const totalAfterDiscount = Math.max(0, grossSubtotal - calculatedDiscountAmount);
+  const totalAfterDiscount = Math.max(0, combinedGross - calculatedDiscountAmount);
   const tradeInAllowance = exchangeDevice ? Number(exchangeDevice.trade_in_value || 0) : 0;
   const netCashDue = Math.max(0, totalAfterDiscount - tradeInAllowance);
   const paidNum = parseFloat(paidAmount) || 0;
+
+  const handleAccessoriesChange = (newAccs: AttachedAccessoryItem[]) => {
+    const prevAccTotal = attachedAccessories.reduce((sum, a) => sum + (Number(a.price) || 0) * (Number(a.quantity) || 1), 0);
+    const newAccTotal = newAccs.reduce((sum, a) => sum + (Number(a.price) || 0) * (Number(a.quantity) || 1), 0);
+    setAttachedAccessories(newAccs);
+
+    const currentPaid = parseFloat(paidAmount) || 0;
+    const oldTotal = Math.max(0, grossSubtotal + prevAccTotal - calculatedDiscountAmount) - tradeInAllowance;
+    if (currentPaid === oldTotal || !paidAmount) {
+      const newTotal = Math.max(0, grossSubtotal + newAccTotal - calculatedDiscountAmount) - tradeInAllowance;
+      setPaidAmount(String(Math.max(0, newTotal)));
+    }
+  };
 
   const isDebtOffset = paymentMethod === 'debt_offset' && !isCreditSale && !isWriteOff;
   const debtOffsetNum = isDebtOffset
@@ -450,6 +477,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
     setSelectedProductId('');
     setSelectedVariantId('');
     setSelectedUnitIds([]);
+    setAttachedAccessories([]);
     setQuantity(1);
     setUnitSellingPrice('');
     setDiscountValue('');
@@ -474,6 +502,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
     setSelectedProductId('');
     setSelectedVariantId('');
     setSelectedUnitIds([]);
+    setAttachedAccessories([]);
     setQuantity(1);
     setUnitSellingPrice('');
     setDiscountValue('');
@@ -549,20 +578,26 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
       setSubmitting(true);
 
       let itemsPayload: Array<{
-        variant_id: string;
+        variant_id: string | null;
         inventory_unit_id: string | null;
+        is_accessory?: boolean;
+        accessory_name?: string | null;
         quantity: number;
         unit_price: number;
         setted_price?: number;
-        sourcing_type: 'internal_stock';
+        sourcing_type: 'internal_stock' | 'brokered_neighbour';
         vendor_contact_id: string | null;
         vendor_cost: number | null;
+        vendor_paid_now?: boolean;
+        vendor_paid_amount?: number;
+        vendor_payment_account_id?: string | null;
       }> = [];
 
       if (selectedUnitIds.length > 0) {
         itemsPayload = selectedUnitIds.map((uId) => ({
           variant_id: selectedVariantId,
           inventory_unit_id: uId,
+          is_accessory: false,
           quantity: 1,
           unit_price: unitPriceNum,
           setted_price: settedPrice > 0 ? settedPrice : undefined,
@@ -575,6 +610,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
           {
             variant_id: selectedVariantId,
             inventory_unit_id: null,
+            is_accessory: false,
             quantity: quantity,
             unit_price: unitPriceNum,
             setted_price: settedPrice > 0 ? settedPrice : undefined,
@@ -584,6 +620,24 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
           },
         ];
       }
+
+      // Append attached accessories
+      attachedAccessories.forEach((acc) => {
+        itemsPayload.push({
+          variant_id: acc.variant_id || null,
+          inventory_unit_id: acc.inventory_unit_id || null,
+          is_accessory: true,
+          accessory_name: acc.name || null,
+          quantity: acc.quantity || 1,
+          unit_price: Number(acc.price) || 0,
+          sourcing_type: acc.source === 'vendor' ? 'brokered_neighbour' : 'internal_stock',
+          vendor_contact_id: acc.source === 'vendor' ? (acc.vendor_contact_id || null) : null,
+          vendor_cost: acc.source === 'vendor' ? (Number(acc.cost) || 0) : null,
+          vendor_paid_now: acc.source === 'vendor' && acc.vendor_payment_method === 'paid_now',
+          vendor_paid_amount: acc.source === 'vendor' && acc.vendor_payment_method === 'paid_now' ? (Number(acc.cost) || 0) : 0,
+          vendor_payment_account_id: acc.source === 'vendor' && acc.vendor_payment_method === 'paid_now' ? (acc.vendor_payment_account_id || null) : null,
+        });
+      });
 
       const salePayload: any = {
         customer_id: customerMode === 'existing' ? (customerId || null) : null,
@@ -1262,6 +1316,19 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                 </div>
               </div>
 
+              {/* Attached Accessories & Bundles */}
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                <AccessoryAttachmentSection
+                  accessories={attachedAccessories}
+                  onChange={handleAccessoriesChange}
+                  products={products}
+                  contacts={contacts}
+                  accounts={accounts}
+                  currentUser={user}
+                  isOwner={user?.role === 'owner'}
+                />
+              </div>
+
               {/* Payment Method Quick Selector */}
               <div>
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">
@@ -1677,6 +1744,27 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                       </div>
                     )}
 
+                    {attachedAccessories.length > 0 && (
+                      <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1">
+                        <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                          <span>Accessories ({attachedAccessories.length})</span>
+                          <span>+{accessoriesTotal.toLocaleString()} ETB</span>
+                        </div>
+                        {attachedAccessories.map((a) => (
+                          <div key={a.id} className="flex justify-between items-center text-[11px] text-slate-600 dark:text-slate-300">
+                            <span className="truncate max-w-[150px]">{a.name || 'Accessory'}</span>
+                            <span className="font-mono whitespace-nowrap">
+                              {Number(a.price) > 0 ? (
+                                `+${(Number(a.price) * (a.quantity || 1)).toLocaleString()} ETB`
+                              ) : (
+                                <span className="text-amber-600 dark:text-amber-400 font-semibold">Free Gift</span>
+                              )}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
                     <div className="flex justify-between pt-2 border-t border-dashed border-slate-200 dark:border-slate-700">
                       <span className="font-bold text-slate-900 dark:text-white">
                         {tradeInAllowance > 0 ? 'Cash Difference to Pay' : 'Net Total'}
@@ -1700,6 +1788,20 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                               {isCreditSale ? 'Balance Due (Credit Sale)' : isWriteOff ? 'Intentional Shortfall (Written Off)' : 'Payment Shortfall — choose an option'}
                             </span>
                             <span className="font-mono whitespace-nowrap">{balanceDue.toLocaleString()} ETB</span>
+                          </div>
+                        )}
+
+                        {(user?.role === 'owner' || !!user?.permissions?.can_view_costs) && (outgoingUnitCost > 0 || accessoriesCostTotal > 0) && (
+                          <div className="flex justify-between items-center text-[11px] pt-1.5 border-t border-slate-100 dark:border-slate-800 text-slate-500">
+                            <span>Estimated Net Profit</span>
+                            <span className={`font-mono font-bold ${
+                              (totalAfterDiscount - ((outgoingUnitCost * quantity) + accessoriesCostTotal)) >= 0
+                                ? 'text-emerald-600 dark:text-emerald-400'
+                                : 'text-rose-600 dark:text-rose-400'
+                            }`}>
+                              {(totalAfterDiscount - ((outgoingUnitCost * quantity) + accessoriesCostTotal)) >= 0 ? '+' : ''}
+                              {(totalAfterDiscount - ((outgoingUnitCost * quantity) + accessoriesCostTotal)).toLocaleString()} ETB
+                            </span>
                           </div>
                         )}
                       </>

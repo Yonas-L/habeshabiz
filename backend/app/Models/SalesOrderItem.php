@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SalesOrderItem extends Model
 {
@@ -17,6 +18,9 @@ class SalesOrderItem extends Model
         'sales_order_id',
         'variant_id',
         'inventory_unit_id',
+        'is_accessory',
+        'accessory_name',
+        'parent_item_id',
         'quantity',
         'unit_price',
         'setted_price',
@@ -31,6 +35,7 @@ class SalesOrderItem extends Model
     protected function casts(): array
     {
         return [
+            'is_accessory' => 'boolean',
             'quantity' => 'integer',
             'unit_price' => 'decimal:2',
             'setted_price' => 'decimal:2',
@@ -64,5 +69,15 @@ class SalesOrderItem extends Model
     public function isBrokered(): bool
     {
         return $this->sourcing_type === 'brokered_neighbour';
+    }
+
+    public function parentItem(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_item_id');
+    }
+
+    public function accessories(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_item_id');
     }
 }

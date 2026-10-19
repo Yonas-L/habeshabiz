@@ -19,6 +19,7 @@ import {
   ChevronDown,
   FileDown,
   Wallet,
+  Sparkles,
 } from 'lucide-react';
 
 interface ReportsViewProps {
@@ -553,6 +554,156 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ tenant, selectedMonth 
               </table>
               </div>
             </div>
+
+            {/* Accessory & Bundle Comparison Report */}
+            {report.accessory_comparison && (
+              <div id="report-accessory-table" data-pdf-section className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-[#131926]">
+                <PdfBrandHeader tenant={tenant} title="Bundles vs Standalone Sales Comparison" />
+                {/* Section Header */}
+                <div className="flex items-center justify-between px-4 py-3 bg-slate-50 dark:bg-slate-900/70 border-b border-slate-200 dark:border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                    <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+                      Bundles vs Standalone Comparison
+                    </h2>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-950/70 dark:text-indigo-300 font-semibold">
+                      {report.accessory_comparison.attachment_rate}% Attachment Rate
+                    </span>
+                    <TableDownloadButton label="Accessory and Bundle Comparison" loading={downloadingTable === 'report-accessory-table'} onClick={() => void downloadTable('report-accessory-table', 'Accessory_Bundle_Comparison')} />
+                  </div>
+                </div>
+
+                {/* Table */}
+                <div data-report-scroll className="overflow-auto print:overflow-visible">
+                  <table className="w-full text-xs text-left">
+                    <thead>
+                      <tr className="border-b border-slate-200 dark:border-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 bg-slate-50/50 dark:bg-slate-900/40">
+                        <th className="py-2.5 px-4">Performance Metric</th>
+                        <th className="py-2.5 px-4 text-right">Sold With Accessories</th>
+                        <th className="py-2.5 px-4 text-right">Standalone (No Add-ons)</th>
+                        <th className="py-2.5 px-4 text-right">Comparison</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                      <tr className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
+                        <td className="py-2.5 px-4 text-slate-600 dark:text-slate-300 font-medium">Orders Count</td>
+                        <td className="py-2.5 px-4 text-right font-mono font-semibold text-slate-900 dark:text-white tabular-nums">
+                          {report.accessory_comparison.with_accessories.orders_count} orders
+                        </td>
+                        <td className="py-2.5 px-4 text-right font-mono font-semibold text-slate-900 dark:text-white tabular-nums">
+                          {report.accessory_comparison.without_accessories.orders_count} orders
+                        </td>
+                        <td className="py-2.5 px-4 text-right font-mono text-slate-500 tabular-nums">
+                          {report.accessory_comparison.attachment_rate}% of all sales
+                        </td>
+                      </tr>
+                      <tr className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
+                        <td className="py-2.5 px-4 text-slate-600 dark:text-slate-300 font-medium">Average Order Value (AOV)</td>
+                        <td className="py-2.5 px-4 text-right font-mono font-semibold text-slate-900 dark:text-white tabular-nums">
+                          {formatMoney(report.accessory_comparison.with_accessories.avg_order_value)}
+                        </td>
+                        <td className="py-2.5 px-4 text-right font-mono font-semibold text-slate-900 dark:text-white tabular-nums">
+                          {formatMoney(report.accessory_comparison.without_accessories.avg_order_value)}
+                        </td>
+                        <td className="py-2.5 px-4 text-right font-mono font-semibold tabular-nums text-indigo-600 dark:text-indigo-400">
+                          {report.accessory_comparison.with_accessories.avg_order_value >= report.accessory_comparison.without_accessories.avg_order_value ? '+' : ''}
+                          {formatMoney(report.accessory_comparison.with_accessories.avg_order_value - report.accessory_comparison.without_accessories.avg_order_value)}
+                        </td>
+                      </tr>
+                      <tr className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
+                        <td className="py-2.5 px-4 text-slate-600 dark:text-slate-300 font-medium">Average Profit per Order</td>
+                        <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-900 dark:text-white tabular-nums">
+                          {formatMoney(report.accessory_comparison.with_accessories.avg_profit_per_order)}
+                        </td>
+                        <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-900 dark:text-white tabular-nums">
+                          {formatMoney(report.accessory_comparison.without_accessories.avg_profit_per_order)}
+                        </td>
+                        <td className={`py-2.5 px-4 text-right font-mono font-bold tabular-nums ${
+                          report.accessory_comparison.profit_difference >= 0
+                            ? 'text-emerald-600 dark:text-emerald-400'
+                            : 'text-amber-600 dark:text-amber-400'
+                        }`}>
+                          {report.accessory_comparison.profit_difference >= 0 ? '+' : ''}
+                          {formatMoney(report.accessory_comparison.profit_difference)}
+                        </td>
+                      </tr>
+                      <tr className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
+                        <td className="py-2.5 px-4 text-slate-600 dark:text-slate-300 font-medium">Profit Margin %</td>
+                        <td className="py-2.5 px-4 text-right font-mono font-semibold text-slate-900 dark:text-white tabular-nums">
+                          {report.accessory_comparison.with_accessories.margin_percent}%
+                        </td>
+                        <td className="py-2.5 px-4 text-right font-mono font-semibold text-slate-900 dark:text-white tabular-nums">
+                          {report.accessory_comparison.without_accessories.margin_percent}%
+                        </td>
+                        <td className="py-2.5 px-4 text-right font-mono font-semibold tabular-nums text-slate-500">
+                          {(report.accessory_comparison.with_accessories.margin_percent - report.accessory_comparison.without_accessories.margin_percent).toFixed(1)}% diff
+                        </td>
+                      </tr>
+                      <tr className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
+                        <td className="py-2.5 px-4 text-slate-600 dark:text-slate-300 font-medium">Total Net Revenue</td>
+                        <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-900 dark:text-white tabular-nums">
+                          {formatMoney(report.accessory_comparison.with_accessories.net_revenue)}
+                        </td>
+                        <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-900 dark:text-white tabular-nums">
+                          {formatMoney(report.accessory_comparison.without_accessories.net_revenue)}
+                        </td>
+                        <td className="py-2.5 px-4 text-right font-mono text-slate-500 tabular-nums">
+                          —
+                        </td>
+                      </tr>
+                      <tr className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
+                        <td className="py-2.5 px-4 text-slate-600 dark:text-slate-300 font-medium">Total Realized Profit</td>
+                        <td className={`py-2.5 px-4 text-right font-mono font-bold tabular-nums ${report.accessory_comparison.with_accessories.profit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                          {formatMoney(report.accessory_comparison.with_accessories.profit)}
+                        </td>
+                        <td className={`py-2.5 px-4 text-right font-mono font-bold tabular-nums ${report.accessory_comparison.without_accessories.profit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                          {formatMoney(report.accessory_comparison.without_accessories.profit)}
+                        </td>
+                        <td className="py-2.5 px-4 text-right font-mono text-slate-500 tabular-nums">
+                          —
+                        </td>
+                      </tr>
+                      {report.accessory_comparison.with_accessories.giveaway_count ? (
+                        <tr className="bg-amber-50/40 dark:bg-amber-950/20 text-amber-900 dark:text-amber-200">
+                          <td className="py-2.5 px-4 font-medium">
+                            Promotional Giveaways (0 ETB gifts)
+                          </td>
+                          <td className="py-2.5 px-4 text-right font-mono tabular-nums">
+                            {report.accessory_comparison.with_accessories.giveaway_count} gifted · {formatMoney(report.accessory_comparison.with_accessories.giveaway_cost || 0)} absorbed
+                          </td>
+                          <td className="py-2.5 px-4 text-right font-mono text-slate-400">
+                            None
+                          </td>
+                          <td className="py-2.5 px-4 text-right font-mono text-[11px] text-amber-700 dark:text-amber-300">
+                            Absorbed from margin
+                          </td>
+                        </tr>
+                      ) : null}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/80">
+                        <td colSpan={4} className="py-2.5 px-4 text-[11px]">
+                          <span className="font-semibold text-slate-900 dark:text-white">Commercial Verdict: </span>
+                          {report.accessory_comparison.with_accessories.orders_count === 0 ? (
+                            <span className="text-slate-500">No bundled accessory sales recorded in this period.</span>
+                          ) : report.accessory_comparison.profit_difference > 0 ? (
+                            <span className="text-emerald-700 dark:text-emerald-300 font-medium">
+                              Bundling accessories is profitable, adding on average <strong className="font-bold">+{formatMoney(report.accessory_comparison.profit_difference)}</strong> net profit per device sold.
+                            </span>
+                          ) : (
+                            <span className="text-amber-700 dark:text-amber-300 font-medium">
+                              Free gifts reduced average profit by <strong className="font-bold">{formatMoney(Math.abs(report.accessory_comparison.profit_difference))}</strong> per device sold.
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            )}
 
             {/* 2. Inventory & Stock Valuation Report */}
             <div id="report-capital-table" data-pdf-section className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-[#131926]">

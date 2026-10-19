@@ -285,6 +285,9 @@ export interface SalesOrderItem {
   sales_order_id: string;
   variant_id: string;
   inventory_unit_id: string | null;
+  is_accessory?: boolean;
+  accessory_name?: string | null;
+  parent_item_id?: string | null;
   quantity: number;
   unit_price: string | number;
   setted_price?: string | number | null;
@@ -297,6 +300,22 @@ export interface SalesOrderItem {
   variant?: ProductVariant & { product?: Product };
   inventory_unit?: InventoryUnit;
   sales_order?: SalesOrder;
+}
+
+export interface AttachedAccessory {
+  variant_id?: string | null;
+  inventory_unit_id?: string | null;
+  is_accessory: boolean;
+  accessory_name?: string | null;
+  quantity?: number;
+  unit_price: number;
+  sourcing_type: 'internal_stock' | 'brokered_neighbour';
+  vendor_contact_id?: string | null;
+  vendor_cost?: number | null;
+  vendor_paid_now?: boolean;
+  vendor_paid_amount?: number | null;
+  vendor_payment_account_id?: string | null;
+  vendor_payment_splits?: { financial_account_id: string; amount: number; reference_number?: string }[] | null;
 }
 
 export interface SalesOrder {
@@ -592,6 +611,28 @@ export interface BusinessReportData {
     net_position: number;
     consignment_note: string;
   };
+  accessory_comparison?: AccessoryComparisonData;
+}
+
+export interface AccessoryComparisonMetrics {
+  orders_count: number;
+  revenue: number;
+  net_revenue: number;
+  profit: number;
+  margin_percent: number;
+  avg_order_value: number;
+  avg_profit_per_order: number;
+  accessories_count?: number;
+  giveaway_count?: number;
+  giveaway_cost?: number;
+}
+
+export interface AccessoryComparisonData {
+  with_accessories: AccessoryComparisonMetrics;
+  without_accessories: AccessoryComparisonMetrics;
+  attachment_rate: number;
+  profit_difference: number;
+  has_data: boolean;
 }
 
 export interface StaffMember {
@@ -1341,6 +1382,7 @@ export const api = {
     customer_name?: string;
     customer_phone?: string;
     notes?: string;
+    accessories?: AttachedAccessory[];
   }) =>
     request<SalesOrder>('/sales/vendor-direct', {
       method: 'POST',

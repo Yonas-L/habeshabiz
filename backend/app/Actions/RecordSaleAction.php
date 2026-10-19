@@ -127,7 +127,7 @@ class RecordSaleAction
                 $unitPrice = (float) $itemData['unit_price'];
                 $totalAmount += $unitPrice * $qty;
 
-                $variant = ProductVariant::find($itemData['variant_id']);
+                $variant = ! empty($itemData['variant_id']) ? ProductVariant::find($itemData['variant_id']) : null;
                 $unit = ! empty($itemData['inventory_unit_id']) ? InventoryUnit::find($itemData['inventory_unit_id']) : null;
                 $benchmarkPrice = (float) ($unit?->selling_price ?? $variant?->default_selling_price ?? 0);
                 $settedPrice = isset($itemData['setted_price']) && (float) $itemData['setted_price'] > 0
@@ -320,6 +320,7 @@ class RecordSaleAction
                 );
             }
 
+            $primaryItemId = null;
             foreach ($data['items'] as $idx => $itemData) {
                 $qty = (int) ($itemData['quantity'] ?? 1);
                 $unitPrice = (float) $itemData['unit_price'];
@@ -357,6 +358,7 @@ class RecordSaleAction
                     $vendorSplits = $itemData['vendor_payment_splits'] ?? null;
                     $hasSplits = is_array($vendorSplits) && count($vendorSplits) > 0;
 
+                    $accLabel = ! empty($itemData['accessory_name']) ? " ({$itemData['accessory_name']})" : '';
                     $brokeredDebt = Debt::create([
                         'tenant_id' => $tenantId,
                         'contact_id' => $vendorContactId,
@@ -370,13 +372,14 @@ class RecordSaleAction
                         'status' => $debtStatus,
                         'payment_splits' => $hasSplits ? $vendorSplits : null,
                         'notes' => $remOwed <= 0.009
-                            ? "Brokered sourcing for Order #{$order->order_number} (Paid on spot)"
+                            ? "Brokered sourcing{$accLabel} for Order #{$order->order_number} (Paid on spot)"
                             : ($paidNow > 0.009
-                                ? "Brokered sourcing for Order #{$order->order_number} (Partial down payment: ".number_format($paidNow, 2)." ETB, Remaining: ".number_format($remOwed, 2)." ETB)"
-                                : "Brokered sourcing for Order #{$order->order_number}"),
+                                ? "Brokered sourcing{$accLabel} for Order #{$order->order_number} (Partial down payment: ".number_format($paidNow, 2)." ETB, Remaining: ".number_format($remOwed, 2)." ETB)"
+                                : "Brokered sourcing{$accLabel} for Order #{$order->order_number}"),
                     ]);
 
                     if ($paidNow > 0) {
+                        $alreadyProcessed = ! empty($itemData['payout_already_processed']);
                         if ($hasSplits) {
                             $splitGroupId = count($vendorSplits) > 1 ? (string) Str::uuid() : null;
                             foreach ($vendorSplits as $vSplit) {
@@ -399,8 +402,26 @@ class RecordSaleAction
                                         : 'Settled immediately at POS sale',
                                     'created_by' => $data['salesperson_id'] ?? auth()->id(),
                                 ]);
+
+                                if (! $alreadyProcessed && $vAcc) {
+                                    $vAcc->decrement('current_balance', $vSplitAmt);
+                                    FinancialTransaction::create([
+                                        'tenant_id' => $tenantId,
+                                        'transaction_number' => 'TXN-'.strtoupper(Str::random(8)),
+                                        'source_account_id' => $vAcc->id,
+                                        'type' => 'supplier_payment',
+                                        'amount' => $vSplitAmt,
+                                        'fee' => 0,
+                                        'reference_number' => $vSplit['reference_number'] ?? null,
+                                        'contact_id' => $vendorContactId,
+                                        'description' => "Vendor payout for brokered item{$accLabel} on Order #{$order->order_number}",
+                                        'date' => now(),
+                                        'created_by' => $data['salesperson_id'] ?? auth()->id(),
+                                    ]);
+                                }
                             }
                         } elseif ($vendorAccountId) {
+                            $vAcc = FinancialAccount::find($vendorAccountId);
                             DebtPayment::create([
                                 'tenant_id' => $tenantId,
                                 'debt_id' => $brokeredDebt->id,
@@ -410,6 +431,22 @@ class RecordSaleAction
                                 'notes' => 'Settled immediately at POS sale',
                                 'created_by' => $data['salesperson_id'] ?? auth()->id(),
                             ]);
+
+                            if (! $alreadyProcessed && $vAcc) {
+                                $vAcc->decrement('current_balance', $paidNow);
+                                FinancialTransaction::create([
+                                    'tenant_id' => $tenantId,
+                                    'transaction_number' => 'TXN-'.strtoupper(Str::random(8)),
+                                    'source_account_id' => $vAcc->id,
+                                    'type' => 'supplier_payment',
+                                    'amount' => $paidNow,
+                                    'fee' => 0,
+                                    'contact_id' => $vendorContactId,
+                                    'description' => "Vendor payout for brokered item{$accLabel} on Order #{$order->order_number}",
+                                    'date' => now(),
+                                    'created_by' => $data['salesperson_id'] ?? auth()->id(),
+                                ]);
+                            }
                         }
                     }
 
@@ -548,11 +585,18 @@ class RecordSaleAction
                 // hides below-cost sales from the owner and overstates profit.
                 $profit = (($unitPrice - $unitCost) * $qty) - $itemBonus;
 
-                SalesOrderItem::create([
+                $isAccessory = ! empty($itemData['is_accessory']);
+                $accessoryName = $itemData['accessory_name'] ?? null;
+                $parentItemId = $itemData['parent_item_id'] ?? ($isAccessory ? $primaryItemId : null);
+
+                $createdItem = SalesOrderItem::create([
                     'tenant_id' => $tenantId,
                     'sales_order_id' => $order->id,
-                    'variant_id' => $itemData['variant_id'],
+                    'variant_id' => $itemData['variant_id'] ?? null,
                     'inventory_unit_id' => $itemData['inventory_unit_id'] ?? null,
+                    'is_accessory' => $isAccessory,
+                    'accessory_name' => $accessoryName,
+                    'parent_item_id' => $parentItemId,
                     'quantity' => $qty,
                     'unit_price' => $unitPrice,
                     'setted_price' => $itemSettedPrice,
@@ -563,6 +607,10 @@ class RecordSaleAction
                     'vendor_contact_id' => $vendorContactId,
                     'vendor_cost' => $vendorCost,
                 ]);
+
+                if (! $isAccessory && $primaryItemId === null) {
+                    $primaryItemId = $createdItem->id;
+                }
             }
 
             // Record salesperson bonus payable if bonus was earned.

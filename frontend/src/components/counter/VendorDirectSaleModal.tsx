@@ -26,6 +26,7 @@ import {
 import { LdrsSpinner } from '../loading/LdrsSpinner';
 import { PartnerFormModal } from '../partners/PartnerFormModal';
 import { SplitPaymentSelector, type PaymentSplitItem } from '../common/SplitPaymentSelector';
+import { AccessoryAttachmentSection, type AttachedAccessoryItem } from './AccessoryAttachmentSection';
 
 type CategoryArchetype =
   | 'phone_tablet'
@@ -190,6 +191,7 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [notes, setNotes] = useState('');
+  const [attachedAccessories, setAttachedAccessories] = useState<AttachedAccessoryItem[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const submittingRef = useRef(false);
 
@@ -691,9 +693,33 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
   const vendorCostNum = parseFormattedNumber(vendorCost) || 0;
   const sellingPriceNum = parseFormattedNumber(sellingPrice) || 0;
   const paidAmountNum = parseFormattedNumber(paidAmount) || 0;
-  const grossProfit = sellingPriceNum - vendorCostNum;
-  const marginPct = sellingPriceNum > 0 ? (grossProfit / sellingPriceNum) * 100 : 0;
-  const isLossDeal = sellingPriceNum > 0 && vendorCostNum > 0 && grossProfit < 0;
+
+  const accessoriesTotalSellingPrice = useMemo(() => {
+    return attachedAccessories.reduce((sum, a) => sum + (Number(a.price) || 0) * (Number(a.quantity) || 1), 0);
+  }, [attachedAccessories]);
+
+  const accessoriesTotalCost = useMemo(() => {
+    return attachedAccessories.reduce((sum, a) => sum + (Number(a.cost) || 0) * (Number(a.quantity) || 1), 0);
+  }, [attachedAccessories]);
+
+  const totalOrderSellingPrice = sellingPriceNum + accessoriesTotalSellingPrice;
+  const totalOrderCost = vendorCostNum + accessoriesTotalCost;
+  const grossProfit = totalOrderSellingPrice - totalOrderCost;
+  const marginPct = totalOrderSellingPrice > 0 ? (grossProfit / totalOrderSellingPrice) * 100 : 0;
+  const isLossDeal = totalOrderSellingPrice > 0 && totalOrderCost > 0 && grossProfit < 0;
+
+  const handleAccessoriesChange = (newAccs: AttachedAccessoryItem[]) => {
+    const prevAccTotal = attachedAccessories.reduce((sum, a) => sum + (Number(a.price) || 0) * (Number(a.quantity) || 1), 0);
+    const newAccTotal = newAccs.reduce((sum, a) => sum + (Number(a.price) || 0) * (Number(a.quantity) || 1), 0);
+    setAttachedAccessories(newAccs);
+
+    const currentPaid = parseFormattedNumber(paidAmount) || 0;
+    const oldTotal = sellingPriceNum + prevAccTotal;
+    if (currentPaid === oldTotal || !paidAmount) {
+      const newTotal = sellingPriceNum + newAccTotal;
+      setPaidAmount(formatCurrencyInput(newTotal));
+    }
+  };
 
   // Vendor payout calculations
   const effectiveVendorPaidAmount = useMemo(() => {
@@ -926,6 +952,22 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
         customer_name: customerMode === 'new' && customerName.trim() ? customerName.trim() : undefined,
         customer_phone: customerMode === 'new' && customerPhone.trim() ? customerPhone.trim() : undefined,
         notes: notes.trim() || undefined,
+        accessories: attachedAccessories.length > 0
+          ? attachedAccessories.map((a) => ({
+              variant_id: a.variant_id || undefined,
+              inventory_unit_id: a.inventory_unit_id || undefined,
+              is_accessory: true,
+              accessory_name: a.name || undefined,
+              quantity: a.quantity || 1,
+              unit_price: Number(a.price) || 0,
+              sourcing_type: a.source === 'vendor' ? ('brokered_neighbour' as const) : ('internal_stock' as const),
+              vendor_contact_id: a.source === 'vendor' ? (a.vendor_contact_id || undefined) : undefined,
+              vendor_cost: a.source === 'vendor' ? (Number(a.cost) || 0) : undefined,
+              vendor_paid_now: a.source === 'vendor' && a.vendor_payment_method === 'paid_now',
+              vendor_paid_amount: a.source === 'vendor' && a.vendor_payment_method === 'paid_now' ? (Number(a.cost) || 0) : undefined,
+              vendor_payment_account_id: a.source === 'vendor' && a.vendor_payment_method === 'paid_now' ? (a.vendor_payment_account_id || undefined) : undefined,
+            }))
+          : undefined,
       };
 
       const order = await api.vendorDirectSale(payload);
@@ -937,6 +979,7 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
       });
 
       // Clear dynamic inputs to prevent duplicate submission
+      setAttachedAccessories([]);
       setImeiOrSerial('');
       setSellingPrice('');
       setPaidAmount('');
@@ -2280,7 +2323,19 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
             )}
           </div>
 
-          {/* ── SECTION 3: CUSTOMER SALE & CHECKOUT ── */}
+          {/* ── SECTION 3: ACCESSORIES & BUNDLES (OPTIONAL) ── */}
+          <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+            <AccessoryAttachmentSection
+              accessories={attachedAccessories}
+              onChange={handleAccessoriesChange}
+              products={localProducts}
+              contacts={contacts}
+              accounts={accounts}
+              isOwner={isOwner}
+            />
+          </div>
+
+          {/* ── SECTION 4: CUSTOMER SALE & CHECKOUT ── */}
           <div className="space-y-3 pt-2 border-t border-slate-100 dark:border-slate-800">
             <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Customer Sale & Checkout <span className="text-rose-500">*</span>
@@ -2319,7 +2374,7 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
             </div>
 
             {/* Margin Pill */}
-            {sellingPriceNum > 0 && vendorCostNum > 0 && (
+            {(sellingPriceNum > 0 || totalOrderSellingPrice > 0) && (vendorCostNum > 0 || totalOrderCost > 0) && (
               <div
                 className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium border ${
                   isLossDeal
@@ -2327,10 +2382,15 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
                     : 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border-emerald-200/60 dark:border-emerald-900/40'
                 }`}
               >
-                <span className="flex items-center gap-1.5 font-semibold">
+                <div className="flex items-center gap-1.5 font-semibold">
                   <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                  {isLossDeal ? 'Below Vendor Cost' : 'Direct Profit Margin'}
-                </span>
+                  <span>{isLossDeal ? 'Below Cost Margin' : 'Net Order Margin'}</span>
+                  {attachedAccessories.length > 0 && (
+                    <span className="text-[10px] opacity-75 font-normal">
+                      (Includes {attachedAccessories.length} add-on{attachedAccessories.length > 1 ? 's' : ''})
+                    </span>
+                  )}
+                </div>
                 <span className="font-mono font-bold">
                   {grossProfit >= 0 ? '+' : ''}
                   {grossProfit.toLocaleString()} ETB ({marginPct.toFixed(1)}%)
@@ -2606,11 +2666,11 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
           <div className="text-xs">
             <span className="text-slate-400">Total Price: </span>
             <span className="font-bold text-slate-900 dark:text-white font-mono">
-              {sellingPriceNum.toLocaleString()} ETB
+              {totalOrderSellingPrice.toLocaleString()} ETB
             </span>
-            {vendorCostNum > 0 && (
-              <span className="ml-2 font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                • Net Profit: {grossProfit.toLocaleString()} ETB
+            {(vendorCostNum > 0 || totalOrderCost > 0) && (
+              <span className={`ml-2 font-mono font-bold ${grossProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                • Net Profit: {grossProfit >= 0 ? '+' : ''}{grossProfit.toLocaleString()} ETB
               </span>
             )}
           </div>

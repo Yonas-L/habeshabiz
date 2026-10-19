@@ -128,6 +128,7 @@ class GenerateBusinessReportAction
             'cash_position' => $this->cashPosition($end),
             'reconciliation' => $this->balanceReconciliation($start, $end),
             'financial_position' => $this->financialPosition($end),
+            'accessory_comparison' => $this->accessoryComparison($orders, $items),
         ];
     }
 
@@ -464,5 +465,87 @@ class GenerateBusinessReportAction
         }
 
         return $profit - ($orderAdjustments * ($lineGross / $orderGross));
+    }
+
+    /**
+     * @return array{
+     *     with_accessories: array<string, mixed>,
+     *     without_accessories: array<string, mixed>,
+     *     attachment_rate: float,
+     *     profit_difference: float,
+     *     has_data: bool
+     * }
+     */
+    private function accessoryComparison(Collection $orders, Collection $items): array
+    {
+        $ordersWithAcc = $orders->filter(function (SalesOrder $order) {
+            return $order->items->contains(fn (SalesOrderItem $item) => (bool) $item->is_accessory);
+        });
+
+        $ordersWithoutAcc = $orders->reject(function (SalesOrder $order) {
+            return $order->items->contains(fn (SalesOrderItem $item) => (bool) $item->is_accessory);
+        });
+
+        $calcMetrics = function (Collection $groupOrders) use ($items) {
+            $count = $groupOrders->count();
+            if ($count === 0) {
+                return [
+                    'orders_count' => 0,
+                    'revenue' => 0.0,
+                    'net_revenue' => 0.0,
+                    'profit' => 0.0,
+                    'margin_percent' => 0.0,
+                    'avg_order_value' => 0.0,
+                    'avg_profit_per_order' => 0.0,
+                    'accessories_count' => 0,
+                    'giveaway_count' => 0,
+                    'giveaway_cost' => 0.0,
+                ];
+            }
+
+            $revenue = (float) $groupOrders->sum('total_amount');
+            $discounts = (float) $groupOrders->sum('discount_amount');
+            $writeOffs = (float) $groupOrders->sum('write_off_amount');
+            $netRevenue = $revenue - $discounts - $writeOffs;
+
+            $groupOrderIds = $groupOrders->pluck('id')->all();
+            $groupItems = $items->filter(fn (SalesOrderItem $i) => in_array($i->sales_order_id, $groupOrderIds, true));
+
+            $profit = (float) $groupItems->sum(fn (SalesOrderItem $item): float => $this->realizedItemProfit($item)) - $discounts - $writeOffs;
+
+            $accessories = $groupItems->filter(fn (SalesOrderItem $i) => (bool) $i->is_accessory);
+            $giveaways = $accessories->filter(fn (SalesOrderItem $i) => (float) $i->unit_price <= 0.009);
+            $giveawayCost = (float) $giveaways->sum(fn (SalesOrderItem $i) => (float) $i->unit_cost * (int) $i->quantity);
+
+            $marginPercent = $netRevenue > 0 ? round(($profit / $netRevenue) * 100, 1) : 0.0;
+
+            return [
+                'orders_count' => $count,
+                'revenue' => round($revenue, 2),
+                'net_revenue' => round($netRevenue, 2),
+                'profit' => round($profit, 2),
+                'margin_percent' => $marginPercent,
+                'avg_order_value' => round($revenue / $count, 2),
+                'avg_profit_per_order' => round($profit / $count, 2),
+                'accessories_count' => (int) $accessories->sum('quantity'),
+                'giveaway_count' => (int) $giveaways->sum('quantity'),
+                'giveaway_cost' => round($giveawayCost, 2),
+            ];
+        };
+
+        $withAcc = $calcMetrics($ordersWithAcc);
+        $withoutAcc = $calcMetrics($ordersWithoutAcc);
+
+        $totalOrders = $orders->count();
+        $attachmentRate = $totalOrders > 0 ? round(($ordersWithAcc->count() / $totalOrders) * 100, 1) : 0.0;
+        $profitDiff = round($withAcc['avg_profit_per_order'] - $withoutAcc['avg_profit_per_order'], 2);
+
+        return [
+            'with_accessories' => $withAcc,
+            'without_accessories' => $withoutAcc,
+            'attachment_rate' => $attachmentRate,
+            'profit_difference' => $profitDiff,
+            'has_data' => $orders->isNotEmpty(),
+        ];
     }
 }

@@ -414,3 +414,77 @@ test('dashboard and business report exclude vendor_payout from operating expense
     $reportRes->assertJsonPath('data.summary.operating_expenses', 500)
         ->assertJsonPath('data.summary.net_profit', -500);
 });
+
+it('accurately calculates accessory comparison metrics in business reports', function (): void {
+    // Order 1: Standalone phone sale (no accessories)
+    $order1 = SalesOrder::create([
+        'tenant_id' => $this->tenant->id,
+        'order_number' => 'SO-STANDALONE',
+        'total_amount' => 1000,
+        'discount_amount' => 0,
+        'paid_amount' => 1000,
+        'payment_status' => 'paid',
+        'payment_method' => 'cash',
+        'order_date' => Carbon::parse('2026-10-10'),
+    ]);
+    SalesOrderItem::create([
+        'tenant_id' => $this->tenant->id,
+        'sales_order_id' => $order1->id,
+        'variant_id' => $this->variant->id,
+        'is_accessory' => false,
+        'quantity' => 1,
+        'unit_price' => 1000,
+        'unit_cost' => 700,
+        'profit' => 300,
+        'sourcing_type' => 'internal_stock',
+    ]);
+
+    // Order 2: Phone with attached free gift accessory
+    $order2 = SalesOrder::create([
+        'tenant_id' => $this->tenant->id,
+        'order_number' => 'SO-WITH-GIFT',
+        'total_amount' => 1000,
+        'discount_amount' => 0,
+        'paid_amount' => 1000,
+        'payment_status' => 'paid',
+        'payment_method' => 'cash',
+        'order_date' => Carbon::parse('2026-10-11'),
+    ]);
+    $phoneItem = SalesOrderItem::create([
+        'tenant_id' => $this->tenant->id,
+        'sales_order_id' => $order2->id,
+        'variant_id' => $this->variant->id,
+        'is_accessory' => false,
+        'quantity' => 1,
+        'unit_price' => 1000,
+        'unit_cost' => 700,
+        'profit' => 300,
+        'sourcing_type' => 'internal_stock',
+    ]);
+    SalesOrderItem::create([
+        'tenant_id' => $this->tenant->id,
+        'sales_order_id' => $order2->id,
+        'variant_id' => null,
+        'is_accessory' => true,
+        'accessory_name' => 'Free Glass Protector',
+        'parent_item_id' => $phoneItem->id,
+        'quantity' => 1,
+        'unit_price' => 0,
+        'unit_cost' => 100,
+        'profit' => -100,
+        'sourcing_type' => 'brokered_neighbour',
+    ]);
+
+    $res = $this->actingAs($this->owner)
+        ->getJson('/api/v1/reports/summary?from=2026-10-01&to=2026-10-31')
+        ->assertOk();
+
+    $res->assertJsonPath('data.accessory_comparison.with_accessories.orders_count', 1)
+        ->assertJsonPath('data.accessory_comparison.without_accessories.orders_count', 1)
+        ->assertJsonPath('data.accessory_comparison.attachment_rate', 50)
+        ->assertJsonPath('data.accessory_comparison.with_accessories.giveaway_count', 1)
+        ->assertJsonPath('data.accessory_comparison.with_accessories.giveaway_cost', 100)
+        ->assertJsonPath('data.accessory_comparison.without_accessories.profit', 300)
+        ->assertJsonPath('data.accessory_comparison.with_accessories.profit', 200)
+        ->assertJsonPath('data.accessory_comparison.profit_difference', -100);
+});
