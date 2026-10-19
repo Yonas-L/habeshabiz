@@ -791,6 +791,12 @@ Thank you for choosing Habeshabiz Electronics!
                             )}
                           </div>
 
+                          {canViewCost && item.unit_cost != null && Number(item.unit_cost) > 0 && (
+                            <div className="text-[10px] text-slate-400 font-mono">
+                              Cost: {Number(item.unit_cost).toLocaleString()} ETB
+                            </div>
+                          )}
+
                           {!isAccessory && (
                             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-slate-400 font-mono">
                               {unit?.imei_or_serial && (
@@ -836,14 +842,24 @@ Thank you for choosing Habeshabiz Electronics!
                         <td className="py-2.5 px-2 text-center font-mono text-slate-800 dark:text-slate-200 font-bold">{item.quantity}</td>
 
                         <td className="py-2.5 px-2 text-right">
-                          <span className="font-mono text-slate-700 dark:text-slate-300 tabular-nums">
-                            {lineUnitPrice.toLocaleString()} <span className="text-[9px] text-slate-400 font-sans">ETB</span>
-                          </span>
+                          {lineUnitPrice === 0 ? (
+                            <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/70 dark:text-amber-300">
+                              Free Gift (0 ETB)
+                            </span>
+                          ) : (
+                            <span className="font-mono text-slate-700 dark:text-slate-300 tabular-nums">
+                              {lineUnitPrice.toLocaleString()} <span className="text-[9px] text-slate-400 font-sans">ETB</span>
+                            </span>
+                          )}
                         </td>
 
                         <td className="py-2.5 px-2 text-right">
                           <span className="font-mono font-bold text-slate-900 dark:text-white tabular-nums">
-                            {lineTotal.toLocaleString()} <span className="text-[9px] text-slate-400 font-sans">ETB</span>
+                            {lineTotal === 0 ? (
+                              <span className="text-amber-600 dark:text-amber-400">0 ETB</span>
+                            ) : (
+                              `${lineTotal.toLocaleString()} ETB`
+                            )}
                           </span>
                         </td>
                       </tr>
@@ -893,13 +909,26 @@ Thank you for choosing Habeshabiz Electronics!
                             {specString}
                           </div>
                         )}
+                        {canViewCost && item.unit_cost != null && Number(item.unit_cost) > 0 && (
+                          <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                            Cost: {Number(item.unit_cost).toLocaleString()} ETB
+                          </div>
+                        )}
                       </div>
                       <div className="text-right shrink-0">
                         <div className="font-mono font-bold text-slate-900 dark:text-white text-xs">
-                          {lineTotal.toLocaleString()} ETB
+                          {lineTotal === 0 ? (
+                            <span className="text-amber-600 dark:text-amber-400">0 ETB</span>
+                          ) : (
+                            `${lineTotal.toLocaleString()} ETB`
+                          )}
                         </div>
                         <span className="text-[10px] text-slate-400 font-mono">
-                          {item.quantity}x @ {lineUnitPrice.toLocaleString()}
+                          {lineUnitPrice === 0 ? (
+                            <span className="text-amber-600 dark:text-amber-400 font-bold">Free Gift</span>
+                          ) : (
+                            `${item.quantity}x @ ${lineUnitPrice.toLocaleString()}`
+                          )}
                         </span>
                       </div>
                     </div>

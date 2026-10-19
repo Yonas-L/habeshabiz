@@ -637,9 +637,20 @@
                             </div>
                         @endif
                     </td>
-                    <td class="col-qty">{{ $item->quantity }}</td>
-                    <td class="col-price">{{ number_format($lineUnitPrice, 2) }}</td>
-                    <td class="col-total">{{ number_format($lineTotal, 2) }}</td>
+                    <td class="col-price">
+                        @if($lineUnitPrice == 0)
+                            <span style="color: #b45309; font-weight: 700;">Free Gift</span>
+                        @else
+                            {{ number_format($lineUnitPrice, 2) }}
+                        @endif
+                    </td>
+                    <td class="col-total">
+                        @if($lineTotal == 0)
+                            <span style="color: #b45309; font-weight: 700;">0.00</span>
+                        @else
+                            {{ number_format($lineTotal, 2) }}
+                        @endif
+                    </td>
                 </tr>
             @endforeach
         </tbody>
