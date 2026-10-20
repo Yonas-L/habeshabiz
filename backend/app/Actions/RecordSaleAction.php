@@ -694,6 +694,19 @@ class RecordSaleAction
                     ->orderBy('created_at')
                     ->get();
 
+                $order->loadMissing(['items.variant.product', 'items.inventoryUnit.variant.product']);
+                $deviceSummary = $order->items->map(function ($it) {
+                    $pName = $it->inventoryUnit?->variant?->product?->name ?? $it->variant?->product?->name ?? 'Device';
+                    $sn = $it->inventoryUnit?->imei_or_serial ? " (SN: {$it->inventoryUnit->imei_or_serial})" : '';
+                    $uId = $it->inventory_unit_id ? " [unit_id:{$it->inventory_unit_id}]" : '';
+
+                    return "{$pName}{$sn}{$uId}";
+                })->filter()->join(', ');
+
+                $offsetNotes = $deviceSummary
+                    ? "Handover device: {$deviceSummary}"
+                    : "Handover device for Order #{$order->order_number}";
+
                 foreach ($openPayables as $payable) {
                     if ($remOffset <= 0) {
                         break;
@@ -707,7 +720,7 @@ class RecordSaleAction
                         'amount' => $applied,
                         'payment_date' => now(),
                         'reference_number' => 'BILATERAL-OFFSET',
-                        'notes' => "Deducted by sale Order #{$order->order_number}",
+                        'notes' => $offsetNotes,
                         'created_by' => $data['salesperson_id'] ?? auth()->id(),
                     ]);
 

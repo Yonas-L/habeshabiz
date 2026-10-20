@@ -431,8 +431,8 @@ test('instant 1-click handover debt offset marks sold, settles debt, generates c
     $rows = $statementA->json('data.ledger');
     expect(count($rows))->toBe(2);
     expect($rows[0]['type_label'])->toBe('Item Received');
-    expect($rows[1]['type_label'])->toBe('Item Sent');
-    expect($rows[1]['context'])->toBe('Handover device: iPhone 13 (SN: INTAKE45K002)');
+    expect($rows[1]['type_label'])->toBe('Device Handover');
+    expect($rows[1]['context'])->toBe('iPhone 13 (SN: INTAKE45K002)');
     expect((float) $rows[1]['running_balance'])->toBe(-50000.00);
     expect((float) $statementA->json('data.kpis.range_closing_balance'))->toBe(-50000.00);
 

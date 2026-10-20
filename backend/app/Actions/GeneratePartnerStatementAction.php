@@ -24,7 +24,8 @@ class GeneratePartnerStatementAction
     protected function sanitizeContext(string $text): string
     {
         $text = preg_replace('/\[unit_id:[a-zA-Z0-9_-]+\]/i', '', $text);
-        $text = preg_replace('/^Deducted by handover device:\s*/i', 'Handover device: ', $text);
+        $text = preg_replace('/^(?:Deducted by handover device|Handover device):\s*/i', '', $text);
+        $text = preg_replace('/^Deducted by sale(?:\s*Order)?\s*/i', '', $text);
         $text = preg_replace('/^Returned handover device:\s*/i', 'Returned: ', $text);
         $text = preg_replace('/^Received fixed from vendor:\s*/i', 'Received fixed: ', $text);
         $text = preg_replace('/wire\s+payout/i', 'Transferred', $text);
@@ -38,7 +39,7 @@ class GeneratePartnerStatementAction
         $text = preg_replace('/\.?\s*Agreed vendor cut\.?/i', '', $text);
         $text = preg_replace('/\s+/', ' ', $text);
 
-        return trim($text, " \t\n\r\0\x0B·-:,.") ?: 'Transaction entry';
+        return trim($text, " \t\n\r\0\x0B·-:,.") ?: 'Device Handover';
     }
 
     /**
@@ -64,10 +65,28 @@ class GeneratePartnerStatementAction
             ->unique()
             ->values();
 
-        $orders = SalesOrder::whereIn('id', $orderIds)
+        $paymentOrderNumbers = [];
+        foreach ($debts as $d) {
+            foreach ($d->payments as $p) {
+                if ($p->notes && preg_match('/(?:Order\s*#|#ORD-|ORD-)([A-Za-z0-9_-]+)/i', $p->notes, $m)) {
+                    $paymentOrderNumbers[] = $m[1];
+                    $paymentOrderNumbers[] = "ORD-{$m[1]}";
+                }
+            }
+        }
+
+        $orders = SalesOrder::where(function ($q) use ($orderIds, $paymentOrderNumbers) {
+                if ($orderIds->isNotEmpty()) {
+                    $q->whereIn('id', $orderIds);
+                }
+                if (! empty($paymentOrderNumbers)) {
+                    $q->orWhereIn('order_number', $paymentOrderNumbers)->orWhereIn('id', $paymentOrderNumbers);
+                }
+            })
             ->with(['items.variant.product', 'items.inventoryUnit.variant.product'])
-            ->get()
-            ->keyBy('id');
+            ->get();
+        $ordersById = $orders->keyBy('id');
+        $ordersByNum = $orders->keyBy('order_number');
 
         $unitIds = $debts->whereIn('reference_type', ['handover_holding', 'vendor_repair_reimbursement', 'repair_reimbursement', 'vendor_return_refund', 'customer_return_refund', 'stock_intake'])
             ->pluck('reference_id')
@@ -94,7 +113,7 @@ class GeneratePartnerStatementAction
 
         foreach ($debts as $debt) {
             $debtCreatedDate = Carbon::parse($debt->created_at);
-            $order = ! empty($debt->reference_id) ? ($orders->get($debt->reference_id) ?? null) : null;
+            $order = ! empty($debt->reference_id) ? ($ordersById->get($debt->reference_id) ?? null) : null;
 
             if ($debt->type === 'payable') {
                 if ($debt->reference_type === 'consignment_sale') {
@@ -481,12 +500,28 @@ class GeneratePartnerStatementAction
                         continue;
                     }
 
+                    $rawContext = $payment->notes;
+                    if ($rawContext && preg_match('/(?:Order\s*#|#ORD-|ORD-)([A-Za-z0-9_-]+)/i', $rawContext, $matches) && ! str_contains($rawContext, 'SN:')) {
+                        $orderNumOrId = $matches[1];
+                        $matchedOrder = $ordersById->get($orderNumOrId) ?? $ordersByNum->get($orderNumOrId) ?? $ordersByNum->get("ORD-{$orderNumOrId}");
+                        if ($matchedOrder && $matchedOrder->items->isNotEmpty()) {
+                            $rawContext = $matchedOrder->items->map(function ($it) {
+                                $pName = $it->inventoryUnit?->variant?->product?->name ?? $it->variant?->product?->name ?? 'Device';
+                                $sn = $it->inventoryUnit?->imei_or_serial ? " (SN: {$it->inventoryUnit->imei_or_serial})" : '';
+
+                                return "{$pName}{$sn}";
+                            })->filter()->join(', ');
+                        }
+                    }
+
+                    $cleanContext = $this->sanitizeContext($rawContext ?: 'Device');
+
                     $rawEntries[] = [
                         'id' => "pay-{$payment->id}",
                         'date' => $payDate,
                         'type' => 'bilateral_offset',
-                        'type_label' => 'Item Sent',
-                        'context' => $this->sanitizeContext($payment->notes ?: 'Handover device'),
+                        'type_label' => 'Device Handover',
+                        'context' => $cleanContext,
                         'payable' => -(float) $payment->amount,
                         'receivable' => 0.0,
                         'balance_effect' => (float) $payment->amount,
@@ -535,8 +570,8 @@ class GeneratePartnerStatementAction
                         'id' => "pay-{$payment->id}",
                         'date' => $payDate,
                         'type' => 'device_offset',
-                        'type_label' => 'Item Sent',
-                        'context' => $this->sanitizeContext($payment->notes ?: 'Handover device'),
+                        'type_label' => 'Device Handover',
+                        'context' => $this->sanitizeContext($payment->notes ?: 'Device'),
                         'payable' => $debt->type === 'payable' ? -(float) $payment->amount : 0.0,
                         'receivable' => $debt->type === 'receivable' ? -(float) $payment->amount : 0.0,
                         'balance_effect' => $debt->type === 'payable' ? (float) $payment->amount : -(float) $payment->amount,
