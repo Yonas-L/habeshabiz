@@ -34,63 +34,6 @@ Route::prefix('v1')->group(function () {
     Route::post('/waitlist', [WaitlistController::class, 'store']);
     Route::get('/public/statement/{token}', [ContactController::class, 'publicStatement']);
     Route::get('/public/statement/{token}/pdf', [ContactController::class, 'publicStatementPdf']);
-    Route::get('/public/pdf-debug', function (App\Services\PdfGeneratorService $pdfService) {
-        $binary = config('laravel-pdf.chrome.chrome_binary');
-        $exists = file_exists($binary);
-        $isExec = is_executable($binary);
-        $whoami = exec('whoami');
-        $cmdOutput = [];
-        $cmdExit = 0;
-        exec("{$binary} --version 2>&1", $cmdOutput, $cmdExit);
-
-        // Test Direct CLI execution
-        $cliTestLen = 0;
-        $cliTestExit = -1;
-        $cliTestOut = [];
-        try {
-            $tmpHtml = sys_get_temp_dir() . '/debug_cli.html';
-            $tmpPdf = sys_get_temp_dir() . '/debug_cli.pdf';
-            $tmpProf = sys_get_temp_dir() . '/debug_cli_prof';
-            @mkdir($tmpProf, 0777, true);
-            file_put_contents($tmpHtml, '<h1>Debug CLI Direct</h1>');
-            $cliCmd = "HOME=/tmp XDG_CONFIG_HOME=/tmp/.chromium-config XDG_CACHE_HOME=/tmp/.chromium-cache TMPDIR=/tmp "
-                . escapeshellarg($binary)
-                . " --headless=new --no-sandbox --disable-setuid-sandbox --disable-gpu --disable-dev-shm-usage --disable-crashpad --disable-crash-reporter --crash-dumps-dir=/tmp --user-data-dir={$tmpProf} --no-pdf-header-footer --print-to-pdf={$tmpPdf} file://{$tmpHtml} 2>&1";
-            exec($cliCmd, $cliTestOut, $cliTestExit);
-            if (file_exists($tmpPdf)) {
-                $cliTestLen = filesize($tmpPdf);
-                @unlink($tmpPdf);
-            }
-            @unlink($tmpHtml);
-            exec("rm -rf {$tmpProf}");
-        } catch (\Throwable $e) {
-            $cliTestOut[] = 'Error: ' . $e->getMessage();
-        }
-
-        // Test PdfGeneratorService
-        $servicePdfLen = 0;
-        $serviceError = null;
-        try {
-            $pdfBytes = $pdfService->renderHtmlToPdf('<h1>Debug Service Test</h1><p>HabeshaBiz PDF Engine</p>');
-            $servicePdfLen = strlen($pdfBytes);
-        } catch (\Throwable $e) {
-            $serviceError = $e->getMessage();
-        }
-
-        return response()->json([
-            'binary' => $binary,
-            'exists' => $exists,
-            'is_executable' => $isExec,
-            'whoami' => $whoami,
-            'version_cmd_output' => $cmdOutput,
-            'version_cmd_exit' => $cmdExit,
-            'cli_test_exit' => $cliTestExit,
-            'cli_test_output' => $cliTestOut,
-            'cli_test_pdf_len' => $cliTestLen,
-            'service_pdf_len' => $servicePdfLen,
-            'service_error' => $serviceError,
-        ]);
-    });
 
     // Platform Superadmin Routes
     Route::prefix('admin')->group(function () {
