@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { BusinessReportData, Tenant } from '../../api/client';
-import { resolveImageUrl } from '../../api/client';
+import { api, resolveImageUrl } from '../../api/client';
+import { toast } from 'sonner';
 import { Printer, X, ShieldCheck, Loader2, CheckCircle2 } from 'lucide-react';
 import { downloadPdf } from '../../utils/downloadPdf';
 
@@ -58,20 +59,40 @@ export const BusinessReportPrintModal: React.FC<BusinessReportPrintModalProps> =
   const today = new Date();
   const issuedDateSlash = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     const sanitizedTenant = (tenant?.name || 'Business').replace(/[^a-zA-Z0-9_-]/g, '_');
     const sanitizedRange = `${from}_to_${to}`.replace(/[^a-zA-Z0-9_-]/g, '_');
     const filename = `Financial_Report_${sanitizedTenant}_${sanitizedRange}`;
-    downloadPdf(
-      'printable-business-report',
-      filename,
-      () => setIsDownloading(true),
-      () => setIsDownloading(false),
-      {
-        expandScrollAreas: true,
-        paginateSections: false,
-      }
-    );
+
+    setIsDownloading(true);
+    try {
+      const blob = await api.downloadBusinessReportPdf(from, to, true);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${filename}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast.success('Executive Financial Report Downloaded', {
+        description: `Verified document #${filename} is ready.`,
+      });
+    } catch (err: any) {
+      console.warn('Server report PDF error, using fallback...', err);
+      downloadPdf(
+        'printable-business-report',
+        filename,
+        () => setIsDownloading(true),
+        () => setIsDownloading(false),
+        {
+          expandScrollAreas: true,
+          paginateSections: false,
+        }
+      );
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   // Staff Totals

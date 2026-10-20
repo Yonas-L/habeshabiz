@@ -1749,6 +1749,19 @@ export const api = {
     return res.blob();
   },
 
+  downloadBusinessReportPdf: async (from?: string, to?: string, forceDownload = true): Promise<Blob> => {
+    const token = getAuthToken();
+    const params = new URLSearchParams();
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    params.set('download', forceDownload ? '1' : '0');
+    const res = await fetch(`${API_BASE}/reports/pdf?${params.toString()}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new Error('Failed to download business report PDF');
+    return res.blob();
+  },
+
   getExpenses: (params?: { is_owner_draw?: boolean; category?: string }) => {
     const query = new URLSearchParams();
     if (params?.is_owner_draw !== undefined) query.set('is_owner_draw', String(params.is_owner_draw));
@@ -2037,5 +2050,15 @@ export const api = {
   getProformaPdfUrl: (id: string, download = false) => {
     const token = getAuthToken();
     return `${API_BASE}/proforma-invoices/${id}/pdf?download=${download ? '1' : '0'}${token ? `&auth_token=${encodeURIComponent(token)}` : ''}`;
+  },
+
+  getBusinessReportPdfUrl: (from?: string, to?: string, download = false) => {
+    const token = getAuthToken();
+    const params = new URLSearchParams();
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    params.set('download', download ? '1' : '0');
+    if (token) params.set('auth_token', token);
+    return `${API_BASE}/reports/pdf?${params.toString()}`;
   },
 };

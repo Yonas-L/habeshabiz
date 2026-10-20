@@ -106,6 +106,7 @@ Route::prefix('v1')->group(function () {
         // Dashboard & Capital Formula Overview
         Route::get('/dashboard/summary', [DashboardController::class, 'summary']);
         Route::get('/reports/summary', [ReportController::class, 'summary']);
+        Route::get('/reports/pdf', [ReportController::class, 'pdf']);
 
         // Categories & Taxonomy
         Route::get('/categories', [CategoryController::class, 'index']);

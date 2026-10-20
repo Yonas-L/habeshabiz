@@ -2,11 +2,13 @@
 
 namespace App\Services;
 
+use App\Actions\GenerateBusinessReportAction;
 use App\Actions\GeneratePartnerStatementAction;
 use App\Models\Contact;
 use App\Models\ProformaInvoice;
 use App\Models\SalesOrder;
 use App\Models\Tenant;
+use Carbon\Carbon;
 use Illuminate\Http\Response;
 use Illuminate\Support\Str;
 use Spatie\LaravelPdf\Enums\Format;
@@ -15,7 +17,8 @@ use Spatie\LaravelPdf\Facades\Pdf;
 class PdfGeneratorService
 {
     public function __construct(
-        protected GeneratePartnerStatementAction $statementAction
+        protected GeneratePartnerStatementAction $statementAction,
+        protected GenerateBusinessReportAction $reportAction
     ) {}
 
     /**
@@ -393,6 +396,108 @@ class PdfGeneratorService
             'signatureBase64' => $signatureBase64,
             'stampBase64' => $stampBase64,
             'stampConfig' => $stampConfig,
+            'filename' => $filename,
+        ])
+            ->format(Format::A4)
+            ->margins(top: 8, right: 12, bottom: 8, left: 12, unit: 'mm')
+            ->headerHtml('<span style="font-size: 1px;"></span>')
+            ->footerHtml($footerHtml)
+            ->name($filename)
+            ->cache();
+
+        return $forceDownload ? $pdf->download() : $pdf->inline();
+    }
+
+    /**
+     * Generate an executive, audit-ready Financial Performance & Business Statement PDF.
+     */
+    public function generateBusinessReportPdf(
+        Tenant $tenant,
+        Carbon $from,
+        Carbon $to,
+        bool $forceDownload = true
+    ): \Spatie\LaravelPdf\PdfBuilder {
+        $reportData = $this->reportAction->execute($from, $to);
+        $summary = $reportData['summary'];
+
+        $tenantSettings = $tenant->settings ?? [];
+        $ownerUser = $tenant->users()->where('role', 'owner')->first();
+
+        $addressParts = array_filter([
+            $tenantSettings['address'] ?? null,
+            $tenantSettings['city'] ?? null,
+        ]);
+        $branch = ! empty($addressParts) ? implode(', ', $addressParts) : ($tenant->business_type ? ucfirst($tenant->business_type) : 'Addis Ababa');
+
+        $businessName = ! empty($tenant->name) ? $tenant->name : 'HabeshaBiz Electronics';
+        $businessPhone = ! empty($tenant->phone) ? $tenant->phone : '+251 91 123 4567';
+        $businessEmail = ! empty($ownerUser?->email) ? $ownerUser->email : 'sales@habeshabiz.et';
+        $businessLogo = $tenantSettings['logo_url'] ?? null;
+
+        $business = [
+            'name' => $businessName,
+            'branch' => $branch,
+            'phone' => $businessPhone,
+            'email' => $businessEmail,
+            'logo_url' => $businessLogo,
+            'logo_base64' => self::resolveImageBase64($businessLogo),
+            'tin_number' => $tenantSettings['tin_number'] ?? null,
+            'vat_number' => $tenantSettings['vat_number'] ?? $tenantSettings['tin_number'] ?? null,
+            'footer_note' => $tenantSettings['footer_note'] ?? null,
+        ];
+
+        // Resolve signature & stamp if configured
+        $prefs = $tenantSettings['signature_stamp_preferences'] ?? [];
+        $autoEmbed = $prefs['auto_embed_report'] ?? true;
+        $sigUrl = $autoEmbed ? ($tenantSettings['default_signature_url'] ?? null) : null;
+        $stmpUrl = $autoEmbed ? ($tenantSettings['default_stamp_url'] ?? null) : null;
+
+        $signatureBase64 = self::resolveImageBase64($sigUrl);
+        $stampBase64 = self::resolveImageBase64($stmpUrl);
+
+        $sanitizedBusiness = Str::slug($businessName, '_');
+        $rangeStr = $from->format('Y_m_d') . '_to_' . $to->format('Y_m_d');
+        $filename = "Financial_Statement_{$sanitizedBusiness}_{$rangeStr}.pdf";
+
+        $cogs = max(0, ($summary['revenue'] ?? 0) - ($summary['gross_profit'] ?? 0));
+        $grossMargin = ($summary['revenue'] ?? 0) > 0 ? round((($summary['gross_profit'] ?? 0) / $summary['revenue']) * 100, 1) : 0;
+        $netMargin = ($summary['revenue'] ?? 0) > 0 ? round((($summary['net_profit'] ?? 0) / $summary['revenue']) * 100, 1) : 0;
+
+        $staffPerformance = $reportData['staff_performance'] ?? [];
+        $staffTotals = [
+            'orders' => array_sum(array_column($staffPerformance, 'orders')),
+            'units' => array_sum(array_column($staffPerformance, 'units')),
+            'revenue' => array_sum(array_column($staffPerformance, 'revenue')),
+            'profit' => array_sum(array_column($staffPerformance, 'profit')),
+        ];
+
+        $vendorList = $reportData['vendor_activity']['vendors'] ?? [];
+        $vendorTotals = [
+            'received' => array_sum(array_column($vendorList, 'received_units')),
+            'sold' => array_sum(array_column($vendorList, 'units_sold')),
+            'revenue' => array_sum(array_column($vendorList, 'revenue')),
+            'returned' => array_sum(array_column($vendorList, 'returned_units')),
+        ];
+
+        $footerHtml = '<div style="width: 100%; font-size: 7.5pt; color: #94a3b8; display: flex; justify-content: space-between; align-items: center; padding: 0 12mm; font-family: -apple-system, BlinkMacSystemFont, Roboto, sans-serif;">'
+            . '<span>' . e($business['name']) . ' · Executive Financial Statement & Business Audit</span>'
+            . '<span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>'
+            . '</div>';
+
+        $pdf = Pdf::view('pdf.financial-report', [
+            'report' => $reportData,
+            'summary' => $summary,
+            'business' => $business,
+            'cogs' => $cogs,
+            'grossMargin' => $grossMargin,
+            'netMargin' => $netMargin,
+            'staffTotals' => $staffTotals,
+            'vendorTotals' => $vendorTotals,
+            'signatureBase64' => $signatureBase64,
+            'stampBase64' => $stampBase64,
+            'from' => $from,
+            'to' => $to,
+            'issuedDate' => now()->format('d/m/Y'),
             'filename' => $filename,
         ])
             ->format(Format::A4)

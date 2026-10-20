@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import type { BusinessReportData, Tenant } from '../api/client';
 import { api, resolveImageUrl } from '../api/client';
+import { toast } from 'sonner';
 import { downloadPdf } from '../utils/downloadPdf';
 import { formatLocalDate } from '../utils/dateUtils';
 import {
@@ -131,6 +132,37 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ tenant, selectedMonth 
     );
   };
 
+  const handleDownloadReportPdf = async () => {
+    setIsDownloading(true);
+    setError(null);
+    try {
+      const blob = await api.downloadBusinessReportPdf(from, to, true);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${filename}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast.success('Executive Financial Statement Downloaded', {
+        description: `Verified audit PDF for ${report?.period.label || 'selected period'} is ready.`,
+      });
+    } catch (err: any) {
+      console.warn('Server-side PDF generation error, trying client-side capture...', err);
+      void downloadPdf(
+        'business-report-print',
+        filename,
+        () => setIsDownloading(true),
+        () => setIsDownloading(false),
+        { revealBranding: true, revealTableBranding: false, expandScrollAreas: true, paginateSections: false },
+        () => setError('The report PDF could not be generated. Please try again.')
+      );
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   const handleApplyPreset = (preset: DatePreset) => {
     setActivePreset(preset);
     const now = new Date();
@@ -249,16 +281,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ tenant, selectedMonth 
 
           <button
             type="button"
-            onClick={() =>
-              void downloadPdf(
-                'business-report-print',
-                filename,
-                () => setIsDownloading(true),
-                () => setIsDownloading(false),
-                { revealBranding: true, revealTableBranding: false, expandScrollAreas: true, paginateSections: false },
-                () => setError('The report PDF could not be generated. Please try again.')
-              )
-            }
+            onClick={handleDownloadReportPdf}
             disabled={!report || isDownloading || loading}
             className="inline-flex h-9 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg bg-slate-900 dark:bg-white px-3.5 text-xs font-bold text-white dark:text-slate-900 shadow-2xs hover:bg-slate-800 dark:hover:bg-slate-100 transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer sm:flex-none"
           >
