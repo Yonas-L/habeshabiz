@@ -42,16 +42,14 @@ Artisan::command('platform:cleanup-signup-attempts', function () {
 
 Schedule::command('platform:cleanup-signup-attempts')->daily();
 
-Artisan::command('pdf:test', function () {
+Artisan::command('pdf:test', function (App\Services\PdfGeneratorService $pdfService) {
     $this->info('Testing Headless Chromium PDF generation...');
     $binary = config('laravel-pdf.chrome.chrome_binary');
     $this->line("Configured Chrome binary: {$binary}");
 
     $start = microtime(true);
     try {
-        $pdf = \Spatie\LaravelPdf\Facades\Pdf::html('<h1>PDF Generation Test</h1><p>HabeshaBiz Vector PDF engine is online and operational.</p>')
-            ->format(\Spatie\LaravelPdf\Enums\Format::A4);
-        $output = $pdf->base64();
+        $output = $pdfService->renderHtmlToPdf('<h1>PDF Generation Test</h1><p>HabeshaBiz Vector PDF engine is online and operational.</p>');
         $duration = round(microtime(true) - $start, 2);
         $this->info("✓ PDF generated successfully in {$duration}s! Output length: " . strlen($output) . " bytes.");
     } catch (\Throwable $e) {

@@ -119,6 +119,97 @@ class PdfGeneratorService
     }
 
     /**
+     * Render an HTML string into binary PDF using direct Headless Chromium CLI,
+     * with fallback to Spatie LaravelPdf.
+     */
+    public function renderHtmlToPdf(string $html): string
+    {
+        $chromeBinary = config('laravel-pdf.chrome.chrome_binary')
+            ?: (PHP_OS_FAMILY === 'Darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : '/usr/bin/chromium-browser');
+
+        // 1. Direct Headless Chromium CLI (--print-to-pdf)
+        // This executes Chromium synchronously without WebSockets or DevTools Protocol,
+        // making it 100% resilient to WebSocket disconnection issues on Alpine Docker.
+        if (! empty($chromeBinary) && (file_exists($chromeBinary) || is_executable($chromeBinary))) {
+            try {
+                $uniqueId = (string) Str::uuid();
+                $tempDir = rtrim(sys_get_temp_dir(), '/');
+                $tempHtmlPath = "{$tempDir}/doc_{$uniqueId}.html";
+                $tempPdfPath = "{$tempDir}/doc_{$uniqueId}.pdf";
+
+                file_put_contents($tempHtmlPath, $html);
+
+                $cmd = sprintf(
+                    '%s --headless=new --no-sandbox --disable-setuid-sandbox --disable-gpu --disable-dev-shm-usage --no-pdf-header-footer --print-to-pdf=%s file://%s 2>&1',
+                    escapeshellarg($chromeBinary),
+                    escapeshellarg($tempPdfPath),
+                    escapeshellarg($tempHtmlPath)
+                );
+
+                $output = [];
+                $exitCode = 0;
+                exec($cmd, $output, $exitCode);
+
+                if (file_exists($tempPdfPath) && filesize($tempPdfPath) > 1000) {
+                    $pdfContent = file_get_contents($tempPdfPath);
+                    @unlink($tempHtmlPath);
+                    @unlink($tempPdfPath);
+
+                    return $pdfContent;
+                }
+
+                @unlink($tempHtmlPath);
+                @unlink($tempPdfPath);
+                \Log::warning('Direct Chromium CLI returned empty or failed, trying Spatie fallback', [
+                    'exit_code' => $exitCode,
+                    'output' => implode("\n", array_slice($output, -10)),
+                ]);
+            } catch (\Throwable $cliException) {
+                \Log::warning('Direct Chromium CLI exception, trying Spatie fallback: ' . $cliException->getMessage());
+            }
+        }
+
+        // 2. Secondary Engine: Spatie LaravelPdf
+        $pdf = Pdf::html($html)->format(Format::A4);
+        $base64 = $pdf->base64();
+        if (! empty($base64)) {
+            return base64_decode($base64);
+        }
+
+        throw new \RuntimeException('Failed to generate PDF through both Chromium Direct CLI and Spatie engines.');
+    }
+
+    /**
+     * Create a standard PDF HTTP response supporting both direct return and ->toResponse() chaining.
+     */
+    public function renderToPdfResponse(
+        string $view,
+        array $viewData,
+        string $filename,
+        bool $forceDownload = true
+    ): \Symfony\Component\HttpFoundation\Response {
+        $html = view($view, $viewData)->render();
+        $pdfBinary = $this->renderHtmlToPdf($html);
+
+        $disposition = $forceDownload ? 'attachment' : 'inline';
+
+        return new class($pdfBinary, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => "{$disposition}; filename=\"{$filename}\"",
+            'Content-Length' => strlen($pdfBinary),
+            'Cache-Control' => 'private, no-cache, no-store, must-revalidate',
+            'Pragma' => 'no-cache',
+            'Expires' => '0',
+            'X-PDF-Engine' => 'Chromium-Direct-Vector',
+        ]) extends \Illuminate\Http\Response {
+            public function toResponse($request): \Symfony\Component\HttpFoundation\Response
+            {
+                return $this;
+            }
+        };
+    }
+
+    /**
      * Generate a crisp, vendor-facing Account Statement PDF.
      */
     public function generateVendorStatement(
@@ -127,7 +218,7 @@ class PdfGeneratorService
         ?string $endDate = null,
         array $selectedAccountIds = [],
         bool $forceDownload = true
-    ): \Spatie\LaravelPdf\PdfBuilder {
+    ): \Symfony\Component\HttpFoundation\Response {
         $data = $this->statementAction->execute($contact, $startDate, $endDate);
 
         // Resolve logo to base64
@@ -176,15 +267,7 @@ class PdfGeneratorService
             . '<span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>'
             . '</div>';
 
-        $pdf = Pdf::view('pdf.vendor-statement', $data)
-            ->format(Format::A4)
-            ->margins(top: 8, right: 12, bottom: 8, left: 12, unit: 'mm')
-            ->headerHtml('<span style="font-size: 1px;"></span>')
-            ->footerHtml($footerHtml)
-            ->name($filename)
-            ->cache();
-
-        return $forceDownload ? $pdf->download() : $pdf->inline();
+        return $this->renderToPdfResponse('pdf.vendor-statement', $data, $filename, $forceDownload);
     }
 
     /**
@@ -193,7 +276,7 @@ class PdfGeneratorService
     public function generateSalesInvoice(
         SalesOrder $order,
         bool $forceDownload = true
-    ): \Spatie\LaravelPdf\PdfBuilder {
+    ): \Symfony\Component\HttpFoundation\Response {
         $order->loadMissing([
             'customer',
             'vendor',
@@ -291,7 +374,7 @@ class PdfGeneratorService
             . '<span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>'
             . '</div>';
 
-        $pdf = Pdf::view('pdf.sales-invoice', [
+        return $this->renderToPdfResponse('pdf.sales-invoice', [
             'order' => $order,
             'business' => $business,
             'grossAmount' => $grossAmount,
@@ -311,15 +394,7 @@ class PdfGeneratorService
             'stampBase64' => $stampBase64,
             'stampConfig' => $stampConfig,
             'filename' => $filename,
-        ])
-            ->format(Format::A4)
-            ->margins(top: 8, right: 12, bottom: 8, left: 12, unit: 'mm')
-            ->headerHtml('<span style="font-size: 1px;"></span>')
-            ->footerHtml($footerHtml)
-            ->name($filename)
-            ->cache();
-
-        return $forceDownload ? $pdf->download() : $pdf->inline();
+        ], $filename, $forceDownload);
     }
 
     /**
@@ -328,7 +403,7 @@ class PdfGeneratorService
     public function generateProformaPdf(
         ProformaInvoice $proforma,
         bool $forceDownload = true
-    ): \Spatie\LaravelPdf\PdfBuilder {
+    ): \Symfony\Component\HttpFoundation\Response {
         $proforma->loadMissing([
             'customer',
             'creator',
@@ -390,22 +465,14 @@ class PdfGeneratorService
             . '<span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>'
             . '</div>';
 
-        $pdf = Pdf::view('pdf.proforma-invoice', [
+        return $this->renderToPdfResponse('pdf.proforma-invoice', [
             'proforma' => $proforma,
             'business' => $business,
             'signatureBase64' => $signatureBase64,
             'stampBase64' => $stampBase64,
             'stampConfig' => $stampConfig,
             'filename' => $filename,
-        ])
-            ->format(Format::A4)
-            ->margins(top: 8, right: 12, bottom: 8, left: 12, unit: 'mm')
-            ->headerHtml('<span style="font-size: 1px;"></span>')
-            ->footerHtml($footerHtml)
-            ->name($filename)
-            ->cache();
-
-        return $forceDownload ? $pdf->download() : $pdf->inline();
+        ], $filename, $forceDownload);
     }
 
     /**
@@ -416,7 +483,7 @@ class PdfGeneratorService
         Carbon $from,
         Carbon $to,
         bool $forceDownload = true
-    ): \Spatie\LaravelPdf\PdfBuilder {
+    ): \Symfony\Component\HttpFoundation\Response {
         $reportData = $this->reportAction->execute($from, $to);
         $summary = $reportData['summary'];
 
@@ -484,7 +551,7 @@ class PdfGeneratorService
             . '<span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>'
             . '</div>';
 
-        $pdf = Pdf::view('pdf.financial-report', [
+        return $this->renderToPdfResponse('pdf.financial-report', [
             'report' => $reportData,
             'summary' => $summary,
             'business' => $business,
@@ -499,14 +566,6 @@ class PdfGeneratorService
             'to' => $to,
             'issuedDate' => now()->format('d/m/Y'),
             'filename' => $filename,
-        ])
-            ->format(Format::A4)
-            ->margins(top: 8, right: 12, bottom: 8, left: 12, unit: 'mm')
-            ->headerHtml('<span style="font-size: 1px;"></span>')
-            ->footerHtml($footerHtml)
-            ->name($filename)
-            ->cache();
-
-        return $forceDownload ? $pdf->download() : $pdf->inline();
+        ], $filename, $forceDownload);
     }
 }
