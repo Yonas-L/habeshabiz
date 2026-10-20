@@ -13,9 +13,14 @@ import {
   Mail,
   Loader2,
   Check,
+  PenTool,
+  Stamp as StampIcon,
+  Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { CustomPageLoader } from '../components/loading/CustomPageLoader';
+import { SignaturePadModal } from '../components/signature/SignaturePadModal';
+import { StampProcessorModal } from '../components/signature/StampProcessorModal';
 
 interface SettingsViewProps {
   user: User | null;
@@ -45,6 +50,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     tenant?.settings?.secondary_currencies || ['USD']
   );
   const [logoUrl, setLogoUrl] = useState<string | null>(tenant?.settings?.logo_url || null);
+
+  // Signature & Company Stamp State
+  const [defaultSignatureUrl, setDefaultSignatureUrl] = useState<string | null>(null);
+  const [defaultStampUrl, setDefaultStampUrl] = useState<string | null>(null);
+  const [autoEmbedSalesInvoice, setAutoEmbedSalesInvoice] = useState(true);
+  const [autoEmbedProforma, setAutoEmbedProforma] = useState(true);
+  const [autoEmbedVendorStatement, setAutoEmbedVendorStatement] = useState(true);
+
+  // Modals & Action States
+  const [isSignaturePadOpen, setIsSignaturePadOpen] = useState(false);
+  const [isStampProcessorOpen, setIsStampProcessorOpen] = useState(false);
+  const [isDeletingSignature, setIsDeletingSignature] = useState(false);
+  const [isDeletingStamp, setIsDeletingStamp] = useState(false);
+  const [isUpdatingPrefs, setIsUpdatingPrefs] = useState(false);
 
   // Owner Account Form State
   const [ownerName, setOwnerName] = useState(user?.name || '');
@@ -79,6 +98,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           const cleanLogo = resolveImageUrl(res.tenant.logo_url) || res.tenant.logo_url || null;
           setLogoUrl(cleanLogo);
 
+          const cleanSig = resolveImageUrl(res.tenant.default_signature_url) || res.tenant.default_signature_url || null;
+          const cleanStamp = resolveImageUrl(res.tenant.default_stamp_url) || res.tenant.default_stamp_url || null;
+          setDefaultSignatureUrl(cleanSig);
+          setDefaultStampUrl(cleanStamp);
+
+          if (res.tenant.signature_stamp_preferences) {
+            setAutoEmbedSalesInvoice(res.tenant.signature_stamp_preferences.auto_embed_sales_invoice ?? true);
+            setAutoEmbedProforma(res.tenant.signature_stamp_preferences.auto_embed_proforma ?? true);
+            setAutoEmbedVendorStatement(res.tenant.signature_stamp_preferences.auto_embed_vendor_statement ?? true);
+          }
+
           if (tenant && user) {
             const updatedTenant: Tenant = {
               ...tenant,
@@ -93,6 +123,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 footer_note: res.tenant.footer_note,
                 secondary_currencies: res.tenant.secondary_currencies,
                 logo_url: cleanLogo,
+                default_signature_url: cleanSig,
+                default_stamp_url: cleanStamp,
               },
             };
             onProfileUpdated(updatedTenant, user);
@@ -246,6 +278,59 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     setSecondaryCurrencies((prev) =>
       prev.includes(curr) ? prev.filter((c) => c !== curr) : [...prev, curr]
     );
+  };
+
+  const handleRemoveSignature = async () => {
+    if (!window.confirm('Are you sure you want to remove the default digital signature?')) return;
+    try {
+      setIsDeletingSignature(true);
+      await api.deleteSignature();
+      setDefaultSignatureUrl(null);
+      toast.success('Digital signature removed');
+    } catch (err: any) {
+      toast.error('Failed to remove signature', { description: err.message });
+    } finally {
+      setIsDeletingSignature(false);
+    }
+  };
+
+  const handleRemoveStamp = async () => {
+    if (!window.confirm('Are you sure you want to remove the official company stamp?')) return;
+    try {
+      setIsDeletingStamp(true);
+      await api.deleteStamp();
+      setDefaultStampUrl(null);
+      toast.success('Company stamp removed');
+    } catch (err: any) {
+      toast.error('Failed to remove stamp', { description: err.message });
+    } finally {
+      setIsDeletingStamp(false);
+    }
+  };
+
+  const handleTogglePref = async (
+    key: 'auto_embed_sales_invoice' | 'auto_embed_proforma' | 'auto_embed_vendor_statement',
+    value: boolean
+  ) => {
+    const updated = {
+      auto_embed_sales_invoice: key === 'auto_embed_sales_invoice' ? value : autoEmbedSalesInvoice,
+      auto_embed_proforma: key === 'auto_embed_proforma' ? value : autoEmbedProforma,
+      auto_embed_vendor_statement: key === 'auto_embed_vendor_statement' ? value : autoEmbedVendorStatement,
+    };
+
+    if (key === 'auto_embed_sales_invoice') setAutoEmbedSalesInvoice(value);
+    if (key === 'auto_embed_proforma') setAutoEmbedProforma(value);
+    if (key === 'auto_embed_vendor_statement') setAutoEmbedVendorStatement(value);
+
+    try {
+      setIsUpdatingPrefs(true);
+      await api.updateSignatureStampPreferences(updated);
+      toast.success('Document signature preferences updated');
+    } catch (err: any) {
+      toast.error('Failed to update preferences', { description: err.message });
+    } finally {
+      setIsUpdatingPrefs(false);
+    }
   };
 
   if (loading) {
@@ -479,6 +564,164 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               </button>
             </div>
           </form>
+
+          {/* Signature & Official Company Stamp Card */}
+          <div className="p-4 sm:p-6 rounded-2xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800/80">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20">
+                  <PenTool className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="text-xs font-bold text-slate-900 dark:text-white">
+                    Digital Signature & Official Stamp
+                  </h2>
+                  <p className="text-[11px] text-slate-400">
+                    Signing credentials and seal for sales invoices, proformas, and vendor statements
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Signature & Stamp Previews Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Digital Signature Card */}
+              <div className="p-4 rounded-xl bg-slate-50/70 dark:bg-slate-900/40 border border-slate-200/60 dark:border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-bold text-slate-900 dark:text-white">Authorized Signature</div>
+                    <div className="text-[10px] text-slate-400">Owner or authorized signer signature</div>
+                  </div>
+                  {defaultSignatureUrl && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveSignature}
+                      disabled={isDeletingSignature}
+                      className="text-[10px] font-semibold text-rose-600 hover:text-rose-700 flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      <span>Remove</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Checkerboard Preview */}
+                <div className="w-full h-28 rounded-lg bg-[repeating-conic-gradient(#e2e8f0_0%_25%,#f8fafc_0%_50%)] dark:bg-[repeating-conic-gradient(#1e293b_0%_25%,#0f172a_0%_50%)] [background-size:14px_14px] border border-slate-200/80 dark:border-slate-700/80 flex items-center justify-center p-2 overflow-hidden shadow-inner">
+                  {defaultSignatureUrl ? (
+                    <img
+                      src={resolveImageUrl(defaultSignatureUrl) || defaultSignatureUrl}
+                      alt="Default Signature"
+                      className="max-w-full max-h-full object-contain filter drop-shadow-xs"
+                    />
+                  ) : (
+                    <span className="text-[11px] text-slate-400 font-medium">No signature configured</span>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsSignaturePadOpen(true)}
+                  className="w-full h-8 px-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <PenTool className="w-3.5 h-3.5" />
+                  <span>{defaultSignatureUrl ? 'Update Signature' : 'Draw or Upload Signature'}</span>
+                </button>
+              </div>
+
+              {/* Official Company Stamp Card */}
+              <div className="p-4 rounded-xl bg-slate-50/70 dark:bg-slate-900/40 border border-slate-200/60 dark:border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-bold text-slate-900 dark:text-white">Official Company Stamp</div>
+                    <div className="text-[10px] text-slate-400">Physical seal with paper stripped away</div>
+                  </div>
+                  {defaultStampUrl && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveStamp}
+                      disabled={isDeletingStamp}
+                      className="text-[10px] font-semibold text-rose-600 hover:text-rose-700 flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      <span>Remove</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Checkerboard Preview */}
+                <div className="w-full h-28 rounded-lg bg-[repeating-conic-gradient(#e2e8f0_0%_25%,#f8fafc_0%_50%)] dark:bg-[repeating-conic-gradient(#1e293b_0%_25%,#0f172a_0%_50%)] [background-size:14px_14px] border border-slate-200/80 dark:border-slate-700/80 flex items-center justify-center p-2 overflow-hidden shadow-inner">
+                  {defaultStampUrl ? (
+                    <img
+                      src={resolveImageUrl(defaultStampUrl) || defaultStampUrl}
+                      alt="Official Company Stamp"
+                      className="max-w-full max-h-full object-contain filter drop-shadow-xs"
+                    />
+                  ) : (
+                    <span className="text-[11px] text-slate-400 font-medium">No company stamp configured</span>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsStampProcessorOpen(true)}
+                  className="w-full h-8 px-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <StampIcon className="w-3.5 h-3.5" />
+                  <span>{defaultStampUrl ? 'Update Stamp' : 'Upload & Clean Stamp'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Automated Embedding Preferences */}
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 space-y-3">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                Automated Document Inclusion
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <label className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200/60 dark:border-slate-800 cursor-pointer">
+                  <div>
+                    <div className="text-xs font-semibold text-slate-900 dark:text-white">Sales Invoices</div>
+                    <div className="text-[10px] text-slate-400">Auto-embed signature & stamp</div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={autoEmbedSalesInvoice}
+                    disabled={isUpdatingPrefs}
+                    onChange={(e) => handleTogglePref('auto_embed_sales_invoice', e.target.checked)}
+                    className="w-4 h-4 rounded text-emerald-600 accent-emerald-600 focus:ring-0 cursor-pointer"
+                  />
+                </label>
+
+                <label className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200/60 dark:border-slate-800 cursor-pointer">
+                  <div>
+                    <div className="text-xs font-semibold text-slate-900 dark:text-white">Proforma Invoices</div>
+                    <div className="text-[10px] text-slate-400">Auto-embed signature & stamp</div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={autoEmbedProforma}
+                    disabled={isUpdatingPrefs}
+                    onChange={(e) => handleTogglePref('auto_embed_proforma', e.target.checked)}
+                    className="w-4 h-4 rounded text-emerald-600 accent-emerald-600 focus:ring-0 cursor-pointer"
+                  />
+                </label>
+
+                <label className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200/60 dark:border-slate-800 cursor-pointer">
+                  <div>
+                    <div className="text-xs font-semibold text-slate-900 dark:text-white">Vendor Statements</div>
+                    <div className="text-[10px] text-slate-400">Auto-embed signature & stamp</div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={autoEmbedVendorStatement}
+                    disabled={isUpdatingPrefs}
+                    onChange={(e) => handleTogglePref('auto_embed_vendor_statement', e.target.checked)}
+                    className="w-4 h-4 rounded text-emerald-600 accent-emerald-600 focus:ring-0 cursor-pointer"
+                  />
+                </label>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Right Column: Owner Account & Password (1 Col on lg) */}
@@ -625,6 +868,49 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </form>
         </div>
       </div>
+
+      {/* Signature & Stamp Modals */}
+      <SignaturePadModal
+        isOpen={isSignaturePadOpen}
+        onClose={() => setIsSignaturePadOpen(false)}
+        onSaved={(url) => {
+          const resolved = resolveImageUrl(url) || url;
+          setDefaultSignatureUrl(resolved);
+          if (tenant && user) {
+            onProfileUpdated(
+              {
+                ...tenant,
+                settings: {
+                  ...tenant.settings,
+                  default_signature_url: resolved,
+                },
+              },
+              user
+            );
+          }
+        }}
+      />
+
+      <StampProcessorModal
+        isOpen={isStampProcessorOpen}
+        onClose={() => setIsStampProcessorOpen(false)}
+        onSaved={(url) => {
+          const resolved = resolveImageUrl(url) || url;
+          setDefaultStampUrl(resolved);
+          if (tenant && user) {
+            onProfileUpdated(
+              {
+                ...tenant,
+                settings: {
+                  ...tenant.settings,
+                  default_stamp_url: resolved,
+                },
+              },
+              user
+            );
+          }
+        }}
+      />
     </div>
   );
 };

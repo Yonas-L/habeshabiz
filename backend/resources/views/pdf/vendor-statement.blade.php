@@ -498,6 +498,51 @@
         .signature-box {
             text-align: right;
             width: 220px;
+            position: relative;
+        }
+
+        .signature-img-wrap {
+            height: 48px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            margin-bottom: 2px;
+        }
+
+        .signature-img-wrap img {
+            max-height: 46px;
+            max-width: 180px;
+            object-fit: contain;
+        }
+
+        .stamp-inplace-wrap {
+            position: absolute;
+            right: 0px;
+            bottom: -10px;
+            width: 80px;
+            height: 80px;
+            pointer-events: none;
+            opacity: 0.92;
+        }
+
+        .stamp-inplace-wrap img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        /* ─── Free-floating Movable & Resizable Overlay ─── */
+        .movable-asset {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            z-index: 50;
+            pointer-events: none;
+        }
+
+        .movable-asset img {
+            width: 100%;
+            height: auto;
+            object-fit: contain;
         }
 
         .signature-line {
@@ -714,6 +759,14 @@
         </div>
     @endif
 
+    @php
+        $sigPos = $stampConfig['signature_position'] ?? ['x' => 80, 'y' => 92, 'width' => 20];
+        $stampPos = $stampConfig['stamp_position'] ?? ['x' => 70, 'y' => 88, 'width' => 24];
+        $showSig = ($stampConfig['show_signature'] ?? true) && !empty($signatureBase64);
+        $showStamp = ($stampConfig['show_stamp'] ?? true) && !empty($stampBase64);
+        $hasCustomPlacement = !empty($stampConfig['has_custom_placement']);
+    @endphp
+
     <!-- ═══ 5. OFFICIAL VERIFICATION SEAL & MINIMAL SIGNATURE ═══ -->
     <div class="official-seal-footer">
         <div class="seal-info">
@@ -730,11 +783,59 @@
         </div>
 
         <div class="signature-box">
+            @if($showSig && !$hasCustomPlacement)
+                <div class="signature-img-wrap">
+                    <img src="{{ $signatureBase64 }}" alt="Authorized Signature" />
+                </div>
+            @endif
+
+            @if($showStamp && !$hasCustomPlacement)
+                <div class="stamp-inplace-wrap">
+                    <img src="{{ $stampBase64 }}" alt="Official Stamp" />
+                </div>
+            @endif
+
             <div class="signature-line">
                 Authorized Signature
             </div>
         </div>
     </div>
+
+    <!-- ═══ 6. FREE-FLOATING MOVABLE & RESIZABLE OVERLAYS (When Custom Placed) ═══ -->
+    @if($hasCustomPlacement)
+        @if($showStamp)
+            <div class="movable-asset" style="
+                left: {{ $stampPos['x'] }}%;
+                top: {{ $stampPos['y'] }}%;
+                width: {{ $stampPos['width'] ?? 24 }}%;
+                @if(!empty($stampPos['rotation']))
+                    transform: translate(-50%, -50%) rotate({{ $stampPos['rotation'] }}deg);
+                @else
+                    transform: translate(-50%, -50%);
+                @endif
+                @if(isset($stampPos['opacity']))
+                    opacity: {{ number_format(((float)$stampPos['opacity']) / 100, 2) }};
+                @endif
+            ">
+                <img src="{{ $stampBase64 }}" alt="Official Stamp" />
+            </div>
+        @endif
+
+        @if($showSig)
+            <div class="movable-asset" style="
+                left: {{ $sigPos['x'] }}%;
+                top: {{ $sigPos['y'] }}%;
+                width: {{ $sigPos['width'] ?? 20 }}%;
+                @if(!empty($sigPos['rotation']))
+                    transform: translate(-50%, -50%) rotate({{ $sigPos['rotation'] }}deg);
+                @else
+                    transform: translate(-50%, -50%);
+                @endif
+            ">
+                <img src="{{ $signatureBase64 }}" alt="Authorized Signature" />
+            </div>
+        @endif
+    @endif
 
 </body>
 </html>

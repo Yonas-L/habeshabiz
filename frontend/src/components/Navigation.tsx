@@ -1,7 +1,7 @@
 import React from 'react';
 import { LayoutDashboard, ShoppingCart, Package, Receipt, CreditCard, Landmark, DollarSign } from 'lucide-react';
 
-export type NavTab = 'overview' | 'counter' | 'inventory' | 'sales' | 'debts' | 'treasury' | 'expenses';
+export type NavTab = 'overview' | 'counter' | 'inventory' | 'sales' | 'proforma' | 'debts' | 'treasury' | 'expenses';
 
 interface NavigationProps {
   activeTab: NavTab;

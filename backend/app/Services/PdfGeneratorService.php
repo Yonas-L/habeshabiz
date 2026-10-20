@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Actions\GeneratePartnerStatementAction;
 use App\Models\Contact;
+use App\Models\ProformaInvoice;
 use App\Models\SalesOrder;
 use App\Models\Tenant;
 use Illuminate\Http\Response;
@@ -92,6 +93,27 @@ class PdfGeneratorService
         $sanitizedRange = Str::slug($data['range']['formatted_range'] ?? 'Statement', '_');
         $filename = "Statement_{$sanitizedContact}_{$sanitizedRange}.pdf";
         $data['filename'] = $filename;
+
+        // Resolve default signature and stamp for vendor statements
+        $tenant = $contact->tenant;
+        if (! $tenant && ! empty($contact->tenant_id)) {
+            $tenant = Tenant::find($contact->tenant_id);
+        }
+        $tenantSettings = $tenant?->settings ?? [];
+        $prefs = $tenantSettings['signature_stamp_preferences'] ?? [];
+        $autoEmbed = $prefs['auto_embed_vendor_statement'] ?? true;
+
+        $sigUrl = $autoEmbed ? ($tenantSettings['default_signature_url'] ?? null) : null;
+        $stmpUrl = $autoEmbed ? ($tenantSettings['default_stamp_url'] ?? null) : null;
+
+        $data['signatureBase64'] = self::resolveImageBase64($sigUrl);
+        $data['stampBase64'] = self::resolveImageBase64($stmpUrl);
+        $data['stampConfig'] = [
+            'show_signature' => ! empty($data['signatureBase64']),
+            'show_stamp' => ! empty($data['stampBase64']),
+            'stamp_position' => $prefs['default_stamp_size'] ?? ['x' => 74, 'y' => 84, 'width' => 22, 'height' => 18],
+            'signature_position' => $prefs['default_signature_size'] ?? ['x' => 78, 'y' => 89, 'width' => 20, 'height' => 10],
+        ];
 
         $footerHtml = '<div style="width: 100%; font-size: 7.5pt; color: #94a3b8; display: flex; justify-content: space-between; align-items: center; padding: 0 12mm; font-family: -apple-system, BlinkMacSystemFont, Roboto, sans-serif;">'
             . '<span>' . e($data['business']['name']) . ' · Verified Accounting Statement</span>'
@@ -190,6 +212,23 @@ class PdfGeneratorService
             $sanitizedNotes = ! empty($cleanLines) ? implode("\n", $cleanLines) : null;
         }
 
+        // Resolve signature & stamp config
+        $prefs = $tenantSettings['signature_stamp_preferences'] ?? [];
+        $autoEmbed = $prefs['auto_embed_sales_invoice'] ?? true;
+        $orderConfig = $order->signature_stamp_config ?? [];
+
+        $signatureUrl = $orderConfig['signature_url'] ?? ($autoEmbed ? ($tenantSettings['default_signature_url'] ?? null) : null);
+        $stampUrl = $orderConfig['stamp_url'] ?? ($autoEmbed ? ($tenantSettings['default_stamp_url'] ?? null) : null);
+
+        $signatureBase64 = self::resolveImageBase64($signatureUrl);
+        $stampBase64 = self::resolveImageBase64($stampUrl);
+        $stampConfig = array_merge([
+            'show_signature' => ! empty($signatureBase64),
+            'show_stamp' => ! empty($stampBase64),
+            'stamp_position' => $prefs['default_stamp_size'] ?? ['x' => 74, 'y' => 84, 'width' => 22, 'height' => 18],
+            'signature_position' => $prefs['default_signature_size'] ?? ['x' => 78, 'y' => 89, 'width' => 20, 'height' => 10],
+        ], $orderConfig);
+
         $footerHtml = '<div style="width: 100%; font-size: 7.5pt; color: #94a3b8; display: flex; justify-content: space-between; align-items: center; padding: 0 12mm; font-family: -apple-system, BlinkMacSystemFont, Roboto, sans-serif;">'
             . '<span>' . e($business['name']) . ' · Official Sales Invoice & Receipt</span>'
             . '<span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>'
@@ -211,6 +250,94 @@ class PdfGeneratorService
             'isB2B' => $isB2B,
             'isPaid' => $isPaid,
             'sanitizedNotes' => $sanitizedNotes,
+            'signatureBase64' => $signatureBase64,
+            'stampBase64' => $stampBase64,
+            'stampConfig' => $stampConfig,
+            'filename' => $filename,
+        ])
+            ->format(Format::A4)
+            ->margins(top: 8, right: 12, bottom: 8, left: 12, unit: 'mm')
+            ->headerHtml('<span style="font-size: 1px;"></span>')
+            ->footerHtml($footerHtml)
+            ->name($filename);
+
+        return $forceDownload ? $pdf->download() : $pdf->inline();
+    }
+
+    /**
+     * Generate an executive Proforma Invoice PDF with corporate branding, tax calculations, and optional stamp/signature.
+     */
+    public function generateProformaPdf(
+        ProformaInvoice $proforma,
+        bool $forceDownload = true
+    ): \Spatie\LaravelPdf\PdfBuilder {
+        $proforma->loadMissing([
+            'customer',
+            'creator',
+            'bankAccount',
+            'items.product',
+            'items.variant',
+        ]);
+
+        $tenant = $proforma->tenant;
+        if (! $tenant && ! empty($proforma->tenant_id)) {
+            $tenant = Tenant::find($proforma->tenant_id);
+        }
+        $tenantSettings = $tenant?->settings ?? [];
+        $ownerUser = $tenant?->users()->where('role', 'owner')->first();
+
+        $addressParts = array_filter([
+            $tenantSettings['address'] ?? null,
+            $tenantSettings['city'] ?? null,
+        ]);
+        $branch = ! empty($addressParts) ? implode(', ', $addressParts) : ($tenant?->business_type ? ucfirst($tenant->business_type) : 'Addis Ababa');
+
+        $businessName = ! empty($tenant?->name) ? $tenant->name : 'HabeshaBiz Electronics';
+        $businessPhone = ! empty($tenant?->phone) ? $tenant->phone : '+251 91 123 4567';
+        $businessEmail = ! empty($ownerUser?->email) ? $ownerUser->email : 'sales@habeshabiz.et';
+        $businessLogo = $tenantSettings['logo_url'] ?? null;
+
+        $business = [
+            'name' => $businessName,
+            'branch' => $branch,
+            'phone' => $businessPhone,
+            'email' => $businessEmail,
+            'logo_url' => $businessLogo,
+            'logo_base64' => self::resolveImageBase64($businessLogo),
+            'tin_number' => $tenantSettings['tin_number'] ?? null,
+            'vat_number' => $tenantSettings['vat_number'] ?? $tenantSettings['tin_number'] ?? null,
+            'footer_note' => $tenantSettings['footer_note'] ?? null,
+        ];
+
+        // Resolving signature and stamp config
+        $prefs = $tenantSettings['signature_stamp_preferences'] ?? [];
+        $autoEmbed = $prefs['auto_embed_proforma'] ?? true;
+        $config = $proforma->signature_stamp_config ?? [];
+        $signatureUrl = $config['signature_url'] ?? ($autoEmbed ? ($tenantSettings['default_signature_url'] ?? null) : null);
+        $stampUrl = $config['stamp_url'] ?? ($autoEmbed ? ($tenantSettings['default_stamp_url'] ?? null) : null);
+
+        $signatureBase64 = self::resolveImageBase64($signatureUrl);
+        $stampBase64 = self::resolveImageBase64($stampUrl);
+        $stampConfig = array_merge([
+            'show_signature' => ! empty($signatureBase64),
+            'show_stamp' => ! empty($stampBase64),
+            'stamp_position' => $prefs['default_stamp_size'] ?? ['x' => 74, 'y' => 84, 'width' => 22, 'height' => 18],
+            'signature_position' => $prefs['default_signature_size'] ?? ['x' => 78, 'y' => 89, 'width' => 20, 'height' => 10],
+        ], $config);
+
+        $filename = "Proforma_{$proforma->proforma_number}.pdf";
+
+        $footerHtml = '<div style="width: 100%; font-size: 7.5pt; color: #94a3b8; display: flex; justify-content: space-between; align-items: center; padding: 0 12mm; font-family: -apple-system, BlinkMacSystemFont, Roboto, sans-serif;">'
+            . '<span>' . e($business['name']) . ' · Proforma Invoice & Official Quotation</span>'
+            . '<span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>'
+            . '</div>';
+
+        $pdf = Pdf::view('pdf.proforma-invoice', [
+            'proforma' => $proforma,
+            'business' => $business,
+            'signatureBase64' => $signatureBase64,
+            'stampBase64' => $stampBase64,
+            'stampConfig' => $stampConfig,
             'filename' => $filename,
         ])
             ->format(Format::A4)

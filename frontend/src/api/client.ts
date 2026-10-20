@@ -157,6 +157,8 @@ export interface Contact {
   phone: string | null;
   alt_phone?: string | null;
   email?: string | null;
+  address?: string | null;
+  tax_number?: string | null;
   roles: string[];
   notes?: string | null;
   is_active?: boolean;
@@ -316,6 +318,97 @@ export interface AttachedAccessory {
   vendor_paid_amount?: number | null;
   vendor_payment_account_id?: string | null;
   vendor_payment_splits?: { financial_account_id: string; amount: number; reference_number?: string }[] | null;
+}
+
+export interface ProformaInvoiceItem {
+  id?: string;
+  item_number?: number;
+  product_id?: string | null;
+  variant_id?: string | null;
+  description: string;
+  sku?: string | null;
+  unit_of_measure?: string;
+  quantity: number;
+  unit_price: number;
+  discount_type?: 'percentage' | 'fixed';
+  discount_rate?: number;
+  discount_amount?: number;
+  tax_rate?: number;
+  taxable_amount?: number;
+  tax_amount?: number;
+  line_total?: number;
+  product?: Product;
+  variant?: ProductVariant;
+}
+
+export interface ProformaInvoice {
+  id: string;
+  tenant_id: string;
+  proforma_number: string;
+  created_by_user_id?: number | null;
+  customer_id?: string | null;
+  customer_name: string;
+  customer_phone?: string | null;
+  customer_email?: string | null;
+  customer_address?: string | null;
+  customer_tin?: string | null;
+  issue_date: string;
+  valid_until?: string | null;
+  currency: string;
+  status: 'draft' | 'sent' | 'accepted' | 'expired' | 'converted_to_sale';
+  subtotal: number | string;
+  discount_total: number | string;
+  taxable_amount: number | string;
+  vat_rate: number | string;
+  vat_total: number | string;
+  withholding_rate: number | string;
+  withholding_total: number | string;
+  shipping_fee: number | string;
+  total_amount: number | string;
+  net_payable: number | string;
+  payment_terms?: string | null;
+  payment_method?: string | null;
+  bank_account_id?: string | null;
+  reference_number?: string | null;
+  prepared_by?: string | null;
+  notes?: string | null;
+  delivery_terms?: string | null;
+  signature_stamp_config?: {
+    signature_url?: string | null;
+    stamp_url?: string | null;
+    show_signature?: boolean;
+    show_stamp?: boolean;
+    has_custom_placement?: boolean;
+    signature_position?: { x: number; y: number; width: number; height: number; rotation?: number; opacity?: number };
+    stamp_position?: { x: number; y: number; width: number; height: number; rotation?: number; opacity?: number };
+  } | null;
+  items?: ProformaInvoiceItem[];
+  customer?: Contact;
+  creator?: User;
+  bank_account?: FinancialAccount;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ProformaInvoiceListResponse {
+  success: boolean;
+  data: ProformaInvoice[];
+  meta: {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+  };
+  metrics: {
+    total_count: number;
+    total_value: number;
+    pending_count: number;
+    pending_value: number;
+    accepted_count: number;
+    accepted_value: number;
+    converted_count: number;
+    expired_count: number;
+  };
 }
 
 export interface SalesOrder {
@@ -869,6 +962,13 @@ export interface SettingsProfileResponse {
     logo_url: string | null;
     footer_note: string;
     secondary_currencies: string[];
+    default_signature_url?: string | null;
+    default_stamp_url?: string | null;
+    signature_stamp_preferences?: {
+      auto_embed_sales_invoice?: boolean;
+      auto_embed_proforma?: boolean;
+      auto_embed_vendor_statement?: boolean;
+    };
   };
   user: {
     id: number;
@@ -1640,6 +1740,15 @@ export const api = {
     return res.blob();
   },
 
+  downloadProformaPdf: async (id: string, forceDownload = true): Promise<Blob> => {
+    const token = getAuthToken();
+    const res = await fetch(`${API_BASE}/proforma-invoices/${id}/pdf?download=${forceDownload ? '1' : '0'}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new Error('Failed to download proforma invoice PDF');
+    return res.blob();
+  },
+
   getExpenses: (params?: { is_owner_draw?: boolean; category?: string }) => {
     const query = new URLSearchParams();
     if (params?.is_owner_draw !== undefined) query.set('is_owner_draw', String(params.is_owner_draw));
@@ -1790,5 +1899,143 @@ export const api = {
       method: 'POST',
       body: formData,
     });
+  },
+
+  saveSignature: (signatureData: string | File) => {
+    if (signatureData instanceof File) {
+      const formData = new FormData();
+      formData.append('signature_file', signatureData);
+      return request<{ signature_url: string }>('/settings/signature', {
+        method: 'POST',
+        body: formData,
+      });
+    }
+    return request<{ signature_url: string }>('/settings/signature', {
+      method: 'POST',
+      body: JSON.stringify({ signature_data: signatureData }),
+    });
+  },
+
+  deleteSignature: () =>
+    request<{ message: string }>('/settings/signature', {
+      method: 'DELETE',
+    }),
+
+  saveStamp: (stampData: string | File) => {
+    if (stampData instanceof File) {
+      const formData = new FormData();
+      formData.append('stamp_file', stampData);
+      return request<{ stamp_url: string }>('/settings/stamp', {
+        method: 'POST',
+        body: formData,
+      });
+    }
+    return request<{ stamp_url: string }>('/settings/stamp', {
+      method: 'POST',
+      body: JSON.stringify({ stamp_data: stampData }),
+    });
+  },
+
+  deleteStamp: () =>
+    request<{ message: string }>('/settings/stamp', {
+      method: 'DELETE',
+    }),
+
+  updateSignatureStampPreferences: (preferences: Record<string, any>) =>
+    request<{ preferences: Record<string, any> }>('/settings/signature-stamp-preferences', {
+      method: 'PUT',
+      body: JSON.stringify({ preferences }),
+    }),
+
+  updateSalesOrderSignatureStamp: (orderId: string, signature_stamp_config: any) =>
+    request<SalesOrder>(`/sales/${orderId}/signature-stamp`, {
+      method: 'POST',
+      body: JSON.stringify({ signature_stamp_config }),
+    }),
+
+  // Proforma Invoices (Quotations, Performa Documents, Official PDF)
+  getProformaInvoices: async (params?: { search?: string; status?: string; start_date?: string; end_date?: string; page?: number; per_page?: number }) => {
+    const query = new URLSearchParams();
+    if (params?.search) query.set('search', params.search);
+    if (params?.status) query.set('status', params.status);
+    if (params?.start_date) query.set('start_date', params.start_date);
+    if (params?.end_date) query.set('end_date', params.end_date);
+    if (params?.page) query.set('page', String(params.page));
+    if (params?.per_page) query.set('per_page', String(params.per_page));
+
+    const token = getAuthToken();
+    const res = await fetch(`${API_BASE}/proforma-invoices?${query.toString()}`, {
+      headers: {
+        Accept: 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.message || 'Failed to fetch proforma invoices');
+    return {
+      data: (json.data || []) as ProformaInvoice[],
+      metrics: json.metrics || {
+        total_count: 0,
+        total_value: 0,
+        pending_count: 0,
+        pending_value: 0,
+        accepted_count: 0,
+        accepted_value: 0,
+        converted_count: 0,
+        expired_count: 0,
+      },
+      meta: json.meta,
+    };
+  },
+
+  getProformaInvoice: (id: string) => request<ProformaInvoice>(`/proforma-invoices/${id}`),
+
+  createProformaInvoice: (data: any) =>
+    request<ProformaInvoice>('/proforma-invoices', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateProformaInvoice: (id: string, data: any) =>
+    request<ProformaInvoice>(`/proforma-invoices/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deleteProformaInvoice: (id: string) =>
+    request<{ message: string }>(`/proforma-invoices/${id}`, {
+      method: 'DELETE',
+    }),
+
+  duplicateProformaInvoice: (id: string) =>
+    request<ProformaInvoice>(`/proforma-invoices/${id}/duplicate`, {
+      method: 'POST',
+    }),
+
+  updateProformaInvoiceStatus: (id: string, status: string) =>
+    request<ProformaInvoice>(`/proforma-invoices/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    }),
+
+  updateProformaSignatureStamp: (id: string, signature_stamp_config: any) =>
+    request<ProformaInvoice>(`/proforma-invoices/${id}/signature-stamp`, {
+      method: 'POST',
+      body: JSON.stringify({ signature_stamp_config }),
+    }),
+
+  uploadProformaAsset: (file: File, type: 'signature' | 'stamp' | 'general' = 'general') => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('type', type);
+    return request<{ url: string; type: string }>('/proforma-invoices/upload-asset', {
+      method: 'POST',
+      body: formData,
+    });
+  },
+
+  getProformaPdfUrl: (id: string, download = false) => {
+    const token = getAuthToken();
+    return `${API_BASE}/proforma-invoices/${id}/pdf?download=${download ? '1' : '0'}${token ? `&auth_token=${encodeURIComponent(token)}` : ''}`;
   },
 };

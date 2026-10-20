@@ -17,6 +17,7 @@ import {
   Handshake,
   ScrollText,
   FileBarChart,
+  FileSpreadsheet,
   X,
   ChevronRight,
   Sun,
@@ -28,6 +29,7 @@ export type NavTab =
   | 'counter'
   | 'inventory'
   | 'sales'
+  | 'proforma'
   | 'partners'
   | 'debts'
   | 'treasury'
@@ -100,6 +102,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'counter', label: 'Sales', icon: ShoppingCart, shortcut: '⌘2' },
     { id: 'inventory', label: 'Stock', icon: Package, shortcut: '⌘3' },
     { id: 'sales', label: 'Sales History', icon: Receipt, shortcut: '⌘4' },
+    { id: 'proforma', label: 'Performa Invoice', icon: FileSpreadsheet, shortcut: '⌘P' },
     ...(isOwner
       ? [
           { id: 'partners' as NavTab, label: 'Vendors', icon: Handshake, shortcut: '⌘5' },

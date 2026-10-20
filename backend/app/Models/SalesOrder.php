@@ -35,6 +35,7 @@ class SalesOrder extends Model
         'vendor_cost_basis',
         'vendor_payment_status',
         'notes',
+        'signature_stamp_config',
         'order_date',
     ];
 
@@ -50,6 +51,7 @@ class SalesOrder extends Model
             'credit_sale' => 'boolean',
             'is_vendor_sourced' => 'boolean',
             'payment_splits' => 'array',
+            'signature_stamp_config' => 'array',
             'vendor_cost_basis' => 'decimal:2',
             'order_date' => 'datetime',
         ];

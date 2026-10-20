@@ -20,6 +20,7 @@ import { OverviewView } from './views/OverviewView';
 import { CounterView } from './views/CounterView';
 import { InventoryView } from './views/InventoryView';
 import { SalesHistoryView } from './views/SalesHistoryView';
+import { ProformaInvoiceView } from './views/ProformaInvoiceView';
 import { DebtsView } from './views/DebtsView';
 import { TreasuryView } from './views/TreasuryView';
 import { ExpensesView } from './views/ExpensesView';
@@ -56,6 +57,7 @@ export const VALID_NAV_TABS: NavTab[] = [
   'counter',
   'inventory',
   'sales',
+  'proforma',
   'partners',
   'debts',
   'treasury',
@@ -321,6 +323,8 @@ export default function App() {
           '2': 'counter',
           '3': 'inventory',
           '4': 'sales',
+          'p': 'proforma',
+          'P': 'proforma',
           ...(isOwner
             ? {
                 '5': 'partners',
@@ -740,6 +744,15 @@ export default function App() {
                   tenant={tenant}
                   initialSelectedOrder={navContext.order}
                   onClearInitialContext={handleClearNavContext}
+                />
+              )}
+
+              {activeTab === 'proforma' && (
+                <ProformaInvoiceView
+                  user={user}
+                  tenant={tenant}
+                  accounts={accounts}
+                  contacts={contacts}
                 />
               )}
 

@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\OnboardingController;
 use App\Http\Controllers\Api\ProductController;
+use App\Http\Controllers\Api\ProformaInvoiceController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\SaleController;
 use App\Http\Controllers\Api\SettingsController;
@@ -74,6 +75,11 @@ Route::prefix('v1')->group(function () {
         Route::get('/settings/profile', [SettingsController::class, 'getProfile']);
         Route::put('/settings/profile', [SettingsController::class, 'updateProfile']);
         Route::post('/settings/profile/logo', [SettingsController::class, 'uploadLogo']);
+        Route::post('/settings/signature', [SettingsController::class, 'uploadSignature']);
+        Route::delete('/settings/signature', [SettingsController::class, 'deleteSignature']);
+        Route::post('/settings/stamp', [SettingsController::class, 'uploadStamp']);
+        Route::delete('/settings/stamp', [SettingsController::class, 'deleteStamp']);
+        Route::put('/settings/signature-stamp-preferences', [SettingsController::class, 'updateSignatureStampPreferences']);
 
         // User Profile & Session
         Route::get('/auth/me', [AuthController::class, 'me']);
@@ -141,6 +147,19 @@ Route::prefix('v1')->group(function () {
         Route::post('/sales/vendor-direct', [SaleController::class, 'storeVendorDirect']);
         Route::post('/sales/{id}/collect', [SaleController::class, 'collectPayment']);
         Route::get('/sales/{id}/invoice/pdf', [SaleController::class, 'invoicePdf']);
+        Route::post('/sales/{id}/signature-stamp', [SaleController::class, 'updateSignatureStampConfig']);
+
+        // Proforma Invoices (Quotations, Performa Documents, Official PDF)
+        Route::get('/proforma-invoices', [ProformaInvoiceController::class, 'index']);
+        Route::post('/proforma-invoices', [ProformaInvoiceController::class, 'store']);
+        Route::post('/proforma-invoices/upload-asset', [ProformaInvoiceController::class, 'uploadAsset']);
+        Route::get('/proforma-invoices/{id}', [ProformaInvoiceController::class, 'show']);
+        Route::put('/proforma-invoices/{id}', [ProformaInvoiceController::class, 'update']);
+        Route::delete('/proforma-invoices/{id}', [ProformaInvoiceController::class, 'destroy']);
+        Route::post('/proforma-invoices/{id}/duplicate', [ProformaInvoiceController::class, 'duplicate']);
+        Route::patch('/proforma-invoices/{id}/status', [ProformaInvoiceController::class, 'updateStatus']);
+        Route::post('/proforma-invoices/{id}/signature-stamp', [ProformaInvoiceController::class, 'updateSignatureStampConfig']);
+        Route::get('/proforma-invoices/{id}/pdf', [ProformaInvoiceController::class, 'downloadPdf']);
 
         // Debts: Receivables & Payables Ledger
         Route::get('/debts', [DebtController::class, 'index']);

@@ -21,6 +21,7 @@ const tabTitles: Record<NavTab, { title: string; subtitle: string }> = {
   counter: { title: 'Sales Counter', subtitle: 'Point of sale checkout' },
   inventory: { title: 'Inventory', subtitle: 'Active store devices and catalog' },
   sales: { title: 'Sales History', subtitle: 'Transactions and store profit' },
+  proforma: { title: 'Performa Invoice', subtitle: 'Official price quotations and proforma documents' },
   partners: { title: 'Vendors', subtitle: 'Suppliers and partner stores' },
   debts: { title: 'Receivable and Payable', subtitle: 'Customer credit and vendor balances' },
   treasury: { title: 'Bank Accounts', subtitle: 'Bank accounts and mobile wallets' },

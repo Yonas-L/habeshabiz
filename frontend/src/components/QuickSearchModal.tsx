@@ -14,6 +14,7 @@ import {
   Landmark,
   DollarSign,
   FileBarChart,
+  FileSpreadsheet,
   Users,
   ScrollText,
   Plus,
@@ -203,6 +204,15 @@ export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({
         icon: Receipt,
         shortcut: '⌘4',
         onSelect: () => onNavigate({ tab: 'sales' }),
+      },
+      {
+        id: 'nav-proforma',
+        type: 'navigation',
+        title: 'Performa Invoices',
+        subtitle: 'Price quotations, official proforma documents & PDF generation',
+        icon: FileSpreadsheet,
+        shortcut: '⌘P',
+        onSelect: () => onNavigate({ tab: 'proforma' }),
       },
     ];
 

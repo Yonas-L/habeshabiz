@@ -824,4 +824,20 @@ class SaleController extends Controller
 
         return $pdfService->generateSalesInvoice($order, $forceDownload)->toResponse($request);
     }
+
+    public function updateSignatureStampConfig(Request $request, string $id): JsonResponse
+    {
+        $validated = $request->validate([
+            'signature_stamp_config' => ['required', 'array'],
+        ]);
+
+        $order = SalesOrder::findOrFail($id);
+        $order->update(['signature_stamp_config' => $validated['signature_stamp_config']]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Sales invoice signature and stamp layout updated.',
+            'data' => $order,
+        ]);
+    }
 }

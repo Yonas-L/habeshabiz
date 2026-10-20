@@ -50,6 +50,15 @@ class SettingsController extends Controller
                     'logo_url' => $settings['logo_url'] ?? null,
                     'footer_note' => $settings['footer_note'] ?? '',
                     'secondary_currencies' => $settings['secondary_currencies'] ?? ['USD'],
+                    'default_signature_url' => $settings['default_signature_url'] ?? null,
+                    'default_stamp_url' => $settings['default_stamp_url'] ?? null,
+                    'signature_stamp_preferences' => $settings['signature_stamp_preferences'] ?? [
+                        'auto_embed_sales_invoice' => true,
+                        'auto_embed_proforma' => true,
+                        'auto_embed_vendor_statement' => true,
+                        'default_signature_size' => ['width' => 22, 'height' => 10],
+                        'default_stamp_size' => ['width' => 24, 'height' => 18],
+                    ],
                 ],
                 'user' => [
                     'id' => $user->id,
@@ -164,6 +173,15 @@ class SettingsController extends Controller
                     'logo_url' => $settings['logo_url'] ?? null,
                     'footer_note' => $settings['footer_note'] ?? '',
                     'secondary_currencies' => $settings['secondary_currencies'] ?? ['USD'],
+                    'default_signature_url' => $settings['default_signature_url'] ?? null,
+                    'default_stamp_url' => $settings['default_stamp_url'] ?? null,
+                    'signature_stamp_preferences' => $settings['signature_stamp_preferences'] ?? [
+                        'auto_embed_sales_invoice' => true,
+                        'auto_embed_proforma' => true,
+                        'auto_embed_vendor_statement' => true,
+                        'default_signature_size' => ['width' => 22, 'height' => 10],
+                        'default_stamp_size' => ['width' => 24, 'height' => 18],
+                    ],
                 ],
                 'user' => [
                     'id' => $user->id,
@@ -216,6 +234,218 @@ class SettingsController extends Controller
             'message' => 'Logo uploaded successfully.',
             'data' => [
                 'logo_url' => $url,
+            ],
+        ]);
+    }
+
+    /**
+     * Save authorized handwritten signature (file upload or canvas transparent data URI).
+     */
+    public function uploadSignature(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        if ($user->role !== 'owner') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Access denied. Owner privileges required.',
+            ], 403);
+        }
+
+        $request->validate([
+            'signature_file' => ['nullable', 'image', 'mimes:jpeg,png,jpg,webp,svg', 'max:4096'],
+            'signature_data' => ['nullable', 'string'],
+        ]);
+
+        /** @var Tenant $tenant */
+        $tenant = $user->tenant;
+
+        $url = null;
+        if ($request->hasFile('signature_file')) {
+            $url = Tenant::convertUploadedFileToDataUri($request->file('signature_file'));
+        } elseif ($request->filled('signature_data')) {
+            $data = $request->input('signature_data');
+            if (! str_starts_with($data, 'data:image/')) {
+                return response()->json(['success' => false, 'message' => 'Invalid signature data format.'], 422);
+            }
+            $url = $data;
+        } else {
+            return response()->json(['success' => false, 'message' => 'No signature provided.'], 422);
+        }
+
+        $settings = $tenant->settings ?? [];
+        $settings['default_signature_url'] = $url;
+        $tenant->update(['settings' => $settings]);
+
+        AuditLog::record(
+            action: 'signature_saved',
+            entityType: 'Tenant',
+            entityId: $tenant->id,
+            newValues: ['default_signature_url' => 'Signature updated']
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Digital signature saved successfully.',
+            'data' => [
+                'signature_url' => $url,
+            ],
+        ]);
+    }
+
+    /**
+     * Delete stored authorized signature.
+     */
+    public function deleteSignature(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        if ($user->role !== 'owner') {
+            return response()->json(['success' => false, 'message' => 'Access denied.'], 403);
+        }
+
+        /** @var Tenant $tenant */
+        $tenant = $user->tenant;
+        $settings = $tenant->settings ?? [];
+        $settings['default_signature_url'] = null;
+        $tenant->update(['settings' => $settings]);
+
+        AuditLog::record(
+            action: 'signature_deleted',
+            entityType: 'Tenant',
+            entityId: $tenant->id,
+            newValues: ['default_signature_url' => null]
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Authorized signature removed.',
+        ]);
+    }
+
+    /**
+     * Save company stamp (file upload or processed transparent canvas data URI).
+     */
+    public function uploadStamp(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        if ($user->role !== 'owner') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Access denied. Owner privileges required.',
+            ], 403);
+        }
+
+        $request->validate([
+            'stamp_file' => ['nullable', 'image', 'mimes:jpeg,png,jpg,webp,svg', 'max:5120'],
+            'stamp_data' => ['nullable', 'string'],
+        ]);
+
+        /** @var Tenant $tenant */
+        $tenant = $user->tenant;
+
+        $url = null;
+        if ($request->hasFile('stamp_file')) {
+            $url = Tenant::convertUploadedFileToDataUri($request->file('stamp_file'));
+        } elseif ($request->filled('stamp_data')) {
+            $data = $request->input('stamp_data');
+            if (! str_starts_with($data, 'data:image/')) {
+                return response()->json(['success' => false, 'message' => 'Invalid stamp data format.'], 422);
+            }
+            $url = $data;
+        } else {
+            return response()->json(['success' => false, 'message' => 'No company stamp provided.'], 422);
+        }
+
+        $settings = $tenant->settings ?? [];
+        $settings['default_stamp_url'] = $url;
+        $tenant->update(['settings' => $settings]);
+
+        AuditLog::record(
+            action: 'stamp_saved',
+            entityType: 'Tenant',
+            entityId: $tenant->id,
+            newValues: ['default_stamp_url' => 'Company stamp updated']
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Company stamp saved successfully.',
+            'data' => [
+                'stamp_url' => $url,
+            ],
+        ]);
+    }
+
+    /**
+     * Delete stored company stamp.
+     */
+    public function deleteStamp(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        if ($user->role !== 'owner') {
+            return response()->json(['success' => false, 'message' => 'Access denied.'], 403);
+        }
+
+        /** @var Tenant $tenant */
+        $tenant = $user->tenant;
+        $settings = $tenant->settings ?? [];
+        $settings['default_stamp_url'] = null;
+        $tenant->update(['settings' => $settings]);
+
+        AuditLog::record(
+            action: 'stamp_deleted',
+            entityType: 'Tenant',
+            entityId: $tenant->id,
+            newValues: ['default_stamp_url' => null]
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Company stamp removed.',
+        ]);
+    }
+
+    /**
+     * Update document automation and signature/stamp placement preferences.
+     */
+    public function updateSignatureStampPreferences(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        if ($user->role !== 'owner') {
+            return response()->json(['success' => false, 'message' => 'Access denied.'], 403);
+        }
+
+        $validated = $request->validate([
+            'preferences' => ['required', 'array'],
+            'preferences.auto_embed_sales_invoice' => ['nullable', 'boolean'],
+            'preferences.auto_embed_proforma' => ['nullable', 'boolean'],
+            'preferences.auto_embed_vendor_statement' => ['nullable', 'boolean'],
+            'preferences.default_signature_size' => ['nullable', 'array'],
+            'preferences.default_stamp_size' => ['nullable', 'array'],
+        ]);
+
+        /** @var Tenant $tenant */
+        $tenant = $user->tenant;
+        $settings = $tenant->settings ?? [];
+        $currentPrefs = $settings['signature_stamp_preferences'] ?? [];
+        $newPrefs = array_merge($currentPrefs, $validated['preferences']);
+        $settings['signature_stamp_preferences'] = $newPrefs;
+        $tenant->update(['settings' => $settings]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Signature and stamp preferences updated.',
+            'data' => [
+                'preferences' => $newPrefs,
             ],
         ]);
     }
