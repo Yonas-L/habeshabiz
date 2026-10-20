@@ -1,10 +1,64 @@
 #!/bin/sh
 set -e
 
-# Dynamically adjust port for Render ($PORT)
-if [ -n "$PORT" ]; then
-    sed -i "s/listen [0-9]*;/listen $PORT;/" /etc/nginx/http.d/default.conf
+PORT="${PORT:-10000}"
+echo "Configuring Nginx for PORT=${PORT}..."
+
+# Generate Nginx configuration dynamically ensuring 0.0.0.0 binding
+cat <<EOF > /etc/nginx/http.d/default.conf
+server {
+    listen 0.0.0.0:${PORT} default_server;
+    listen [::]:${PORT} default_server;
+EOF
+
+if [ "$PORT" != "80" ]; then
+    cat <<EOF >> /etc/nginx/http.d/default.conf
+    listen 0.0.0.0:80;
+    listen [::]:80;
+EOF
 fi
+
+cat <<'EOF' >> /etc/nginx/http.d/default.conf
+    server_name _;
+    root /var/www/html/public;
+
+    add_header X-Frame-Options "SAMEORIGIN";
+    add_header X-Content-Type-Options "nosniff";
+
+    index index.php;
+
+    charset utf-8;
+
+    client_max_body_size 64M;
+
+    access_log /dev/stdout;
+    error_log /dev/stderr warn;
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location = /favicon.ico { access_log off; log_not_found off; }
+    location = /robots.txt  { access_log off; log_not_found off; }
+
+    error_page 404 /index.php;
+
+    location ~ \.php$ {
+        fastcgi_pass 127.0.0.1:9000;
+        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        include fastcgi_params;
+        fastcgi_hide_header X-Powered-By;
+        fastcgi_read_timeout 300;
+    }
+
+    location ~ /\.(?!well-known).* {
+        deny all;
+    }
+}
+EOF
+
+echo "Testing Nginx configuration..."
+nginx -t
 
 # Ensure storage link exists
 php artisan storage:link --force || true

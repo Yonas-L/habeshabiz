@@ -57,6 +57,6 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction --ignore-pl
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
     && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
-EXPOSE 80 10000
+EXPOSE 10000 80
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

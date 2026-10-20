@@ -6,7 +6,10 @@ services:
     dockerContext: ./backend
     plan: free
     region: ohio
+    healthCheckPath: /up
     envVars:
+      - key: PORT
+        value: "10000"
       - key: APP_NAME
         value: HabeshaBiz
       - key: APP_ENV
