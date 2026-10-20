@@ -106,13 +106,27 @@ export const ProformaInvoiceView: React.FC<ProformaInvoiceViewProps> = ({
     }
   };
 
-  // Handle Quick Print
-  const handlePrint = (e: React.MouseEvent, invoice: ProformaInvoice) => {
+  // Handle Quick Print / Vector PDF Preview
+  const handlePrint = async (e: React.MouseEvent, invoice: ProformaInvoice) => {
     e.stopPropagation();
-    const url = api.getProformaPdfUrl(invoice.id, false);
-    const win = window.open(url, '_blank');
-    if (win) win.focus();
-    else toast.error('Please allow popups to open PDF document.');
+    try {
+      const blob = await api.downloadProformaPdf(invoice.id, false);
+      const url = URL.createObjectURL(blob);
+      const win = window.open(url, '_blank');
+      if (win) {
+        win.focus();
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+      } else {
+        toast.error('Please allow popups to open PDF document.');
+      }
+    } catch {
+      // Fallback: direct authenticated URL with auth_token query parameter
+      const fallbackUrl = api.getProformaPdfUrl(invoice.id, false);
+      const win = window.open(fallbackUrl, '_blank');
+      if (!win) {
+        toast.error('Please allow popups to open PDF document.');
+      }
+    }
   };
 
   // Handle Duplicate

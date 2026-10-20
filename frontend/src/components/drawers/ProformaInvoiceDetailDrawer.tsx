@@ -77,14 +77,24 @@ export const ProformaInvoiceDetailDrawer: React.FC<ProformaInvoiceDetailDrawerPr
     }
   };
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     if (!proforma?.id) return;
-    const pdfUrl = api.getProformaPdfUrl(proforma.id, false);
-    const win = window.open(pdfUrl, '_blank');
-    if (win) {
-      win.focus();
-    } else {
-      toast.error('Please allow popups to open document for printing.');
+    try {
+      const blob = await api.downloadProformaPdf(proforma.id, false);
+      const url = URL.createObjectURL(blob);
+      const win = window.open(url, '_blank');
+      if (win) {
+        win.focus();
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+      } else {
+        toast.error('Please allow popups to open document for printing.');
+      }
+    } catch {
+      const fallbackUrl = api.getProformaPdfUrl(proforma.id, false);
+      const win = window.open(fallbackUrl, '_blank');
+      if (!win) {
+        toast.error('Please allow popups to open document for printing.');
+      }
     }
   };
 

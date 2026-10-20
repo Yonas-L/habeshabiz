@@ -325,3 +325,48 @@ test('multi-tenant isolation prevents accessing another tenants proforma invoice
 
     $res->assertStatus(404);
 });
+
+test('can download proforma pdf using query auth_token without Authorization header', function () {
+    $proforma = ProformaInvoice::create([
+        'tenant_id' => $this->tenant->id,
+        'proforma_number' => 'PI-2026-0005',
+        'customer_name' => 'Query Token Test Client',
+        'issue_date' => now()->format('Y-m-d'),
+        'subtotal' => 5000.00,
+        'taxable_amount' => 5000.00,
+        'vat_total' => 750.00,
+        'total_amount' => 5750.00,
+        'net_payable' => 5750.00,
+    ]);
+
+    $token = $this->owner->createToken('test_token')->plainTextToken;
+
+    // Simulate direct browser GET request with auth_token in query string, no Bearer header
+    $response = $this->get("/api/v1/proforma-invoices/{$proforma->id}/pdf?download=0&auth_token={$token}");
+
+    $response->assertStatus(200);
+    Pdf::assertRespondedWithPdf(function (\Spatie\LaravelPdf\PdfBuilder $pdf) use ($proforma) {
+        return $pdf->viewName === 'pdf.proforma-invoice'
+            && $pdf->viewData['proforma']->id === $proforma->id;
+    });
+});
+
+test('unauthenticated request to api pdf route returns 401 instead of Route [login] not defined exception', function () {
+    $proforma = ProformaInvoice::create([
+        'tenant_id' => $this->tenant->id,
+        'proforma_number' => 'PI-2026-0006',
+        'customer_name' => 'Unauthenticated Test Client',
+        'issue_date' => now()->format('Y-m-d'),
+        'subtotal' => 2000.00,
+        'taxable_amount' => 2000.00,
+        'total_amount' => 2000.00,
+        'net_payable' => 2000.00,
+    ]);
+
+    // Simulate browser direct GET without Accept: application/json and without auth
+    $response = $this->withHeaders(['Accept' => 'text/html,application/xhtml+xml'])
+        ->get("/api/v1/proforma-invoices/{$proforma->id}/pdf?download=0");
+
+    $response->assertStatus(401);
+});
+

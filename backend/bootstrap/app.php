@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\AuthenticatePlatformAdmin;
+use App\Http\Middleware\AuthenticateQueryToken;
 use App\Http\Middleware\CheckTenantNotLocked;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -15,6 +16,12 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->redirectGuestsTo(fn () => null);
+
+        $middleware->api(prepend: [
+            AuthenticateQueryToken::class,
+        ]);
+
         $middleware->alias([
             'auth.platform_admin' => AuthenticatePlatformAdmin::class,
             'tenant.not_locked' => CheckTenantNotLocked::class,
