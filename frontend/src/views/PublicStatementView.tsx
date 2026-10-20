@@ -378,6 +378,8 @@ export const PublicStatementView: React.FC<PublicStatementViewProps> = ({ token 
                               .replace(/\[unit_id:[a-zA-Z0-9_-]+\]/gi, '')
                               .replace(/^(?:Deducted by handover device|Handover device):\s*/gi, '')
                               .replace(/^Deducted by sale(?:\s*Order)?\s*/gi, '')
+                              .replace(/Returned:\s*Transaction entry/gi, 'Device returned to vendor')
+                              .replace(/Transaction entry/gi, 'Device')
                               .replace(/wire\s+payout/gi, 'Transferred')
                               .replace(/(?:in|for|from)?\s*Order\s*#[A-Za-z0-9_-]+/gi, '')
                               .replace(/#ORD-[A-Za-z0-9_-]+/gi, '')

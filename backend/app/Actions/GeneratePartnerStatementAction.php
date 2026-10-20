@@ -452,7 +452,7 @@ class GeneratePartnerStatementAction
                 $accountName = $payment->financialAccount?->name ?? 'Wire';
 
                 if ($payment->reference_number === 'RETURN-TO-VENDOR') {
-                    $context = 'Returned to vendor';
+                    $context = 'Device returned to vendor';
                     if ($order && $order->items->isNotEmpty()) {
                         $vendorItems = $order->items->filter(fn ($it) => (string) $it->vendor_contact_id === (string) $contact->id);
                         $itemsToMap = $vendorItems->isNotEmpty() ? $vendorItems : $order->items;
@@ -462,18 +462,23 @@ class GeneratePartnerStatementAction
 
                             return "{$pName}{$sn}";
                         })->join(', ');
-                        $context = $devs ? "Returned: {$devs}" : 'Returned to vendor';
+                        $context = $devs ? "Returned: {$devs}" : 'Device returned to vendor';
+                    } elseif (! empty($debt->reference_id) && ($linkedUnit = $inventoryUnits->get($debt->reference_id))) {
+                        $pName = $linkedUnit->variant?->product?->name ?? 'Device';
+                        $sn = $linkedUnit->imei_or_serial ? " (SN: {$linkedUnit->imei_or_serial})" : '';
+                        $context = "Returned: {$pName}{$sn}";
                     } elseif ($debt->notes) {
                         $cleaned = str_ireplace('Stock intake: ', '', $this->sanitizeContext($debt->notes));
-                        $context = ($cleaned && $cleaned !== 'Transaction entry') ? "Returned: {$cleaned}" : 'Returned to vendor';
+                        $context = ($cleaned && $cleaned !== 'Transaction entry') ? "Returned: {$cleaned}" : 'Device returned to vendor';
                     } elseif ($payment->notes && ! str_contains($payment->notes, 'canceling payable obligation')) {
-                        $context = $this->sanitizeContext($payment->notes);
+                        $sanitized = $this->sanitizeContext($payment->notes);
+                        $context = ($sanitized && $sanitized !== 'Transaction entry') ? $sanitized : 'Device returned to vendor';
                     }
                     $rawEntries[] = [
                         'id' => "pay-{$payment->id}",
                         'date' => $payDate,
                         'type' => 'vendor_return',
-                        'type_label' => 'Return',
+                        'type_label' => 'Device Return',
                         'context' => $context,
                         'payable' => -(float) $payment->amount,
                         'receivable' => 0.0,

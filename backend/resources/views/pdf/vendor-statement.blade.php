@@ -680,7 +680,7 @@
                         <span class="type-pill {{ $pillClass }}">{{ $row['type_label'] ?? ucfirst(str_replace('_', ' ', $rowType)) }}</span>
                     </td>
                     <td class="col-desc">
-                        <div class="desc-text">{{ $row['context'] ?? 'Transaction entry' }}</div>
+                        <div class="desc-text">{{ !empty($row['context']) && $row['context'] !== 'Transaction entry' ? str_replace('Returned: Transaction entry', 'Device returned to vendor', $row['context']) : 'Device' }}</div>
                         @if(!empty($row['reference_number']) && !str_starts_with($row['reference_number'], 'ORD-'))
                             <div class="desc-sub">Ref: {{ $row['reference_number'] }}</div>
                         @elseif(!empty($row['account_name']))

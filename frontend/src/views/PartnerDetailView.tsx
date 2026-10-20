@@ -594,7 +594,7 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
                             </span>
                           </td>
                           <td className="py-2.5 px-3.5 font-sans text-xs font-semibold text-slate-900 dark:text-white">
-                            <div>{row.context}</div>
+                            <div>{(row.context || '').replace(/Returned:\s*Transaction entry/gi, 'Device returned to vendor').replace(/Transaction entry/gi, 'Device')}</div>
                           </td>
                           <td className="py-2.5 px-3.5 text-right tabular-nums text-slate-700 dark:text-slate-300">
                             {row.payable !== 0 ? (
