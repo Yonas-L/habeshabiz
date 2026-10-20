@@ -136,12 +136,15 @@ class PdfGeneratorService
                 $tempDir = rtrim(sys_get_temp_dir(), '/');
                 $tempHtmlPath = "{$tempDir}/doc_{$uniqueId}.html";
                 $tempPdfPath = "{$tempDir}/doc_{$uniqueId}.pdf";
+                $tempProfileDir = "{$tempDir}/chrome_profile_{$uniqueId}";
+                @mkdir($tempProfileDir, 0777, true);
 
                 file_put_contents($tempHtmlPath, $html);
 
                 $cmd = sprintf(
-                    '%s --headless=new --no-sandbox --disable-setuid-sandbox --disable-gpu --disable-dev-shm-usage --no-pdf-header-footer --print-to-pdf=%s file://%s 2>&1',
+                    '%s --headless=new --no-sandbox --disable-setuid-sandbox --disable-gpu --disable-dev-shm-usage --disable-crash-reporter --crash-dumps-dir=/tmp --user-data-dir=%s --no-pdf-header-footer --print-to-pdf=%s file://%s 2>&1',
                     escapeshellarg($chromeBinary),
+                    escapeshellarg($tempProfileDir),
                     escapeshellarg($tempPdfPath),
                     escapeshellarg($tempHtmlPath)
                 );
@@ -154,12 +157,14 @@ class PdfGeneratorService
                     $pdfContent = file_get_contents($tempPdfPath);
                     @unlink($tempHtmlPath);
                     @unlink($tempPdfPath);
+                    exec('rm -rf ' . escapeshellarg($tempProfileDir));
 
                     return $pdfContent;
                 }
 
                 @unlink($tempHtmlPath);
                 @unlink($tempPdfPath);
+                exec('rm -rf ' . escapeshellarg($tempProfileDir));
                 \Log::warning('Direct Chromium CLI returned empty or failed, trying Spatie fallback', [
                     'exit_code' => $exitCode,
                     'output' => implode("\n", array_slice($output, -10)),

@@ -50,14 +50,17 @@ Route::prefix('v1')->group(function () {
         try {
             $tmpHtml = sys_get_temp_dir() . '/debug_cli.html';
             $tmpPdf = sys_get_temp_dir() . '/debug_cli.pdf';
+            $tmpProf = sys_get_temp_dir() . '/debug_cli_prof';
+            @mkdir($tmpProf, 0777, true);
             file_put_contents($tmpHtml, '<h1>Debug CLI Direct</h1>');
-            $cliCmd = escapeshellarg($binary) . " --headless=new --no-sandbox --disable-setuid-sandbox --disable-gpu --disable-dev-shm-usage --no-pdf-header-footer --print-to-pdf={$tmpPdf} file://{$tmpHtml} 2>&1";
+            $cliCmd = escapeshellarg($binary) . " --headless=new --no-sandbox --disable-setuid-sandbox --disable-gpu --disable-dev-shm-usage --disable-crash-reporter --crash-dumps-dir=/tmp --user-data-dir={$tmpProf} --no-pdf-header-footer --print-to-pdf={$tmpPdf} file://{$tmpHtml} 2>&1";
             exec($cliCmd, $cliTestOut, $cliTestExit);
             if (file_exists($tmpPdf)) {
                 $cliTestLen = filesize($tmpPdf);
                 @unlink($tmpPdf);
             }
             @unlink($tmpHtml);
+            exec("rm -rf {$tmpProf}");
         } catch (\Throwable $e) {
             $cliTestOut[] = 'Error: ' . $e->getMessage();
         }
