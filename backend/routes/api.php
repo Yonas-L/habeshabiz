@@ -53,7 +53,9 @@ Route::prefix('v1')->group(function () {
             $tmpProf = sys_get_temp_dir() . '/debug_cli_prof';
             @mkdir($tmpProf, 0777, true);
             file_put_contents($tmpHtml, '<h1>Debug CLI Direct</h1>');
-            $cliCmd = escapeshellarg($binary) . " --headless=new --no-sandbox --disable-setuid-sandbox --disable-gpu --disable-dev-shm-usage --disable-crash-reporter --crash-dumps-dir=/tmp --user-data-dir={$tmpProf} --no-pdf-header-footer --print-to-pdf={$tmpPdf} file://{$tmpHtml} 2>&1";
+            $cliCmd = "HOME=/tmp XDG_CONFIG_HOME=/tmp/.chromium-config XDG_CACHE_HOME=/tmp/.chromium-cache TMPDIR=/tmp "
+                . escapeshellarg($binary)
+                . " --headless=new --no-sandbox --disable-setuid-sandbox --disable-gpu --disable-dev-shm-usage --disable-crashpad --disable-crash-reporter --crash-dumps-dir=/tmp --user-data-dir={$tmpProf} --no-pdf-header-footer --print-to-pdf={$tmpPdf} file://{$tmpHtml} 2>&1";
             exec($cliCmd, $cliTestOut, $cliTestExit);
             if (file_exists($tmpPdf)) {
                 $cliTestLen = filesize($tmpPdf);

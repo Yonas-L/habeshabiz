@@ -141,8 +141,10 @@ class PdfGeneratorService
 
                 file_put_contents($tempHtmlPath, $html);
 
+                $envPrefix = 'HOME=/tmp XDG_CONFIG_HOME=/tmp/.chromium-config XDG_CACHE_HOME=/tmp/.chromium-cache TMPDIR=/tmp';
                 $cmd = sprintf(
-                    '%s --headless=new --no-sandbox --disable-setuid-sandbox --disable-gpu --disable-dev-shm-usage --disable-crash-reporter --crash-dumps-dir=/tmp --user-data-dir=%s --no-pdf-header-footer --print-to-pdf=%s file://%s 2>&1',
+                    '%s %s --headless=new --no-sandbox --disable-setuid-sandbox --disable-gpu --disable-dev-shm-usage --disable-crashpad --disable-crash-reporter --crash-dumps-dir=/tmp --user-data-dir=%s --no-pdf-header-footer --print-to-pdf=%s file://%s 2>&1',
+                    $envPrefix,
                     escapeshellarg($chromeBinary),
                     escapeshellarg($tempProfileDir),
                     escapeshellarg($tempPdfPath),

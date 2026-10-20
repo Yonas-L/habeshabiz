@@ -24,6 +24,7 @@ ENV CHROME_BIN=/usr/bin/chromium-browser \
     LARAVEL_PDF_CHROME_NO_SANDBOX=true \
     XDG_CONFIG_HOME=/tmp/.chromium-config \
     XDG_CACHE_HOME=/tmp/.chromium-cache \
+    HOME=/tmp \
     TMPDIR=/tmp
 
 # Configure PHP-FPM to keep environment variables and create Chromium temp directories
