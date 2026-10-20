@@ -26,7 +26,7 @@ return [
          * to call `->cache()`. Call `->cache()` or `->dontCache()` on a PDF
          * to override this.
          */
-        'automatic' => env('LARAVEL_PDF_CACHE_AUTOMATIC', false),
+        'automatic' => env('LARAVEL_PDF_CACHE_AUTOMATIC', true),
 
         /*
          * The cache store to use. Leave null to use the default store.
@@ -157,19 +157,32 @@ return [
     'chrome' => [
         'chrome_binary' => env('LARAVEL_PDF_CHROME_BINARY'),
 
-        'no_sandbox' => env('LARAVEL_PDF_CHROME_NO_SANDBOX', false),
+        'no_sandbox' => env('LARAVEL_PDF_CHROME_NO_SANDBOX', true),
 
         'startup_timeout' => env('LARAVEL_PDF_CHROME_STARTUP_TIMEOUT', 30),
 
         'timeout' => env('LARAVEL_PDF_CHROME_TIMEOUT', 30000),
 
-        'operation_timeout' => env('LARAVEL_PDF_CHROME_OPERATION_TIMEOUT', 5000),
+        'operation_timeout' => env('LARAVEL_PDF_CHROME_OPERATION_TIMEOUT', 15000),
 
         'user_data_dir' => env('LARAVEL_PDF_CHROME_USER_DATA_DIR'),
 
         'custom_flags' => [
-            '--disable-dev-shm-usage',
             '--disable-gpu',
+            '--disable-dev-shm-usage',
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--no-zygote',
+            '--disable-extensions',
+            '--disable-software-rasterizer',
+            '--disable-background-networking',
+            '--disable-component-update',
+            '--disable-sync',
+            '--disable-translate',
+            '--metrics-recording-only',
+            '--no-first-run',
+            '--safebrowsing-disable-auto-update',
+            '--font-render-hinting=none',
         ],
 
         'env_variables' => [],

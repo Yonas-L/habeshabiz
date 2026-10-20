@@ -19,6 +19,51 @@ class PdfGeneratorService
     ) {}
 
     /**
+     * Resample and compress binary image data to crisp print dimensions while saving CPU and payload size.
+     */
+    public static function compressImage(string $binaryData, ?string $mime = 'image/png', int $maxDim = 400): string
+    {
+        $mime = $mime ?: 'image/png';
+        if (strlen($binaryData) < 60 * 1024 || ! extension_loaded('gd')) {
+            return "data:{$mime};base64," . base64_encode($binaryData);
+        }
+
+        try {
+            $src = @imagecreatefromstring($binaryData);
+            if (! $src) {
+                return "data:{$mime};base64," . base64_encode($binaryData);
+            }
+
+            $w = imagesx($src);
+            $h = imagesy($src);
+
+            if ($w <= $maxDim && $h <= $maxDim) {
+                return "data:{$mime};base64," . base64_encode($binaryData);
+            }
+
+            $ratio = min($maxDim / $w, $maxDim / $h, 1.0);
+            $newW = max(1, (int) round($w * $ratio));
+            $newH = max(1, (int) round($h * $ratio));
+
+            $dst = imagecreatetruecolor($newW, $newH);
+            imagealphablending($dst, false);
+            imagesavealpha($dst, true);
+            $transparent = imagecolorallocatealpha($dst, 255, 255, 255, 127);
+            imagefilledrectangle($dst, 0, 0, $newW, $newH, $transparent);
+
+            imagecopyresampled($dst, $src, 0, 0, 0, 0, $newW, $newH, $w, $h);
+
+            ob_start();
+            imagepng($dst, null, 7);
+            $compressed = ob_get_clean();
+
+            return 'data:image/png;base64,' . base64_encode($compressed);
+        } catch (\Throwable) {
+            return "data:{$mime};base64," . base64_encode($binaryData);
+        }
+    }
+
+    /**
      * Convert local storage image URLs to base64 so Chrome renders them with zero network latency.
      */
     public static function resolveImageBase64(?string $url): ?string
@@ -28,6 +73,16 @@ class PdfGeneratorService
         }
 
         if (str_starts_with($url, 'data:image')) {
+            if (strlen($url) > 100 * 1024 && str_contains($url, ';base64,')) {
+                [$header, $base64Data] = explode(';base64,', $url, 2);
+                $decoded = base64_decode($base64Data);
+                if ($decoded !== false) {
+                    $mime = str_replace('data:', '', $header);
+
+                    return self::compressImage($decoded, $mime);
+                }
+            }
+
             return $url;
         }
 
@@ -42,9 +97,8 @@ class PdfGeneratorService
         $publicFile = public_path($relativePath);
         if (file_exists($publicFile) && is_file($publicFile)) {
             $mime = mime_content_type($publicFile) ?: 'image/png';
-            $data = base64_encode(file_get_contents($publicFile));
 
-            return "data:{$mime};base64,{$data}";
+            return self::compressImage(file_get_contents($publicFile), $mime);
         }
 
         // Check storage symlink: storage/... -> storage/app/public/...
@@ -53,9 +107,8 @@ class PdfGeneratorService
             $storageFile = storage_path('app/public/' . $subPath);
             if (file_exists($storageFile) && is_file($storageFile)) {
                 $mime = mime_content_type($storageFile) ?: 'image/png';
-                $data = base64_encode(file_get_contents($storageFile));
 
-                return "data:{$mime};base64,{$data}";
+                return self::compressImage(file_get_contents($storageFile), $mime);
             }
         }
 
@@ -125,7 +178,8 @@ class PdfGeneratorService
             ->margins(top: 8, right: 12, bottom: 8, left: 12, unit: 'mm')
             ->headerHtml('<span style="font-size: 1px;"></span>')
             ->footerHtml($footerHtml)
-            ->name($filename);
+            ->name($filename)
+            ->cache();
 
         return $forceDownload ? $pdf->download() : $pdf->inline();
     }
@@ -259,7 +313,8 @@ class PdfGeneratorService
             ->margins(top: 8, right: 12, bottom: 8, left: 12, unit: 'mm')
             ->headerHtml('<span style="font-size: 1px;"></span>')
             ->footerHtml($footerHtml)
-            ->name($filename);
+            ->name($filename)
+            ->cache();
 
         return $forceDownload ? $pdf->download() : $pdf->inline();
     }
@@ -344,7 +399,8 @@ class PdfGeneratorService
             ->margins(top: 8, right: 12, bottom: 8, left: 12, unit: 'mm')
             ->headerHtml('<span style="font-size: 1px;"></span>')
             ->footerHtml($footerHtml)
-            ->name($filename);
+            ->name($filename)
+            ->cache();
 
         return $forceDownload ? $pdf->download() : $pdf->inline();
     }
