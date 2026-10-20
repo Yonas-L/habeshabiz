@@ -75,32 +75,56 @@ class Contact extends Model
 
     public function getOpenReceivableAttribute(): float
     {
-        if ($this->relationLoaded('debts')) {
-            return round((float) $this->debts
+        $open = $this->relationLoaded('debts')
+            ? (float) $this->debts
                 ->where('type', 'receivable')
                 ->whereIn('status', ['open', 'partially_paid'])
-                ->sum('remaining_amount'), 2);
+                ->sum('remaining_amount')
+            : (float) $this->debts()
+                ->where('type', 'receivable')
+                ->whereIn('status', ['open', 'partially_paid'])
+                ->sum('remaining_amount');
+
+        $surplus = 0.0;
+        if ($this->relationLoaded('debts')) {
+            foreach ($this->debts->where('type', 'receivable') as $d) {
+                if ($d->relationLoaded('payments')) {
+                    $paid = (float) $d->payments->sum('amount');
+                    if ($paid > (float) $d->original_amount) {
+                        $surplus += ($paid - (float) $d->original_amount);
+                    }
+                }
+            }
         }
 
-        return round((float) $this->debts()
-            ->where('type', 'receivable')
-            ->whereIn('status', ['open', 'partially_paid'])
-            ->sum('remaining_amount'), 2);
+        return round(max(0.0, $open - $surplus), 2);
     }
 
     public function getOpenPayableAttribute(): float
     {
-        if ($this->relationLoaded('debts')) {
-            return round((float) $this->debts
+        $open = $this->relationLoaded('debts')
+            ? (float) $this->debts
                 ->where('type', 'payable')
                 ->whereIn('status', ['open', 'partially_paid'])
-                ->sum('remaining_amount'), 2);
+                ->sum('remaining_amount')
+            : (float) $this->debts()
+                ->where('type', 'payable')
+                ->whereIn('status', ['open', 'partially_paid'])
+                ->sum('remaining_amount');
+
+        $surplus = 0.0;
+        if ($this->relationLoaded('debts')) {
+            foreach ($this->debts->where('type', 'payable') as $d) {
+                if ($d->relationLoaded('payments')) {
+                    $paid = (float) $d->payments->sum('amount');
+                    if ($paid > (float) $d->original_amount) {
+                        $surplus += ($paid - (float) $d->original_amount);
+                    }
+                }
+            }
         }
 
-        return round((float) $this->debts()
-            ->where('type', 'payable')
-            ->whereIn('status', ['open', 'partially_paid'])
-            ->sum('remaining_amount'), 2);
+        return round(max(0.0, $open - $surplus), 2);
     }
 
     public function getNetBalanceAttribute(): float

@@ -945,6 +945,15 @@ class GeneratePartnerStatementAction
             ->whereIn('status', ['open', 'partially_paid'])
             ->sum('remaining_amount');
 
+        $surplusPayable = 0.0;
+        foreach ($debts->where('type', 'payable') as $d) {
+            $paid = (float) $d->payments->sum('amount');
+            if ($paid > (float) $d->original_amount) {
+                $surplusPayable += ($paid - (float) $d->original_amount);
+            }
+        }
+        $currentOpenPayable = max(0.0, $currentOpenPayable - $surplusPayable);
+
         $unDebtStockPayable = (float) InventoryUnit::where('supplier_contact_id', $contact->id)
             ->where('status', 'in_stock')
             ->whereNotIn('source_type', ['exchange', 'vendor_direct', 'consignment'])
@@ -962,6 +971,15 @@ class GeneratePartnerStatementAction
             ->where('type', 'receivable')
             ->whereIn('status', ['open', 'partially_paid'])
             ->sum('remaining_amount');
+
+        $surplusReceivable = 0.0;
+        foreach ($debts->where('type', 'receivable') as $d) {
+            $paid = (float) $d->payments->sum('amount');
+            if ($paid > (float) $d->original_amount) {
+                $surplusReceivable += ($paid - (float) $d->original_amount);
+            }
+        }
+        $currentOpenReceivable = max(0.0, $currentOpenReceivable - $surplusReceivable);
 
         $currentNetBalance = $currentOpenReceivable - $currentOpenPayable;
 
