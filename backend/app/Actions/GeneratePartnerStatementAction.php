@@ -24,6 +24,7 @@ class GeneratePartnerStatementAction
     protected function sanitizeContext(string $text): string
     {
         $text = preg_replace('/\[unit_id:[a-zA-Z0-9_-]+\]/i', '', $text);
+        $text = preg_replace('/\[exclude_statement\]/i', '', $text);
         $text = preg_replace('/^(?:Deducted by handover device|Handover device):\s*/i', '', $text);
         $text = preg_replace('/^Deducted by sale(?:\s*Order)?\s*/i', '', $text);
         $text = preg_replace('/^Returned handover device:\s*/i', 'Returned: ', $text);
@@ -112,6 +113,10 @@ class GeneratePartnerStatementAction
         $rawEntries = [];
 
         foreach ($debts as $debt) {
+            if (str_contains(strtolower($debt->notes ?? ''), 'exclude_statement')) {
+                continue;
+            }
+
             $debtCreatedDate = Carbon::parse($debt->created_at);
             $order = ! empty($debt->reference_id) ? ($ordersById->get($debt->reference_id) ?? null) : null;
 
@@ -428,6 +433,10 @@ class GeneratePartnerStatementAction
 
             // Downstream payments for this debt
             foreach ($debt->payments as $payment) {
+                if (str_contains(strtolower($payment->notes ?? ''), 'exclude_statement')) {
+                    continue;
+                }
+
                 if ($payment->reference_number === 'MUTUAL-OFFSET'
                     || (str_starts_with($payment->reference_number ?? '', 'OFFSET-') && $payment->reference_number !== 'OFFSET-INTAKE')
                     || str_contains(strtolower($payment->notes ?? ''), 'mutual credit offset')
@@ -758,6 +767,9 @@ class GeneratePartnerStatementAction
             ->with(['variant.product'])
             ->get()
             ->filter(function ($u) use ($debts) {
+                if (str_contains(strtolower($u->notes ?? ''), 'exclude_statement')) {
+                    return false;
+                }
                 if ($u->source_type === 'exchange' || $u->source_type === 'vendor_direct' || ! empty($u->exchange_sales_order_id)) {
                     return false;
                 }
@@ -985,6 +997,10 @@ class GeneratePartnerStatementAction
 
         // Inventory Breakdown for Tabs
         $suppliedUnits = InventoryUnit::where('supplier_contact_id', $contact->id)
+            ->where(function ($q) {
+                $q->whereNull('notes')
+                    ->orWhere('notes', 'not ilike', '%exclude_statement%');
+            })
             ->with(['variant.product', 'salesOrderItem.salesOrder'])
             ->orderByDesc('created_at')
             ->get()
@@ -1067,6 +1083,10 @@ class GeneratePartnerStatementAction
                     ->whereIn('status', ['returned', 'returned_to_vendor']);
             });
         })
+            ->where(function ($q) {
+                $q->whereNull('notes')
+                    ->orWhere('notes', 'not ilike', '%exclude_statement%');
+            })
             ->with(['variant.product', 'maintenanceRecords'])
             ->get()
             ->map(function ($u) {
