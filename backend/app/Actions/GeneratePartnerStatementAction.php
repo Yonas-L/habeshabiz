@@ -39,7 +39,7 @@ class GeneratePartnerStatementAction
         $text = preg_replace('/\.?\s*Agreed vendor cut\.?/i', '', $text);
         $text = preg_replace('/\s+/', ' ', $text);
 
-        return trim($text, " \t\n\r\0\x0B·-:,.") ?: 'Device Handover';
+        return trim($text, " \t\n\r\0\x0B·-:,.") ?: 'Transaction entry';
     }
 
     /**
@@ -453,8 +453,19 @@ class GeneratePartnerStatementAction
 
                 if ($payment->reference_number === 'RETURN-TO-VENDOR') {
                     $context = 'Returned to vendor';
-                    if ($debt->notes) {
-                        $context = 'Returned: '.str_ireplace('Stock intake: ', '', $this->sanitizeContext($debt->notes));
+                    if ($order && $order->items->isNotEmpty()) {
+                        $vendorItems = $order->items->filter(fn ($it) => (string) $it->vendor_contact_id === (string) $contact->id);
+                        $itemsToMap = $vendorItems->isNotEmpty() ? $vendorItems : $order->items;
+                        $devs = $itemsToMap->map(function ($it) {
+                            $pName = $it->inventoryUnit?->variant?->product?->name ?? $it->variant?->product?->name ?? 'Device';
+                            $sn = $it->inventoryUnit?->imei_or_serial ? " (SN: {$it->inventoryUnit->imei_or_serial})" : '';
+
+                            return "{$pName}{$sn}";
+                        })->join(', ');
+                        $context = $devs ? "Returned: {$devs}" : 'Returned to vendor';
+                    } elseif ($debt->notes) {
+                        $cleaned = str_ireplace('Stock intake: ', '', $this->sanitizeContext($debt->notes));
+                        $context = ($cleaned && $cleaned !== 'Transaction entry') ? "Returned: {$cleaned}" : 'Returned to vendor';
                     } elseif ($payment->notes && ! str_contains($payment->notes, 'canceling payable obligation')) {
                         $context = $this->sanitizeContext($payment->notes);
                     }
