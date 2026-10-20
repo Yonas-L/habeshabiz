@@ -167,21 +167,47 @@ class PdfGeneratorService
                 @unlink($tempHtmlPath);
                 @unlink($tempPdfPath);
                 exec('rm -rf ' . escapeshellarg($tempProfileDir));
-                \Log::warning('Direct Chromium CLI returned empty or failed, trying Spatie fallback', [
+                \Log::warning('Direct Chromium CLI returned empty or failed, trying Dompdf fallback', [
                     'exit_code' => $exitCode,
                     'output' => implode("\n", array_slice($output, -10)),
                 ]);
             } catch (\Throwable $cliException) {
-                \Log::warning('Direct Chromium CLI exception, trying Spatie fallback: ' . $cliException->getMessage());
+                \Log::warning('Direct Chromium CLI exception, trying Dompdf fallback: ' . $cliException->getMessage());
             }
         }
 
-        // 2. Secondary Engine: Spatie LaravelPdf
-        $pdf = Pdf::html($html)->format(Format::A4);
-        $base64 = $pdf->base64();
-        if (! empty($base64)) {
-            return base64_decode($base64);
+        // 2. Pure-PHP Dompdf Engine (100% resilient, runs directly inside PHP-FPM memory)
+        try {
+            $options = new \Dompdf\Options();
+            $options->set('isHtml5ParserEnabled', true);
+            $options->set('isRemoteEnabled', false);
+            $options->set('defaultFont', 'Helvetica');
+
+            $dompdf = new \Dompdf\Dompdf($options);
+            $dompdf->loadHtml($html, 'UTF-8');
+            $dompdf->setPaper('A4', 'portrait');
+            $dompdf->render();
+
+            $output = $dompdf->output();
+            if (! empty($output) && strlen($output) > 1000) {
+                return $output;
+            }
+        } catch (\Throwable $dompdfException) {
+            \Log::error('Dompdf fallback error: ' . $dompdfException->getMessage());
         }
+
+        // 3. Last-resort fallback to Spatie LaravelPdf if available
+        try {
+            $pdf = Pdf::html($html)->format(Format::A4);
+            $base64 = $pdf->base64();
+            if (! empty($base64)) {
+                return base64_decode($base64);
+            }
+        } catch (\Throwable $spatieException) {
+            \Log::error('Spatie fallback error: ' . $spatieException->getMessage());
+        }
+
+        throw new \RuntimeException('All PDF rendering engines failed to produce output.');
 
         throw new \RuntimeException('Failed to generate PDF through both Chromium Direct CLI and Spatie engines.');
     }

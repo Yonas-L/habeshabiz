@@ -714,21 +714,21 @@
             @if($discountAmount > 0)
                 <div class="fin-row" style="color: #be123c;">
                     <span>Discount Applied</span>
-                    <span class="fin-num">−{{ number_format($discountAmount, 2) }} ETB</span>
+                    <span class="fin-num">-{{ number_format($discountAmount, 2) }} ETB</span>
                 </div>
             @endif
 
             @if($writeOffAmount > 0)
                 <div class="fin-row" style="color: #be123c;">
                     <span>Price Concession (Write-Off)</span>
-                    <span class="fin-num">−{{ number_format($writeOffAmount, 2) }} ETB</span>
+                    <span class="fin-num">-{{ number_format($writeOffAmount, 2) }} ETB</span>
                 </div>
             @endif
 
             @if($exchangeAllowance > 0)
                 <div class="fin-row" style="color: #7c3aed;">
                     <span>Trade-In ({{ $order->exchangeUnit?->variant?->product?->name ?? 'Device' }}{{ $order->exchangeUnit?->imei_or_serial ? ' · SN: ' . $order->exchangeUnit->imei_or_serial : '' }})</span>
-                    <span class="fin-num">−{{ number_format($exchangeAllowance, 2) }} ETB</span>
+                    <span class="fin-num">-{{ number_format($exchangeAllowance, 2) }} ETB</span>
                 </div>
             @endif
 

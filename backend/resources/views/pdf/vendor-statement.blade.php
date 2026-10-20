@@ -628,7 +628,7 @@
                 <span>{{ $isReceivable ? 'Partner Owes Us' : ($isPayable ? 'We Owe Partner' : 'Settled In Full') }}</span>
             </div>
             <div class="balance-amount {{ $isReceivable ? 'status-receivable' : ($isPayable ? 'status-payable' : 'status-settled') }}">
-                {{ $isReceivable ? '+' : ($isPayable ? '−' : '') }}{{ number_format($absBalance, 2) }}<span class="currency-tag">ETB</span>
+                {{ $isReceivable ? '+' : ($isPayable ? '-' : '') }}{{ number_format($absBalance, 2) }}<span class="currency-tag">ETB</span>
             </div>
         </div>
     </div>
@@ -690,7 +690,7 @@
                     <td class="col-payable">
                         @if(!empty($row['payable']) && $row['payable'] != 0)
                             <span style="{{ $row['payable'] < 0 ? 'color: #1d4ed8; font-weight: 700;' : 'color: #0f172a; font-weight: 500;' }}">
-                                {{ $row['payable'] < 0 ? '−' : '' }}{{ number_format(abs($row['payable']), 2) }}
+                                {{ $row['payable'] < 0 ? '-' : '' }}{{ number_format(abs($row['payable']), 2) }}
                             </span>
                         @else
                             <span class="dash-muted">—</span>
@@ -699,7 +699,7 @@
                     <td class="col-receivable">
                         @if(!empty($row['receivable']) && $row['receivable'] != 0)
                             <span style="{{ $row['receivable'] < 0 ? 'color: #047857; font-weight: 700;' : 'color: #0f172a; font-weight: 500;' }}">
-                                {{ $row['receivable'] < 0 ? '−' : '' }}{{ number_format(abs($row['receivable']), 2) }}
+                                {{ $row['receivable'] < 0 ? '-' : '' }}{{ number_format(abs($row['receivable']), 2) }}
                             </span>
                         @else
                             <span class="dash-muted">—</span>

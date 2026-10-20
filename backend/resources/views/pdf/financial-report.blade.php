@@ -463,7 +463,7 @@
         <div class="kpi-card {{ $isProfit ? 'highlight-profit' : 'highlight-loss' }}">
             <div class="kpi-label">Net Operating {{ $isProfit ? 'Profit' : 'Loss' }}</div>
             <div class="kpi-val" style="color: {{ $isProfit ? '#047857' : '#be123c' }};">
-                {{ $isProfit ? '+' : '−' }}{{ $money(abs($netProfit)) }}
+                {{ $isProfit ? '+' : '-' }}{{ $money(abs($netProfit)) }}
             </div>
             <div class="kpi-sub" style="color: {{ $isProfit ? '#047857' : '#be123c' }}; font-weight: 700;">
                 Net Margin: {{ $netMargin }}%
@@ -507,13 +507,13 @@
             @if(($summary['discounts'] ?? 0) > 0)
                 <tr>
                     <td style="color: #475569; padding-left: 20px;">↳ Customer discounts allowed</td>
-                    <td class="text-right" style="color: #d97706;">−{{ $money($summary['discounts'] ?? 0) }}</td>
+                    <td class="text-right" style="color: #d97706;">-{{ $money($summary['discounts'] ?? 0) }}</td>
                 </tr>
             @endif
             @if(($summary['write_offs'] ?? 0) > 0)
                 <tr>
                     <td style="color: #475569; padding-left: 20px;">↳ Intentional price concessions & write-offs</td>
-                    <td class="text-right" style="color: #be123c;">−{{ $money($summary['write_offs'] ?? 0) }}</td>
+                    <td class="text-right" style="color: #be123c;">-{{ $money($summary['write_offs'] ?? 0) }}</td>
                 </tr>
             @endif
             <tr>
@@ -522,7 +522,7 @@
             </tr>
             <tr>
                 <td>Cost of goods sold (inventory purchase cost)</td>
-                <td class="text-right" style="color: #475569;">−{{ $money($cogs ?? 0) }}</td>
+                <td class="text-right" style="color: #475569;">-{{ $money($cogs ?? 0) }}</td>
             </tr>
             <tr style="background-color: #f1f5f9; font-weight: 700;">
                 <td>Gross profit margin after product cost</td>
@@ -532,11 +532,11 @@
             </tr>
             <tr>
                 <td>Operating overhead expenses (rent, utilities, operational costs)</td>
-                <td class="text-right" style="color: #be123c;">−{{ $money($summary['operating_expenses'] ?? 0) }}</td>
+                <td class="text-right" style="color: #be123c;">-{{ $money($summary['operating_expenses'] ?? 0) }}</td>
             </tr>
             <tr>
                 <td>Payment gateway, bank transfer & transaction fees</td>
-                <td class="text-right" style="color: #be123c;">−{{ $money($summary['transaction_fees'] ?? 0) }}</td>
+                <td class="text-right" style="color: #be123c;">-{{ $money($summary['transaction_fees'] ?? 0) }}</td>
             </tr>
         </tbody>
         <tfoot>
@@ -551,7 +551,7 @@
             @if(($summary['owner_draws'] ?? 0) > 0)
                 <tr style="background-color: #f8fafc; font-size: 9.5px; border-top: 1px dashed #cbd5e1;">
                     <td style="color: #64748b; font-style: italic;">Owner equity withdrawals (recorded separately)</td>
-                    <td class="text-right" style="color: #b45309; font-weight: 600;">−{{ $money($summary['owner_draws']) }}</td>
+                    <td class="text-right" style="color: #b45309; font-weight: 600;">-{{ $money($summary['owner_draws']) }}</td>
                 </tr>
             @endif
         </tfoot>
