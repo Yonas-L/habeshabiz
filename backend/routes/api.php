@@ -34,6 +34,40 @@ Route::prefix('v1')->group(function () {
     Route::post('/waitlist', [WaitlistController::class, 'store']);
     Route::get('/public/statement/{token}', [ContactController::class, 'publicStatement']);
     Route::get('/public/statement/{token}/pdf', [ContactController::class, 'publicStatementPdf']);
+    Route::get('/public/pdf-debug', function () {
+        $binary = config('laravel-pdf.chrome.chrome_binary');
+        $exists = file_exists($binary);
+        $isExec = is_executable($binary);
+        $whoami = exec('whoami');
+        $cmdOutput = [];
+        $cmdExit = 0;
+        exec("{$binary} --version 2>&1", $cmdOutput, $cmdExit);
+
+        $renderError = null;
+        $renderOutputLen = 0;
+        try {
+            $pdf = \Spatie\LaravelPdf\Facades\Pdf::html('<h1>Debug Test</h1>')->format(\Spatie\LaravelPdf\Enums\Format::A4);
+            $renderOutputLen = strlen($pdf->base64());
+        } catch (\Throwable $e) {
+            $renderError = [
+                'class' => get_class($e),
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ];
+        }
+
+        return response()->json([
+            'binary' => $binary,
+            'exists' => $exists,
+            'is_executable' => $isExec,
+            'whoami' => $whoami,
+            'version_cmd_output' => $cmdOutput,
+            'version_cmd_exit' => $cmdExit,
+            'render_error' => $renderError,
+            'render_output_len' => $renderOutputLen,
+        ]);
+    });
 
     // Platform Superadmin Routes
     Route::prefix('admin')->group(function () {

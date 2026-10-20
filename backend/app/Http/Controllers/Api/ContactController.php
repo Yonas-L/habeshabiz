@@ -233,7 +233,15 @@ class ContactController extends Controller
                 'contact_name' => $contact->name,
                 'exception' => $e,
             ]);
-            throw $e;
+            return response()->json([
+                'success' => false,
+                'message' => 'PDF generation failed on server',
+                'error' => $e->getMessage(),
+                'class' => get_class($e),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => array_slice(explode("\n", $e->getTraceAsString()), 0, 5),
+            ], 500);
         } finally {
             TenantScope::setForcedTenantId(null);
         }
