@@ -70,6 +70,16 @@ class ReportController extends Controller
 
         $forceDownload = $request->boolean('download', true);
 
-        return $pdfService->generateBusinessReportPdf($tenant, $from, $to, $forceDownload)->toResponse($request);
+        try {
+            return $pdfService->generateBusinessReportPdf($tenant, $from, $to, $forceDownload)->toResponse($request);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Financial Report PDF generation failed: ' . $e->getMessage(), [
+                'tenant_id' => $tenant->id,
+                'from' => $from->toDateString(),
+                'to' => $to->toDateString(),
+                'exception' => $e,
+            ]);
+            throw $e;
+        }
     }
 }

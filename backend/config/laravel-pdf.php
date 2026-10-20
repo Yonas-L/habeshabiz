@@ -155,7 +155,7 @@ return [
      * @see https://github.com/chrome-php/chrome
      */
     'chrome' => [
-        'chrome_binary' => env('LARAVEL_PDF_CHROME_BINARY'),
+        'chrome_binary' => env('LARAVEL_PDF_CHROME_BINARY', PHP_OS_FAMILY === 'Darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : '/usr/bin/chromium-browser'),
 
         'no_sandbox' => env('LARAVEL_PDF_CHROME_NO_SANDBOX', true),
 
@@ -183,9 +183,14 @@ return [
             '--no-first-run',
             '--safebrowsing-disable-auto-update',
             '--font-render-hinting=none',
+            '--headless=new',
         ],
 
-        'env_variables' => [],
+        'env_variables' => [
+            'XDG_CONFIG_HOME' => '/tmp/.chromium-config',
+            'XDG_CACHE_HOME' => '/tmp/.chromium-cache',
+            'TMPDIR' => '/tmp',
+        ],
     ],
 
     /*

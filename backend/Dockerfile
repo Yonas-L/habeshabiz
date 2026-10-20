@@ -11,13 +11,27 @@ RUN apk add --no-cache \
     harfbuzz \
     ca-certificates \
     ttf-freefont \
-    font-noto
+    font-noto \
+    gcompat \
+    libstdc++ \
+    udev \
+    fontconfig
 
 # Chromium environment variables for container headless execution
 ENV CHROME_BIN=/usr/bin/chromium-browser \
     CHROME_PATH=/usr/bin/chromium-browser \
     LARAVEL_PDF_CHROME_BINARY=/usr/bin/chromium-browser \
-    LARAVEL_PDF_CHROME_NO_SANDBOX=true
+    LARAVEL_PDF_CHROME_NO_SANDBOX=true \
+    XDG_CONFIG_HOME=/tmp/.chromium-config \
+    XDG_CACHE_HOME=/tmp/.chromium-cache \
+    TMPDIR=/tmp
+
+# Configure PHP-FPM to keep environment variables and create Chromium temp directories
+RUN echo "clear_env = no" >> /usr/local/etc/php-fpm.d/www.conf \
+    && echo "clear_env = no" >> /usr/local/etc/php-fpm.d/docker.conf \
+    && mkdir -p /tmp/.chromium-config /tmp/.chromium-cache /tmp/chrome-user-data \
+    && chown -R www-data:www-data /tmp/.chromium-config /tmp/.chromium-cache /tmp/chrome-user-data \
+    && chmod -R 777 /tmp
 
 # Install PHP extensions using official binary extension installer
 ADD --chmod=0755 https://github.com/mlocati/docker-php-extension-installer/releases/latest/download/install-php-extensions /usr/local/bin/

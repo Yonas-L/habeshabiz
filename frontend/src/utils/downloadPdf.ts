@@ -114,6 +114,15 @@ export async function downloadPdf(
           clonedDocument.documentElement.style.backgroundColor = '#ffffff';
           clonedDocument.body.style.backgroundColor = '#ffffff';
 
+          // ── Ensure document container renders at full A4 desktop width even on mobile screens ──
+          const targetContainer = clonedDocument.getElementById(elementId) || clonedDocument.querySelector<HTMLElement>(`#${elementId}`);
+          if (targetContainer) {
+            targetContainer.style.width = '800px';
+            targetContainer.style.minWidth = '800px';
+            targetContainer.style.maxWidth = '800px';
+            targetContainer.style.boxSizing = 'border-box';
+          }
+
           // ── Hide interactive-only controls (download buttons, etc.) ──
           clonedDocument.querySelectorAll<HTMLElement>('[data-pdf-control]').forEach((node) => {
             node.style.display = 'none';

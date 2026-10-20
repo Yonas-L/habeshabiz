@@ -194,7 +194,16 @@ class ContactController extends Controller
 
         $forceDownload = $request->query('download', '1') === '1';
 
-        return $pdfService->generateVendorStatement($contact, $startDate, $endDate, $selectedAccountIds, $forceDownload)->toResponse($request);
+        try {
+            return $pdfService->generateVendorStatement($contact, $startDate, $endDate, $selectedAccountIds, $forceDownload)->toResponse($request);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('PDF Statement generation failed: ' . $e->getMessage(), [
+                'contact_id' => $id,
+                'contact_name' => $contact->name,
+                'exception' => $e,
+            ]);
+            throw $e;
+        }
     }
 
     public function publicStatementPdf(Request $request, string $token, PdfGeneratorService $pdfService): \Symfony\Component\HttpFoundation\Response
@@ -217,6 +226,14 @@ class ContactController extends Controller
 
         try {
             return $pdfService->generateVendorStatement($contact, $startDate, $endDate, $selectedAccountIds, $forceDownload)->toResponse($request);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Public PDF Statement generation failed: ' . $e->getMessage(), [
+                'token' => $token,
+                'contact_id' => $contact->id,
+                'contact_name' => $contact->name,
+                'exception' => $e,
+            ]);
+            throw $e;
         } finally {
             TenantScope::setForcedTenantId(null);
         }

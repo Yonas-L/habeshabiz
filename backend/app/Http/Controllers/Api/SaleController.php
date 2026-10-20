@@ -822,7 +822,16 @@ class SaleController extends Controller
 
         $forceDownload = $request->query('download', '1') === '1';
 
-        return $pdfService->generateSalesInvoice($order, $forceDownload)->toResponse($request);
+        try {
+            return $pdfService->generateSalesInvoice($order, $forceDownload)->toResponse($request);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Sales Invoice PDF generation failed: ' . $e->getMessage(), [
+                'order_id' => $id,
+                'order_number' => $order->order_number,
+                'exception' => $e,
+            ]);
+            throw $e;
+        }
     }
 
     public function updateSignatureStampConfig(Request $request, string $id): JsonResponse
