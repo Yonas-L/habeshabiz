@@ -6,15 +6,18 @@
     <style>
         @page {
             size: A4 portrait;
-            margin: 8mm 12mm 10mm 12mm;
+            margin: 10mm 12mm 10mm 12mm;
         }
 
         * {
             box-sizing: border-box;
-            margin: 0;
-            padding: 0;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
+        }
+
+        body, div, p, table, tr, td, th, ul, ol, li, h1, h2, h3, h4, h5, h6 {
+            margin: 0;
+            padding: 0;
         }
 
         body {
@@ -23,7 +26,6 @@
             line-height: 1.4;
             color: #0f172a;
             background-color: #ffffff;
-            padding: 0;
         }
 
         /* ─── Corporate Letterhead ─── */
@@ -560,13 +562,13 @@
             </tr>
             @if(($summary['discounts'] ?? 0) > 0)
                 <tr>
-                    <td style="color: #475569; padding-left: 20px;">↳ Customer discounts allowed</td>
+                    <td style="color: #475569; padding-left: 20px;">› Customer discounts allowed</td>
                     <td class="text-right" style="color: #d97706;">-{{ $money($summary['discounts'] ?? 0) }}</td>
                 </tr>
             @endif
             @if(($summary['write_offs'] ?? 0) > 0)
                 <tr>
-                    <td style="color: #475569; padding-left: 20px;">↳ Intentional price concessions & write-offs</td>
+                    <td style="color: #475569; padding-left: 20px;">› Intentional price concessions & write-offs</td>
                     <td class="text-right" style="color: #be123c;">-{{ $money($summary['write_offs'] ?? 0) }}</td>
                 </tr>
             @endif
@@ -759,7 +761,7 @@
                     Balance Reconciliation & Audit Trail
                 </div>
                 <div class="reconcile-status-badge {{ $isReconciled ? 'badge-reconciled' : 'badge-discrepancy' }}">
-                    {{ $isReconciled ? '✓ Zero Variance · Perfectly Reconciled' : '⚠ Discrepancy: ' . $money(abs($rec['variance'] ?? 0)) }}
+                    {{ $isReconciled ? 'Zero Variance · Perfectly Reconciled' : 'Discrepancy: ' . $money(abs($rec['variance'] ?? 0)) }}
                 </div>
             </div>
 

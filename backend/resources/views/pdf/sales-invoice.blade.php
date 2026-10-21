@@ -6,15 +6,18 @@
     <style>
         @page {
             size: A4 portrait;
-            margin: 8mm 12mm 10mm 12mm;
+            margin: 10mm 12mm 10mm 12mm;
         }
 
         * {
             box-sizing: border-box;
-            margin: 0;
-            padding: 0;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
+        }
+
+        body, div, p, table, tr, td, th, ul, ol, li, h1, h2, h3, h4, h5, h6 {
+            margin: 0;
+            padding: 0;
         }
 
         body {
@@ -23,7 +26,6 @@
             line-height: 1.4;
             color: #0f172a;
             background-color: #ffffff;
-            padding: 0;
         }
 
         /* ─── Corporate Letterhead ─── */
@@ -770,7 +772,7 @@
             @if(!empty($order->payment_splits) && count($order->payment_splits) > 1)
                 @foreach($order->payment_splits as $split)
                     <div class="fin-row" style="font-size: 9.5px; color: #64748b; padding-left: 8px;">
-                        <span>↳ {{ $split['account_name'] ?? 'Deposit Account' }}</span>
+                        <span>› {{ $split['account_name'] ?? 'Deposit Account' }}</span>
                         <span class="fin-num">+{{ number_format((float) ($split['amount'] ?? 0), 2) }} ETB</span>
                     </div>
                 @endforeach
@@ -810,10 +812,7 @@
     <div class="official-seal-footer">
         <div class="seal-info">
             <div class="seal-badge">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                    <path d="m9 12 2 2 4-4"/>
-                </svg>
+                <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiMwNTk2NjkiIHN0cm9rZS13aWR0aD0iMi41IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik0xMiAyMnM4LTQgOC0xMFY1bC04LTMtOCAzdjdjMCA2IDggMTAgOCAxMHoiLz48cGF0aCBkPSJtOSAxMiAyIDIgNC00Ii8+PC9zdmc+" width="14" height="14" style="vertical-align: middle; margin-right: 4px; display: inline-block;" />
                 <span>OFFICIAL FINANCIAL SALES RECORD</span>
             </div>
             <p class="seal-note">

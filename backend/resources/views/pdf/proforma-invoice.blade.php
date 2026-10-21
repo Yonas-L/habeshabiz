@@ -6,15 +6,18 @@
     <style>
         @page {
             size: A4 portrait;
-            margin: 8mm 12mm 10mm 12mm;
+            margin: 10mm 12mm 10mm 12mm;
         }
 
         * {
             box-sizing: border-box;
-            margin: 0;
-            padding: 0;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
+        }
+
+        body, div, p, table, tr, td, th, ul, ol, li, h1, h2, h3, h4, h5, h6 {
+            margin: 0;
+            padding: 0;
         }
 
         body {
@@ -23,9 +26,7 @@
             line-height: 1.4;
             color: #0f172a;
             background-color: #ffffff;
-            padding: 0;
             position: relative;
-            min-height: 270mm;
             box-sizing: border-box;
         }
 

@@ -6,15 +6,18 @@
     <style>
         @page {
             size: A4 portrait;
-            margin: 8mm 12mm 10mm 12mm;
+            margin: 10mm 12mm 10mm 12mm;
         }
 
         * {
             box-sizing: border-box;
-            margin: 0;
-            padding: 0;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
+        }
+
+        body, div, p, table, tr, td, th, ul, ol, li, h1, h2, h3, h4, h5, h6 {
+            margin: 0;
+            padding: 0;
         }
 
         body {
@@ -23,7 +26,6 @@
             line-height: 1.4;
             color: #0f172a;
             background-color: #ffffff;
-            padding: 0;
         }
 
         /* ─── Corporate Letterhead ─── */
@@ -807,7 +809,7 @@
     <div class="official-seal-footer">
         <div class="seal-info">
             <div class="seal-badge">
-                <span style="color: #059669; font-weight: 900; margin-right: 4px;">✓</span>
+                <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiMwNTk2NjkiIHN0cm9rZS13aWR0aD0iMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cG9seWxpbmUgcG9pbnRzPSIyMCA2IDkgMTcgNCAxMiIvPjwvc3ZnPg==" width="12" height="12" style="vertical-align: middle; margin-right: 4px; display: inline-block;" />
                 <span>OFFICIAL FINANCIAL STATEMENT</span>
             </div>
             <p class="seal-note">

@@ -81,7 +81,7 @@ class GeneratePartnerStatementAction
                     $q->whereIn('id', $orderIds);
                 }
                 if (! empty($paymentOrderNumbers)) {
-                    $q->orWhereIn('order_number', $paymentOrderNumbers)->orWhereIn('id', $paymentOrderNumbers);
+                    $q->orWhereIn('order_number', $paymentOrderNumbers);
                 }
             })
             ->with(['items.variant.product', 'items.inventoryUnit.variant.product'])

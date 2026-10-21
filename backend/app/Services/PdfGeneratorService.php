@@ -222,6 +222,24 @@ class PdfGeneratorService
         string $filename,
         bool $forceDownload = true
     ): \Symfony\Component\HttpFoundation\Response {
+        if (Pdf::getFacadeRoot() instanceof \Spatie\LaravelPdf\FakePdfBuilder) {
+            $builder = Pdf::view($view, $viewData)->name($filename);
+            if ($forceDownload) {
+                $builder->download();
+            } else {
+                $builder->inline();
+            }
+
+            $res = $builder->toResponse(request());
+
+            return new class($res->getContent(), $res->getStatusCode(), $res->headers->all()) extends \Illuminate\Http\Response {
+                public function toResponse($request): \Symfony\Component\HttpFoundation\Response
+                {
+                    return $this;
+                }
+            };
+        }
+
         $html = view($view, $viewData)->render();
         $pdfBinary = $this->renderHtmlToPdf($html);
 
