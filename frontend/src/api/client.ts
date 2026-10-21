@@ -1412,11 +1412,12 @@ export const api = {
       body: JSON.stringify(data || {}),
     }),
 
-  getSales: (params?: { payment_status?: string; source_type?: string; search?: string }) => {
+  getSales: (params?: { payment_status?: string; source_type?: string; search?: string; per_page?: number | string }) => {
     const query = new URLSearchParams();
     if (params?.payment_status) query.set('payment_status', params.payment_status);
     if (params?.source_type) query.set('source_type', params.source_type);
     if (params?.search) query.set('search', params.search);
+    if (params?.per_page) query.set('per_page', String(params.per_page));
     return request<SalesOrder[]>(`/sales?${query.toString()}`);
   },
 
