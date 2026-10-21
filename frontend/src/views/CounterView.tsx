@@ -874,53 +874,102 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
 
           {/* ── STEP 1: Product Search & Selection ── */}
           <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs relative">
-            {/* Action Bar (Full-Width Model Search with Floating Combobox + Category Filter + Source from Vendor) */}
+            {/* Top Action Bar: Step 1 Title + Category Filter & Source from Vendor (Where they belong) */}
             {!selectedProductId && (
               <>
-                <div className="p-3 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2 sm:gap-2.5">
-                  {/* Full-width Search Bar with Floating Dropdown UI/UX */}
-                  <div ref={modelSearchContainerRef} className="relative flex-1">
-                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    <input
-                      ref={searchRef}
-                      type="text"
-                      value={productSearch}
-                      onFocus={() => setIsModelSearchOpen(true)}
-                      onClick={() => setIsModelSearchOpen(true)}
-                      onChange={(e) => {
-                        setProductSearch(e.target.value);
-                        setIsModelSearchOpen(true);
-                      }}
-                      onKeyDown={handleSearchKeyDown}
-                      placeholder="Search model, brand, or serial..."
-                      className="w-full h-9 sm:h-10 pl-9 pr-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/60 text-xs font-semibold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-                    />
-                    {productSearch ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setProductSearch('');
-                          setIsModelSearchOpen(true);
-                          searchRef.current?.focus();
-                        }}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
-                        title="Clear search"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsModelSearchOpen((prev) => !prev);
-                          searchRef.current?.focus();
-                        }}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
-                        title="Toggle models list"
-                      >
-                        <ChevronDown className="w-3.5 h-3.5" />
-                      </button>
+                <div className="p-3.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-xs">
+                      1
+                    </div>
+                    <div>
+                      <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white">
+                        Device / Model Selection
+                      </h2>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    {/* Category Dropdown (Where it was!) */}
+                    {categories.length > 0 && (
+                      <div className="relative">
+                        <select
+                          value={selectedCategoryFilter}
+                          onChange={(e) => setSelectedCategoryFilter(e.target.value)}
+                          className="h-9 sm:h-9.5 pl-3 pr-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/60 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-800/80 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all appearance-none cursor-pointer max-w-[130px] sm:max-w-[170px] truncate dark:[&>option]:bg-slate-900 dark:[&>option]:text-white"
+                          aria-label="Filter products by category"
+                        >
+                          <option value="all">All Categories</option>
+                          {categories.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      </div>
                     )}
+
+                    {/* Source from Vendor Action (Where it was!) */}
+                    <button
+                      type="button"
+                      onClick={() => setIsVendorDirectModalOpen(true)}
+                      className="h-9 sm:h-9.5 px-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-800/80 dark:border-slate-800 text-emerald-400 dark:text-emerald-400 active:scale-95 text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all shrink-0 cursor-pointer group"
+                      title="Source device directly from vendor (1-Step POS Sale)"
+                    >
+                      <Handshake className="w-4 h-4 text-emerald-400 transition-transform group-hover:scale-105" />
+                      <span className="hidden sm:inline text-emerald-400">Source from Vendor</span>
+                      <span className="sm:hidden text-emerald-400">Vendor</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Centered Full-Width Search Bar & Floating UI/UX Section */}
+                <div className="p-4 sm:p-5 space-y-3.5">
+                  <div ref={modelSearchContainerRef} className="relative w-full">
+                    <div className="relative flex items-center">
+                      <Search className="w-4 h-4 text-slate-400 absolute left-3.5 pointer-events-none" />
+                      <input
+                        ref={searchRef}
+                        type="text"
+                        value={productSearch}
+                        onFocus={() => setIsModelSearchOpen(true)}
+                        onClick={() => setIsModelSearchOpen(true)}
+                        onChange={(e) => {
+                          setProductSearch(e.target.value);
+                          setIsModelSearchOpen(true);
+                        }}
+                        onKeyDown={handleSearchKeyDown}
+                        placeholder="Search model, brand, or serial..."
+                        className="w-full h-11 pl-10 pr-10 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/60 text-xs font-semibold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-2xs"
+                      />
+                      {productSearch ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setProductSearch('');
+                            setIsModelSearchOpen(true);
+                            searchRef.current?.focus();
+                          }}
+                          className="absolute right-3 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                          title="Clear search"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsModelSearchOpen((prev) => !prev);
+                            searchRef.current?.focus();
+                          }}
+                          className="absolute right-3 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                          title="Toggle models list"
+                        >
+                          <ChevronDown className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
 
                     {/* Floating Suggestions Overlay Dropdown */}
                     {isModelSearchOpen && (
@@ -1030,82 +1079,52 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                     )}
                   </div>
 
-                  {/* Category Dropdown (Where it was!) */}
-                  {categories.length > 0 && (
-                    <div className="relative shrink-0">
-                      <select
-                        value={selectedCategoryFilter}
-                        onChange={(e) => setSelectedCategoryFilter(e.target.value)}
-                        className="h-9 sm:h-10 pl-3 pr-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/60 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-800/80 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all appearance-none cursor-pointer max-w-[130px] sm:max-w-[180px] truncate dark:[&>option]:bg-slate-900 dark:[&>option]:text-white"
-                        aria-label="Filter products by category"
-                      >
-                        <option value="all">All Categories</option>
-                        {categories.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name}
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  {/* Quick Recent Models Chips Under the Search Bar */}
+                  {recentModels.length > 0 && !isModelSearchOpen && (
+                    <div className="flex items-center gap-2 flex-wrap pt-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1 shrink-0">
+                        <Clock className="w-3 h-3 text-emerald-500" />
+                        <span>Recent:</span>
+                      </span>
+                      {recentModels.slice(0, 6).map((p) => (
+                        <button
+                          key={`chip-${p.id}`}
+                          type="button"
+                          onClick={() => handleSelectProduct(p.id)}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 text-slate-700 dark:text-slate-300 hover:border-emerald-500 hover:text-emerald-600 dark:hover:text-emerald-400 active:scale-95 transition-all shadow-2xs cursor-pointer"
+                          title={`${p.name} (${p.stockCount} in stock)`}
+                        >
+                          <span className="truncate max-w-[130px]">{p.name}</span>
+                          {p.stockCount > 0 && (
+                            <span className="text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                              ({p.stockCount})
+                            </span>
+                          )}
+                        </button>
+                      ))}
                     </div>
                   )}
 
-                  {/* Source from Vendor Action (Where it was!) */}
-                  <button
-                    type="button"
-                    onClick={() => setIsVendorDirectModalOpen(true)}
-                    className="h-9 sm:h-10 px-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-800/80 dark:border-slate-800 text-emerald-400 dark:text-emerald-400 active:scale-95 text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all shrink-0 cursor-pointer group"
-                    title="Source device directly from vendor (1-Step POS Sale)"
-                  >
-                    <Handshake className="w-4 h-4 text-emerald-400 transition-transform group-hover:scale-105" />
-                    <span className="hidden sm:inline text-emerald-400">Source from Vendor</span>
-                    <span className="sm:hidden text-emerald-400">Vendor</span>
-                  </button>
-                </div>
-
-                {/* Quick Recent Models Chips Under the Bar */}
-                {recentModels.length > 0 && (
-                  <div className="px-4 py-2.5 bg-slate-50/60 dark:bg-slate-900/30 border-b border-slate-100 dark:border-slate-800/60 flex items-center gap-2 flex-wrap">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1 shrink-0">
-                      <Clock className="w-3 h-3 text-emerald-500" />
-                      <span>Recent:</span>
-                    </span>
-                    {recentModels.slice(0, 6).map((p) => (
-                      <button
-                        key={`chip-${p.id}`}
-                        type="button"
-                        onClick={() => handleSelectProduct(p.id)}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 text-slate-700 dark:text-slate-300 hover:border-emerald-500 hover:text-emerald-600 dark:hover:text-emerald-400 active:scale-95 transition-all shadow-2xs cursor-pointer"
-                        title={`${p.name} (${p.stockCount} in stock)`}
-                      >
-                        <span className="truncate max-w-[130px]">{p.name}</span>
-                        {p.stockCount > 0 && (
-                          <span className="text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                            ({p.stockCount})
-                          </span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {/* Resting Guide Prompt (When no model is chosen yet) */}
-                <div
-                  onClick={() => {
-                    searchRef.current?.focus();
-                    setIsModelSearchOpen(true);
-                  }}
-                  className="p-8 sm:p-12 text-center flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50/40 dark:hover:bg-slate-900/20 transition-colors group"
-                >
-                  <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
-                    <Search className="w-5 h-5" />
-                  </div>
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">
-                    Search or Pick a Model Above
-                  </h3>
-                  <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 max-w-sm">
-                    Click the search bar to filter models as you type, select from recent sales, or source directly from a vendor.
-                  </p>
+                  {/* Resting Guide Prompt (When no model is chosen yet and dropdown is closed) */}
+                  {!isModelSearchOpen && (
+                    <div
+                      onClick={() => {
+                        searchRef.current?.focus();
+                        setIsModelSearchOpen(true);
+                      }}
+                      className="p-8 sm:p-10 text-center flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50/40 dark:hover:bg-slate-900/20 rounded-xl transition-colors group border border-dashed border-slate-200/80 dark:border-slate-800/80 mt-2"
+                    >
+                      <div className="w-11 h-11 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-2.5 group-hover:scale-105 transition-transform">
+                        <Search className="w-5 h-5" />
+                      </div>
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">
+                        Search or Pick a Model
+                      </h3>
+                      <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 max-w-sm">
+                        Click or type in the search bar above to filter models as you type, choose from recent sales, or source directly from a vendor.
+                      </p>
+                    </div>
+                  )}
                 </div>
               </>
             )}
