@@ -2346,7 +2346,11 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
               accessories={attachedAccessories}
               onChange={handleAccessoriesChange}
               products={localProducts}
-              contacts={contacts}
+              categories={categories}
+              contacts={liveContacts}
+              onContactCreated={(newC) => {
+                setLiveContacts((prev) => [...prev.filter((c) => c.id !== newC.id), newC]);
+              }}
               accounts={accounts}
               isOwner={isOwner}
             />

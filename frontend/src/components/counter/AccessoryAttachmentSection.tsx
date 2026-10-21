@@ -1,8 +1,9 @@
-import React, { useMemo } from 'react';
-import type { Product, Contact, FinancialAccount, User } from '../../api/client';
+import React, { useState, useEffect, useMemo } from 'react';
+import type { Product, Contact, FinancialAccount, User, ProductCategory } from '../../api/client';
 import { Plus, X, Package, Truck, Sparkles } from 'lucide-react';
 import { formatCurrencyInput, parseFormattedNumber } from '../../utils/numberUtils';
 import { SplitPaymentSelector, type PaymentSplitItem } from '../common/SplitPaymentSelector';
+import { PartnerFormModal } from '../partners/PartnerFormModal';
 
 export interface AttachedAccessoryItem {
   id: string; // client temporary uuid
@@ -30,7 +31,9 @@ interface AccessoryAttachmentSectionProps {
   accessories: AttachedAccessoryItem[];
   onChange: (accessories: AttachedAccessoryItem[]) => void;
   products: Product[];
+  categories?: ProductCategory[];
   contacts: Contact[];
+  onContactCreated?: (contact: Contact) => void;
   accounts: FinancialAccount[];
   currentUser?: User | null;
   isOwner?: boolean;
@@ -40,7 +43,9 @@ export const AccessoryAttachmentSection: React.FC<AccessoryAttachmentSectionProp
   accessories,
   onChange,
   products,
+  categories,
   contacts,
+  onContactCreated,
   accounts,
   currentUser,
   isOwner = false,
@@ -48,47 +53,95 @@ export const AccessoryAttachmentSection: React.FC<AccessoryAttachmentSectionProp
   const canViewCost = isOwner || !!currentUser?.can_view_costs || !!currentUser?.permissions?.can_view_costs;
   const canDiscount = isOwner || !!currentUser?.can_discount || !!currentUser?.permissions?.can_discount;
 
+  const [liveContacts, setLiveContacts] = useState<Contact[]>(contacts);
+  const [isAddPartnerOpen, setIsAddPartnerOpen] = useState(false);
+  const [targetAccIdForNewVendor, setTargetAccIdForNewVendor] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLiveContacts(contacts);
+  }, [contacts]);
+
   const vendorContacts = useMemo(
     () =>
-      contacts.filter(
+      liveContacts.filter(
         (c) =>
           c.is_active !== false &&
           ['vendor', 'peer_vendor', 'supplier', 'partner'].some((r) => c.roles?.includes(r))
       ),
-    [contacts]
+    [liveContacts]
   );
 
-  // Flatten available stocked accessories/products with variants
+  // Flatten available stocked accessories ONLY (filtered to accessory categories)
   const stockOptions = useMemo(() => {
     const list: Array<{
       product_id: string;
       variant_id: string;
       unit_id?: string;
       label: string;
+      category_name?: string;
       cost: number;
       default_price: number;
       stock_qty: number;
-      is_accessory_cat: boolean;
     }> = [];
 
     products.forEach((p) => {
-      const cat = (p.category || '').toLowerCase();
-      const name = p.name.toLowerCase();
+      // Find category object
+      const catObj = categories?.find((c) => c.id === p.category_id) || p.category_rel;
+      const catSlug = (catObj?.slug || '').toLowerCase();
+      const catName = (catObj?.name || p.category || '').toLowerCase();
+      const pName = (p.name || '').toLowerCase();
+
+      // Main device categories MUST be excluded
+      const isMainDevice =
+        p.has_serials === true ||
+        catObj?.has_serials === true ||
+        ['smartphones', 'iphone', 'samsung', 'motorola', 'tablets', 'laptops', 'desktops', 'tvs', 'gaming-consoles', 'consoles', 'wearables'].includes(catSlug) ||
+        catName.includes('smartphones') ||
+        catName.includes('tablets') ||
+        catName.includes('laptops') ||
+        catName.includes('desktops') ||
+        catName.includes('smart displays') ||
+        catName.includes('consoles');
+
+      if (isMainDevice) {
+        return;
+      }
+
+      // Check if product belongs to accessory categories or accessory items
       const isAccessory =
-        cat.includes('access') ||
-        cat.includes('protect') ||
-        cat.includes('glass') ||
-        cat.includes('charg') ||
-        cat.includes('cable') ||
-        cat.includes('power') ||
-        cat.includes('gadget') ||
-        cat.includes('audio') ||
-        name.includes('case') ||
-        name.includes('cover') ||
-        name.includes('protector') ||
-        name.includes('charger') ||
-        name.includes('adapter') ||
-        name.includes('cable');
+        ['accessories', 'chargers', 'cables', 'cases', 'screen-protectors', 'protectors', 'powerbanks', 'gadgets', 'audio', 'earphones', 'headphones', 'game-discs', 'joysticks', 'covers'].includes(catSlug) ||
+        catName.includes('access') ||
+        catName.includes('charg') ||
+        catName.includes('cable') ||
+        catName.includes('case') ||
+        catName.includes('cover') ||
+        catName.includes('protect') ||
+        catName.includes('glass') ||
+        catName.includes('power') ||
+        catName.includes('battery') ||
+        catName.includes('audio') ||
+        catName.includes('headset') ||
+        catName.includes('earphone') ||
+        catName.includes('headphone') ||
+        catName.includes('speaker') ||
+        catName.includes('gadget') ||
+        catName.includes('disc') ||
+        pName.includes('case') ||
+        pName.includes('cover') ||
+        pName.includes('protector') ||
+        pName.includes('glass') ||
+        pName.includes('charger') ||
+        pName.includes('adapter') ||
+        pName.includes('cable') ||
+        pName.includes('power bank') ||
+        pName.includes('powerbank') ||
+        pName.includes('earbud') ||
+        pName.includes('airpod') ||
+        pName.includes('headphone');
+
+      if (!isAccessory) {
+        return;
+      }
 
       (p.variants || []).forEach((v) => {
         const inStockUnits = (v.inventory_units || []).filter((u) => u.status === 'in_stock');
@@ -104,36 +157,36 @@ export const AccessoryAttachmentSection: React.FC<AccessoryAttachmentSectionProp
           variant_id: v.id,
           unit_id: inStockUnits[0]?.id,
           label: `${p.name}${specStr}`,
+          category_name: catObj?.name || p.category || 'Accessory',
           cost: unitCost,
           default_price: defaultPrice,
           stock_qty: qty,
-          is_accessory_cat: isAccessory,
         });
       });
     });
 
-    // Prioritize accessory categories first, then alphabetical
+    // Sort: In-stock items first, then alphabetical by label
     return list.sort((a, b) => {
-      if (a.is_accessory_cat && !b.is_accessory_cat) return -1;
-      if (!a.is_accessory_cat && b.is_accessory_cat) return 1;
+      if (a.stock_qty > 0 && b.stock_qty <= 0) return -1;
+      if (a.stock_qty <= 0 && b.stock_qty > 0) return 1;
       return a.label.localeCompare(b.label);
     });
-  }, [products]);
+  }, [products, categories]);
 
   const handleAddAccessory = () => {
-    // Default to first stock option if available, otherwise vendor sourced
-    const firstStock = stockOptions[0];
-    const newAcc: AttachedAccessoryItem = firstStock
+    // Default to first in-stock accessory option if available, otherwise first option or vendor sourced
+    const inStockFirst = stockOptions.find((o) => o.stock_qty > 0) || stockOptions[0];
+    const newAcc: AttachedAccessoryItem = inStockFirst
       ? {
           id: Math.random().toString(36).substring(2, 9),
           source: 'stock',
-          product_id: firstStock.product_id,
-          variant_id: firstStock.variant_id,
-          inventory_unit_id: firstStock.unit_id,
-          name: firstStock.label,
-          available_stock: firstStock.stock_qty,
-          cost: firstStock.cost,
-          price: firstStock.default_price,
+          product_id: inStockFirst.product_id,
+          variant_id: inStockFirst.variant_id,
+          inventory_unit_id: inStockFirst.unit_id,
+          name: inStockFirst.label,
+          available_stock: inStockFirst.stock_qty,
+          cost: inStockFirst.cost,
+          price: inStockFirst.default_price,
           quantity: 1,
           vendor_payment_method: 'owed',
         }
@@ -310,13 +363,17 @@ export const AccessoryAttachmentSection: React.FC<AccessoryAttachmentSectionProp
                             });
                           }
                         }}
-                        className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
                       >
-                        {stockOptions.map((opt) => (
-                          <option key={opt.variant_id} value={opt.variant_id}>
-                            {opt.label} ({opt.stock_qty} in stock)
-                          </option>
-                        ))}
+                        {stockOptions.length === 0 ? (
+                          <option value="" disabled>No in-stock accessory items in catalog</option>
+                        ) : (
+                          stockOptions.map((opt) => (
+                            <option key={opt.variant_id} value={opt.variant_id}>
+                              {opt.label}{opt.category_name ? ` · ${opt.category_name}` : ''} ({opt.stock_qty} in stock)
+                            </option>
+                          ))
+                        )}
                       </select>
                     </div>
                   </div>
@@ -336,18 +393,31 @@ export const AccessoryAttachmentSection: React.FC<AccessoryAttachmentSectionProp
                         />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-medium text-slate-500 mb-0.5">
-                          Vendor / Broker
-                        </label>
+                        <div className="flex items-center justify-between mb-0.5">
+                          <label className="block text-[10px] font-medium text-slate-500 dark:text-slate-400">
+                            Vendor / Broker *
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTargetAccIdForNewVendor(acc.id);
+                              setIsAddPartnerOpen(true);
+                            }}
+                            className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-0.5 cursor-pointer"
+                          >
+                            <Plus className="w-3 h-3" />
+                            <span>New Vendor</span>
+                          </button>
+                        </div>
                         <select
                           value={acc.vendor_contact_id || ''}
                           onChange={(e) => handleUpdate(acc.id, { vendor_contact_id: e.target.value })}
-                          className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-2 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-2 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
                         >
                           <option value="">Select Vendor</option>
                           {vendorContacts.map((v) => (
                             <option key={v.id} value={v.id}>
-                              {v.name}
+                              {v.name} {v.phone ? `(${v.phone})` : ''}
                             </option>
                           ))}
                         </select>
@@ -498,6 +568,25 @@ export const AccessoryAttachmentSection: React.FC<AccessoryAttachmentSectionProp
           </div>
         </div>
       )}
+
+      {/* Add New Vendor / Partner Modal */}
+      <PartnerFormModal
+        isOpen={isAddPartnerOpen}
+        onClose={() => {
+          setIsAddPartnerOpen(false);
+          setTargetAccIdForNewVendor(null);
+        }}
+        defaultRole="supplier"
+        onSuccess={(saved) => {
+          setLiveContacts((prev) => [...prev.filter((c) => c.id !== saved.id), saved]);
+          if (targetAccIdForNewVendor) {
+            handleUpdate(targetAccIdForNewVendor, { vendor_contact_id: saved.id });
+          }
+          onContactCreated?.(saved);
+          setIsAddPartnerOpen(false);
+          setTargetAccIdForNewVendor(null);
+        }}
+      />
     </div>
   );
 };

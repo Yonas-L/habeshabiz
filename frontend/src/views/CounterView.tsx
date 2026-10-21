@@ -1601,7 +1601,11 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                   accessories={attachedAccessories}
                   onChange={handleAccessoriesChange}
                   products={products}
-                  contacts={contacts}
+                  categories={categories}
+                  contacts={liveContacts}
+                  onContactCreated={(newC) => {
+                    setLiveContacts((prev) => [...prev.filter((c) => c.id !== newC.id), newC]);
+                  }}
                   accounts={accounts}
                   currentUser={user}
                   isOwner={user?.role === 'owner'}
