@@ -46,18 +46,31 @@
 
         /* ─── Corporate Letterhead ─── */
         .letterhead {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
+            display: table;
+            width: 100%;
+            table-layout: fixed;
             padding-bottom: 12px;
             border-bottom: 2px solid #0f172a;
             margin-bottom: 14px;
         }
 
         .brand-section {
-            display: flex;
-            align-items: flex-start;
-            gap: 14px;
+            display: table-cell;
+            vertical-align: top;
+            width: 60%;
+        }
+
+        .brand-layout-table {
+            border-collapse: collapse;
+            margin: 0;
+            padding: 0;
+            border: none;
+        }
+
+        .brand-layout-table td {
+            vertical-align: top;
+            padding: 0;
+            border: none;
         }
 
         .brand-logo {
@@ -73,18 +86,16 @@
             background-color: #0f172a;
             color: #ffffff;
             border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            display: block;
+            text-align: center;
+            line-height: 48px;
             font-size: 16pt;
             font-weight: 800;
             letter-spacing: -0.5px;
         }
 
         .brand-info {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
+            display: block;
         }
 
         .company-name {
@@ -99,20 +110,17 @@
         .company-meta {
             font-size: 8pt;
             color: #64748b;
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
+            display: block;
             margin-top: 3px;
             font-weight: 400;
             line-height: 1.35;
         }
 
         .doc-title-section {
+            display: table-cell;
+            vertical-align: top;
+            width: 40%;
             text-align: right;
-            display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            gap: 3px;
         }
 
         .doc-badge {
@@ -129,6 +137,7 @@
             font-size: 10pt;
             font-weight: 700;
             color: #475569;
+            margin-top: 2px;
         }
 
         .doc-date {
@@ -136,6 +145,7 @@
             color: #64748b;
             font-feature-settings: "tnum";
             font-variant-numeric: tabular-nums;
+            margin-top: 2px;
         }
 
         .status-pill {
@@ -222,13 +232,14 @@
 
         /* ─── Line Items Table (Executive & Clean) ─── */
         .section-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            display: table;
+            width: 100%;
             margin-bottom: 8px;
         }
 
         .section-title {
+            display: table-cell;
+            vertical-align: middle;
             font-size: 8pt;
             font-weight: 900;
             text-transform: uppercase;
@@ -237,6 +248,9 @@
         }
 
         .section-count {
+            display: table-cell;
+            vertical-align: middle;
+            text-align: right;
             font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
             font-size: 8pt;
             font-weight: 600;
@@ -368,8 +382,7 @@
 
         /* ─── Financial Settlement Card ─── */
         .financial-summary-grid {
-            display: flex;
-            justify-content: flex-end;
+            width: 100%;
             margin-bottom: 14px;
             break-inside: avoid;
             page-break-inside: avoid;
@@ -377,6 +390,8 @@
 
         .financial-card {
             width: 330px;
+            margin-left: auto;
+            margin-right: 0;
             background-color: #f8fafc;
             border: 1px solid #e2e8f0;
             border-radius: 8px;
@@ -384,19 +399,25 @@
         }
 
         .fin-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            display: table;
+            width: 100%;
+            table-layout: fixed;
             font-size: 8.5pt;
             padding: 2.5px 0;
             color: #475569;
         }
 
         .fin-label {
+            display: table-cell;
+            text-align: left;
+            vertical-align: middle;
             font-weight: 600;
         }
 
         .fin-num {
+            display: table-cell;
+            text-align: right;
+            vertical-align: middle;
             font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
             font-variant-numeric: tabular-nums;
             font-weight: 600;
@@ -575,34 +596,41 @@
             <!-- ═══ 1. CORPORATE LETTERHEAD ═══ -->
             <div class="letterhead">
                 <div class="brand-section">
-                    @if(!empty($business['logo_base64']))
-                        <img class="brand-logo" src="{{ $business['logo_base64'] }}" alt="{{ $business['name'] }}">
-                    @else
-                        <div class="brand-logo-fallback">
-                            {{ strtoupper(substr($business['name'] ?? 'HB', 0, 2)) }}
-                        </div>
-                    @endif
-
-                    <div class="brand-info">
-                        <div class="company-name">{{ $business['name'] }}</div>
-                        <div class="company-meta">
-                            @if(!empty($business['branch']))
-                                <span>{{ $business['branch'] }}</span>
-                            @endif
-                            @if(!empty($business['phone']))
-                                <span>Tel: {{ $business['phone'] }}</span>
-                            @endif
-                            @if(!empty($business['tin_number']))
-                                <span>TIN: {{ $business['tin_number'] }}</span>
-                            @endif
-                            @if(!empty($business['vat_number']) && $business['vat_number'] !== ($business['tin_number'] ?? null))
-                                <span>VAT: {{ $business['vat_number'] }}</span>
-                            @endif
-                            @if(!empty($business['email']))
-                                <span>Email: {{ $business['email'] }}</span>
-                            @endif
-                        </div>
-                    </div>
+                    <table class="brand-layout-table">
+                        <tr>
+                            <td style="padding-right: 14px;">
+                                @if(!empty($business['logo_base64']))
+                                    <img class="brand-logo" src="{{ $business['logo_base64'] }}" alt="{{ $business['name'] }}">
+                                @else
+                                    <div class="brand-logo-fallback">
+                                        {{ strtoupper(substr($business['name'] ?? 'HB', 0, 2)) }}
+                                    </div>
+                                @endif
+                            </td>
+                            <td>
+                                <div class="brand-info">
+                                    <div class="company-name">{{ $business['name'] }}</div>
+                                    <div class="company-meta">
+                                        @if(!empty($business['branch']))
+                                            <div>{{ $business['branch'] }}</div>
+                                        @endif
+                                        @if(!empty($business['phone']))
+                                            <div>Tel: {{ $business['phone'] }}</div>
+                                        @endif
+                                        @if(!empty($business['tin_number']))
+                                            <div>TIN: {{ $business['tin_number'] }}</div>
+                                        @endif
+                                        @if(!empty($business['vat_number']) && $business['vat_number'] !== ($business['tin_number'] ?? null))
+                                            <div>VAT: {{ $business['vat_number'] }}</div>
+                                        @endif
+                                        @if(!empty($business['email']))
+                                            <div>Email: {{ $business['email'] }}</div>
+                                        @endif
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
                 </div>
 
                 <div class="doc-title-section">

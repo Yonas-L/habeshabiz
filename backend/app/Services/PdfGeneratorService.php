@@ -143,7 +143,7 @@ class PdfGeneratorService
 
                 $envPrefix = 'HOME=/tmp XDG_CONFIG_HOME=/tmp/.chromium-config XDG_CACHE_HOME=/tmp/.chromium-cache TMPDIR=/tmp';
                 $cmd = sprintf(
-                    '%s %s --headless=new --no-sandbox --disable-setuid-sandbox --disable-gpu --disable-dev-shm-usage --disable-crashpad --disable-crash-reporter --crash-dumps-dir=/tmp --user-data-dir=%s --no-pdf-header-footer --print-to-pdf=%s file://%s 2>&1',
+                    '%s %s --headless --no-sandbox --disable-setuid-sandbox --disable-gpu --disable-dev-shm-usage --disable-software-rasterizer --disable-crash-reporter --no-first-run --no-default-browser-check --font-render-hinting=none --user-data-dir=%s --no-pdf-header-footer --print-to-pdf=%s file://%s 2>&1',
                     $envPrefix,
                     escapeshellarg($chromeBinary),
                     escapeshellarg($tempProfileDir),
@@ -182,6 +182,7 @@ class PdfGeneratorService
             $options->set('isHtml5ParserEnabled', true);
             $options->set('isRemoteEnabled', false);
             $options->set('defaultFont', 'Helvetica');
+            $options->set('dpi', 96);
 
             $dompdf = new \Dompdf\Dompdf($options);
             $dompdf->loadHtml($html, 'UTF-8');

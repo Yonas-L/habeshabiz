@@ -28,18 +28,31 @@
 
         /* ─── Corporate Letterhead ─── */
         .letterhead {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
+            display: table;
+            width: 100%;
+            table-layout: fixed;
             padding-bottom: 10px;
             border-bottom: 2px solid #0f172a;
             margin-bottom: 12px;
         }
 
         .brand-section {
-            display: flex;
-            align-items: flex-start;
-            gap: 14px;
+            display: table-cell;
+            vertical-align: top;
+            width: 60%;
+        }
+
+        .brand-layout-table {
+            border-collapse: collapse;
+            margin: 0;
+            padding: 0;
+            border: none;
+        }
+
+        .brand-layout-table td {
+            vertical-align: top;
+            padding: 0;
+            border: none;
         }
 
         .brand-logo {
@@ -55,18 +68,16 @@
             background-color: #0f172a;
             color: #ffffff;
             border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            display: block;
+            text-align: center;
+            line-height: 48px;
             font-size: 17px;
             font-weight: 800;
             letter-spacing: -0.5px;
         }
 
         .brand-info {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
+            display: block;
         }
 
         .company-name {
@@ -81,19 +92,17 @@
         .company-meta {
             font-size: 10px;
             color: #64748b;
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
+            display: block;
             margin-top: 3px;
             font-weight: 400;
             line-height: 1.35;
         }
 
         .doc-title-section {
+            display: table-cell;
+            vertical-align: top;
+            width: 40%;
             text-align: right;
-            display: flex;
-            flex-direction: column;
-            gap: 3px;
         }
 
         .doc-badge {
@@ -110,19 +119,21 @@
             font-size: 11px;
             font-weight: 700;
             color: #475569;
+            margin-top: 2px;
         }
 
         .doc-date {
             font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
             font-size: 10px;
             color: #94a3b8;
+            margin-top: 2px;
         }
 
         /* ─── Customer & Financial Position Strip ─── */
         .position-strip {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            display: table;
+            width: 100%;
+            table-layout: fixed;
             background-color: #f8fafc;
             border: 1px solid #e2e8f0;
             border-radius: 8px;
@@ -133,9 +144,9 @@
         }
 
         .customer-info {
-            display: flex;
-            flex-direction: column;
-            gap: 3px;
+            display: table-cell;
+            vertical-align: middle;
+            width: 55%;
         }
 
         .customer-label {
@@ -144,6 +155,8 @@
             text-transform: uppercase;
             letter-spacing: 0.8px;
             color: #94a3b8;
+            display: block;
+            margin-bottom: 2px;
         }
 
         .customer-name {
@@ -151,14 +164,14 @@
             font-weight: 800;
             color: #0f172a;
             letter-spacing: -0.2px;
+            line-height: 1.2;
+            margin-bottom: 2px;
         }
 
         .customer-meta {
             font-size: 10.5px;
             color: #475569;
-            display: flex;
-            align-items: center;
-            gap: 6px;
+            display: block;
         }
 
         .role-tag {
@@ -170,13 +183,16 @@
             border-radius: 4px;
             background-color: #e2e8f0;
             color: #334155;
+            display: inline-block;
+            vertical-align: middle;
+            margin-left: 4px;
         }
 
         .balance-box {
+            display: table-cell;
+            vertical-align: middle;
+            width: 45%;
             text-align: right;
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
         }
 
         .balance-verdict {
@@ -227,13 +243,14 @@
 
         /* ─── Table Section ─── */
         .section-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            display: table;
+            width: 100%;
             margin-bottom: 12px;
         }
 
         .section-title {
+            display: table-cell;
+            vertical-align: middle;
             font-size: 11px;
             font-weight: 900;
             text-transform: uppercase;
@@ -242,6 +259,9 @@
         }
 
         .section-count {
+            display: table-cell;
+            vertical-align: middle;
+            text-align: right;
             font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
             font-size: 11px;
             font-weight: 400;
@@ -366,8 +386,7 @@
 
         /* ─── Financial Settlement Breakdown ─── */
         .financial-summary-grid {
-            display: flex;
-            justify-content: flex-end;
+            width: 100%;
             margin-bottom: 14px;
             break-inside: avoid;
             page-break-inside: avoid;
@@ -375,6 +394,8 @@
 
         .financial-card {
             width: 320px;
+            margin-left: auto;
+            margin-right: 0;
             background-color: #f8fafc;
             border: 1px solid #e2e8f0;
             border-radius: 8px;
@@ -382,12 +403,25 @@
         }
 
         .fin-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            display: table;
+            width: 100%;
+            table-layout: fixed;
             font-size: 10.5px;
             padding: 2.5px 0;
             color: #475569;
+        }
+
+        .fin-row > span:first-child {
+            display: table-cell;
+            text-align: left;
+            vertical-align: middle;
+        }
+
+        .fin-row > span.fin-num,
+        .fin-row > span:last-child {
+            display: table-cell;
+            text-align: right;
+            vertical-align: middle;
         }
 
         .fin-row.total-row {
@@ -430,42 +464,24 @@
             margin-top: 20px;
             padding-top: 16px;
             border-top: 2px solid #0f172a;
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-end;
-            gap: 24px;
+            display: table;
+            width: 100%;
+            table-layout: fixed;
             break-inside: avoid;
             page-break-inside: avoid;
         }
 
         .seal-info {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-            max-width: 400px;
-        }
-
-        .seal-badge {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 11px;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 0.02em;
-            color: #0f172a;
-        }
-
-        .seal-note {
-            font-size: 10px;
-            color: #64748b;
-            line-height: 1.4;
-            margin-top: 2px;
+            display: table-cell;
+            vertical-align: bottom;
+            width: 60%;
         }
 
         .signature-box {
+            display: table-cell;
+            vertical-align: bottom;
+            width: 40%;
             text-align: right;
-            width: 220px;
             position: relative;
         }
 
@@ -531,30 +547,38 @@
     <!-- ═══ 1. CORPORATE LETTERHEAD ═══ -->
     <div class="letterhead">
         <div class="brand-section">
-            @if(!empty($business['logo_base64']))
-                <img src="{{ $business['logo_base64'] }}" alt="{{ $business['name'] }}" class="brand-logo">
-            @else
-                <div class="brand-logo-fallback">
-                    {{ strtoupper(substr($business['name'] ?? 'H', 0, 2)) }}
-                </div>
-            @endif
-            <div class="brand-info">
-                <div class="company-name">{{ $business['name'] }}</div>
-                <div class="company-meta">
-                    @if(!empty($business['branch']))
-                        <div>{{ $business['branch'] }}</div>
-                    @endif
-                    @if(!empty($business['phone']))
-                        <div>{{ $business['phone'] }}</div>
-                    @endif
-                    @if(!empty($business['email']))
-                        <div>{{ $business['email'] }}</div>
-                    @endif
-                    @if(!empty($business['tin_number']))
-                        <div style="font-family: monospace;">TIN: {{ $business['tin_number'] }}</div>
-                    @endif
-                </div>
-            </div>
+            <table class="brand-layout-table">
+                <tr>
+                    <td style="padding-right: 14px;">
+                        @if(!empty($business['logo_base64']))
+                            <img src="{{ $business['logo_base64'] }}" alt="{{ $business['name'] }}" class="brand-logo">
+                        @else
+                            <div class="brand-logo-fallback">
+                                {{ strtoupper(substr($business['name'] ?? 'H', 0, 2)) }}
+                            </div>
+                        @endif
+                    </td>
+                    <td>
+                        <div class="brand-info">
+                            <div class="company-name">{{ $business['name'] }}</div>
+                            <div class="company-meta">
+                                @if(!empty($business['branch']))
+                                    <div>{{ $business['branch'] }}</div>
+                                @endif
+                                @if(!empty($business['phone']))
+                                    <div>{{ $business['phone'] }}</div>
+                                @endif
+                                @if(!empty($business['email']))
+                                    <div>{{ $business['email'] }}</div>
+                                @endif
+                                @if(!empty($business['tin_number']))
+                                    <div style="font-family: monospace;">TIN: {{ $business['tin_number'] }}</div>
+                                @endif
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            </table>
         </div>
 
         <div class="doc-title-section">
@@ -682,6 +706,7 @@
                             </div>
                         @endif
                     </td>
+                    <td class="col-qty">{{ (int) $item->quantity }}</td>
                     <td class="col-price">
                         @if($lineUnitPrice == 0)
                             <span style="color: #b45309; font-weight: 700;">Free Gift</span>

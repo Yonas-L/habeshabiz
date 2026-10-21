@@ -28,18 +28,31 @@
 
         /* ─── Corporate Letterhead ─── */
         .letterhead {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
+            display: table;
+            width: 100%;
+            table-layout: fixed;
             padding-bottom: 12px;
             border-bottom: 2px solid #0f172a;
             margin-bottom: 14px;
         }
 
         .brand-section {
-            display: flex;
-            align-items: flex-start;
-            gap: 14px;
+            display: table-cell;
+            vertical-align: top;
+            width: 60%;
+        }
+
+        .brand-layout-table {
+            border-collapse: collapse;
+            margin: 0;
+            padding: 0;
+            border: none;
+        }
+
+        .brand-layout-table td {
+            vertical-align: top;
+            padding: 0;
+            border: none;
         }
 
         .brand-logo {
@@ -55,18 +68,16 @@
             background-color: #0f172a;
             color: #ffffff;
             border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            display: block;
+            text-align: center;
+            line-height: 48px;
             font-size: 17px;
             font-weight: 800;
             letter-spacing: -0.5px;
         }
 
         .brand-info {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
+            display: block;
         }
 
         .company-name {
@@ -81,19 +92,17 @@
         .company-meta {
             font-size: 9.5px;
             color: #64748b;
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
+            display: block;
             margin-top: 3px;
             font-weight: 400;
             line-height: 1.35;
         }
 
         .doc-title-section {
+            display: table-cell;
+            vertical-align: top;
+            width: 40%;
             text-align: right;
-            display: flex;
-            flex-direction: column;
-            gap: 3px;
         }
 
         .doc-badge {
@@ -126,13 +135,22 @@
         }
 
         /* ─── Executive KPI Highlights ─── */
-        .kpi-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 10px;
+        .kpi-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 8px 0;
+            table-layout: fixed;
+            margin-left: -8px;
+            margin-right: -8px;
             margin-bottom: 14px;
             page-break-inside: avoid;
             break-inside: avoid;
+        }
+
+        .kpi-table td {
+            vertical-align: top;
+            padding: 0;
+            border: none;
         }
 
         .kpi-card {
@@ -140,9 +158,7 @@
             border: 1px solid #e2e8f0;
             border-radius: 8px;
             padding: 9px 12px;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
+            min-height: 64px;
         }
 
         .kpi-card.highlight-profit {
@@ -182,9 +198,8 @@
 
         /* ─── Section Header ─── */
         .section-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            display: table;
+            width: 100%;
             margin-top: 14px;
             margin-bottom: 8px;
             padding-bottom: 4px;
@@ -194,14 +209,13 @@
         }
 
         .section-title {
+            display: table-cell;
+            vertical-align: middle;
             font-size: 9.5pt;
             font-weight: 800;
             text-transform: uppercase;
             letter-spacing: 0.05em;
             color: #0f172a;
-            display: flex;
-            align-items: center;
-            gap: 6px;
         }
 
         .section-pill {
@@ -212,6 +226,7 @@
             background-color: #f1f5f9;
             padding: 1px 6px;
             border-radius: 4px;
+            float: right;
         }
 
         /* ─── Modern Tables ─── */
@@ -271,11 +286,17 @@
             background-color: #fafbfc;
         }
 
+        table.report-table tfoot {
+            display: table-row-group;
+        }
+
         table.report-table tfoot tr {
             border-top: 2px solid #0f172a;
             border-bottom: 2px solid #0f172a;
             background-color: #f8fafc;
             font-weight: 800;
+            break-inside: avoid;
+            page-break-inside: avoid;
         }
 
         table.report-table tfoot td {
@@ -286,12 +307,29 @@
 
         /* ─── Two-Column Grid ─── */
         .two-col-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 14px;
+            display: table;
+            width: 100%;
+            table-layout: fixed;
             margin-bottom: 12px;
             page-break-inside: avoid;
             break-inside: avoid;
+        }
+
+        .two-col-grid > div {
+            display: table-cell;
+            vertical-align: top;
+            width: 50%;
+            padding: 0 7px;
+        }
+
+        .two-col-grid > div:first-child {
+            padding-left: 0;
+            padding-right: 7px;
+        }
+
+        .two-col-grid > div:last-child {
+            padding-left: 7px;
+            padding-right: 0;
         }
 
         /* ─── Reconciliation & Position Card ─── */
@@ -404,33 +442,40 @@
     <!-- ═══ 1. CORPORATE LETTERHEAD ═══ -->
     <div class="letterhead">
         <div class="brand-section">
-            @if(!empty($business['logo_base64']))
-                <img src="{{ $business['logo_base64'] }}" alt="{{ $business['name'] }}" class="brand-logo">
-            @else
-                <div class="brand-logo-fallback">
-                    {{ strtoupper(substr($business['name'] ?? 'HB', 0, 2)) }}
-                </div>
-            @endif
-
-            <div class="brand-info">
-                <div class="company-name">{{ $business['name'] }}</div>
-                <div class="company-meta">
-                    @if(!empty($business['branch']))
-                        <div>{{ $business['branch'] }}</div>
-                    @endif
-                    <div>
-                        @if(!empty($business['phone']))
-                            <span>Tel: {{ $business['phone'] }}</span>
+            <table class="brand-layout-table">
+                <tr>
+                    <td style="padding-right: 14px;">
+                        @if(!empty($business['logo_base64']))
+                            <img src="{{ $business['logo_base64'] }}" alt="{{ $business['name'] }}" class="brand-logo">
+                        @else
+                            <div class="brand-logo-fallback">
+                                {{ strtoupper(substr($business['name'] ?? 'HB', 0, 2)) }}
+                            </div>
                         @endif
-                        @if(!empty($business['email']))
-                            <span> · {{ $business['email'] }}</span>
-                        @endif
-                    </div>
-                    @if(!empty($business['tin_number']))
-                        <div style="font-family: monospace;">TIN / VAT: {{ $business['tin_number'] }}</div>
-                    @endif
-                </div>
-            </div>
+                    </td>
+                    <td>
+                        <div class="brand-info">
+                            <div class="company-name">{{ $business['name'] }}</div>
+                            <div class="company-meta">
+                                @if(!empty($business['branch']))
+                                    <div>{{ $business['branch'] }}</div>
+                                @endif
+                                <div>
+                                    @if(!empty($business['phone']))
+                                        <span>Tel: {{ $business['phone'] }}</span>
+                                    @endif
+                                    @if(!empty($business['email']))
+                                        <span> · {{ $business['email'] }}</span>
+                                    @endif
+                                </div>
+                                @if(!empty($business['tin_number']))
+                                    <div style="font-family: monospace;">TIN / VAT: {{ $business['tin_number'] }}</div>
+                                @endif
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            </table>
         </div>
 
         <div class="doc-title-section">
@@ -442,42 +487,51 @@
     </div>
 
     <!-- ═══ 2. EXECUTIVE PERFORMANCE KPI HIGHLIGHTS ═══ -->
-    <div class="kpi-grid">
-        <div class="kpi-card">
-            <div class="kpi-label">Gross Revenue</div>
-            <div class="kpi-val">{{ $money($summary['revenue'] ?? 0) }}</div>
-            <div class="kpi-sub">Net: {{ $money($summary['net_revenue'] ?? $summary['revenue'] ?? 0) }}</div>
-        </div>
-        <div class="kpi-card">
-            <div class="kpi-label">Cost of Goods Sold (COGS)</div>
-            <div class="kpi-val">{{ $money($cogs ?? 0) }}</div>
-            <div class="kpi-sub">Gross Margin: {{ $grossMargin }}%</div>
-        </div>
-        <div class="kpi-card">
-            <div class="kpi-label">Operating Expenses & Fees</div>
-            <div class="kpi-val" style="color: #be123c;">
-                {{ $money(($summary['operating_expenses'] ?? 0) + ($summary['transaction_fees'] ?? 0)) }}
-            </div>
-            <div class="kpi-sub">Overheads: {{ $money($summary['operating_expenses'] ?? 0) }}</div>
-        </div>
-        <div class="kpi-card {{ $isProfit ? 'highlight-profit' : 'highlight-loss' }}">
-            <div class="kpi-label">Net Operating {{ $isProfit ? 'Profit' : 'Loss' }}</div>
-            <div class="kpi-val" style="color: {{ $isProfit ? '#047857' : '#be123c' }};">
-                {{ $isProfit ? '+' : '-' }}{{ $money(abs($netProfit)) }}
-            </div>
-            <div class="kpi-sub" style="color: {{ $isProfit ? '#047857' : '#be123c' }}; font-weight: 700;">
-                Net Margin: {{ $netMargin }}%
-            </div>
-        </div>
-    </div>
+    <table class="kpi-table">
+        <tr>
+            <td style="width: 25%;">
+                <div class="kpi-card">
+                    <div class="kpi-label">Gross Revenue</div>
+                    <div class="kpi-val">{{ $money($summary['revenue'] ?? 0) }}</div>
+                    <div class="kpi-sub">Net: {{ $money($summary['net_revenue'] ?? $summary['revenue'] ?? 0) }}</div>
+                </div>
+            </td>
+            <td style="width: 25%;">
+                <div class="kpi-card">
+                    <div class="kpi-label">Cost of Goods Sold (COGS)</div>
+                    <div class="kpi-val">{{ $money($cogs ?? 0) }}</div>
+                    <div class="kpi-sub">Gross Margin: {{ $grossMargin }}%</div>
+                </div>
+            </td>
+            <td style="width: 25%;">
+                <div class="kpi-card">
+                    <div class="kpi-label">Operating Expenses & Fees</div>
+                    <div class="kpi-val" style="color: #be123c;">
+                        {{ $money(($summary['operating_expenses'] ?? 0) + ($summary['transaction_fees'] ?? 0)) }}
+                    </div>
+                    <div class="kpi-sub">Overheads: {{ $money($summary['operating_expenses'] ?? 0) }}</div>
+                </div>
+            </td>
+            <td style="width: 25%;">
+                <div class="kpi-card {{ $isProfit ? 'highlight-profit' : 'highlight-loss' }}">
+                    <div class="kpi-label">Net Operating {{ $isProfit ? 'Profit' : 'Loss' }}</div>
+                    <div class="kpi-val" style="color: {{ $isProfit ? '#047857' : '#be123c' }};">
+                        {{ $isProfit ? '+' : '-' }}{{ $money(abs($netProfit)) }}
+                    </div>
+                    <div class="kpi-sub" style="color: {{ $isProfit ? '#047857' : '#be123c' }}; font-weight: 700;">
+                        Net Margin: {{ $netMargin }}%
+                    </div>
+                </div>
+            </td>
+        </tr>
+    </table>
 
     <!-- ═══ 3. SECTION: COMMERCIAL ACTIVITY & REVENUE BREAKDOWN ═══ -->
     <div class="section-header">
         <div class="section-title">
             <span>Commercial Activity & Revenue Breakdown</span>
-            <span class="section-pill">{{ $summary['orders'] ?? 0 }} closed orders</span>
         </div>
-        <div class="section-pill">{{ $summary['units_sold'] ?? 0 }} physical units sold</div>
+        <div class="section-pill">{{ $summary['orders'] ?? 0 }} closed orders · {{ $summary['units_sold'] ?? 0 }} physical units sold</div>
     </div>
 
     <table class="report-table">
@@ -563,7 +617,7 @@
             <div class="section-title" style="color: #be123c;">
                 <span>Below-Cost Sales & Concessions Audit</span>
                 <span class="section-pill" style="background-color: #ffe4e6; color: #be123c;">
-                    {{ $summary['loss_making_items'] }} units · Total Loss: −{{ $money($summary['loss_amount'] ?? 0) }}
+                    {{ $summary['loss_making_items'] }} units · Total Loss: -{{ $money($summary['loss_amount'] ?? 0) }}
                 </span>
             </div>
         </div>
@@ -589,7 +643,7 @@
                         <td style="font-family: monospace; font-size: 9px;">{{ $item['order_date'] ?? '—' }}</td>
                         <td class="text-right">{{ $money($item['unit_price'] ?? 0) }}</td>
                         <td class="text-right">{{ $money($item['unit_cost'] ?? 0) }}</td>
-                        <td class="text-right" style="color: #be123c; font-weight: 700;">−{{ $money($item['loss'] ?? 0) }}</td>
+                        <td class="text-right" style="color: #be123c; font-weight: 700;">-{{ $money($item['loss'] ?? 0) }}</td>
                     </tr>
                 @endforeach
             </tbody>
@@ -743,28 +797,28 @@
                         </tr>
                     @endif
                     <tr>
-                        <td>(−) Outflow for vendor consignment & supplier settlement</td>
-                        <td class="text-right" style="color: #be123c;">−{{ $money($rec['supplier_payments'] ?? 0) }}</td>
+                        <td>(-) Outflow for vendor consignment & supplier settlement</td>
+                        <td class="text-right" style="color: #be123c;">-{{ $money($rec['supplier_payments'] ?? 0) }}</td>
                         <td class="text-right">—</td>
                     </tr>
                     @if(($rec['operating_expenses'] ?? 0) > 0)
                         <tr>
-                            <td>(−) Operating overhead & utility expense payments</td>
-                            <td class="text-right" style="color: #be123c;">−{{ $money($rec['operating_expenses']) }}</td>
+                            <td>(-) Operating overhead & utility expense payments</td>
+                            <td class="text-right" style="color: #be123c;">-{{ $money($rec['operating_expenses']) }}</td>
                             <td class="text-right">—</td>
                         </tr>
                     @endif
                     @if(($rec['owner_draws'] ?? 0) > 0)
                         <tr>
-                            <td>(−) Owner equity dividend drawings</td>
-                            <td class="text-right" style="color: #d97706;">−{{ $money($rec['owner_draws']) }}</td>
+                            <td>(-) Owner equity dividend drawings</td>
+                            <td class="text-right" style="color: #d97706;">-{{ $money($rec['owner_draws']) }}</td>
                             <td class="text-right">—</td>
                         </tr>
                     @endif
                     @if(($rec['transaction_fees'] ?? 0) > 0)
                         <tr>
-                            <td>(−) Payment gateway and bank transfer fees</td>
-                            <td class="text-right" style="color: #be123c;">−{{ $money($rec['transaction_fees']) }}</td>
+                            <td>(-) Payment gateway and bank transfer fees</td>
+                            <td class="text-right" style="color: #be123c;">-{{ $money($rec['transaction_fees']) }}</td>
                             <td class="text-right">—</td>
                         </tr>
                     @endif
