@@ -1749,11 +1749,12 @@ export const api = {
     return res.blob();
   },
 
-  downloadBusinessReportPdf: async (from?: string, to?: string, forceDownload = true): Promise<Blob> => {
+  downloadBusinessReportPdf: async (from?: string, to?: string, forceDownload = true, section?: string): Promise<Blob> => {
     const token = getAuthToken();
     const params = new URLSearchParams();
     if (from) params.set('from', from);
     if (to) params.set('to', to);
+    if (section) params.set('section', section);
     params.set('download', forceDownload ? '1' : '0');
     const res = await fetch(`${API_BASE}/reports/pdf?${params.toString()}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},

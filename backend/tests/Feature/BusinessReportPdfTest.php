@@ -59,3 +59,28 @@ test('owners can download the business report pdf', function () {
         return $pdf->viewName === 'pdf.financial-report';
     });
 });
+
+test('owners can download individual section report pdfs', function () {
+    $sections = [
+        'Sales_and_Revenue',
+        'Accessory_Bundle_Comparison',
+        'Inventory_and_Stock_Valuation',
+        'Staff_Sales',
+        'Vendor_Consignment',
+        'Repair_and_Maintenance',
+        'Accounts_and_Liquidity',
+        'Financial_Position',
+        'Balance_Reconciliation',
+    ];
+
+    foreach ($sections as $section) {
+        $response = $this->actingAs($this->owner)
+            ->get("/api/v1/reports/pdf?from=2026-10-01&to=2026-10-20&section={$section}");
+
+        $response->assertStatus(200);
+
+        Pdf::assertRespondedWithPdf(function ($pdf) {
+            return $pdf->viewName === 'pdf.financial-report';
+        });
+    }
+});

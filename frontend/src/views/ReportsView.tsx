@@ -121,15 +121,32 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ tenant, selectedMonth 
 
   const downloadTable = async (elementId: string, label: string) => {
     setDownloadingTable(elementId);
-    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-    await downloadPdf(
-      elementId,
-      `${tenant?.name || 'Business'}_${label}_${from}_to_${to}`.replace(/\s+/g, '_'),
-      undefined,
-      () => setDownloadingTable(null),
-      { revealTableBranding: true, expandScrollAreas: true, singleTable: true },
-      () => setError('The table PDF could not be generated. Please try again.'),
-    );
+    setError(null);
+    try {
+      const blob = await api.downloadBusinessReportPdf(from, to, true, label);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      const sanitizedBusiness = (tenant?.name || 'Business').replace(/\s+/g, '_');
+      link.download = `Report_${sanitizedBusiness}_${label}_${from}_to_${to}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      console.warn('Server-side PDF generation failed, falling back to client-side capture:', err);
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      await downloadPdf(
+        elementId,
+        `${tenant?.name || 'Business'}_${label}_${from}_to_${to}`.replace(/\s+/g, '_'),
+        undefined,
+        undefined,
+        { revealTableBranding: true, expandScrollAreas: true, singleTable: true },
+        () => setError('The table PDF could not be generated. Please try again.'),
+      );
+    } finally {
+      setDownloadingTable(null);
+    }
   };
 
   const handleDownloadReportPdf = async () => {

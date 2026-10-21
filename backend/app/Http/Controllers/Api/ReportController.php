@@ -59,6 +59,7 @@ class ReportController extends Controller
         $validated = $request->validate([
             'from' => ['nullable', 'date'],
             'to' => ['nullable', 'date', 'after_or_equal:from'],
+            'section' => ['nullable', 'string'],
         ]);
 
         $from = isset($validated['from'])
@@ -68,10 +69,11 @@ class ReportController extends Controller
             ? Carbon::parse($validated['to'])
             : now();
 
+        $section = $validated['section'] ?? $request->query('section');
         $forceDownload = $request->boolean('download', true);
 
         try {
-            return $pdfService->generateBusinessReportPdf($tenant, $from, $to, $forceDownload)->toResponse($request);
+            return $pdfService->generateBusinessReportPdf($tenant, $from, $to, $forceDownload, $section)->toResponse($request);
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::error('Financial Report PDF generation failed: ' . $e->getMessage(), [
                 'tenant_id' => $tenant->id,

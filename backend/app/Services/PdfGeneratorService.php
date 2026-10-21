@@ -534,7 +534,8 @@ class PdfGeneratorService
         Tenant $tenant,
         Carbon $from,
         Carbon $to,
-        bool $forceDownload = true
+        bool $forceDownload = true,
+        ?string $section = null
     ): \Symfony\Component\HttpFoundation\Response {
         $reportData = $this->reportAction->execute($from, $to);
         $summary = $reportData['summary'];
@@ -574,9 +575,53 @@ class PdfGeneratorService
         $signatureBase64 = self::resolveImageBase64($sigUrl);
         $stampBase64 = self::resolveImageBase64($stmpUrl);
 
+        $sectionNormalized = match (strtolower(str_replace(['-', ' '], '_', $section ?? 'all'))) {
+            'sales_and_revenue', 'sales', 'revenue' => 'sales',
+            'accessory_bundle_comparison', 'accessory', 'bundle' => 'accessory',
+            'inventory_and_stock_valuation', 'inventory', 'stock', 'capital' => 'inventory',
+            'staff_sales', 'staff' => 'staff',
+            'vendor_consignment', 'vendor', 'vendors' => 'vendors',
+            'repair_and_maintenance', 'repair', 'repairs', 'maintenance' => 'repairs',
+            'accounts_and_liquidity', 'accounts', 'liquidity' => 'accounts',
+            'financial_position', 'position', 'balance_sheet' => 'position',
+            'balance_reconciliation', 'reconciliation', 'ledger' => 'reconciliation',
+            default => 'all',
+        };
+
+        $reportTitle = match ($sectionNormalized) {
+            'sales' => 'SALES & REVENUE REPORT',
+            'accessory' => 'ACCESSORIES & BUNDLES REPORT',
+            'inventory' => 'INVENTORY & STOCK VALUATION',
+            'staff' => 'STAFF SALES PERFORMANCE REPORT',
+            'vendors' => 'VENDOR CONSIGNMENT ACTIVITY REPORT',
+            'repairs' => 'REPAIR & MAINTENANCE AUDIT REPORT',
+            'accounts' => 'ACCOUNTS & LIQUIDITY RESERVES',
+            'position' => 'FINANCIAL POSITION & BALANCE SHEET',
+            'reconciliation' => 'BALANCE RECONCILIATION LEDGER',
+            default => 'FINANCIAL STATEMENT & AUDIT',
+        };
+
+        $reportSubtitle = match ($sectionNormalized) {
+            'sales' => 'Commercial Activity, Sales Revenue & Profit Realization',
+            'accessory' => 'Attachment Rates & Bundled vs Standalone Performance',
+            'inventory' => 'Shelf Stock Holdings, Consignment Custody & Valuation',
+            'staff' => 'Sales Team Closed Orders, Delivered Units & Margins',
+            'vendors' => 'Vendor Consignment Inflow, Turnaround & Sales Ledger',
+            'repairs' => 'Defective Hardware Diagnostics & Service Expense Audit',
+            'accounts' => 'Liquid Cash Reserves, Settlement Accounts & Balances',
+            'position' => 'Total Assets, Open Liabilities & Net Equity Position',
+            'reconciliation' => 'Audit Trail, Cash Inflow/Outflow & Variance Analysis',
+            default => 'Verified Cross-Sector Executive Business Audit',
+        };
+
         $sanitizedBusiness = Str::slug($businessName, '_');
         $rangeStr = $from->format('Y_m_d') . '_to_' . $to->format('Y_m_d');
-        $filename = "Financial_Statement_{$sanitizedBusiness}_{$rangeStr}.pdf";
+        if ($sectionNormalized === 'all') {
+            $filename = "Financial_Statement_{$sanitizedBusiness}_{$rangeStr}.pdf";
+        } else {
+            $sectionSlug = Str::slug($sectionNormalized, '_');
+            $filename = "Report_{$sanitizedBusiness}_{$sectionSlug}_{$rangeStr}.pdf";
+        }
 
         $cogs = max(0, ($summary['revenue'] ?? 0) - ($summary['gross_profit'] ?? 0));
         $grossMargin = ($summary['revenue'] ?? 0) > 0 ? round((($summary['gross_profit'] ?? 0) / $summary['revenue']) * 100, 1) : 0;
@@ -598,8 +643,21 @@ class PdfGeneratorService
             'returned' => array_sum(array_column($vendorList, 'returned_units')),
         ];
 
+        $footerTitle = match ($sectionNormalized) {
+            'sales' => 'Sales & Revenue Audit',
+            'accessory' => 'Accessories & Bundles Audit',
+            'inventory' => 'Stock & Inventory Valuation Audit',
+            'staff' => 'Staff Sales Performance Audit',
+            'vendors' => 'Vendor Consignment Activity Audit',
+            'repairs' => 'Repair & Maintenance Audit',
+            'accounts' => 'Accounts & Liquidity Reserves Audit',
+            'position' => 'Financial Position & Balance Sheet',
+            'reconciliation' => 'Balance Reconciliation Ledger',
+            default => 'Executive Financial Statement & Business Audit',
+        };
+
         $footerHtml = '<div style="width: 100%; font-size: 7.5pt; color: #94a3b8; display: flex; justify-content: space-between; align-items: center; padding: 0 12mm; font-family: -apple-system, BlinkMacSystemFont, Roboto, sans-serif;">'
-            . '<span>' . e($business['name']) . ' · Executive Financial Statement & Business Audit</span>'
+            . '<span>' . e($business['name']) . ' · ' . e($footerTitle) . '</span>'
             . '<span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>'
             . '</div>';
 
@@ -616,6 +674,9 @@ class PdfGeneratorService
             'stampBase64' => $stampBase64,
             'from' => $from,
             'to' => $to,
+            'section' => $sectionNormalized,
+            'reportTitle' => $reportTitle,
+            'reportSubtitle' => $reportSubtitle,
             'issuedDate' => now()->format('d/m/Y'),
             'filename' => $filename,
         ], $filename, $forceDownload);
