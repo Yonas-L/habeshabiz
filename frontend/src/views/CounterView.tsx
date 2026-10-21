@@ -469,16 +469,19 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
     }
   };
 
-  // Auto-select first in-stock unit for serial products if none selected yet
+  // Auto-select first in-stock unit(s) for serial products if none selected yet
   useEffect(() => {
     if (selectedProduct?.has_serials && selectedVariantId && unitsForVariant.length > 0 && selectedUnitIds.length === 0) {
-      const first = unitsForVariant[0];
-      setSelectedUnitIds([first.id]);
-      if (first.selling_price) {
-        setUnitSellingPrice(String(first.selling_price));
+      const neededCount = Math.min(Math.max(1, quantity), unitsForVariant.length);
+      const toSelect = unitsForVariant.slice(0, neededCount).map((u) => u.id);
+      setSelectedUnitIds(toSelect);
+      const firstWithPrice = unitsForVariant.find((u) => Number(u.selling_price) > 0);
+      const targetPrice = firstWithPrice?.selling_price || selectedVariant?.default_selling_price;
+      if (targetPrice && (!unitSellingPrice || Number(unitSellingPrice) <= 0)) {
+        setUnitSellingPrice(String(targetPrice));
       }
     }
-  }, [selectedProduct?.has_serials, selectedVariantId, unitsForVariant, selectedUnitIds.length]);
+  }, [selectedProduct?.has_serials, selectedVariantId, unitsForVariant, selectedUnitIds.length, quantity, selectedVariant, unitSellingPrice]);
 
   const handleToggleUnit = (unitId: string) => {
     setSelectedUnitIds((prev) => {
@@ -516,6 +519,9 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
     if (maxAvailableStock <= 0) {
       toast.error('Item is out of stock.');
       setQuantity(1);
+      if (selectedProduct?.has_serials) {
+        setSelectedUnitIds([]);
+      }
       return;
     }
     if (newQty > maxAvailableStock) {
@@ -524,8 +530,30 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
     }
     const validQty = Math.max(1, newQty);
     setQuantity(validQty);
-    if (unitPriceNum > 0) {
-      const newGross = unitPriceNum * validQty;
+
+    // Auto-select available serial units to match the requested quantity
+    if (selectedProduct?.has_serials) {
+      let nextUnits = [...selectedUnitIds];
+      if (validQty > nextUnits.length) {
+        const remaining = unitsForVariant.filter((u) => !nextUnits.includes(u.id));
+        const needed = validQty - nextUnits.length;
+        nextUnits = [...nextUnits, ...remaining.slice(0, needed).map((u) => u.id)];
+      } else if (validQty < nextUnits.length) {
+        nextUnits = nextUnits.slice(0, validQty);
+      }
+      setSelectedUnitIds(nextUnits);
+    }
+
+    const currentPrice = parseFloat(unitSellingPrice) || 0;
+    const effectivePrice = currentPrice > 0
+      ? currentPrice
+      : Number(unitsForVariant.find((u) => Number(u.selling_price) > 0)?.selling_price || selectedVariant?.default_selling_price || 0);
+
+    if (effectivePrice > 0) {
+      if (currentPrice <= 0) {
+        setUnitSellingPrice(String(effectivePrice));
+      }
+      const newGross = effectivePrice * validQty;
       const discountAmt = discountType === 'percent'
         ? (newGross * Math.min(100, rawDiscountVal)) / 100
         : Math.min(newGross, rawDiscountVal);
