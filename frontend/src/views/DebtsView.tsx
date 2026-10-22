@@ -426,8 +426,8 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
         </div>
       </div>
 
-      {/* Main Single Card Container (Matching Inventory View design - NO nested border on border) */}
-      <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-100 dark:border-slate-800/80 overflow-hidden shadow-2xs">
+      {/* Main Single Card Container */}
+      <div className="bg-transparent md:bg-white md:dark:bg-[#131926] md:rounded-2xl md:border md:border-slate-100 md:dark:border-slate-800/80 md:overflow-hidden md:shadow-2xs space-y-3 md:space-y-0">
         {/* Desktop Table (md and up) */}
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-xs">
@@ -751,7 +751,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
         </div>
 
         {/* Mobile Native Cards (< md) */}
-        <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800/80">
+        <div className="md:hidden space-y-3">
           {loading ? (
             <div className="py-6 text-center">
               <CustomPageLoader mode="app" fullScreen={false} />
@@ -768,7 +768,16 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
               const isSettled = displayRemaining <= 0.001;
 
               return (
-                <div key={group.contactId} className="p-4 space-y-3">
+                <div
+                  key={group.contactId}
+                  className={`p-4 rounded-2xl transition-all duration-200 space-y-3 ${
+                    isExpanded
+                      ? debtType === 'receivable'
+                        ? 'bg-white dark:bg-[#131926] border border-emerald-500/50 dark:border-emerald-500/40 shadow-[0_8px_24px_-4px_rgba(16,185,129,0.12),0_2px_6px_-2px_rgba(0,0,0,0.05)]'
+                        : 'bg-white dark:bg-[#131926] border border-rose-500/50 dark:border-rose-500/40 shadow-[0_8px_24px_-4px_rgba(244,63,94,0.12),0_2px_6px_-2px_rgba(0,0,0,0.05)]'
+                      : 'bg-white dark:bg-[#131926] border border-slate-200/90 dark:border-slate-800 shadow-[0_3px_12px_-2px_rgba(0,0,0,0.06),0_1px_3px_-1px_rgba(0,0,0,0.03)] hover:shadow-md'
+                  }`}
+                >
                   {/* Top Row: Click to toggle expand */}
                   <div
                     onClick={() => toggleExpand(group.contactId)}
@@ -853,91 +862,96 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
 
                   {/* Expanded Obligations Sub-List */}
                   {isExpanded && (
-                    <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5 animate-in fade-in duration-200">
-                      {group.debts.map((debt) => {
-                        const orig = parseFloat(String(debt.original_amount)) || 0;
-                        const paid = parseFloat(String(debt.paid_amount)) || 0;
-                        const rem = parseFloat(String(debt.remaining_amount)) || 0;
-                        const allocOffset = (debt as any).allocatedOffset || 0;
-                        const effectiveRem = (debt as any).effectiveRemaining !== undefined ? (debt as any).effectiveRemaining : rem;
+                    <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2 animate-in fade-in duration-200">
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Individual Obligations ({group.debts.length})
+                      </div>
+                      <div className="space-y-2">
+                        {group.debts.map((debt) => {
+                          const orig = parseFloat(String(debt.original_amount)) || 0;
+                          const paid = parseFloat(String(debt.paid_amount)) || 0;
+                          const rem = parseFloat(String(debt.remaining_amount)) || 0;
+                          const allocOffset = (debt as any).allocatedOffset || 0;
+                          const effectiveRem = (debt as any).effectiveRemaining !== undefined ? (debt as any).effectiveRemaining : rem;
 
-                        const isDbSettled = rem <= 0.001;
-                        const isOffsetCovered = !isDbSettled && effectiveRem <= 0.001 && allocOffset > 0.01;
-                        const isDebtSettled = isDbSettled || isOffsetCovered;
-                        const isPartial = !isDebtSettled && (paid > 0 || allocOffset > 0.01);
-                        const displayAmount = isDebtSettled ? (isDbSettled ? orig : rem) : effectiveRem;
-                        const originLabel = getOriginLabel(debt.reference_type);
-                        const dateFormatted = debt.created_at
-                          ? new Date(debt.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
-                          : '—';
+                          const isDbSettled = rem <= 0.001;
+                          const isOffsetCovered = !isDbSettled && effectiveRem <= 0.001 && allocOffset > 0.01;
+                          const isDebtSettled = isDbSettled || isOffsetCovered;
+                          const isPartial = !isDebtSettled && (paid > 0 || allocOffset > 0.01);
+                          const displayAmount = isDebtSettled ? (isDbSettled ? orig : rem) : effectiveRem;
+                          const originLabel = getOriginLabel(debt.reference_type);
+                          const dateFormatted = debt.created_at
+                            ? new Date(debt.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
+                            : '—';
 
-                        return (
-                          <div
-                            key={debt.id}
-                            onClick={() => setDrawerDebt(debt)}
-                            className={`flex items-center justify-between p-2.5 rounded-xl border text-xs cursor-pointer transition-all ${
-                              isDebtSettled
-                                ? 'bg-slate-100/40 dark:bg-slate-900/20 border-slate-200/40 dark:border-slate-800/40 opacity-60'
-                                : 'bg-slate-50/80 dark:bg-slate-800/40 border-slate-200/60 dark:border-slate-700/60 active:bg-slate-100 dark:active:bg-slate-800'
-                            }`}
-                          >
-                            <div className="min-w-0 pr-2">
-                              <div className="flex items-center gap-1.5 font-medium flex-wrap">
-                                <span className={`font-semibold text-xs ${isDebtSettled ? 'text-slate-500 dark:text-slate-400' : 'text-slate-800 dark:text-slate-200'}`}>
-                                  {originLabel}
-                                </span>
-                                <span className="text-slate-300 dark:text-slate-600 text-xs">•</span>
-                                <span className="font-mono text-slate-400 text-[11px]">
-                                  {dateFormatted}
-                                </span>
-                                {isPartial && (
-                                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400">
-                                    Partial
+                          return (
+                            <div
+                              key={debt.id}
+                              onClick={() => setDrawerDebt(debt)}
+                              className={`flex items-center justify-between p-3 rounded-xl border text-xs cursor-pointer transition-all ${
+                                isDebtSettled
+                                  ? 'bg-slate-50/60 dark:bg-slate-900/40 border-slate-200/50 dark:border-slate-800/50 opacity-60'
+                                  : 'bg-slate-50/90 dark:bg-slate-800/60 border-slate-200/80 dark:border-slate-700/80 shadow-2xs hover:border-slate-300 dark:hover:border-slate-600 active:bg-slate-100 dark:active:bg-slate-800'
+                              }`}
+                            >
+                              <div className="min-w-0 pr-2">
+                                <div className="flex items-center gap-1.5 font-medium flex-wrap">
+                                  <span className={`font-semibold text-xs ${isDebtSettled ? 'text-slate-500 dark:text-slate-400' : 'text-slate-800 dark:text-slate-200'}`}>
+                                    {originLabel}
                                   </span>
-                                )}
-                                {isDebtSettled && (
-                                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-200/60 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
-                                    Covered
+                                  <span className="text-slate-300 dark:text-slate-600 text-xs">•</span>
+                                  <span className="font-mono text-slate-400 text-[11px]">
+                                    {dateFormatted}
                                   </span>
-                                )}
-                              </div>
-                              {!isDebtSettled && allocOffset > 0.01 && (
-                                <div className="text-[10px] text-amber-600 dark:text-amber-400 font-mono mt-0.5">
-                                  Gross {rem.toLocaleString()} · −{allocOffset.toLocaleString()} Credit
+                                  {isPartial && (
+                                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400">
+                                      Partial
+                                    </span>
+                                  )}
+                                  {isDebtSettled && (
+                                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-200/60 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                                      Covered
+                                    </span>
+                                  )}
                                 </div>
-                              )}
-                            </div>
-
-                            <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
-                              <div
-                                className={`font-mono font-bold text-xs ${
-                                  isDebtSettled ? 'text-slate-400 line-through' : debtType === 'receivable' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
-                                }`}
-                              >
-                                {debtType === 'receivable' ? '+' : '−'}{displayAmount.toLocaleString()} ETB
+                                {!isDebtSettled && allocOffset > 0.01 && (
+                                  <div className="text-[10px] text-amber-600 dark:text-amber-400 font-mono mt-0.5">
+                                    Gross {rem.toLocaleString()} · −{allocOffset.toLocaleString()} Credit
+                                  </div>
+                                )}
                               </div>
-                              {!isDebtSettled ? (
-                                <button
-                                  type="button"
-                                  onClick={() => setDrawerDebt(debt)}
-                                  className={`px-2 py-0.5 rounded-lg text-[10px] font-bold text-white shadow-2xs active:scale-95 cursor-pointer ${
-                                    debtType === 'receivable'
-                                      ? 'bg-emerald-600 hover:bg-emerald-700'
-                                      : 'bg-rose-600 hover:bg-rose-700'
+
+                              <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                <div
+                                  className={`font-mono font-bold text-xs ${
+                                    isDebtSettled ? 'text-slate-400 line-through' : debtType === 'receivable' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
                                   }`}
                                 >
-                                  {debtType === 'receivable' ? 'Collect' : 'Pay'}
-                                </button>
-                              ) : (
-                                <span className="text-[10px] text-slate-400">Complete</span>
-                              )}
-                              <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
+                                  {debtType === 'receivable' ? '+' : '−'}{displayAmount.toLocaleString()} ETB
+                                </div>
+                                {!isDebtSettled ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setDrawerDebt(debt)}
+                                    className={`px-2 py-0.5 rounded-lg text-[10px] font-bold text-white shadow-2xs active:scale-95 cursor-pointer ${
+                                      debtType === 'receivable'
+                                        ? 'bg-emerald-600 hover:bg-emerald-700'
+                                        : 'bg-rose-600 hover:bg-rose-700'
+                                    }`}
+                                  >
+                                    {debtType === 'receivable' ? 'Collect' : 'Pay'}
+                                  </button>
+                                ) : (
+                                  <span className="text-[10px] text-slate-400">Complete</span>
+                                )}
+                                <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
                       {group.offsetAmount !== undefined && group.offsetAmount > 0.01 && (
-                        <div className="flex items-center justify-between p-2.5 rounded-xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40 text-xs">
+                        <div className="flex items-center justify-between p-3 rounded-xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40 text-xs shadow-2xs">
                           <div>
                             <div className="font-semibold text-slate-800 dark:text-slate-200">
                               Trade Credit Applied
@@ -968,7 +982,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
 
         {/* Pagination */}
         {partyGroups.length > pageSize && (
-          <div className="px-4 py-3 border-t border-slate-100 dark:border-slate-800/80">
+          <div className="px-1 py-2 md:px-4 md:py-3 md:border-t md:border-slate-100 md:dark:border-slate-800/80">
             <Pagination
               currentPage={currentPage}
               totalItems={partyGroups.length}

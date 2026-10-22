@@ -11,6 +11,7 @@ import {
   Check,
   Loader2,
 } from 'lucide-react';
+import { BrandSelectInput } from '../common/BrandSelectInput';
 
 export interface ExchangeDevicePayload {
   variant_id: string;
@@ -76,6 +77,7 @@ export const ExchangeDeviceModal: React.FC<ExchangeDeviceModalProps> = ({
   // New product quick create inline
   const [newCatId, setNewCatId] = useState<string>('');
   const [newProductName, setNewProductName] = useState<string>('');
+  const [newProductBrand, setNewProductBrand] = useState<string>('');
   const [newStorage, setNewStorage] = useState<string>('128GB');
   const [newRam, setNewRam] = useState<string>('');
   const [newColor, setNewColor] = useState<string>('Black');
@@ -237,6 +239,7 @@ export const ExchangeDeviceModal: React.FC<ExchangeDeviceModalProps> = ({
       setIsCreatingNewProduct(true);
       const res = await api.createProduct({
         name: newProductName.trim(),
+        brand: newProductBrand.trim() || undefined,
         category_id: cat?.id,
         category: cat?.slug || 'phones',
         has_serials: cat?.has_serials ?? true,
@@ -411,6 +414,16 @@ export const ExchangeDeviceModal: React.FC<ExchangeDeviceModalProps> = ({
                   />
                 </div>
               </div>
+
+              <BrandSelectInput
+                value={newProductBrand}
+                onChange={setNewProductBrand}
+                products={products}
+                categorySlug={categories.find((c) => c.id === newCatId)?.slug}
+                categoryName={categories.find((c) => c.id === newCatId)?.name}
+                modelName={newProductName}
+                placeholder="Select or enter brand..."
+              />
 
               <div className="grid grid-cols-3 gap-2">
                 <div>

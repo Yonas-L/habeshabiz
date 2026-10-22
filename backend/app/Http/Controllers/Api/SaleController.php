@@ -66,10 +66,10 @@ class SaleController extends Controller
             $query->where(function ($q) use ($search) {
                 $q->where('order_number', 'ilike', "%{$search}%")
                     ->orWhereHas('customer', fn ($cq) => $cq->where('name', 'ilike', "%{$search}%"))
-                    ->orWhereHas('items.inventoryUnit', fn ($iq) => $iq->where('imei_or_serial', 'ilike', "%{$search}%"))
+                    ->orWhereHas('items.inventoryUnit', fn ($iq) => $iq->where('imei_or_serial', 'ilike', "%{$search}%")->orWhere('serial_number', 'ilike', "%{$search}%"))
                     ->orWhereHas('items.variant.product', fn ($pq) => $pq->where('name', 'ilike', "%{$search}%"))
                     ->orWhereHas('items.inventoryUnit.variant.product', fn ($pq) => $pq->where('name', 'ilike', "%{$search}%"))
-                    ->orWhereHas('exchangeUnit', fn ($eq) => $eq->where('imei_or_serial', 'ilike', "%{$search}%"));
+                    ->orWhereHas('exchangeUnit', fn ($eq) => $eq->where('imei_or_serial', 'ilike', "%{$search}%")->orWhere('serial_number', 'ilike', "%{$search}%"));
             });
         }
 
@@ -206,6 +206,7 @@ class SaleController extends Controller
             'exchange.variant_id' => ['required_with:exchange', 'exists:product_variants,id'],
             'exchange.trade_in_value' => ['required_with:exchange', 'numeric', 'min:0.01'],
             'exchange.imei_or_serial' => ['nullable', 'string', 'max:100'],
+            'exchange.serial_number' => ['nullable', 'string', 'max:100'],
             'exchange.condition' => ['nullable', 'string', 'max:50'],
             'exchange.battery_health' => ['nullable', 'integer', 'min:1', 'max:100'],
             'exchange.cycle_count' => ['nullable', 'integer', 'min:0'],
@@ -403,10 +404,15 @@ class SaleController extends Controller
             'product_id' => ['nullable', 'exists:products,id'],
             'variant_id' => ['nullable', 'exists:product_variants,id'],
             'product_name' => ['required_without_all:product_id,variant_id', 'nullable', 'string', 'max:255'],
+            'category_id' => ['nullable', 'exists:categories,id'],
+            'category' => ['nullable', 'string', 'max:100'],
+            'has_serials' => ['nullable', 'boolean'],
             'storage' => ['nullable', 'string', 'max:50'],
             'ram' => ['nullable', 'string', 'max:50'],
             'color' => ['nullable', 'string', 'max:50'],
+            'specs' => ['nullable', 'array'],
             'imei_or_serial' => ['nullable', 'string', 'max:100'],
+            'serial_number' => ['nullable', 'string', 'max:100'],
             'condition' => ['nullable', 'string', 'max:50'],
             'battery_health' => ['nullable', 'integer', 'min:0', 'max:100'],
             'cycle_count' => ['nullable', 'integer', 'min:0'],
@@ -630,8 +636,9 @@ class SaleController extends Controller
                     $product = Product::create([
                         'tenant_id' => $tenantId,
                         'name' => $validated['product_name'],
-                        'category' => 'phone_tablet',
-                        'has_serials' => true,
+                        'category_id' => $validated['category_id'] ?? null,
+                        'category' => $validated['category'] ?? 'phone_tablet',
+                        'has_serials' => $validated['has_serials'] ?? true,
                         'is_active' => true,
                     ]);
                     $productId = $product->id;
@@ -641,12 +648,18 @@ class SaleController extends Controller
                     'storage' => $validated['storage'] ?? null,
                     'ram' => $validated['ram'] ?? null,
                     'color' => $validated['color'] ?? null,
+                    'specs' => $validated['specs'] ?? null,
                     'default_selling_price' => $validated['selling_price'],
                 ]);
                 $variantId = $variant->id;
             }
 
             $imei = ! empty($validated['imei_or_serial']) ? trim($validated['imei_or_serial']) : null;
+            $serial = ! empty($validated['serial_number']) ? trim($validated['serial_number']) : null;
+            if (! $imei && $serial) {
+                $imei = $serial;
+            }
+
             if ($imei) {
                 $existingActive = InventoryUnit::where('tenant_id', $tenantId)
                     ->whereIn('status', ['in_stock', 'reserved', 'out'])
@@ -669,10 +682,33 @@ class SaleController extends Controller
                 }
             }
 
+            if ($serial && $serial !== $imei) {
+                $existingActiveS = InventoryUnit::where('tenant_id', $tenantId)
+                    ->whereIn('status', ['in_stock', 'reserved', 'out'])
+                    ->where('serial_number', $serial)
+                    ->exists();
+                if ($existingActiveS) {
+                    throw ValidationException::withMessages([
+                        'serial_number' => ["Serial '{$serial}' is already in active shop inventory."],
+                    ]);
+                }
+
+                $existingSoldS = InventoryUnit::where('tenant_id', $tenantId)
+                    ->where('status', 'sold')
+                    ->where('serial_number', $serial)
+                    ->exists();
+                if ($existingSoldS) {
+                    throw ValidationException::withMessages([
+                        'serial_number' => ["Serial '{$serial}' has already been recorded as sold."],
+                    ]);
+                }
+            }
+
             $unit = InventoryUnit::create([
                 'tenant_id' => $tenantId,
                 'variant_id' => $variantId,
                 'imei_or_serial' => $imei,
+                'serial_number' => $serial,
                 'battery_health' => $validated['battery_health'] ?? null,
                 'cycle_count' => $validated['cycle_count'] ?? null,
                 'sim_type' => $validated['sim_type'] ?? 'physical',

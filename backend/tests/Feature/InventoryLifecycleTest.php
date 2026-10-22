@@ -1182,3 +1182,104 @@ test('sync sales order items unit variants migration heals mismatched historical
     $soItem->refresh();
     expect($soItem->variant_id)->toBe($var2->id);
 });
+
+test('can intake tablet or device with both serial number and imei', function () {
+    $account = FinancialAccount::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'CBE Main',
+        'type' => 'bank',
+        'currency' => 'ETB',
+        'current_balance' => 1000000.00,
+        'is_active' => true,
+    ]);
+
+    $response = $this->actingAs($this->user)
+        ->postJson('/api/v1/inventory/units', [
+            'variant_id' => $this->variant->id,
+            'source_type' => 'purchase',
+            'funding_source' => 'account',
+            'payment_account_id' => $account->id,
+            'cost_basis' => 50000.00,
+            'selling_price' => 65000.00,
+            'condition' => 'new',
+            'serial_number' => 'DMPTAB123456',
+            'imei_or_serial' => '861234567890123',
+            'sim_type' => 'esim',
+        ]);
+
+    $response->assertStatus(201)
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.serial_number', 'DMPTAB123456')
+        ->assertJsonPath('data.imei_or_serial', '861234567890123');
+
+    $this->assertDatabaseHas('inventory_units', [
+        'tenant_id' => $this->tenant->id,
+        'serial_number' => 'DMPTAB123456',
+        'imei_or_serial' => '861234567890123',
+    ]);
+});
+
+test('prevents intake with duplicate serial number or duplicate imei', function () {
+    $account = FinancialAccount::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Cash Drawer',
+        'type' => 'cash',
+        'currency' => 'ETB',
+        'current_balance' => 500000.00,
+        'is_active' => true,
+    ]);
+
+    // Create an existing unit with a serial
+    InventoryUnit::create([
+        'tenant_id' => $this->tenant->id,
+        'variant_id' => $this->variant->id,
+        'serial_number' => 'SERIAL-DUPE-TEST',
+        'imei_or_serial' => 'IMEI-DUPE-TEST',
+        'condition' => 'new',
+        'cost_basis' => 40000.00,
+        'status' => 'in_stock',
+    ]);
+
+    // Attempt intake with identical serial_number
+    $res = $this->actingAs($this->user)
+        ->postJson('/api/v1/inventory/units', [
+            'variant_id' => $this->variant->id,
+            'source_type' => 'purchase',
+            'funding_source' => 'account',
+            'payment_account_id' => $account->id,
+            'cost_basis' => 40000.00,
+            'condition' => 'new',
+            'serial_number' => 'SERIAL-DUPE-TEST',
+            'imei_or_serial' => 'DIFFERENT-IMEI-999',
+        ]);
+
+    $res->assertStatus(422)
+        ->assertJsonPath('success', false)
+        ->assertSee('already in active shop inventory');
+});
+
+test('can update unit with brand, model name, and specs via drawer update endpoint', function () {
+    $res = $this->actingAs($this->user)
+        ->putJson("/api/v1/inventory/units/{$this->unit->id}", [
+            'product_name' => 'iPhone 16 Pro Max Edition',
+            'brand' => 'Apple Inc',
+            'storage' => '512GB',
+            'color' => 'Black Titanium',
+            'specs' => ['connectivity' => '5G Ultra'],
+            'condition' => 'used_clean',
+            'cost_basis' => 155000.00,
+            'selling_price' => 180000.00,
+            'location' => 'Safe Backroom',
+        ]);
+
+    $res->assertStatus(200)
+        ->assertJsonPath('success', true);
+
+    $this->assertDatabaseHas('products', [
+        'id' => $this->product->id,
+        'brand' => 'Apple Inc',
+    ]);
+
+    expect($this->unit->fresh()->condition)->toBe('used_clean');
+    expect($this->unit->fresh()->location)->toBe('Safe Backroom');
+});

@@ -36,6 +36,7 @@ import { ExchangeDeviceModal, type ExchangeDevicePayload } from '../components/c
 import { VendorDirectSaleModal } from '../components/counter/VendorDirectSaleModal';
 import { AccessoryAttachmentSection, type AttachedAccessoryItem } from '../components/counter/AccessoryAttachmentSection';
 import type { ProductCategory } from '../api/client';
+import { formatUnitDisplayIdentifier, getCategoryArchetype } from '../utils/electronicsArchetypes';
 
 interface CounterViewProps {
   user: User | null;
@@ -257,10 +258,19 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
         }
         if (!q) return true;
         const cat = p.category_rel?.name || p.category || '';
-        return (
+        const matchesText =
           p.name.toLowerCase().includes(q) ||
           (p.brand || '').toLowerCase().includes(q) ||
-          cat.toLowerCase().includes(q)
+          cat.toLowerCase().includes(q);
+        if (matchesText) return true;
+
+        // Fast search by unit serial number or IMEI
+        const variantIds = (p.variants || []).map((v) => v.id);
+        return availableUnits.some(
+          (u) =>
+            variantIds.includes(u.variant_id) &&
+            ((u.imei_or_serial && u.imei_or_serial.toLowerCase().includes(q)) ||
+              (u.serial_number && u.serial_number.toLowerCase().includes(q)))
         );
       })
       .map((p) => {
@@ -1275,9 +1285,43 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                         >
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
-                              <span className="font-mono font-bold text-slate-900 dark:text-white text-[11px] truncate">
-                                {u.imei_or_serial || 'No Serial'}
-                              </span>
+                              {(() => {
+                                const ident = formatUnitDisplayIdentifier(u);
+                                const isTablet = getCategoryArchetype(selectedProduct?.category, selectedProduct?.category_rel?.name, selectedProduct?.name) === 'tablet';
+                                return (
+                                  <>
+                                    {ident.hasBoth ? (
+                                      <div className="flex flex-col text-left">
+                                        <span className="font-mono font-bold text-slate-900 dark:text-white text-[11px] leading-tight">
+                                          SN: {ident.serial}
+                                        </span>
+                                        <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
+                                          IMEI: {ident.imei}
+                                        </span>
+                                      </div>
+                                    ) : (
+                                      <span className="font-mono font-bold text-slate-900 dark:text-white text-[11px] truncate">
+                                        {ident.primaryLabel}
+                                      </span>
+                                    )}
+                                    {u.sim_type === 'esim' && (
+                                      <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200/50">
+                                        eSIM
+                                      </span>
+                                    )}
+                                    {u.sim_type === 'dual' && (
+                                      <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/50">
+                                        Dual SIM
+                                      </span>
+                                    )}
+                                    {isTablet && u.sim_type === 'na' && (
+                                      <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                                        Wi-Fi
+                                      </span>
+                                    )}
+                                  </>
+                                );
+                              })()}
                               {selectedVariant && (selectedVariant.storage || selectedVariant.ram) && (
                                 <span className="inline-flex items-center text-[9px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/80 px-1.5 py-0.2 rounded font-mono">
                                   {[selectedVariant.storage, selectedVariant.ram ? (selectedVariant.ram.toLowerCase().includes('ram') ? selectedVariant.ram : `${selectedVariant.ram} RAM`) : null].filter(Boolean).join('/')}
@@ -1926,7 +1970,13 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                               return (
                                 <div key={uId} className="flex items-center gap-1.5">
                                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                                  <span>{u?.imei_or_serial || 'Unknown'}</span>
+                                  <span>
+                                    {(() => {
+                                      if (!u) return 'Unknown';
+                                      const ident = formatUnitDisplayIdentifier(u);
+                                      return ident.hasBoth ? `SN: ${ident.serial} · IMEI: ${ident.imei}` : ident.primaryLabel;
+                                    })()}
+                                  </span>
                                   {u?.source_type === 'consignment' && (
                                     <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-600 dark:text-amber-400">
                                       <Handshake className="w-2.5 h-2.5" />

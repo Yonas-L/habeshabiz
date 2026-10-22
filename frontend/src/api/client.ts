@@ -42,6 +42,7 @@ export interface ProductVariant {
   ram: string | null;
   color: string | null;
   sku?: string | null;
+  sim_type?: string | null;
   default_selling_price: string | number | null;
   specs?: Record<string, any> | null;
   display_name?: string;
@@ -106,6 +107,7 @@ export interface InventoryUnit {
   id: string;
   variant_id: string;
   imei_or_serial: string | null;
+  serial_number?: string | null;
   battery_health: number | null;
   cycle_count: number | null;
   sim_type: 'physical' | 'esim' | 'dual' | 'na';
@@ -1237,7 +1239,9 @@ export const api = {
     condition?: string;
     quantity?: number;
     imei_or_serial?: string | null;
+    serial_number?: string | null;
     imeis?: string[];
+    serials?: string[];
     selling_price?: number;
     source_type?: 'purchase' | 'consignment';
     supplier_contact_id?: string | null;
@@ -1263,6 +1267,7 @@ export const api = {
     units?: Array<{
       variant_id: string;
       imei_or_serial?: string | null;
+      serial_number?: string | null;
       battery_health?: number | null;
       cycle_count?: number | null;
       sim_type?: string;
@@ -1282,11 +1287,14 @@ export const api = {
     id: string,
     data: {
       product_name?: string | null;
+      brand?: string | null;
       storage?: string | null;
       ram?: string | null;
       color?: string | null;
+      specs?: Record<string, any> | null;
       variant_id?: string | null;
       imei_or_serial?: string | null;
+      serial_number?: string | null;
       condition?: string;
       cost_basis?: number;
       selling_price?: number | null;
@@ -1458,10 +1466,15 @@ export const api = {
     product_id?: string;
     variant_id?: string;
     product_name?: string;
+    category_id?: string;
+    category?: string;
+    has_serials?: boolean;
     storage?: string;
     ram?: string;
     color?: string;
+    specs?: Record<string, any>;
     imei_or_serial?: string;
+    serial_number?: string;
     condition?: string;
     battery_health?: number | null;
     cycle_count?: number | null;

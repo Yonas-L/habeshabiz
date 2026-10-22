@@ -38,50 +38,18 @@ interface StockIntakeModalProps {
   initialVariantId?: string;
 }
 
-type CategoryArchetype =
-  | 'phone_tablet'
-  | 'laptop_computer'
-  | 'smartwatch'
-  | 'screen_protector'
-  | 'case_cover'
-  | 'charger_cable'
-  | 'audio'
-  | 'gaming'
-  | 'general';
-
-function getCategoryArchetype(catSlug?: string, catName?: string): CategoryArchetype {
-  const s = `${catSlug || ''} ${catName || ''}`.toLowerCase();
-  if (s.includes('protector') || s.includes('glass') || s.includes('tempered') || s.includes('film')) {
-    return 'screen_protector';
-  }
-  if (s.includes('case') || s.includes('cover') || s.includes('pouch') || s.includes('skin')) {
-    return 'case_cover';
-  }
-  if (s.includes('charger') || s.includes('cable') || s.includes('power') || s.includes('adapter')) {
-    return 'charger_cable';
-  }
-  if (s.includes('watch') || s.includes('wearable')) {
-    return 'smartwatch';
-  }
-  if (s.includes('laptop') || s.includes('macbook') || s.includes('computer') || s.includes('pc') || s.includes('desktop')) {
-    return 'laptop_computer';
-  }
-  if (s.includes('audio') || s.includes('headphone') || s.includes('earphone') || s.includes('airpod') || s.includes('speaker')) {
-    return 'audio';
-  }
-  if (s.includes('game') || s.includes('gaming') || s.includes('console') || s.includes('playstation') || s.includes('xbox')) {
-    return 'gaming';
-  }
-  if (s.includes('phone') || s.includes('tablet') || s.includes('ipad') || s.includes('smartphone')) {
-    return 'phone_tablet';
-  }
-  return 'general';
-}
+import {
+  getCategoryArchetype,
+  getDefaultHasSerials,
+  isCellularTablet,
+} from '../../utils/electronicsArchetypes';
+import { BrandSelectInput } from '../common/BrandSelectInput';
 
 export interface BatchDeviceItem {
   id: string;
   variant_id: string;
   imei_or_serial: string;
+  serial_number?: string;
   battery_health?: string;
   cycle_count?: string;
   sim_type?: 'physical' | 'esim' | 'dual' | 'na';
@@ -129,6 +97,8 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
   const [variantCaseSize, setVariantCaseSize] = useState('');
   const [variantMaterial, setVariantMaterial] = useState('');
   const [variantGeneralSpec, setVariantGeneralSpec] = useState('');
+  const [variantConnectivity, setVariantConnectivity] = useState<'Wi-Fi' | 'Wi-Fi + Cellular'>('Wi-Fi');
+  const [newProductHasSerials, setNewProductHasSerials] = useState<boolean>(true);
 
   const [isSubmittingProduct, setIsSubmittingProduct] = useState(false);
   const [isCreatingVariant, setIsCreatingVariant] = useState(false);
@@ -138,6 +108,7 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
   const [intakeMode, setIntakeMode] = useState<'single' | 'batch' | 'bulk'>('single');
   const [batchItems, setBatchItems] = useState<BatchDeviceItem[]>([]);
   const [singleImei, setSingleImei] = useState('');
+  const [singleSerial, setSingleSerial] = useState('');
   const [bulkImeisText, setBulkImeisText] = useState('');
   const [quantity, setQuantity] = useState('1');
   const [condition, setCondition] = useState('new');
@@ -229,11 +200,22 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
     return categories.find((c) => c.id === selectedCategoryId) || categories[0];
   }, [categories, selectedCategoryId]);
 
-  const activeArchetype = useMemo(() => {
-    return getCategoryArchetype(activeCategory?.slug, activeCategory?.name);
-  }, [activeCategory]);
+  const selectedProduct = useMemo(() => {
+    return localProducts.find((p) => p.id === selectedProductId) || null;
+  }, [localProducts, selectedProductId]);
 
-  const hasSerials = activeCategory ? activeCategory.has_serials : true;
+  const activeArchetype = useMemo(() => {
+    return getCategoryArchetype(activeCategory?.slug, activeCategory?.name, selectedProduct?.name);
+  }, [activeCategory, selectedProduct]);
+
+  const hasSerials = selectedProduct ? (selectedProduct.has_serials ?? true) : (activeCategory ? activeCategory.has_serials : true);
+
+  // Sync new product classification mode whenever activeCategory changes
+  useEffect(() => {
+    if (activeCategory) {
+      setNewProductHasSerials(activeCategory.has_serials ?? getDefaultHasSerials(getCategoryArchetype(activeCategory.slug, activeCategory.name)));
+    }
+  }, [activeCategory]);
 
   // Filter products by selected category
   const filteredProducts = useMemo(() => {
@@ -251,10 +233,6 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
       return false;
     });
   }, [localProducts, selectedCategoryId, categories]);
-
-  const selectedProduct = useMemo(() => {
-    return localProducts.find((p) => p.id === selectedProductId) || null;
-  }, [localProducts, selectedProductId]);
 
   // Extract existing variants' attributes for selected product
   const productExistingStorages = useMemo(() => {
@@ -400,6 +378,7 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
     setVariantCaseSize('');
     setVariantMaterial('');
     setVariantGeneralSpec('');
+    setVariantConnectivity('Wi-Fi');
   };
 
   // Build variant payload based on category archetype
@@ -411,10 +390,16 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
     let color: string | undefined = undefined;
 
     switch (activeArchetype) {
-      case 'phone_tablet':
+      case 'phone':
         storage = variantStorage.trim() || undefined;
         ram = variantRam.trim() || undefined;
         color = variantColor.trim() || undefined;
+        break;
+
+      case 'tablet':
+        storage = variantStorage.trim() || undefined;
+        color = variantColor.trim() || undefined;
+        specs.connectivity = variantConnectivity;
         break;
 
       case 'laptop_computer':
@@ -447,13 +432,18 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
         color = variantColor.trim() || undefined;
         break;
 
+      case 'powerbank':
+        if (variantGeneralSpec.trim()) specs.capacity = variantGeneralSpec.trim();
+        if (variantWattage.trim()) specs.wattage = variantWattage.trim();
+        color = variantColor.trim() || undefined;
+        break;
+
       case 'audio':
       case 'gaming':
       case 'general':
       default:
-        storage = variantStorage.trim() || undefined;
         color = variantColor.trim() || undefined;
-        if (variantGeneralSpec.trim()) specs.edition = variantGeneralSpec.trim();
+        if (variantGeneralSpec.trim()) specs.option = variantGeneralSpec.trim();
         break;
     }
 
@@ -482,7 +472,7 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
         brand: newProductBrand.trim() || undefined,
         category: activeCategory?.slug || 'other',
         category_id: activeCategory?.id,
-        has_serials: activeCategory?.has_serials ?? true,
+        has_serials: newProductHasSerials,
         variants: [variantData],
       });
 
@@ -668,24 +658,33 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
     const catSlug = activeCategory?.slug || '';
     const prodName = (selectedProduct?.name || '').toLowerCase();
     return (
+      activeArchetype === 'phone' ||
       catSlug.includes('phone') ||
       catSlug.includes('smartphone') ||
       prodName.includes('iphone') ||
       prodName.includes('galaxy') ||
       prodName.includes('pixel')
     );
-  }, [activeCategory, selectedProduct]);
+  }, [activeCategory, selectedProduct, activeArchetype]);
+
+  const isTablet = activeArchetype === 'tablet';
+
+  const isCurrentTabletCellular = useMemo(() => {
+    if (!isTablet) return false;
+    const v = selectedProduct?.variants?.find((item) => item.id === selectedVariantId);
+    return isCellularTablet(simType || v?.sim_type, v?.specs?.connectivity, v?.display_name);
+  }, [isTablet, selectedProduct, selectedVariantId, simType]);
 
   // Batch table: category-aware column labels and variant option text
-  const showBattery = isPhone || activeArchetype === 'phone_tablet' || activeArchetype === 'laptop_computer' || activeArchetype === 'smartwatch';
-  const serialLabel = isPhone || activeArchetype === 'phone_tablet' ? 'IMEI' : 'Serial';
+  const showBattery = isPhone || isTablet || activeArchetype === 'laptop_computer' || activeArchetype === 'smartwatch';
+  const serialLabel = isPhone ? 'IMEI' : (isTablet ? (isCurrentTabletCellular ? 'IMEI & S/N' : 'Serial') : 'Serial');
   const variantOptionLabel = (v: ProductVariant) => {
     const specVals = v.specs ? Object.values(v.specs).filter(Boolean).map(String) : [];
     const ramLabel = v.ram ? (v.ram.toLowerCase().includes('ram') ? v.ram : `${v.ram} RAM`) : null;
     const parts =
-      activeArchetype === 'phone_tablet' || activeArchetype === 'laptop_computer'
+      activeArchetype === 'phone' || activeArchetype === 'laptop_computer'
         ? [v.storage, ramLabel, ...specVals, v.color]
-        : [...specVals, v.storage, v.color];
+        : (activeArchetype === 'tablet' ? [v.storage, ...specVals, v.color] : [...specVals, v.storage, v.color]);
     return parts.filter(Boolean).join(' · ') || 'Standard';
   };
 
@@ -829,22 +828,54 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
           toast.error(`Device #${i + 1} has an invalid cost`);
           return;
         }
-        if (hasSerials && !it.imei_or_serial.trim()) {
-          toast.error(`Device #${i + 1} requires an IMEI or Serial #`);
-          return;
+        if (hasSerials) {
+          const itemVariant = (selectedProduct?.variants || []).find((v) => v.id === it.variant_id);
+          const isCell = isTablet && isCellularTablet(
+            itemVariant?.sim_type,
+            (itemVariant?.specs as any)?.connectivity,
+            itemVariant?.display_name
+          );
+
+          if (isCell) {
+            if (!it.serial_number?.trim()) {
+              toast.error(`Device #${i + 1} requires a Serial Number (S/N)`);
+              return;
+            }
+            if (!it.imei_or_serial?.trim()) {
+              toast.error(`Device #${i + 1} requires a Cellular IMEI`);
+              return;
+            }
+          } else {
+            const val = it.serial_number?.trim() || it.imei_or_serial?.trim();
+            if (!val) {
+              toast.error(`Device #${i + 1} requires an IMEI or Serial #`);
+              return;
+            }
+          }
         }
       }
 
-      // Check duplicate IMEIs in batch
+      // Check duplicate IMEIs/serials in batch
       if (hasSerials) {
         const imeis = batchItems.map((it) => it.imei_or_serial.trim().toLowerCase()).filter(Boolean);
-        const seen = new Set<string>();
+        const serials = batchItems.map((it) => it.serial_number?.trim().toLowerCase()).filter(Boolean) as string[];
+
+        const seenImeis = new Set<string>();
         for (const imei of imeis) {
-          if (seen.has(imei)) {
+          if (seenImeis.has(imei)) {
             toast.error(`Duplicate Serial/IMEI detected (${imei}) within batch`);
             return;
           }
-          seen.add(imei);
+          seenImeis.add(imei);
+        }
+
+        const seenSerials = new Set<string>();
+        for (const sn of serials) {
+          if (seenSerials.has(sn)) {
+            toast.error(`Duplicate Serial Number detected (${sn}) within batch`);
+            return;
+          }
+          seenSerials.add(sn);
         }
       }
     } else {
@@ -870,9 +901,34 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
           );
           return;
         }
-        if (intakeMode === 'single' && !singleImei.trim()) {
-          toast.error('Please enter the device Serial or IMEI');
-          return;
+        if (intakeMode === 'single') {
+          if (isTablet) {
+            if (isCurrentTabletCellular) {
+              if (!singleSerial.trim()) {
+                toast.error('Please enter the tablet Serial Number (S/N)');
+                return;
+              }
+              if (!singleImei.trim()) {
+                toast.error('Please enter the tablet Cellular IMEI');
+                return;
+              }
+            } else {
+              if (!singleSerial.trim() && !singleImei.trim()) {
+                toast.error('Please enter the tablet Serial Number (S/N)');
+                return;
+              }
+            }
+          } else if (activeArchetype === 'laptop_computer') {
+            if (!singleSerial.trim() && !singleImei.trim()) {
+              toast.error('Please enter the laptop Serial Number (S/N)');
+              return;
+            }
+          } else {
+            if (!singleImei.trim()) {
+              toast.error('Please enter the device Serial or IMEI');
+              return;
+            }
+          }
         }
       } else {
         const q = parseInt(quantity, 10);
@@ -950,18 +1006,30 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
 
       if (intakeMode === 'batch') {
         payload = {
-          units: batchItems.map((it) => ({
-            variant_id: it.variant_id,
-            imei_or_serial: it.imei_or_serial.trim() || undefined,
-            cost_basis: parseFormattedNumber(it.cost_basis) ?? 0,
-            selling_price: parseFormattedNumber(it.selling_price) ?? undefined,
-            condition: it.condition,
-            battery_health: showBattery && it.battery_health ? parseInt(it.battery_health, 10) : undefined,
-            cycle_count: it.cycle_count ? parseInt(it.cycle_count, 10) : undefined,
-            sim_type: it.sim_type,
-            notes: it.notes?.trim() || undefined,
-            location: location || 'Shop Counter',
-          })),
+          units: batchItems.map((it) => {
+            const itemVariant = (selectedProduct?.variants || []).find((v) => v.id === it.variant_id);
+            const isCell = isTablet && isCellularTablet(
+              itemVariant?.sim_type,
+              (itemVariant?.specs as any)?.connectivity,
+              itemVariant?.display_name
+            );
+            const serial = it.serial_number?.trim() || undefined;
+            const imei = it.imei_or_serial?.trim() || undefined;
+
+            return {
+              variant_id: it.variant_id,
+              imei_or_serial: isTablet ? (isCell ? imei : (serial || imei)) : (imei || serial),
+              serial_number: isTablet ? (serial || (!isCell ? imei : undefined)) : (serial || (activeArchetype === 'laptop_computer' ? imei : undefined)),
+              cost_basis: parseFormattedNumber(it.cost_basis) ?? 0,
+              selling_price: parseFormattedNumber(it.selling_price) ?? undefined,
+              condition: it.condition,
+              battery_health: showBattery && it.battery_health ? parseInt(it.battery_health, 10) : undefined,
+              cycle_count: it.cycle_count ? parseInt(it.cycle_count, 10) : undefined,
+              sim_type: isTablet ? (isCell ? (it.sim_type || itemVariant?.sim_type || 'physical') : 'na') : it.sim_type,
+              notes: it.notes?.trim() || undefined,
+              location: location || 'Shop Counter',
+            };
+          }),
           source_type: sourceType,
           supplier_contact_id: supplierId || undefined,
           return_deadline: calculatedReturnDeadline,
@@ -997,12 +1065,36 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
           if (intakeMode === 'bulk') {
             payload.imeis = parsedImeis;
           } else {
-            payload.imei_or_serial = singleImei.trim();
+            if (isTablet) {
+              if (isCurrentTabletCellular) {
+                payload.serial_number = singleSerial.trim() || undefined;
+                payload.imei_or_serial = singleImei.trim() || undefined;
+              } else {
+                const s = singleSerial.trim() || singleImei.trim();
+                payload.serial_number = s || undefined;
+                payload.imei_or_serial = s || undefined;
+              }
+            } else if (activeArchetype === 'laptop_computer') {
+              const s = singleSerial.trim() || singleImei.trim();
+              payload.serial_number = s || undefined;
+              payload.imei_or_serial = s || undefined;
+            } else {
+              payload.imei_or_serial = singleImei.trim();
+              if (singleSerial.trim()) {
+                payload.serial_number = singleSerial.trim();
+              }
+            }
           }
-          if (isPhone) {
+          if (showBattery) {
             payload.battery_health = batteryHealth ? parseInt(batteryHealth, 10) : null;
             payload.cycle_count = cycleCount ? parseInt(cycleCount, 10) : null;
-            payload.sim_type = simType;
+          }
+          if (isPhone) {
+            payload.sim_type = simType || 'physical';
+          } else if (isTablet) {
+            payload.sim_type = isCurrentTabletCellular ? (simType || 'physical') : 'na';
+          } else {
+            payload.sim_type = 'na';
           }
         } else {
           payload.quantity = parseInt(quantity, 10) || 1;
@@ -1038,6 +1130,7 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
 
       // Reset fields
       setSingleImei('');
+      setSingleSerial('');
       setBulkImeisText('');
       setBatchItems([]);
       setQuantity('1');
@@ -1370,7 +1463,193 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
           </div>
         );
 
-      case 'phone_tablet':
+      case 'tablet':
+        return (
+          <div className="space-y-3.5">
+            {/* Storage Radio Buttons */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                  Storage / Capacity <span className="text-rose-500">*</span>
+                </label>
+                <span className="text-[10px] text-slate-400">Click to select or enter new</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5 mb-1.5">
+                {['64GB', '128GB', '256GB', '512GB', '1TB', '2TB'].map((opt) => {
+                  const isSelected = variantStorage.trim().toLowerCase() === opt.toLowerCase();
+                  return (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => setVariantStorage(opt)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-slate-900 dark:bg-slate-900 text-emerald-400 dark:text-emerald-400 border-slate-800 shadow-2xs font-bold ring-1 ring-emerald-500/20'
+                          : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-slate-300'
+                      }`}
+                    >
+                      {opt}
+                    </button>
+                  );
+                })}
+              </div>
+              <input
+                type="text"
+                placeholder="Or custom capacity (e.g. 256GB)..."
+                value={variantStorage}
+                onChange={(e) => setVariantStorage(e.target.value)}
+                className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900/20"
+              />
+            </div>
+
+            {/* Connectivity */}
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                Connectivity / Network Type
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setVariantConnectivity('Wi-Fi');
+                    setSimType('na');
+                  }}
+                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                    variantConnectivity === 'Wi-Fi'
+                      ? 'border-slate-800 bg-slate-900 text-emerald-400 font-bold shadow-xs ring-1 ring-emerald-500/20'
+                      : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300'
+                  }`}
+                >
+                  <div className="text-xs font-bold">📶 Wi-Fi Only</div>
+                  <div className="text-[10px] text-slate-400 font-normal">Requires Serial Number only (no SIM)</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setVariantConnectivity('Wi-Fi + Cellular');
+                    if (simType === 'na') setSimType('physical');
+                  }}
+                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                    variantConnectivity === 'Wi-Fi + Cellular'
+                      ? 'border-slate-800 bg-slate-900 text-emerald-400 font-bold shadow-xs ring-1 ring-emerald-500/20'
+                      : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300'
+                  }`}
+                >
+                  <div className="text-xs font-bold">📡 Wi-Fi + Cellular</div>
+                  <div className="text-[10px] text-slate-400 font-normal">Takes SIM/eSIM · Has both IMEI & S/N</div>
+                </button>
+              </div>
+            </div>
+
+            {/* Color */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                  Color / Finish
+                </label>
+              </div>
+              <div className="flex flex-wrap gap-1.5 mb-1.5">
+                {['Space Gray', 'Silver', 'Starlight', 'Midnight', 'Blue', 'Pink', 'Yellow'].map((opt) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => setVariantColor(opt)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                      variantColor.trim().toLowerCase() === opt.toLowerCase()
+                        ? 'bg-slate-900 text-emerald-400 border-slate-800 shadow-2xs font-bold ring-1 ring-emerald-500/20'
+                        : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-slate-300'
+                    }`}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
+              <input
+                type="text"
+                placeholder="Or custom color..."
+                value={variantColor}
+                onChange={(e) => setVariantColor(e.target.value)}
+                className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900/20"
+              />
+            </div>
+          </div>
+        );
+
+      case 'powerbank':
+        return (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                Battery Capacity *
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. 10000mAh, 20000mAh"
+                value={variantGeneralSpec}
+                onChange={(e) => setVariantGeneralSpec(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                Output Power
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. 22.5W Fast, 65W PD"
+                value={variantWattage}
+                onChange={(e) => setVariantWattage(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                Color
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Black, White"
+                value={variantColor}
+                onChange={(e) => setVariantColor(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+              />
+            </div>
+          </div>
+        );
+
+      case 'audio':
+      case 'gaming':
+      case 'general':
+        return (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                Option / Spec Name
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Pro Edition, ANC, Wireless"
+                value={variantGeneralSpec}
+                onChange={(e) => setVariantGeneralSpec(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                Color (Optional)
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Black, White"
+                value={variantColor}
+                onChange={(e) => setVariantColor(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+              />
+            </div>
+          </div>
+        );
+
+      case 'phone':
       default:
         return (
           <div className="space-y-3.5">
@@ -1572,6 +1851,42 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                   New Product Model ({activeCategory?.name || 'Category'})
                 </div>
 
+                {/* Inventory Tracking Classification */}
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800">
+                  <div>
+                    <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 block">Inventory Tracking Mode</span>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                      {newProductHasSerials
+                        ? 'Unique units (individual Serial # / IMEI & condition)'
+                        : 'Bulk batch stock (simple total quantity count)'}
+                    </span>
+                  </div>
+                  <div className="flex items-center p-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60">
+                    <button
+                      type="button"
+                      onClick={() => setNewProductHasSerials(true)}
+                      className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
+                        newProductHasSerials
+                          ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-2xs font-bold'
+                          : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'
+                      }`}
+                    >
+                      Serialized (IMEI / SN)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewProductHasSerials(false)}
+                      className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
+                        !newProductHasSerials
+                          ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-2xs font-bold'
+                          : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'
+                      }`}
+                    >
+                      Bulk Quantity
+                    </button>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
@@ -1586,18 +1901,15 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                      Brand
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Apple, Anker, Spigen"
-                      value={newProductBrand}
-                      onChange={(e) => setNewProductBrand(e.target.value)}
-                      className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
-                    />
-                  </div>
+                  <BrandSelectInput
+                    value={newProductBrand}
+                    onChange={setNewProductBrand}
+                    products={products}
+                    categorySlug={activeCategory?.slug}
+                    categoryName={activeCategory?.name}
+                    modelName={newProductName}
+                    placeholder="Select or enter brand..."
+                  />
                 </div>
 
                 {/* Category-Specific Variant Fields for New Model */}
@@ -1938,8 +2250,15 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                     <table className="w-full table-fixed text-left text-xs">
                       <colgroup>
                         <col className="w-9" />
-                        <col className="w-[26%]" />
-                        <col />
+                        <col className={isTablet ? 'w-[22%]' : 'w-[26%]'} />
+                        {isTablet ? (
+                          <>
+                            <col className="w-[140px]" />
+                            <col className="w-[140px]" />
+                          </>
+                        ) : (
+                          <col />
+                        )}
                         {showBattery && <col className="w-[72px]" />}
                         <col className="w-[110px]" />
                         <col className="w-[110px]" />
@@ -1965,9 +2284,16 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                               </button>
                             </div>
                           </th>
-                          <th className="py-2.5 px-2">
-                            {serialLabel} <span className="text-rose-500">*</span>
-                          </th>
+                          {isTablet ? (
+                            <>
+                              <th className="py-2.5 px-2">Serial (S/N) <span className="text-rose-500">*</span></th>
+                              <th className="py-2.5 px-2">Cellular IMEI</th>
+                            </>
+                          ) : (
+                            <th className="py-2.5 px-2">
+                              {serialLabel} <span className="text-rose-500">*</span>
+                            </th>
+                          )}
                           {showBattery && <th className="py-2.5 px-2 text-center">Battery</th>}
                           <th className="py-2.5 px-2">
                             Cost <span className="text-rose-500">*</span>
@@ -1977,7 +2303,14 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 bg-white dark:bg-slate-900/40">
-                        {batchItems.map((item, idx) => (
+                        {batchItems.map((item, idx) => {
+                          const itemVariant = (selectedProduct?.variants || []).find((v) => v.id === item.variant_id);
+                          const isItemCellular = isTablet && isCellularTablet(
+                            itemVariant?.sim_type,
+                            (itemVariant?.specs as any)?.connectivity,
+                            itemVariant?.display_name
+                          );
+                          return (
                           <tr key={item.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
                             <td className="py-2 px-2 text-center text-slate-400 font-mono text-[11px]">{idx + 1}</td>
                             <td className="py-2 px-2">
@@ -1993,16 +2326,58 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                                 ))}
                               </select>
                             </td>
-                            <td className="py-2 px-2">
-                              <input
-                                type="text"
-                                required
-                                placeholder={serialLabel === 'IMEI' ? '15-digit IMEI' : 'Serial number'}
-                                value={item.imei_or_serial}
-                                onChange={(e) => handleUpdateBatchItem(idx, { imei_or_serial: e.target.value })}
-                                className="w-full h-9 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono text-xs tracking-wide text-slate-900 dark:text-white placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-slate-900/20"
-                              />
-                            </td>
+                            {isTablet ? (
+                              <>
+                                <td className="py-2 px-2">
+                                  <input
+                                    type="text"
+                                    required
+                                    placeholder="Serial (S/N)"
+                                    value={item.serial_number ?? item.imei_or_serial}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      handleUpdateBatchItem(idx, {
+                                        serial_number: val,
+                                        ...(!isItemCellular ? { imei_or_serial: val } : {}),
+                                      });
+                                    }}
+                                    className="w-full h-9 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono text-xs tracking-wide text-slate-900 dark:text-white placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-slate-900/20"
+                                  />
+                                </td>
+                                <td className="py-2 px-2">
+                                  {isItemCellular ? (
+                                    <input
+                                      type="text"
+                                      required
+                                      placeholder="15-digit IMEI"
+                                      value={item.imei_or_serial}
+                                      onChange={(e) => handleUpdateBatchItem(idx, { imei_or_serial: e.target.value })}
+                                      className="w-full h-9 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono text-xs tracking-wide text-slate-900 dark:text-white placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-slate-900/20"
+                                    />
+                                  ) : (
+                                    <span className="inline-flex items-center px-2 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-[10px] font-medium text-slate-400 dark:text-slate-500">
+                                      Wi-Fi (No IMEI)
+                                    </span>
+                                  )}
+                                </td>
+                              </>
+                            ) : (
+                              <td className="py-2 px-2">
+                                <input
+                                  type="text"
+                                  required
+                                  placeholder={serialLabel === 'IMEI' ? '15-digit IMEI' : 'Serial number'}
+                                  value={item.imei_or_serial}
+                                  onChange={(e) =>
+                                    handleUpdateBatchItem(idx, {
+                                      imei_or_serial: e.target.value,
+                                      ...(activeArchetype === 'laptop_computer' ? { serial_number: e.target.value } : {}),
+                                    })
+                                  }
+                                  className="w-full h-9 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono text-xs tracking-wide text-slate-900 dark:text-white placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-slate-900/20"
+                                />
+                              </td>
+                            )}
                             {showBattery && (
                               <td className="py-2 px-2">
                                 <div className="relative">
@@ -2061,14 +2436,22 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                               </div>
                             </td>
                           </tr>
-                        ))}
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
 
                   {/* Mobile Cards */}
                   <div className="sm:hidden space-y-2.5">
-                    {batchItems.map((item, idx) => (
+                    {batchItems.map((item, idx) => {
+                      const itemVariant = (selectedProduct?.variants || []).find((v) => v.id === item.variant_id);
+                      const isItemCellular = isTablet && isCellularTablet(
+                        itemVariant?.sim_type,
+                        (itemVariant?.specs as any)?.connectivity,
+                        itemVariant?.display_name
+                      );
+                      return (
                       <div key={item.id} className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 space-y-2">
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-bold text-slate-900 dark:text-white font-mono">
@@ -2123,18 +2506,64 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                           </select>
                         </div>
 
-                        <div>
-                          <label className="block text-[10px] font-medium text-slate-500 mb-1">
-                            {serialLabel} <span className="text-rose-500">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            placeholder={serialLabel === 'IMEI' ? '15-digit IMEI' : 'Serial number'}
-                            value={item.imei_or_serial}
-                            onChange={(e) => handleUpdateBatchItem(idx, { imei_or_serial: e.target.value })}
-                            className="w-full h-9 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono text-xs tracking-wide placeholder:text-slate-300 focus:outline-none"
-                          />
-                        </div>
+                        {isTablet ? (
+                          <div className="space-y-2">
+                            <div>
+                              <label className="block text-[10px] font-medium text-slate-500 mb-1">
+                                Serial Number (S/N) <span className="text-rose-500">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="e.g. DMPX9218HG6R"
+                                value={item.serial_number ?? item.imei_or_serial}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  handleUpdateBatchItem(idx, {
+                                    serial_number: val,
+                                    ...(!isItemCellular ? { imei_or_serial: val } : {}),
+                                  });
+                                }}
+                                className="w-full h-9 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono text-xs tracking-wide placeholder:text-slate-300 focus:outline-none"
+                              />
+                            </div>
+                            {isItemCellular ? (
+                              <div>
+                                <label className="block text-[10px] font-medium text-slate-500 mb-1">
+                                  Cellular IMEI <span className="text-rose-500">*</span>
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder="15-digit IMEI"
+                                  value={item.imei_or_serial}
+                                  onChange={(e) => handleUpdateBatchItem(idx, { imei_or_serial: e.target.value })}
+                                  className="w-full h-9 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono text-xs tracking-wide placeholder:text-slate-300 focus:outline-none"
+                                />
+                              </div>
+                            ) : (
+                              <div className="text-[10px] text-slate-400 font-medium py-1">
+                                Wi-Fi Only (No IMEI needed)
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div>
+                            <label className="block text-[10px] font-medium text-slate-500 mb-1">
+                              {serialLabel} <span className="text-rose-500">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              placeholder={serialLabel === 'IMEI' ? '15-digit IMEI' : 'Serial number'}
+                              value={item.imei_or_serial}
+                              onChange={(e) =>
+                                handleUpdateBatchItem(idx, {
+                                  imei_or_serial: e.target.value,
+                                  ...(activeArchetype === 'laptop_computer' ? { serial_number: e.target.value } : {}),
+                                })
+                              }
+                              className="w-full h-9 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono text-xs tracking-wide placeholder:text-slate-300 focus:outline-none"
+                            />
+                          </div>
+                        )}
 
                         <div className={`grid gap-2 ${showBattery ? 'grid-cols-3' : 'grid-cols-2'}`}>
                           {showBattery && (
@@ -2174,7 +2603,8 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                           </div>
                         </div>
                       </div>
-                    ))}
+                    );
+                  })}
                   </div>
 
                   <button
@@ -2208,23 +2638,102 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                   </div>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
-                      {isPhone ? 'IMEI / Serial #' : 'Serial #'}
-                    </label>
-                    <div className="relative">
-                      <Barcode className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
-                      <input
-                        type="text"
-                        required
-                        value={singleImei}
-                        onChange={(e) => setSingleImei(e.target.value)}
-                        placeholder={isPhone ? '359871109988776' : 'S01-F329482'}
-                        className="w-full h-10 pl-9 pr-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
-                      />
+                <div className="space-y-3">
+                  {isTablet ? (
+                    isCurrentTabletCellular ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
+                            Tablet Serial Number (S/N) <span className="text-rose-500">*</span>
+                          </label>
+                          <div className="relative">
+                            <Barcode className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
+                            <input
+                              type="text"
+                              required
+                              value={singleSerial}
+                              onChange={(e) => setSingleSerial(e.target.value)}
+                              placeholder="e.g. DMPX9218HG6R"
+                              className="w-full h-10 pl-9 pr-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
+                            Cellular IMEI # <span className="text-rose-500">*</span>
+                          </label>
+                          <div className="relative">
+                            <Barcode className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
+                            <input
+                              type="text"
+                              required
+                              value={singleImei}
+                              onChange={(e) => setSingleImei(e.target.value)}
+                              placeholder="e.g. 359871109988776"
+                              className="w-full h-10 pl-9 pr-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
+                          Tablet Serial Number (S/N) <span className="text-rose-500">*</span>
+                        </label>
+                        <div className="relative">
+                          <Barcode className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
+                          <input
+                            type="text"
+                            required
+                            value={singleSerial}
+                            onChange={(e) => {
+                              setSingleSerial(e.target.value);
+                              setSingleImei(e.target.value);
+                            }}
+                            placeholder="e.g. DMPX9218HG6R (Wi-Fi Only · No IMEI)"
+                            className="w-full h-10 pl-9 pr-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+                          />
+                        </div>
+                      </div>
+                    )
+                  ) : activeArchetype === 'laptop_computer' ? (
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
+                        Hardware Serial Number (S/N) <span className="text-rose-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <Barcode className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
+                        <input
+                          type="text"
+                          required
+                          value={singleSerial}
+                          onChange={(e) => {
+                            setSingleSerial(e.target.value);
+                            setSingleImei(e.target.value);
+                          }}
+                          placeholder="e.g. C02G9214MD6R"
+                          className="w-full h-10 pl-9 pr-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+                        />
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
+                        {isPhone ? 'IMEI / Serial #' : 'Serial #'} <span className="text-rose-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <Barcode className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
+                        <input
+                          type="text"
+                          required
+                          value={singleImei}
+                          onChange={(e) => setSingleImei(e.target.value)}
+                          placeholder={isPhone ? '359871109988776' : 'S01-F329482'}
+                          className="w-full h-10 pl-9 pr-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+                        />
+                      </div>
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
@@ -2305,16 +2814,28 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                 </div>
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
-                    SIM Type
+                    SIM / Network Type
                   </label>
                   <select
                     value={simType}
                     onChange={(e) => setSimType(e.target.value as any)}
                     className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-900 dark:text-white cursor-pointer focus:outline-none"
                   >
-                    <option value="physical">Physical SIM</option>
-                    <option value="esim">eSIM Only</option>
-                    <option value="dual">Dual SIM</option>
+                    {isTablet ? (
+                      <>
+                        <option value="na">Wi-Fi Only (No SIM / S/N Only)</option>
+                        <option value="physical">Physical SIM (Cellular · S/N & IMEI)</option>
+                        <option value="esim">eSIM Only (Cellular · S/N & IMEI)</option>
+                        <option value="dual">Dual SIM (Cellular · S/N & IMEI)</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="physical">Physical SIM</option>
+                        <option value="esim">eSIM Only</option>
+                        <option value="dual">Dual SIM</option>
+                        <option value="na">N/A</option>
+                      </>
+                    )}
                   </select>
                 </div>
               </div>

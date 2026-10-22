@@ -249,6 +249,10 @@ class RecordSaleAction
             if (! empty($exchangeData) && ! empty($exchangeData['variant_id']) && $exchangeAllowance > 0) {
                 $exchangeVariant = ProductVariant::with('product')->findOrFail($exchangeData['variant_id']);
                 $exchangeImei = ! empty($exchangeData['imei_or_serial']) ? trim($exchangeData['imei_or_serial']) : null;
+                $exchangeSerial = ! empty($exchangeData['serial_number']) ? trim($exchangeData['serial_number']) : null;
+                if (! $exchangeImei && $exchangeSerial) {
+                    $exchangeImei = $exchangeSerial;
+                }
 
                 if ($exchangeImei) {
                     $alreadyExists = InventoryUnit::where('tenant_id', $tenantId)
@@ -261,10 +265,22 @@ class RecordSaleAction
                     }
                 }
 
+                if ($exchangeSerial && $exchangeSerial !== $exchangeImei) {
+                    $alreadyExistsS = InventoryUnit::where('tenant_id', $tenantId)
+                        ->whereIn('status', ['in_stock', 'reserved', 'out'])
+                        ->where('serial_number', $exchangeSerial)
+                        ->exists();
+
+                    if ($alreadyExistsS) {
+                        throw new InvalidArgumentException("Traded-in device Serial '{$exchangeSerial}' is already present in active shop inventory.");
+                    }
+                }
+
                 $exchangeUnit = InventoryUnit::create([
                     'tenant_id' => $tenantId,
                     'variant_id' => $exchangeVariant->id,
                     'imei_or_serial' => $exchangeImei,
+                    'serial_number' => $exchangeSerial,
                     'condition' => $exchangeData['condition'] ?? 'used_clean',
                     'battery_health' => isset($exchangeData['battery_health']) && $exchangeData['battery_health'] !== '' ? (int) $exchangeData['battery_health'] : null,
                     'cycle_count' => isset($exchangeData['cycle_count']) && $exchangeData['cycle_count'] !== '' ? (int) $exchangeData['cycle_count'] : null,

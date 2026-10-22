@@ -13,44 +13,22 @@ import {
   ChevronDown,
   Edit2,
   Check,
+  Barcode,
 } from 'lucide-react';
 import { getCategoryIcon } from './CategoryManagementModal';
+import {
+  getCategoryArchetype,
+} from '../../utils/electronicsArchetypes';
+import { BrandSelectInput } from '../common/BrandSelectInput';
 
 interface EditProductModalProps {
   isOpen: boolean;
   onClose: () => void;
   product: Product | null;
   categories: ProductCategory[];
+  products?: Product[];
   onProductUpdated: () => void;
   onProductDeleted?: () => void;
-}
-
-type CategoryArchetype =
-  | 'phone_tablet'
-  | 'laptop'
-  | 'screen_protector'
-  | 'charger_cable'
-  | 'smartwatch'
-  | 'general';
-
-function getCategoryArchetype(slug?: string, name?: string): CategoryArchetype {
-  const s = ((slug || '') + ' ' + (name || '')).toLowerCase();
-  if (s.includes('protector') || s.includes('tempered') || s.includes('glass')) {
-    return 'screen_protector';
-  }
-  if (s.includes('charger') || s.includes('adapter') || s.includes('cable') || s.includes('power')) {
-    return 'charger_cable';
-  }
-  if (s.includes('watch') || s.includes('band')) {
-    return 'smartwatch';
-  }
-  if (s.includes('laptop') || s.includes('macbook') || s.includes('computer')) {
-    return 'laptop';
-  }
-  if (s.includes('phone') || s.includes('tablet') || s.includes('ipad') || s.includes('smartphone')) {
-    return 'phone_tablet';
-  }
-  return 'general';
 }
 
 export const EditProductModal: React.FC<EditProductModalProps> = ({
@@ -58,6 +36,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
   onClose,
   product,
   categories,
+  products = [],
   onProductUpdated,
   onProductDeleted,
 }) => {
@@ -81,10 +60,12 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
   const [newColor, setNewColor] = useState('');
   const [newProcessor, setNewProcessor] = useState('');
   const [newCompatibility, setNewCompatibility] = useState('');
+  const [newMaterial, setNewMaterial] = useState('');
   const [newGlassType, setNewGlassType] = useState('');
   const [newWattage, setNewWattage] = useState('');
   const [newCaseSize, setNewCaseSize] = useState('');
   const [newGeneralSpec, setNewGeneralSpec] = useState('');
+  const [newConnectivity, setNewConnectivity] = useState<'Wi-Fi' | 'Wi-Fi + Cellular'>('Wi-Fi');
   const [newPrice, setNewPrice] = useState('');
 
   // Inline Edit Variant State
@@ -127,8 +108,8 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
   }, [categories, categoryId, product]);
 
   const activeArchetype = useMemo(() => {
-    return getCategoryArchetype(currentCategory?.slug, currentCategory?.name);
-  }, [currentCategory]);
+    return getCategoryArchetype(currentCategory?.slug, currentCategory?.name, name || product?.name);
+  }, [currentCategory, name, product]);
 
   const productExistingStorages = useMemo(() => {
     return Array.from(new Set(variants.map(v => v.storage).filter(Boolean) as string[]));
@@ -162,10 +143,12 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
     setNewColor('');
     setNewProcessor('');
     setNewCompatibility('');
+    setNewMaterial('');
     setNewGlassType('');
     setNewWattage('');
     setNewCaseSize('');
     setNewGeneralSpec('');
+    setNewConnectivity('Wi-Fi');
     setNewPrice('');
   };
 
@@ -213,7 +196,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
       };
 
       switch (activeArchetype) {
-        case 'laptop':
+        case 'laptop_computer':
           payload.storage = newStorage.trim() || undefined;
           payload.ram = newRam.trim() || undefined;
           payload.color = newColor.trim() || undefined;
@@ -221,36 +204,55 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
             payload.specs = { processor: newProcessor.trim() };
           }
           break;
+        case 'tablet':
+          payload.storage = newStorage.trim() || undefined;
+          payload.color = newColor.trim() || undefined;
+          payload.specs = { connectivity: newConnectivity };
+          break;
         case 'screen_protector':
           payload.specs = {
             compatible_model: newCompatibility.trim() || undefined,
             glass_type: newGlassType.trim() || undefined,
           };
-          payload.storage = newCompatibility.trim() || undefined;
-          payload.color = newGlassType.trim() || undefined;
+          break;
+        case 'case_cover':
+          payload.specs = {
+            compatible_model: newCompatibility.trim() || undefined,
+            material: newMaterial.trim() || undefined,
+          };
+          payload.color = newColor.trim() || undefined;
           break;
         case 'charger_cable':
           payload.specs = {
             wattage: newWattage.trim() || undefined,
+            port_type: newGeneralSpec.trim() || undefined,
           };
-          payload.storage = newWattage.trim() || undefined;
+          payload.color = newColor.trim() || undefined;
+          break;
+        case 'powerbank':
+          payload.specs = {
+            capacity: newGeneralSpec.trim() || undefined,
+            wattage: newWattage.trim() || undefined,
+          };
           payload.color = newColor.trim() || undefined;
           break;
         case 'smartwatch':
           payload.specs = {
             case_size: newCaseSize.trim() || undefined,
+            connectivity: newRam.trim() || undefined,
           };
-          payload.storage = newCaseSize.trim() || undefined;
           payload.color = newColor.trim() || undefined;
           break;
-        case 'phone_tablet':
+        case 'phone':
           payload.storage = newStorage.trim() || undefined;
           payload.ram = newRam.trim() || undefined;
           payload.color = newColor.trim() || undefined;
           break;
         default:
-          payload.storage = newGeneralSpec.trim() || undefined;
           payload.color = newColor.trim() || undefined;
+          if (newGeneralSpec.trim()) {
+            payload.specs = { option: newGeneralSpec.trim() };
+          }
           break;
       }
 
@@ -421,18 +423,16 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Brand / Manufacturer
-                </label>
-                <input
-                  type="text"
-                  value={brand}
-                  onChange={(e) => setBrand(e.target.value)}
-                  placeholder="e.g. Apple, Samsung, Sony"
-                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700"
-                />
-              </div>
+              <BrandSelectInput
+                value={brand}
+                onChange={setBrand}
+                products={products}
+                categorySlug={currentCategory?.slug}
+                categoryName={currentCategory?.name}
+                modelName={name}
+                label="Brand / Manufacturer"
+                placeholder="Select or enter brand..."
+              />
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
@@ -452,6 +452,39 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                   </select>
                   <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2.5 top-3 pointer-events-none" />
                 </div>
+              </div>
+            </div>
+
+            {/* Inventory Tracking Mode */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                Inventory Tracking Mode
+              </label>
+              <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setHasSerials(true)}
+                  className={`h-8 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                    hasSerials
+                      ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
+                      : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                  }`}
+                >
+                  <Barcode className="w-3.5 h-3.5" />
+                  <span>Serialized / IMEI</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHasSerials(false)}
+                  className={`h-8 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                    !hasSerials
+                      ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
+                      : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                  }`}
+                >
+                  <Package className="w-3.5 h-3.5" />
+                  <span>Bulk / Quantity</span>
+                </button>
               </div>
             </div>
 
@@ -511,7 +544,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                 </div>
 
                 {/* Context-aware dynamic fields */}
-                {activeArchetype === 'laptop' && (
+                {activeArchetype === 'laptop_computer' && (
                   <div className="space-y-3">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
@@ -635,7 +668,101 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                   </div>
                 )}
 
-                {activeArchetype === 'phone_tablet' && (
+                {activeArchetype === 'tablet' && (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                          Storage <span className="text-rose-500">*</span>
+                        </label>
+                        <div className="flex flex-wrap gap-1 mb-1.5">
+                          {['64GB', '128GB', '256GB', '512GB', '1TB', '2TB'].map((st) => (
+                            <button
+                              key={st}
+                              type="button"
+                              onClick={() => setNewStorage(st)}
+                              className={`px-2 py-0.5 rounded text-[11px] font-medium transition-all ${
+                                newStorage === st
+                                  ? 'bg-emerald-600 text-white font-bold shadow-sm'
+                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                              }`}
+                            >
+                              {st}
+                            </button>
+                          ))}
+                        </div>
+                        <input
+                          type="text"
+                          value={newStorage}
+                          onChange={(e) => setNewStorage(e.target.value)}
+                          placeholder="e.g. 256GB"
+                          className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                          Connectivity
+                        </label>
+                        <div className="grid grid-cols-2 gap-1.5 mt-1">
+                          <button
+                            type="button"
+                            onClick={() => setNewConnectivity('Wi-Fi')}
+                            className={`p-1.5 rounded-lg border text-left text-xs transition-all ${
+                              newConnectivity === 'Wi-Fi'
+                                ? 'border-slate-800 bg-slate-900 text-emerald-400 font-bold'
+                                : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
+                            }`}
+                          >
+                            <div>📶 Wi-Fi Only</div>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setNewConnectivity('Wi-Fi + Cellular')}
+                            className={`p-1.5 rounded-lg border text-left text-xs transition-all ${
+                              newConnectivity === 'Wi-Fi + Cellular'
+                                ? 'border-slate-800 bg-slate-900 text-emerald-400 font-bold'
+                                : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
+                            }`}
+                          >
+                            <div>📡 Cellular</div>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                        Color
+                      </label>
+                      <div className="flex flex-wrap gap-1 mb-1.5">
+                        {['Space Gray', 'Silver', 'Starlight', 'Midnight', 'Blue', 'Pink'].map((col) => (
+                          <button
+                            key={col}
+                            type="button"
+                            onClick={() => setNewColor(col)}
+                            className={`px-2 py-0.5 rounded text-[10px] font-medium transition-all ${
+                              newColor === col
+                                ? 'bg-emerald-600 text-white font-bold shadow-sm'
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                            }`}
+                          >
+                            {col}
+                          </button>
+                        ))}
+                      </div>
+                      <input
+                        type="text"
+                        value={newColor}
+                        onChange={(e) => setNewColor(e.target.value)}
+                        placeholder="e.g. Space Gray"
+                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {activeArchetype === 'phone' && (
                   <div className="space-y-3">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
@@ -728,6 +855,47 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                   </div>
                 )}
 
+                {activeArchetype === 'case_cover' && (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                        Phone Model *
+                      </label>
+                      <input
+                        type="text"
+                        value={newCompatibility}
+                        onChange={(e) => setNewCompatibility(e.target.value)}
+                        placeholder="e.g. iPhone 16 Pro Max"
+                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                        Material / Style
+                      </label>
+                      <input
+                        type="text"
+                        value={newMaterial}
+                        onChange={(e) => setNewMaterial(e.target.value)}
+                        placeholder="e.g. Silicone, Clear MagSafe"
+                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                        Color
+                      </label>
+                      <input
+                        type="text"
+                        value={newColor}
+                        onChange={(e) => setNewColor(e.target.value)}
+                        placeholder="e.g. Black, Clear"
+                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                )}
+
                 {activeArchetype === 'screen_protector' && (
                   <div className="grid grid-cols-2 gap-2.5">
                     <div>
@@ -786,6 +954,47 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                   </div>
                 )}
 
+                {activeArchetype === 'powerbank' && (
+                  <div className="grid grid-cols-3 gap-2.5">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                        Battery Capacity *
+                      </label>
+                      <input
+                        type="text"
+                        value={newGeneralSpec}
+                        onChange={(e) => setNewGeneralSpec(e.target.value)}
+                        placeholder="e.g. 10000mAh, 20000mAh"
+                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                        Output Wattage
+                      </label>
+                      <input
+                        type="text"
+                        value={newWattage}
+                        onChange={(e) => setNewWattage(e.target.value)}
+                        placeholder="e.g. 22.5W Fast, 65W PD"
+                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                        Color
+                      </label>
+                      <input
+                        type="text"
+                        value={newColor}
+                        onChange={(e) => setNewColor(e.target.value)}
+                        placeholder="e.g. Black, White"
+                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                )}
+
                 {activeArchetype === 'smartwatch' && (
                   <div className="grid grid-cols-2 gap-2.5">
                     <div>
@@ -815,7 +1024,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                   </div>
                 )}
 
-                {activeArchetype === 'general' && (
+                {(activeArchetype === 'audio' || activeArchetype === 'gaming' || activeArchetype === 'general') && (
                   <div className="grid grid-cols-2 gap-2.5">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">

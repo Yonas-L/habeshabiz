@@ -88,6 +88,7 @@ class InventoryController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('imei_or_serial', 'ilike', "%{$search}%")
+                    ->orWhere('serial_number', 'ilike', "%{$search}%")
                     ->orWhere('condition', 'ilike', "%{$search}%")
                     ->orWhere('handover_to', 'ilike', "%{$search}%")
                     ->orWhere('return_reason', 'ilike', "%{$search}%")
@@ -163,6 +164,7 @@ class InventoryController extends Controller
                 'units' => ['required', 'array', 'min:1'],
                 'units.*.variant_id' => ['required', 'exists:product_variants,id'],
                 'units.*.imei_or_serial' => ['nullable', 'string', 'max:100'],
+                'units.*.serial_number' => ['nullable', 'string', 'max:100'],
                 'units.*.battery_health' => ['nullable', 'integer', 'min:0', 'max:100'],
                 'units.*.cycle_count' => ['nullable', 'integer', 'min:0'],
                 'units.*.sim_type' => ['nullable', 'string', 'in:physical,esim,dual,na'],
@@ -191,8 +193,11 @@ class InventoryController extends Controller
             $validated = $request->validate([
                 'variant_id' => ['required', 'exists:product_variants,id'],
                 'imei_or_serial' => ['nullable', 'string', 'max:100'],
+                'serial_number' => ['nullable', 'string', 'max:100'],
                 'imeis' => ['nullable', 'array'],
                 'imeis.*' => ['string', 'max:100'],
+                'serials' => ['nullable', 'array'],
+                'serials.*' => ['string', 'max:100'],
                 'quantity' => ['nullable', 'integer', 'min:1'],
                 'battery_health' => ['nullable', 'integer', 'min:0', 'max:100'],
                 'cycle_count' => ['nullable', 'integer', 'min:0'],
@@ -233,15 +238,29 @@ class InventoryController extends Controller
                 $imeisList = array_values(array_filter(array_map('trim', $parsed)));
             }
 
+            $serialsList = [];
+            if (! empty($validated['serials']) && is_array($validated['serials'])) {
+                $serialsList = array_values(array_filter(array_map('trim', $validated['serials'])));
+            } elseif (! empty($validated['serial_number'])) {
+                $parsedS = preg_split('/[\r\n,]+/', trim($validated['serial_number']));
+                $serialsList = array_values(array_filter(array_map('trim', $parsedS)));
+            }
+
             $variant = ProductVariant::with('product')->findOrFail($validated['variant_id']);
             $hasSerials = (bool) ($variant->product?->has_serials ?? true);
-            $countToCreate = $hasSerials ? count($imeisList) : max(1, (int) ($validated['quantity'] ?? 1));
+            $countToCreate = $hasSerials ? max(count($imeisList), count($serialsList), 1) : max(1, (int) ($validated['quantity'] ?? 1));
 
             $unitItems = [];
             for ($i = 0; $i < $countToCreate; $i++) {
+                $imeiVal = $hasSerials ? ($imeisList[$i] ?? null) : null;
+                $serialVal = $hasSerials ? ($serialsList[$i] ?? null) : null;
+                if (! $imeiVal && $serialVal) {
+                    $imeiVal = $serialVal;
+                }
                 $unitItems[] = [
                     'variant_id' => $variant->id,
-                    'imei_or_serial' => $hasSerials ? ($imeisList[$i] ?? null) : null,
+                    'imei_or_serial' => $imeiVal,
+                    'serial_number' => $serialVal,
                     'battery_health' => $validated['battery_health'] ?? null,
                     'cycle_count' => $validated['cycle_count'] ?? null,
                     'sim_type' => $validated['sim_type'] ?? 'na',
@@ -287,20 +306,31 @@ class InventoryController extends Controller
         $variants = ProductVariant::with('product')->whereIn('id', $variantIds)->get()->keyBy('id');
 
         $submittedImeis = [];
-        foreach ($unitItems as $item) {
+        $submittedSerials = [];
+        foreach ($unitItems as &$item) {
             $v = $variants[$item['variant_id']] ?? null;
             $hasSerials = (bool) ($v?->product?->has_serials ?? true);
             $imei = ! empty($item['imei_or_serial']) ? trim($item['imei_or_serial']) : null;
-            if ($hasSerials && empty($imei)) {
+            $serial = ! empty($item['serial_number']) ? trim($item['serial_number']) : null;
+
+            if ($hasSerials && empty($imei) && empty($serial)) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Serial number or IMEI is required for '.($v?->display_name ?? 'serialized device').'.',
                 ], 422);
             }
+            if ($hasSerials && empty($imei) && ! empty($serial)) {
+                $imei = $serial;
+                $item['imei_or_serial'] = $serial;
+            }
             if (! empty($imei)) {
                 $submittedImeis[] = $imei;
             }
+            if (! empty($serial)) {
+                $submittedSerials[] = $serial;
+            }
         }
+        unset($item);
 
         if (! empty($submittedImeis)) {
             $duplicates = array_diff_assoc($submittedImeis, array_unique($submittedImeis));
@@ -322,6 +352,30 @@ class InventoryController extends Controller
                 return response()->json([
                     'success' => false,
                     'message' => 'The following IMEI/Serial number(s) are already in active shop inventory: '.implode(', ', $existing),
+                ], 422);
+            }
+        }
+
+        if (! empty($submittedSerials)) {
+            $duplicatesS = array_diff_assoc($submittedSerials, array_unique($submittedSerials));
+            if (! empty($duplicatesS)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Duplicate Serial number in submission: '.implode(', ', array_unique($duplicatesS)),
+                ], 422);
+            }
+
+            $tenantId = $user->tenant_id;
+            $existingS = InventoryUnit::where('tenant_id', $tenantId)
+                ->whereIn('status', ['in_stock', 'reserved', 'out'])
+                ->whereIn('serial_number', $submittedSerials)
+                ->pluck('serial_number')
+                ->all();
+
+            if (! empty($existingS)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'The following Serial number(s) are already in active shop inventory: '.implode(', ', $existingS),
                 ], 422);
             }
         }
@@ -493,7 +547,8 @@ class InventoryController extends Controller
                 $unit = InventoryUnit::create([
                     'tenant_id' => $tenantId,
                     'variant_id' => $variant->id,
-                    'imei_or_serial' => ! empty($item['imei_or_serial']) ? trim($item['imei_or_serial']) : null,
+                    'imei_or_serial' => ! empty($item['imei_or_serial']) ? trim($item['imei_or_serial']) : (! empty($item['serial_number']) ? trim($item['serial_number']) : null),
+                    'serial_number' => ! empty($item['serial_number']) ? trim($item['serial_number']) : null,
                     'battery_health' => $item['battery_health'] ?? null,
                     'cycle_count' => $item['cycle_count'] ?? null,
                     'sim_type' => $item['sim_type'] ?? 'na',
@@ -920,11 +975,14 @@ class InventoryController extends Controller
 
         $validated = $request->validate([
             'product_name' => ['nullable', 'string', 'max:255'],
+            'brand' => ['nullable', 'string', 'max:100'],
             'storage' => ['nullable', 'string', 'max:50'],
             'ram' => ['nullable', 'string', 'max:50'],
             'color' => ['nullable', 'string', 'max:50'],
+            'specs' => ['nullable', 'array'],
             'variant_id' => ['nullable', 'exists:product_variants,id'],
             'imei_or_serial' => ['nullable', 'string', 'max:100'],
+            'serial_number' => ['nullable', 'string', 'max:100'],
             'condition' => ['nullable', 'string', 'max:50'],
             'cost_basis' => ['nullable', 'numeric', 'min:0'],
             'selling_price' => ['nullable', 'numeric', 'min:0'],
@@ -954,6 +1012,26 @@ class InventoryController extends Controller
                 }
             }
             $validated['imei_or_serial'] = $newImei !== '' ? $newImei : null;
+        }
+
+        // If Serial number is provided and changed, ensure no other active unit has it
+        if (array_key_exists('serial_number', $validated)) {
+            $newSerial = trim($validated['serial_number'] ?? '');
+            if ($newSerial !== '' && $newSerial !== $unit->serial_number) {
+                $duplicate = InventoryUnit::where('tenant_id', $user->tenant_id)
+                    ->where('id', '!=', $unit->id)
+                    ->whereIn('status', ['in_stock', 'reserved', 'out'])
+                    ->where('serial_number', $newSerial)
+                    ->exists();
+
+                if ($duplicate) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "The Serial number '{$newSerial}' is already in active shop inventory.",
+                    ], 422);
+                }
+            }
+            $validated['serial_number'] = $newSerial !== '' ? $newSerial : null;
         }
 
         $currentVariant = $unit->variant;
@@ -995,7 +1073,7 @@ class InventoryController extends Controller
                         $targetProduct = Product::create([
                             'tenant_id' => $user->tenant_id,
                             'name' => $newProductName,
-                            'brand' => $currentProduct->brand,
+                            'brand' => array_key_exists('brand', $validated) ? (trim($validated['brand'] ?? '') ?: null) : $currentProduct->brand,
                             'category' => $currentProduct->category,
                             'category_id' => $currentProduct->category_id,
                             'has_serials' => $currentProduct->has_serials,
@@ -1003,6 +1081,14 @@ class InventoryController extends Controller
                         ]);
                     }
                 }
+            }
+        }
+
+        // Update brand if provided
+        if (array_key_exists('brand', $validated) && $targetProduct) {
+            $newBrand = trim($validated['brand'] ?? '') ?: null;
+            if ($newBrand !== $targetProduct->brand) {
+                $targetProduct->update(['brand' => $newBrand]);
             }
         }
 
@@ -1065,7 +1151,14 @@ class InventoryController extends Controller
         }
 
         $validated['variant_id'] = $targetVariantId;
-        unset($validated['product_name'], $validated['storage'], $validated['ram'], $validated['color']);
+        unset(
+            $validated['product_name'],
+            $validated['brand'],
+            $validated['storage'],
+            $validated['ram'],
+            $validated['color'],
+            $validated['specs']
+        );
 
         $newProductName = $targetProduct?->name ?? $oldProductName;
         $newImei = array_key_exists('imei_or_serial', $validated) ? $validated['imei_or_serial'] : $oldImei;

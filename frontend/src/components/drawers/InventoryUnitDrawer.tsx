@@ -7,6 +7,11 @@ import { toast } from 'sonner';
 import { formatPurchaseAge } from '../../utils/dateUtils';
 import { formatCurrencyInput, parseFormattedNumber } from '../../utils/numberUtils';
 import {
+  formatUnitDisplayIdentifier,
+  getCategoryArchetype,
+  isCellularTablet,
+} from '../../utils/electronicsArchetypes';
+import {
   Battery,
   RotateCcw,
   MapPin,
@@ -29,6 +34,7 @@ import {
   ExternalLink,
   Trash2,
 } from 'lucide-react';
+import { BrandSelectInput } from '../common/BrandSelectInput';
 
 interface InventoryUnitDrawerProps {
   unit: InventoryUnit | null;
@@ -99,10 +105,20 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
 
   // Editable form fields
   const [productModelName, setProductModelName] = useState('');
+  const [productBrand, setProductBrand] = useState('');
   const [variantStorage, setVariantStorage] = useState('');
   const [variantRam, setVariantRam] = useState('');
   const [variantColor, setVariantColor] = useState('');
+  const [variantProcessor, setVariantProcessor] = useState('');
+  const [variantConnectivity, setVariantConnectivity] = useState<'Wi-Fi' | 'Wi-Fi + Cellular'>('Wi-Fi');
+  const [variantCompatibleModel, setVariantCompatibleModel] = useState('');
+  const [variantMaterial, setVariantMaterial] = useState('');
+  const [variantGlassType, setVariantGlassType] = useState('');
+  const [variantWattage, setVariantWattage] = useState('');
+  const [variantBatteryCapacity, setVariantBatteryCapacity] = useState('');
   const [imei, setImei] = useState('');
+  const [serialNumber, setSerialNumber] = useState('');
+  const [copiedSerial, setCopiedSerial] = useState(false);
   const [condition, setCondition] = useState('new');
   const [costBasis, setCostBasis] = useState('');
   const [sellingPrice, setSellingPrice] = useState('');
@@ -120,10 +136,20 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
 
   const initForm = (u: InventoryUnit) => {
     setProductModelName(u.variant?.product?.name || '');
+    setProductBrand(u.variant?.product?.brand || '');
     setVariantStorage(u.variant?.storage || '');
     setVariantRam(u.variant?.ram || '');
     setVariantColor(u.variant?.color || '');
+    const specs = (u.variant?.specs as any) || {};
+    setVariantProcessor(specs.processor || '');
+    setVariantConnectivity(specs.connectivity || (u.sim_type === 'na' ? 'Wi-Fi' : 'Wi-Fi + Cellular'));
+    setVariantCompatibleModel(specs.compatible_model || '');
+    setVariantMaterial(specs.material || specs.port_type || '');
+    setVariantGlassType(specs.glass_type || '');
+    setVariantWattage(specs.wattage || '');
+    setVariantBatteryCapacity(specs.battery_capacity || '');
     setImei(u.imei_or_serial || '');
+    setSerialNumber(u.serial_number || '');
     setCondition(u.condition || 'new');
     setCostBasis(u.cost_basis !== undefined && u.cost_basis !== null ? formatCurrencyInput(u.cost_basis) : '');
     setSellingPrice(u.selling_price ? formatCurrencyInput(u.selling_price) : '');
@@ -167,6 +193,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
 
   const productName = currentUnit.variant?.product?.name || 'Electronic Item';
   const specText = [currentUnit.variant?.storage, currentUnit.variant?.color].filter(Boolean).join(' • ');
+  const idInfo = formatUnitDisplayIdentifier(currentUnit);
 
   const handleCopyImei = () => {
     if (!currentUnit.imei_or_serial) return;
@@ -198,14 +225,51 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
 
     try {
       setSaving(true);
+      const uArch = currentUnit?.variant?.product
+        ? getCategoryArchetype(
+            currentUnit.variant.product.category,
+            currentUnit.variant.product.category_rel?.name,
+            productModelName
+          )
+        : 'general';
+
+      const specsPayload: Record<string, any> = {};
+      if (uArch === 'tablet') {
+        specsPayload.connectivity = variantConnectivity;
+      } else if (uArch === 'laptop_computer') {
+        if (variantProcessor.trim()) specsPayload.processor = variantProcessor.trim();
+      } else if (uArch === 'case_cover') {
+        if (variantCompatibleModel.trim()) specsPayload.compatible_model = variantCompatibleModel.trim();
+        if (variantMaterial.trim()) specsPayload.material = variantMaterial.trim();
+      } else if (uArch === 'screen_protector') {
+        if (variantCompatibleModel.trim()) specsPayload.compatible_model = variantCompatibleModel.trim();
+        if (variantGlassType.trim()) specsPayload.glass_type = variantGlassType.trim();
+      } else if (uArch === 'charger_cable') {
+        if (variantWattage.trim()) specsPayload.wattage = variantWattage.trim();
+        if (variantMaterial.trim()) specsPayload.port_type = variantMaterial.trim();
+      } else if (uArch === 'powerbank') {
+        if (variantBatteryCapacity.trim()) specsPayload.battery_capacity = variantBatteryCapacity.trim();
+        if (variantWattage.trim()) specsPayload.wattage = variantWattage.trim();
+      }
+
+      let finalSimType = simType;
+      if (uArch === 'tablet') {
+        finalSimType = variantConnectivity === 'Wi-Fi' ? 'na' : (simType === 'na' ? 'physical' : simType);
+      } else if (uArch !== 'phone') {
+        finalSimType = 'na';
+      }
+
       const payload: any = {
         product_name: productModelName.trim() || null,
-        storage: variantStorage.trim() || null,
-        ram: variantRam.trim() || null,
-        color: variantColor.trim() || null,
-        imei_or_serial: imei.trim() || null,
+        brand: productBrand.trim() || null,
+        storage: (uArch === 'phone' || uArch === 'tablet' || uArch === 'laptop_computer') ? (variantStorage.trim() || null) : null,
+        ram: (uArch === 'phone' || uArch === 'laptop_computer') ? (variantRam.trim() || null) : null,
+        color: (uArch !== 'screen_protector') ? (variantColor.trim() || null) : null,
+        specs: Object.keys(specsPayload).length > 0 ? specsPayload : null,
+        imei_or_serial: imei.trim() || serialNumber.trim() || null,
+        serial_number: serialNumber.trim() || null,
         condition,
-        sim_type: simType,
+        sim_type: finalSimType,
         location: location.trim() || 'Shop Counter',
         notes: notes.trim() || null,
         supplier_contact_id: supplierContactId || null,
@@ -853,133 +917,484 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
               </span>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Product / Model Name
-              </label>
-              <input
-                type="text"
-                value={productModelName}
-                onChange={(e) => setProductModelName(e.target.value)}
-                placeholder="e.g. iPhone 15 Pro Max"
-                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Product / Model Name
+                </label>
+                <input
+                  type="text"
+                  value={productModelName}
+                  onChange={(e) => setProductModelName(e.target.value)}
+                  placeholder="e.g. iPhone 15 Pro Max"
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                />
+              </div>
+
+              <BrandSelectInput
+                value={productBrand}
+                onChange={setProductBrand}
+                categorySlug={currentUnit?.variant?.product?.category}
+                categoryName={currentUnit?.variant?.product?.category_rel?.name}
+                modelName={productModelName}
+                label="Brand / Manufacturer"
+                placeholder="Select or enter brand..."
               />
-              <span className="text-[10px] text-slate-400 mt-1 block">
-                Model family or device series name
-              </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Storage
-                </label>
-                <input
-                  type="text"
-                  value={variantStorage}
-                  onChange={(e) => setVariantStorage(e.target.value)}
-                  placeholder="e.g. 128GB, 256GB"
-                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                />
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {['64GB', '128GB', '256GB', '512GB', '1TB'].map((st) => (
-                    <button
-                      key={st}
-                      type="button"
-                      onClick={() => setVariantStorage(st)}
-                      className={`px-1.5 py-0.5 rounded text-[9px] font-semibold transition-colors cursor-pointer ${
-                        variantStorage === st
-                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200'
-                      }`}
-                    >
-                      {st}
-                    </button>
-                  ))}
-                </div>
-              </div>
+            {/* Dynamic Category Archetype Specs */}
+            {(() => {
+              const uArch = currentUnit?.variant?.product
+                ? getCategoryArchetype(
+                    currentUnit.variant.product.category,
+                    currentUnit.variant.product.category_rel?.name,
+                    productModelName
+                  )
+                : 'general';
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  RAM (Memory)
-                </label>
-                <input
-                  type="text"
-                  value={variantRam}
-                  onChange={(e) => setVariantRam(e.target.value)}
-                  placeholder="e.g. 6GB, 8GB"
-                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                />
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {['4GB', '6GB', '8GB', '12GB', '16GB'].map((r) => (
-                    <button
-                      key={r}
-                      type="button"
-                      onClick={() => setVariantRam(r)}
-                      className={`px-1.5 py-0.5 rounded text-[9px] font-semibold transition-colors cursor-pointer ${
-                        variantRam === r
-                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200'
-                      }`}
-                    >
-                      {r}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              if (uArch === 'tablet') {
+                return (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        Storage
+                      </label>
+                      <input
+                        type="text"
+                        value={variantStorage}
+                        onChange={(e) => setVariantStorage(e.target.value)}
+                        placeholder="e.g. 128GB, 256GB"
+                        className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                      />
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {['64GB', '128GB', '256GB', '512GB', '1TB'].map((st) => (
+                          <button
+                            key={st}
+                            type="button"
+                            onClick={() => setVariantStorage(st)}
+                            className={`px-1.5 py-0.5 rounded text-[9px] font-semibold transition-colors cursor-pointer ${
+                              variantStorage === st
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200'
+                            }`}
+                          >
+                            {st}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Color / Finish
-                </label>
-                <input
-                  type="text"
-                  value={variantColor}
-                  onChange={(e) => setVariantColor(e.target.value)}
-                  placeholder="e.g. Black, Blue"
-                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                />
-              </div>
-            </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        Connectivity
+                      </label>
+                      <select
+                        value={variantConnectivity}
+                        onChange={(e) => {
+                          const val = e.target.value as 'Wi-Fi' | 'Wi-Fi + Cellular';
+                          setVariantConnectivity(val);
+                          if (val === 'Wi-Fi') {
+                            setSimType('na');
+                          } else if (simType === 'na') {
+                            setSimType('physical');
+                          }
+                        }}
+                        className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                      >
+                        <option value="Wi-Fi">Wi-Fi Only (S/N only)</option>
+                        <option value="Wi-Fi + Cellular">Wi-Fi + Cellular (S/N + IMEI)</option>
+                      </select>
+                      <span className="text-[10px] text-slate-400 mt-1 block">
+                        Controls SIM & IMEI tracking
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        Color / Finish
+                      </label>
+                      <input
+                        type="text"
+                        value={variantColor}
+                        onChange={(e) => setVariantColor(e.target.value)}
+                        placeholder="e.g. Space Gray, Silver"
+                        className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                      />
+                    </div>
+                  </div>
+                );
+              }
+
+              if (uArch === 'case_cover') {
+                return (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        Compatible Phone Model
+                      </label>
+                      <input
+                        type="text"
+                        value={variantCompatibleModel}
+                        onChange={(e) => setVariantCompatibleModel(e.target.value)}
+                        placeholder="e.g. iPhone 16 Pro Max"
+                        className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        Material / Style
+                      </label>
+                      <input
+                        type="text"
+                        value={variantMaterial}
+                        onChange={(e) => setVariantMaterial(e.target.value)}
+                        placeholder="e.g. Silicone MagSafe, Leather"
+                        className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        Color / Finish
+                      </label>
+                      <input
+                        type="text"
+                        value={variantColor}
+                        onChange={(e) => setVariantColor(e.target.value)}
+                        placeholder="e.g. Black, Clear, Desert"
+                        className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                      />
+                    </div>
+                  </div>
+                );
+              }
+
+              if (uArch === 'screen_protector') {
+                return (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        Compatible Phone Model
+                      </label>
+                      <input
+                        type="text"
+                        value={variantCompatibleModel}
+                        onChange={(e) => setVariantCompatibleModel(e.target.value)}
+                        placeholder="e.g. iPhone 16 Pro Max, S24 Ultra"
+                        className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        Glass / Finish Type
+                      </label>
+                      <input
+                        type="text"
+                        value={variantGlassType}
+                        onChange={(e) => setVariantGlassType(e.target.value)}
+                        placeholder="e.g. Privacy, Matte Anti-Glare, HD Tempered"
+                        className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                      />
+                    </div>
+                  </div>
+                );
+              }
+
+              if (uArch === 'charger_cable' || uArch === 'powerbank') {
+                return (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        {uArch === 'powerbank' ? 'Battery Capacity' : 'Wattage / Output'}
+                      </label>
+                      <input
+                        type="text"
+                        value={uArch === 'powerbank' ? variantBatteryCapacity : variantWattage}
+                        onChange={(e) => (uArch === 'powerbank' ? setVariantBatteryCapacity(e.target.value) : setVariantWattage(e.target.value))}
+                        placeholder={uArch === 'powerbank' ? 'e.g. 10000mAh, 20000mAh' : 'e.g. 20W, 30W, 65W GaN'}
+                        className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        {uArch === 'powerbank' ? 'Output / Ports' : 'Port / Cable Type'}
+                      </label>
+                      <input
+                        type="text"
+                        value={variantMaterial}
+                        onChange={(e) => setVariantMaterial(e.target.value)}
+                        placeholder={uArch === 'powerbank' ? 'e.g. 22.5W Fast USB-C' : 'e.g. USB-C to USB-C 1m'}
+                        className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        Color / Finish
+                      </label>
+                      <input
+                        type="text"
+                        value={variantColor}
+                        onChange={(e) => setVariantColor(e.target.value)}
+                        placeholder="e.g. White, Black"
+                        className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                      />
+                    </div>
+                  </div>
+                );
+              }
+
+              if (uArch === 'laptop_computer') {
+                return (
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-1">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        Storage
+                      </label>
+                      <input
+                        type="text"
+                        value={variantStorage}
+                        onChange={(e) => setVariantStorage(e.target.value)}
+                        placeholder="e.g. 512GB, 1TB"
+                        className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        RAM
+                      </label>
+                      <input
+                        type="text"
+                        value={variantRam}
+                        onChange={(e) => setVariantRam(e.target.value)}
+                        placeholder="e.g. 16GB, 32GB"
+                        className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        Processor / Chip
+                      </label>
+                      <input
+                        type="text"
+                        value={variantProcessor}
+                        onChange={(e) => setVariantProcessor(e.target.value)}
+                        placeholder="e.g. M3 Pro, Core i7"
+                        className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        Color / Finish
+                      </label>
+                      <input
+                        type="text"
+                        value={variantColor}
+                        onChange={(e) => setVariantColor(e.target.value)}
+                        placeholder="e.g. Space Black"
+                        className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                      />
+                    </div>
+                  </div>
+                );
+              }
+
+              // Default / Phone
+              return (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Storage
+                    </label>
+                    <input
+                      type="text"
+                      value={variantStorage}
+                      onChange={(e) => setVariantStorage(e.target.value)}
+                      placeholder="e.g. 128GB, 256GB"
+                      className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                    />
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {['64GB', '128GB', '256GB', '512GB', '1TB'].map((st) => (
+                        <button
+                          key={st}
+                          type="button"
+                          onClick={() => setVariantStorage(st)}
+                          className={`px-1.5 py-0.5 rounded text-[9px] font-semibold transition-colors cursor-pointer ${
+                            variantStorage === st
+                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200'
+                          }`}
+                        >
+                          {st}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      RAM (Memory)
+                    </label>
+                    <input
+                      type="text"
+                      value={variantRam}
+                      onChange={(e) => setVariantRam(e.target.value)}
+                      placeholder="e.g. 6GB, 8GB"
+                      className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                    />
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {['4GB', '6GB', '8GB', '12GB', '16GB'].map((r) => (
+                        <button
+                          key={r}
+                          type="button"
+                          onClick={() => setVariantRam(r)}
+                          className={`px-1.5 py-0.5 rounded text-[9px] font-semibold transition-colors cursor-pointer ${
+                            variantRam === r
+                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200'
+                          }`}
+                        >
+                          {r}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Color / Finish
+                    </label>
+                    <input
+                      type="text"
+                      value={variantColor}
+                      onChange={(e) => setVariantColor(e.target.value)}
+                      placeholder="e.g. Black, Blue"
+                      className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                    />
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Section 1: Identification & Condition */}
           <div className="p-3.5 rounded-2xl bg-white dark:bg-[#131926] border border-slate-100 dark:border-slate-800 space-y-3 shadow-2xs">
             <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-              Serial Number & Condition
+              Identifiers & Condition
             </h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Serial Number
-                </label>
-                <input
-                  type="text"
-                  value={imei}
-                  onChange={(e) => setImei(e.target.value)}
-                  placeholder="e.g. 2345678654399"
-                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                />
-              </div>
+            {(() => {
+              const uArch = currentUnit?.variant?.product
+                ? getCategoryArchetype(
+                    currentUnit.variant.product.category,
+                    null,
+                    currentUnit.variant.product.name
+                  )
+                : 'general';
+              const isTablet = uArch === 'tablet';
+              const isCellular =
+                isTablet &&
+                isCellularTablet(
+                  simType || currentUnit.sim_type,
+                  (currentUnit.variant?.specs as any)?.connectivity,
+                  currentUnit.variant?.display_name
+                );
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Condition
-                </label>
-                <select
-                  value={condition}
-                  onChange={(e) => setCondition(e.target.value)}
-                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white capitalize focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700"
-                >
-                  <option value="new">Brand New</option>
-                  <option value="used_clean">Used Clean</option>
-                  <option value="scratched">Scratched</option>
-                  <option value="backcrack">Back Crack</option>
-                  <option value="screen_blemish">Screen Blemish</option>
-                  <option value="defective">Defective</option>
-                </select>
-              </div>
-            </div>
+              return (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {isTablet ? (
+                    isCellular ? (
+                      <>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                            Tablet Serial Number (S/N)
+                          </label>
+                          <input
+                            type="text"
+                            value={serialNumber}
+                            onChange={(e) => setSerialNumber(e.target.value)}
+                            placeholder="e.g. DMPX9218HG6R"
+                            className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-mono font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                            Cellular IMEI #
+                          </label>
+                          <input
+                            type="text"
+                            value={imei}
+                            onChange={(e) => setImei(e.target.value)}
+                            placeholder="e.g. 359871109988776"
+                            className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                          Tablet Serial Number (S/N)
+                        </label>
+                        <input
+                          type="text"
+                          value={serialNumber || imei}
+                          onChange={(e) => {
+                            setSerialNumber(e.target.value);
+                            setImei(e.target.value);
+                          }}
+                          placeholder="e.g. DMPX9218HG6R (Wi-Fi Only · No IMEI)"
+                          className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-mono font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                        />
+                      </div>
+                    )
+                  ) : uArch === 'laptop_computer' ? (
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        Hardware Serial Number (S/N)
+                      </label>
+                      <input
+                        type="text"
+                        value={serialNumber || imei}
+                        onChange={(e) => {
+                          setSerialNumber(e.target.value);
+                          setImei(e.target.value);
+                        }}
+                        placeholder="e.g. C02G9214MD6R"
+                        className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-mono font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                      />
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        Serial / IMEI Number
+                      </label>
+                      <input
+                        type="text"
+                        value={imei}
+                        onChange={(e) => setImei(e.target.value)}
+                        placeholder="e.g. 359871109988776"
+                        className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Condition
+                    </label>
+                    <select
+                      value={condition}
+                      onChange={(e) => setCondition(e.target.value)}
+                      className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white capitalize focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700"
+                    >
+                      <option value="new">Brand New</option>
+                      <option value="used_clean">Used Clean</option>
+                      <option value="scratched">Scratched</option>
+                      <option value="backcrack">Back Crack</option>
+                      <option value="screen_blemish">Screen Blemish</option>
+                      <option value="defective">Defective</option>
+                    </select>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Section 2: Pricing & Valuation */}
@@ -1687,24 +2102,63 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
 
           {/* Clean Device Overview Block */}
           <div className="flex items-start justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                Serial Number
+                {idInfo.hasBoth ? 'Identifiers' : (idInfo.serial ? 'Serial Number' : (idInfo.imei ? 'IMEI #' : 'Item Identifier'))}
               </span>
-              <div
-                onClick={handleCopyImei}
-                className="flex items-center gap-2 cursor-pointer group select-all"
-                title="Click to copy IMEI"
-              >
-                <span className="text-base font-bold font-mono text-emerald-600 dark:text-emerald-400 group-hover:underline">
-                  {currentUnit.imei_or_serial || 'Bulk Item'}
-                </span>
-                {copiedImei ? (
-                  <Check className="w-3.5 h-3.5 text-emerald-600" />
-                ) : (
-                  <Copy className="w-3.5 h-3.5 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-                )}
-              </div>
+              {idInfo.hasBoth ? (
+                <div className="space-y-1">
+                  <div
+                    onClick={() => {
+                      if (!currentUnit.serial_number) return;
+                      navigator.clipboard.writeText(currentUnit.serial_number);
+                      setCopiedSerial(true);
+                      toast.success('Serial number copied', { description: currentUnit.serial_number });
+                      setTimeout(() => setCopiedSerial(false), 2000);
+                    }}
+                    className="flex items-center gap-2 cursor-pointer group select-all"
+                    title="Click to copy Serial Number"
+                  >
+                    <span className="text-xs font-bold font-mono text-slate-800 dark:text-slate-200 group-hover:underline">
+                      SN: {currentUnit.serial_number}
+                    </span>
+                    {copiedSerial ? (
+                      <Check className="w-3 h-3 text-emerald-600" />
+                    ) : (
+                      <Copy className="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    )}
+                  </div>
+                  <div
+                    onClick={handleCopyImei}
+                    className="flex items-center gap-2 cursor-pointer group select-all"
+                    title="Click to copy IMEI"
+                  >
+                    <span className="text-sm font-bold font-mono text-emerald-600 dark:text-emerald-400 group-hover:underline">
+                      IMEI: {currentUnit.imei_or_serial}
+                    </span>
+                    {copiedImei ? (
+                      <Check className="w-3.5 h-3.5 text-emerald-600" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div
+                  onClick={handleCopyImei}
+                  className="flex items-center gap-2 cursor-pointer group select-all"
+                  title="Click to copy identifier"
+                >
+                  <span className="text-base font-bold font-mono text-emerald-600 dark:text-emerald-400 group-hover:underline">
+                    {idInfo.primaryLabel}
+                  </span>
+                  {copiedImei ? (
+                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  )}
+                </div>
+              )}
               <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                 <span>Condition:</span>
                 <span className="font-semibold text-slate-700 dark:text-slate-200 capitalize">

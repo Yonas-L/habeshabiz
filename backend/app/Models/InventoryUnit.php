@@ -19,6 +19,7 @@ class InventoryUnit extends Model
         'tenant_id',
         'variant_id',
         'imei_or_serial',
+        'serial_number',
         'battery_health',
         'cycle_count',
         'sim_type',

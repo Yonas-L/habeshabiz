@@ -52,20 +52,21 @@ class ProductVariant extends Model
     public function getDisplayNameAttribute(): string
     {
         $productName = $this->product instanceof Product ? $this->product->name : '';
-        $parts = [$productName];
+        $parts = array_filter([$productName]);
         if ($this->storage) {
             $parts[] = $this->storage;
         }
         if ($this->ram) {
-            $parts[] = $this->ram.' RAM';
+            $ramStr = (string) $this->ram;
+            $parts[] = str_contains(strtolower($ramStr), 'ram') ? $ramStr : $ramStr.' RAM';
         }
         if ($this->color) {
             $parts[] = $this->color;
         }
         if (! empty($this->specs) && is_array($this->specs)) {
             foreach ($this->specs as $val) {
-                if ($val) {
-                    $parts[] = (string) $val;
+                if ($val && is_string($val) && ! in_array($val, $parts, true)) {
+                    $parts[] = $val;
                 }
             }
         }

@@ -269,7 +269,7 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
 
       {/* Filter Segmented Control & Search Input */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl text-xs font-semibold shadow-2xs">
+        <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl text-xs font-semibold shadow-2xs overflow-x-auto max-w-full no-scrollbar">
           <button
             onClick={() => { setStatusFilter(''); setSourceFilter(''); }}
             className={`px-3 sm:px-4 py-1.5 rounded-lg transition-all cursor-pointer ${
@@ -370,7 +370,7 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
       </div>
 
       {/* Orders Table — High-contrast, clean ledger */}
-      <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-100 dark:border-slate-800/80 overflow-hidden shadow-2xs">
+      <div className="bg-transparent md:bg-white md:dark:bg-[#131926] md:rounded-2xl md:border md:border-slate-100 md:dark:border-slate-800/80 md:overflow-hidden md:shadow-2xs space-y-3 md:space-y-0">
         {/* Desktop Table (md and up) */}
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-xs">
@@ -639,7 +639,7 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
         </div>
 
         {/* Mobile Native Cards (< md) */}
-        <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800/80">
+        <div className="md:hidden space-y-3">
           {loading ? (
             <div className="py-6 text-center">
               <CustomPageLoader mode="app" fullScreen={false} />
@@ -669,7 +669,7 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
                 <div
                   key={order.id}
                   onClick={() => setSelectedOrder(order)}
-                  className="p-4 space-y-3 hover:bg-slate-50/80 dark:hover:bg-slate-800/30 transition-colors cursor-pointer active:bg-slate-100 dark:active:bg-slate-800/50"
+                  className="p-4 rounded-2xl bg-white dark:bg-[#131926] border border-slate-200/90 dark:border-slate-800 shadow-[0_3px_12px_-2px_rgba(0,0,0,0.06),0_1px_3px_-1px_rgba(0,0,0,0.03)] hover:shadow-md transition-all cursor-pointer active:scale-[0.99] space-y-3"
                 >
                   {/* Card Header: Order # + Date + Status */}
                   <div className="flex items-start justify-between gap-3">
@@ -834,7 +834,7 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
         </div>
 
         {/* Pagination */}
-        <div className="px-5 pb-4">
+        <div className="px-1 py-2 md:px-5 md:pb-4 md:border-t md:border-slate-100 md:dark:border-slate-800">
           <Pagination
             currentPage={currentPage}
             totalItems={sales.length}
