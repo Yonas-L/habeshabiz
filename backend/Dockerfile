@@ -34,6 +34,9 @@ RUN echo "clear_env = no" >> /usr/local/etc/php-fpm.d/www.conf \
     && chown -R www-data:www-data /tmp/.chromium-config /tmp/.chromium-cache /tmp/chrome-user-data \
     && chmod -R 777 /tmp
 
+# Security Hardening: Neutralize CVE-2026-109619 ("PHP2Shell") vector & disable info disclosure
+RUN printf "session.upload_progress.enabled = 0\nexpose_php = 0\ndisplay_errors = 0\ndisplay_startup_errors = 0\n" > /usr/local/etc/php/conf.d/security-hardening.ini
+
 # Install PHP extensions using official binary extension installer
 ADD --chmod=0755 https://github.com/mlocati/docker-php-extension-installer/releases/latest/download/install-php-extensions /usr/local/bin/
 

@@ -28,7 +28,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
     // Public Endpoints
-    Route::post('/auth/login', [AuthController::class, 'login']);
+    Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
     Route::post('/onboard', [OnboardingController::class, 'onboard']);
     Route::get('/onboard/business-types', [OnboardingController::class, 'businessTypes']);
     Route::post('/waitlist', [WaitlistController::class, 'store']);
@@ -42,6 +42,9 @@ Route::prefix('v1')->group(function () {
         Route::middleware('auth.platform_admin')->group(function () {
             Route::post('/auth/logout', [AdminAuthController::class, 'logout']);
             Route::get('/auth/me', [AdminAuthController::class, 'me']);
+
+            // System Diagnostics
+            Route::get('/system/diagnostics', [AdminSettingController::class, 'diagnostics']);
 
             // Tenants
             Route::get('/tenants', [AdminTenantController::class, 'index']);

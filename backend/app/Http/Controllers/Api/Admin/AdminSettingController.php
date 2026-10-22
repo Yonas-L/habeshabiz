@@ -58,4 +58,21 @@ class AdminSettingController extends Controller
             'value' => $validated['value'],
         ]);
     }
+
+    public function diagnostics(): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'php_version' => PHP_VERSION,
+                'php_sapi' => PHP_SAPI,
+                'laravel_version' => app()->version(),
+                'upload_progress_enabled' => (bool) ini_get('session.upload_progress.enabled'),
+                'expose_php' => (bool) ini_get('expose_php'),
+                'memory_limit' => ini_get('memory_limit'),
+                'os' => PHP_OS,
+                'server_time' => now()->toIso8601String(),
+            ],
+        ]);
+    }
 }
