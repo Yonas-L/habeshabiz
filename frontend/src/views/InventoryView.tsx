@@ -367,10 +367,20 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const toggleExpand = (productId: string) => {
     setExpandedProductIds((prev) => {
       const next = new Set(prev);
-      if (next.has(productId)) {
-        next.delete(productId);
-      } else {
+      const isOpening = !next.has(productId);
+      if (isOpening) {
         next.add(productId);
+        // Ensure the newly expanded item and its child units smoothly scroll into clear view
+        setTimeout(() => {
+          const el =
+            document.getElementById(`product-row-${productId}`) ||
+            document.getElementById(`product-card-${productId}`);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }
+        }, 80);
+      } else {
+        next.delete(productId);
       }
       return next;
     });
@@ -1169,7 +1179,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         <div className="hidden md:block">
           {statusFilter === 'in_stock' ? (
             /* COLLAPSIBLE GROUPED IN-STOCK TABLE */
-            <div className="overflow-x-auto max-h-[580px] overflow-y-auto overscroll-contain">
+            <div className="overflow-x-auto max-h-[calc(100vh-230px)] min-h-[500px] overflow-y-auto overscroll-contain scroll-smooth pb-8">
               <table className="w-full text-left text-xs table-fixed min-w-[720px]">
                 <colgroup>
                   <col className="w-auto min-w-[260px]" />
@@ -1216,6 +1226,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                         <React.Fragment key={item.product.id}>
                           {/* Parent Product Row (Collapsible) */}
                           <tr
+                            id={`product-row-${item.product.id}`}
                             onClick={() => toggleExpand(item.product.id)}
                             className={`hover:bg-slate-50/90 dark:hover:bg-slate-800/40 transition-colors cursor-pointer group select-none ${
                               isExpanded ? 'bg-slate-50/60 dark:bg-slate-900/40' : ''
@@ -1318,7 +1329,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                                 colSpan={canViewCost ? (canAction ? 6 : 5) : (canAction ? 5 : 4)}
                                 className="p-0 border-y border-slate-200/80 dark:border-slate-800/80"
                               >
-                                <div className="max-h-72 overflow-y-auto overscroll-contain shadow-inner">
+                                <div className="max-h-80 overflow-y-auto overscroll-contain shadow-inner pb-3">
                                   <table className="w-full text-left text-xs table-fixed min-w-[720px]">
                                     <colgroup>
                                       <col className="w-auto min-w-[260px]" />
@@ -1531,6 +1542,13 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                       );
                     })
                   )}
+                  {/* Dedicated bottom clearance spacer row so the last item and its expanded units have full viewing room */}
+                  <tr>
+                    <td
+                      colSpan={canViewCost ? (canAction ? 6 : 5) : (canAction ? 5 : 4)}
+                      className="h-28 pointer-events-none border-none p-0 bg-transparent"
+                    />
+                  </tr>
                 </tbody>
               </table>
             </div>
@@ -2047,7 +2065,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         <div className="md:hidden">
           {statusFilter === 'in_stock' ? (
             /* COLLAPSIBLE GROUPED IN-STOCK MOBILE FLOATING CARDS */
-            <div className="space-y-3 max-h-[640px] overflow-y-auto overscroll-contain px-0.5 pb-2">
+            <div className="space-y-3 overflow-y-auto overscroll-contain px-0.5 pb-32 max-h-[calc(100dvh-180px)] min-h-[420px] scroll-smooth">
               {loading ? (
                 <div className="py-6 text-center">
                   <CustomPageLoader mode="app" fullScreen={false} />
@@ -2074,6 +2092,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
                   return (
                     <div
+                      id={`product-card-${item.product.id}`}
                       key={item.product.id}
                       className={`rounded-2xl transition-all duration-200 overflow-hidden ${
                         isExpanded
@@ -2140,7 +2159,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
                       {/* Expanded Solid Tray View (Clean solid unit cards with comfortable spacing) */}
                       {isExpanded && (
-                        <div className="bg-slate-50/90 dark:bg-[#0c1017] p-2.5 sm:p-3 border-t border-slate-100 dark:border-slate-800/80 space-y-2.5 max-h-[460px] overflow-y-auto overscroll-contain">
+                        <div className="bg-slate-50/90 dark:bg-[#0c1017] p-2.5 sm:p-3 border-t border-slate-100 dark:border-slate-800/80 space-y-2.5 max-h-[520px] overflow-y-auto overscroll-contain pb-6">
                           {/* 1. Serialized Units */}
                           {item.units.map((unit) => {
                             const unitSpec = [
@@ -2329,9 +2348,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   );
                 })
               )}
+              {/* Mobile bottom clearance spacer ensuring the last card and its expanded tray are completely clear of bottom nav */}
+              <div className="h-28 pointer-events-none" />
             </div>
           ) : (
-            <div className="space-y-3 max-h-[640px] overflow-y-auto overscroll-contain px-0.5 pb-2">
+            <div className="space-y-3 overflow-y-auto overscroll-contain px-0.5 pb-32 max-h-[calc(100dvh-180px)] min-h-[420px] scroll-smooth">
               {statusFilter === 'archived' ? (
                 /* ARCHIVED PRODUCT MODELS MOBILE ROWS */
                 filteredArchivedProducts.length === 0 ? (
@@ -2463,6 +2484,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   })
                 )
               )}
+              {/* Mobile bottom clearance spacer */}
+              <div className="h-28 pointer-events-none" />
             </div>
           )}
         </div>
