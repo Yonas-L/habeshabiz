@@ -19,6 +19,7 @@ use App\Services\PdfGeneratorService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -768,7 +769,7 @@ class SaleController extends Controller
                 'financial_account_id' => $validated['financial_account_id'] ?? ($hasCustomerSplits ? $rawCustomerSplits[0]['financial_account_id'] : null),
                 'payment_splits' => $validated['payment_splits'] ?? null,
                 'notes' => $validated['notes'] ?? 'Vendor Direct Sale',
-                'items' => (function () use ($variantId, $unit, $validated, $vendorCost, $vendorPaidAmount, $preparedVendorSplits, $hasVendorSplits, $tenantId, $user) {
+                'items' => (function () use ($variantId, $unit, $validated, $vendorCost, $vendorPaidAmount, $preparedVendorSplits, $hasVendorSplits) {
                     $orderItems = [
                         [
                             'variant_id' => $variantId,
@@ -861,7 +862,7 @@ class SaleController extends Controller
         try {
             return $pdfService->generateSalesInvoice($order, $forceDownload)->toResponse($request);
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('Sales Invoice PDF generation failed: ' . $e->getMessage(), [
+            Log::error('Sales Invoice PDF generation failed: '.$e->getMessage(), [
                 'order_id' => $id,
                 'order_number' => $order->order_number,
                 'exception' => $e,

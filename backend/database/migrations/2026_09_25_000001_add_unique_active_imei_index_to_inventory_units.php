@@ -19,6 +19,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        DB::statement("DROP INDEX IF EXISTS inventory_units_tenant_active_imei_unique;");
+        DB::statement('DROP INDEX IF EXISTS inventory_units_tenant_active_imei_unique;');
     }
 };

@@ -2,6 +2,7 @@
 
 use App\Actions\SynchronizeInventoryStockAction;
 use App\Models\PlatformSignupAttempt;
+use App\Services\PdfGeneratorService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -42,7 +43,7 @@ Artisan::command('platform:cleanup-signup-attempts', function () {
 
 Schedule::command('platform:cleanup-signup-attempts')->daily();
 
-Artisan::command('pdf:test', function (App\Services\PdfGeneratorService $pdfService) {
+Artisan::command('pdf:test', function (PdfGeneratorService $pdfService) {
     $this->info('Testing Headless Chromium PDF generation...');
     $binary = config('laravel-pdf.chrome.chrome_binary');
     $this->line("Configured Chrome binary: {$binary}");
@@ -51,9 +52,10 @@ Artisan::command('pdf:test', function (App\Services\PdfGeneratorService $pdfServ
     try {
         $output = $pdfService->renderHtmlToPdf('<h1>PDF Generation Test</h1><p>HabeshaBiz Vector PDF engine is online and operational.</p>');
         $duration = round(microtime(true) - $start, 2);
-        $this->info("✓ PDF generated successfully in {$duration}s! Output length: " . strlen($output) . " bytes.");
-    } catch (\Throwable $e) {
-        $this->error("✗ PDF generation failed: " . $e->getMessage());
+        $this->info("✓ PDF generated successfully in {$duration}s! Output length: ".strlen($output).' bytes.');
+    } catch (Throwable $e) {
+        $this->error('✗ PDF generation failed: '.$e->getMessage());
+
         return 1;
     }
 })->purpose('Test PDF generation engine');

@@ -1,9 +1,16 @@
 <?php
 
+use App\Models\Category;
 use App\Models\Contact;
 use App\Models\Debt;
+use App\Models\DebtPayment;
 use App\Models\FinancialAccount;
 use App\Models\FinancialTransaction;
+use App\Models\InventoryUnit;
+use App\Models\Product;
+use App\Models\ProductVariant;
+use App\Models\SalesOrder;
+use App\Models\SalesOrderItem;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Scopes\TenantScope;
@@ -413,26 +420,26 @@ test('mutual offset or payment on handover debt automatically synchronizes linke
         'roles' => ['supplier', 'customer'],
     ]);
 
-    $category = \App\Models\Category::create([
+    $category = Category::create([
         'tenant_id' => $this->tenant->id,
         'name' => 'Smartphones',
         'slug' => 'smartphones',
     ]);
 
-    $product = \App\Models\Product::create([
+    $product = Product::create([
         'tenant_id' => $this->tenant->id,
         'category_id' => $category->id,
         'name' => 'iPhone 16 Pro',
         'has_serials' => true,
     ]);
 
-    $variant = \App\Models\ProductVariant::create([
+    $variant = ProductVariant::create([
         'tenant_id' => $this->tenant->id,
         'product_id' => $product->id,
         'name' => '256GB Black',
     ]);
 
-    $unit = \App\Models\InventoryUnit::create([
+    $unit = InventoryUnit::create([
         'tenant_id' => $this->tenant->id,
         'variant_id' => $variant->id,
         'imei_or_serial' => 'SN-16PRO-TEST-99',
@@ -455,7 +462,7 @@ test('mutual offset or payment on handover debt automatically synchronizes linke
         'status' => 'partially_paid',
     ]);
 
-    \App\Models\DebtPayment::create([
+    DebtPayment::create([
         'tenant_id' => $this->tenant->id,
         'debt_id' => $debt->id,
         'financial_account_id' => $this->cashAccount->id,
@@ -465,7 +472,7 @@ test('mutual offset or payment on handover debt automatically synchronizes linke
     ]);
 
     // Create linked sales order
-    $order = \App\Models\SalesOrder::create([
+    $order = SalesOrder::create([
         'tenant_id' => $this->tenant->id,
         'order_number' => 'SO-TEST-HANDOVER-1',
         'customer_id' => $contact->id,
@@ -477,7 +484,7 @@ test('mutual offset or payment on handover debt automatically synchronizes linke
         'order_date' => now(),
     ]);
 
-    \App\Models\SalesOrderItem::create([
+    SalesOrderItem::create([
         'tenant_id' => $this->tenant->id,
         'sales_order_id' => $order->id,
         'variant_id' => $variant->id,
@@ -532,6 +539,3 @@ test('mutual offset or payment on handover debt automatically synchronizes linke
     expect($order->payment_status)->toBe('paid');
     expect($order->credit_sale)->toBeFalse();
 });
-
-
-

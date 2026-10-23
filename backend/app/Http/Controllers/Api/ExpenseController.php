@@ -12,11 +12,13 @@ use App\Models\FinancialAccount;
 use App\Models\FinancialTransaction;
 use App\Models\InventoryUnit;
 use App\Models\MaintenanceRecord;
+use App\Models\User;
 use App\Scopes\TenantScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class ExpenseController extends Controller
 {
@@ -87,8 +89,8 @@ class ExpenseController extends Controller
                 $splits = $rawSplits;
                 $splitSum = (float) collect($splits)->sum(fn ($s) => (float) ($s['amount'] ?? 0));
                 if (abs($splitSum - $amount) > 0.01) {
-                    throw \Illuminate\Validation\ValidationException::withMessages([
-                        'payment_splits' => ["Split allocation total (".number_format($splitSum, 2)." ETB) does not match total expense amount (".number_format($amount, 2)." ETB)."],
+                    throw ValidationException::withMessages([
+                        'payment_splits' => ['Split allocation total ('.number_format($splitSum, 2).' ETB) does not match total expense amount ('.number_format($amount, 2).' ETB).'],
                     ]);
                 }
             } else {
@@ -111,8 +113,8 @@ class ExpenseController extends Controller
 
                 if ((float) $splitAccount->current_balance < $splitTotal) {
                     $errorKey = ! empty($validated['payment_splits']) ? 'payment_splits' : 'financial_account_id';
-                    throw \Illuminate\Validation\ValidationException::withMessages([
-                        $errorKey => ["Insufficient balance in account '{$splitAccount->name}'. Available: ".number_format((float) $splitAccount->current_balance, 2)." ETB, Required: ".number_format($splitTotal, 2)." ETB (including fee)."],
+                    throw ValidationException::withMessages([
+                        $errorKey => ["Insufficient balance in account '{$splitAccount->name}'. Available: ".number_format((float) $splitAccount->current_balance, 2).' ETB, Required: '.number_format($splitTotal, 2).' ETB (including fee).'],
                     ]);
                 }
 
@@ -268,7 +270,7 @@ class ExpenseController extends Controller
                                 'amount' => $amount,
                                 'payment_date' => $expense->date ?? now(),
                                 'reference_number' => 'REPAIR-OFFSET',
-                                'notes' => "Repair offset deduction for SN: ".($unit->imei_or_serial ?? 'Unit'),
+                                'notes' => 'Repair offset deduction for SN: '.($unit->imei_or_serial ?? 'Unit'),
                                 'created_by' => auth()->id(),
                             ]);
 
@@ -294,7 +296,7 @@ class ExpenseController extends Controller
                                 'remaining_amount' => $amount,
                                 'due_date' => now()->addDays(7),
                                 'status' => 'open',
-                                'notes' => "Repair reimbursement claim for defective device SN: ".($unit->imei_or_serial ?? 'Unit'),
+                                'notes' => 'Repair reimbursement claim for defective device SN: '.($unit->imei_or_serial ?? 'Unit'),
                             ]);
                             $vendorDebtId = $vendorReceivable->id;
                         }
@@ -311,7 +313,7 @@ class ExpenseController extends Controller
                             'remaining_amount' => $amount,
                             'due_date' => now()->addDays(7),
                             'status' => 'open',
-                            'notes' => "Repair reimbursement claim for defective device SN: ".($unit->imei_or_serial ?? 'Unit'),
+                            'notes' => 'Repair reimbursement claim for defective device SN: '.($unit->imei_or_serial ?? 'Unit'),
                         ]);
                         $vendorDebtId = $vendorReceivable->id;
                     }
@@ -391,7 +393,7 @@ class ExpenseController extends Controller
 
     public function destroy(Request $request, string $id): JsonResponse
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
         if (! $user || ! $user->isOwner()) {
             return response()->json([

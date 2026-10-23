@@ -167,7 +167,7 @@ return new class extends Migration
                         ->where('tenant_id', $tenant->id)
                         ->where(function ($q) {
                             $q->where('category', 'phones')
-                              ->orWhere('category', 'smartphone');
+                                ->orWhere('category', 'smartphone');
                         })
                         ->update(['category_id' => $catId, 'category' => 'smartphones']);
                 } elseif ($cat['slug'] === 'joysticks') {

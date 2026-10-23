@@ -1,12 +1,19 @@
 <?php
 
+use App\Models\Category;
+use App\Models\FinancialAccount;
+use App\Models\InventoryUnit;
 use App\Models\PlatformAdmin;
 use App\Models\PlatformSetting;
 use App\Models\PlatformSignupAttempt;
 use App\Models\PlatformWaitlist;
 use App\Models\PlatformWhitelist;
+use App\Models\Product;
+use App\Models\ProductVariant;
+use App\Models\SalesOrder;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\TenantOnboardingService;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
@@ -467,7 +474,7 @@ test('admin can reset a tenant data completely while preserving login users and 
     ]);
     $adminToken = $admin->createToken('admin_token')->plainTextToken;
 
-    $onboardingService = app(\App\Services\TenantOnboardingService::class);
+    $onboardingService = app(TenantOnboardingService::class);
     $res = $onboardingService->onboard([
         'business_type' => 'electronics',
         'business_name' => 'Test Reset Store',
@@ -483,8 +490,8 @@ test('admin can reset a tenant data completely while preserving login users and 
     $user = $res['user'];
 
     // Create some sales or inventory for this tenant
-    $category = \App\Models\Category::where('tenant_id', $tenant->id)->first();
-    $product = \App\Models\Product::create([
+    $category = Category::where('tenant_id', $tenant->id)->first();
+    $product = Product::create([
         'tenant_id' => $tenant->id,
         'category_id' => $category?->id,
         'name' => 'Dummy Phone',
@@ -493,11 +500,11 @@ test('admin can reset a tenant data completely while preserving login users and 
         'has_serials' => true,
         'is_active' => true,
     ]);
-    $variant = \App\Models\ProductVariant::create([
+    $variant = ProductVariant::create([
         'tenant_id' => $tenant->id,
         'product_id' => $product->id,
     ]);
-    \App\Models\InventoryUnit::create([
+    InventoryUnit::create([
         'tenant_id' => $tenant->id,
         'variant_id' => $variant->id,
         'imei' => '354892019283741',
@@ -505,7 +512,7 @@ test('admin can reset a tenant data completely while preserving login users and 
         'status' => 'in_stock',
     ]);
 
-    expect(\App\Models\InventoryUnit::where('tenant_id', $tenant->id)->count())->toBe(1);
+    expect(InventoryUnit::where('tenant_id', $tenant->id)->count())->toBe(1);
 
     // Call reset endpoint
     $response = $this->withHeader('Authorization', 'Bearer '.$adminToken)
@@ -520,13 +527,13 @@ test('admin can reset a tenant data completely while preserving login users and 
         ]);
 
     // Transactional records cleared
-    expect(\App\Models\InventoryUnit::where('tenant_id', $tenant->id)->count())->toBe(0);
-    expect(\App\Models\SalesOrder::where('tenant_id', $tenant->id)->count())->toBe(0);
+    expect(InventoryUnit::where('tenant_id', $tenant->id)->count())->toBe(0);
+    expect(SalesOrder::where('tenant_id', $tenant->id)->count())->toBe(0);
 
     // User and tenant preserved
-    expect(\App\Models\User::where('tenant_id', $tenant->id)->count())->toBe(1);
-    expect(\App\Models\Tenant::where('id', $tenant->id)->exists())->toBeTrue();
-    expect(\App\Models\FinancialAccount::where('tenant_id', $tenant->id)->count())->toBeGreaterThan(0);
+    expect(User::where('tenant_id', $tenant->id)->count())->toBe(1);
+    expect(Tenant::where('id', $tenant->id)->exists())->toBeTrue();
+    expect(FinancialAccount::where('tenant_id', $tenant->id)->count())->toBeGreaterThan(0);
 });
 
 test('admin can permanently delete a tenant and all its data', function () {
@@ -537,7 +544,7 @@ test('admin can permanently delete a tenant and all its data', function () {
     ]);
     $adminToken = $admin->createToken('admin_token')->plainTextToken;
 
-    $onboardingService = app(\App\Services\TenantOnboardingService::class);
+    $onboardingService = app(TenantOnboardingService::class);
     $res = $onboardingService->onboard([
         'business_type' => 'electronics',
         'business_name' => 'Delete Me Store',
@@ -557,9 +564,9 @@ test('admin can permanently delete a tenant and all its data', function () {
 
     $response->assertStatus(200);
 
-    expect(\App\Models\Tenant::where('id', $tenant->id)->exists())->toBeFalse();
-    expect(\App\Models\User::where('tenant_id', $tenant->id)->exists())->toBeFalse();
-    expect(\App\Models\FinancialAccount::where('tenant_id', $tenant->id)->exists())->toBeFalse();
+    expect(Tenant::where('id', $tenant->id)->exists())->toBeFalse();
+    expect(User::where('tenant_id', $tenant->id)->exists())->toBeFalse();
+    expect(FinancialAccount::where('tenant_id', $tenant->id)->exists())->toBeFalse();
 });
 
 test('admin can toggle business type active status and disabled business type is rejected on registration', function () {
@@ -621,4 +628,3 @@ test('admin can toggle business type active status and disabled business type is
     ]);
     $resOnboardSuccess->assertStatus(201);
 });
-

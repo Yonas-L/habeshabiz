@@ -393,7 +393,7 @@ class RecordSaleAction
                         'notes' => $remOwed <= 0.009
                             ? "Brokered sourcing{$accLabel} for Order #{$order->order_number} (Paid on spot)"
                             : ($paidNow > 0.009
-                                ? "Brokered sourcing{$accLabel} for Order #{$order->order_number} (Partial down payment: ".number_format($paidNow, 2)." ETB, Remaining: ".number_format($remOwed, 2)." ETB)"
+                                ? "Brokered sourcing{$accLabel} for Order #{$order->order_number} (Partial down payment: ".number_format($paidNow, 2).' ETB, Remaining: '.number_format($remOwed, 2).' ETB)'
                                 : "Brokered sourcing{$accLabel} for Order #{$order->order_number}"),
                     ]);
 

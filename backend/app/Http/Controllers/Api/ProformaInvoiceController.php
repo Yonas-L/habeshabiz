@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\ProformaInvoice;
-use App\Models\ProformaInvoiceItem;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\PdfGeneratorService;

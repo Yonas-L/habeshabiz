@@ -18,6 +18,7 @@ use App\Models\ProductVariant;
 use App\Models\SalesOrder;
 use App\Models\SalesOrderItem;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -456,7 +457,7 @@ class InventoryController extends Controller
                 $splitSum = (float) collect($rawSplits)->sum(fn ($s) => (float) ($s['amount'] ?? 0));
                 if (abs($splitSum - $bankAmount) > 0.01) {
                     throw ValidationException::withMessages([
-                        'payment_splits' => ["Split funding total (".number_format($splitSum, 2)." ETB) does not match required funding amount (".number_format($bankAmount, 2)." ETB)."],
+                        'payment_splits' => ['Split funding total ('.number_format($splitSum, 2).' ETB) does not match required funding amount ('.number_format($bankAmount, 2).' ETB).'],
                     ]);
                 }
                 $splitsToProcess = $rawSplits;
@@ -753,7 +754,7 @@ class InventoryController extends Controller
 
                     if ($finalPrice > $totalOpenPayables) {
                         throw ValidationException::withMessages([
-                            'handover_payout' => ["Agreed deduction amount (".number_format($finalPrice, 2)." ETB) exceeds your total open payables to {$partnerContact->name} (".number_format($totalOpenPayables, 2)." ETB). You can only offset up to the amount you owe. To hand out devices for {$partnerContact->name} to sell, choose 'Temporary Handout' instead."],
+                            'handover_payout' => ['Agreed deduction amount ('.number_format($finalPrice, 2)." ETB) exceeds your total open payables to {$partnerContact->name} (".number_format($totalOpenPayables, 2)." ETB). You can only offset up to the amount you owe. To hand out devices for {$partnerContact->name} to sell, choose 'Temporary Handout' instead."],
                         ]);
                     }
 
@@ -1739,7 +1740,7 @@ class InventoryController extends Controller
 
             if ($finalPrice > $totalOpenPayables) {
                 throw ValidationException::withMessages([
-                    'handover_payout' => ["Agreed deduction amount (".number_format($finalPrice, 2)." ETB) exceeds your total open payables to {$partnerContact->name} (".number_format($totalOpenPayables, 2)." ETB). You can only offset up to the amount you owe. To hand out devices for {$partnerContact->name} to sell, choose 'Temporary Handout' instead."],
+                    'handover_payout' => ['Agreed deduction amount ('.number_format($finalPrice, 2)." ETB) exceeds your total open payables to {$partnerContact->name} (".number_format($totalOpenPayables, 2)." ETB). You can only offset up to the amount you owe. To hand out devices for {$partnerContact->name} to sell, choose 'Temporary Handout' instead."],
                 ]);
             }
 
@@ -1835,7 +1836,7 @@ class InventoryController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => "Device handed over and ".number_format($finalPrice, 2)." ETB deducted from {$partnerContact->name}'s debt.",
+                'message' => 'Device handed over and '.number_format($finalPrice, 2)." ETB deducted from {$partnerContact->name}'s debt.",
                 'data' => $unit->fresh()->load('variant.product'),
                 'instant_offset' => true,
             ]);
@@ -3166,7 +3167,7 @@ class InventoryController extends Controller
 
                         $alreadyReOffset = $pDebt->payments
                             ->where('reference_number', 'BILATERAL-OFFSET')
-                            ->filter(fn ($p) => str_contains($p->notes ?? '', "(Repaired)") && str_contains($p->notes ?? '', "[unit_id:{$unit->id}]"))
+                            ->filter(fn ($p) => str_contains($p->notes ?? '', '(Repaired)') && str_contains($p->notes ?? '', "[unit_id:{$unit->id}]"))
                             ->first();
 
                         if (! $alreadyReOffset && $pDebt->remaining_amount > 0) {
@@ -3233,7 +3234,7 @@ class InventoryController extends Controller
             }
 
             $cleanPrevNotes = $prevNotes ? preg_replace('/(\s*\|\s*)?Received fixed from [^|]+(\.|$)/i', '', $prevNotes) : '';
-            $cleanPrevNotes = trim($cleanPrevNotes, " |");
+            $cleanPrevNotes = trim($cleanPrevNotes, ' |');
 
             $updateData = [
                 'status' => $status,
@@ -3690,7 +3691,7 @@ class InventoryController extends Controller
      * Accurately matches intake debts (by unit ID / IMEI) as well as brokered sourcing
      * and consignment sales (linked via SalesOrder ID or order number).
      */
-    private function resolveUnitSupplierPayables(InventoryUnit $unit, string $tenantId): \Illuminate\Database\Eloquent\Collection
+    private function resolveUnitSupplierPayables(InventoryUnit $unit, string $tenantId): Collection
     {
         $orderItems = SalesOrderItem::where('inventory_unit_id', $unit->id)->with('salesOrder')->get();
         $orderIds = $orderItems->pluck('sales_order_id')->filter()->unique();

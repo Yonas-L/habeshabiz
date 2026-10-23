@@ -8,6 +8,7 @@ use App\Models\InventoryStock;
 use App\Models\InventoryUnit;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\SalesOrderItem;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -155,7 +156,7 @@ class ProductController extends Controller
         $product = Product::with(['variants'])->findOrFail($id);
         $variantIds = $product->variants->pluck('id')->toArray();
 
-        $hasSales = \App\Models\SalesOrderItem::whereIn('variant_id', $variantIds)->exists();
+        $hasSales = SalesOrderItem::whereIn('variant_id', $variantIds)->exists();
         $hasUnits = InventoryUnit::whereIn('variant_id', $variantIds)->exists();
 
         DB::transaction(function () use ($product, $variantIds, $hasSales, $hasUnits) {

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\User;
+use App\Support\DeviceDetector;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -35,7 +36,7 @@ class AuthController extends Controller
         }
 
         // Track device info
-        $deviceInfo = \App\Support\DeviceDetector::parse($request->userAgent());
+        $deviceInfo = DeviceDetector::parse($request->userAgent());
         $user->update([
             'last_device' => $deviceInfo['platform'],
             'last_device_type' => $deviceInfo['type'],

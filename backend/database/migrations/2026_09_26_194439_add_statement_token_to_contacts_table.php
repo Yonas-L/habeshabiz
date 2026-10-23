@@ -2,7 +2,9 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 return new class extends Migration
 {
@@ -16,11 +18,11 @@ return new class extends Migration
         });
 
         // Backfill existing contacts with unique random tokens
-        $contacts = \Illuminate\Support\Facades\DB::table('contacts')->get(['id']);
+        $contacts = DB::table('contacts')->get(['id']);
         foreach ($contacts as $contact) {
-            \Illuminate\Support\Facades\DB::table('contacts')
+            DB::table('contacts')
                 ->where('id', $contact->id)
-                ->update(['statement_token' => \Illuminate\Support\Str::random(32)]);
+                ->update(['statement_token' => Str::random(32)]);
         }
     }
 

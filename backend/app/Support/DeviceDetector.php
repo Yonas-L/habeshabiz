@@ -7,7 +7,6 @@ class DeviceDetector
     /**
      * Parse raw User-Agent header string into structured device metadata.
      *
-     * @param string|null $userAgent
      * @return array{type: string, platform: string, browser: string, label: string, raw: ?string}
      */
     public static function parse(?string $userAgent): array
@@ -56,9 +55,9 @@ class DeviceDetector
         $browser = 'Browser';
         if (preg_match('/Edg/i', $ua)) {
             $browser = 'Edge';
-        } elseif (preg_match('/Chrome/i', $ua) && !preg_match('/Edg/i', $ua)) {
+        } elseif (preg_match('/Chrome/i', $ua) && ! preg_match('/Edg/i', $ua)) {
             $browser = 'Chrome';
-        } elseif (preg_match('/Safari/i', $ua) && !preg_match('/Chrome/i', $ua)) {
+        } elseif (preg_match('/Safari/i', $ua) && ! preg_match('/Chrome/i', $ua)) {
             $browser = 'Safari';
         } elseif (preg_match('/Firefox/i', $ua)) {
             $browser = 'Firefox';

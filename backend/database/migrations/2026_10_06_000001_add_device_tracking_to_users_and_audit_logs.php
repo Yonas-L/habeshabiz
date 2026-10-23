@@ -19,7 +19,7 @@ return new class extends Migration
             $table->timestamp('last_login_at')->nullable()->after('last_login_ip');
         });
 
-        if (Schema::hasTable('audit_logs') && !Schema::hasColumn('audit_logs', 'user_agent')) {
+        if (Schema::hasTable('audit_logs') && ! Schema::hasColumn('audit_logs', 'user_agent')) {
             Schema::table('audit_logs', function (Blueprint $table) {
                 $table->string('user_agent', 255)->nullable()->after('ip_address');
             });

@@ -55,7 +55,7 @@ class SettleDebtPaymentAction
                     return $waterfallRes['payments'][0];
                 }
 
-                throw new InvalidArgumentException("Payment amount (".number_format($amount, 2)." ETB) exceeds total open balance (".number_format($totalContactRemaining, 2)." ETB).");
+                throw new InvalidArgumentException('Payment amount ('.number_format($amount, 2).' ETB) exceeds total open balance ('.number_format($totalContactRemaining, 2).' ETB).');
             }
 
             if ($amount > (float) $debt->remaining_amount) {
@@ -102,7 +102,7 @@ class SettleDebtPaymentAction
 
             $totalRemaining = (float) $debts->sum('remaining_amount');
             if ($amount > $totalRemaining + 0.01) {
-                throw new InvalidArgumentException("Payment amount (".number_format($amount, 2)." ETB) exceeds total open balance (".number_format($totalRemaining, 2)." ETB).");
+                throw new InvalidArgumentException('Payment amount ('.number_format($amount, 2).' ETB) exceeds total open balance ('.number_format($totalRemaining, 2).' ETB).');
             }
 
             // Normalise splits pool
@@ -111,7 +111,7 @@ class SettleDebtPaymentAction
                 $splits = $rawSplits;
                 $splitSum = (float) collect($splits)->sum(fn ($s) => (float) ($s['amount'] ?? 0));
                 if (abs($splitSum - $amount) > 0.01) {
-                    throw new InvalidArgumentException("Split allocation total (".number_format($splitSum, 2)." ETB) does not match payment amount (".number_format($amount, 2)." ETB).");
+                    throw new InvalidArgumentException('Split allocation total ('.number_format($splitSum, 2).' ETB) does not match payment amount ('.number_format($amount, 2).' ETB).');
                 }
             } else {
                 if (empty($data['financial_account_id'])) {
@@ -223,7 +223,7 @@ class SettleDebtPaymentAction
             $account = FinancialAccount::findOrFail($split['financial_account_id']);
             $refNumber = $split['reference_number'] ?? $data['reference_number'] ?? null;
             $splitNotes = count($splits) > 1
-                ? trim(($data['notes'] ?? '')." (Split via {$account->name}: ".number_format($splitAmount, 2)." ETB)")
+                ? trim(($data['notes'] ?? '')." (Split via {$account->name}: ".number_format($splitAmount, 2).' ETB)')
                 : ($data['notes'] ?? null);
 
             $payment = DebtPayment::create([
@@ -265,7 +265,7 @@ class SettleDebtPaymentAction
                 $totalDeduction = $splitAmount + $fee;
 
                 if ((float) $account->current_balance < $totalDeduction) {
-                    throw new InvalidArgumentException("Insufficient balance in account '{$account->name}'. Available: ".number_format((float) $account->current_balance, 2)." ETB, Required: ".number_format($totalDeduction, 2)." ETB (including fee).");
+                    throw new InvalidArgumentException("Insufficient balance in account '{$account->name}'. Available: ".number_format((float) $account->current_balance, 2).' ETB, Required: '.number_format($totalDeduction, 2).' ETB (including fee).');
                 }
                 $account->decrement('current_balance', $totalDeduction);
 
@@ -413,4 +413,3 @@ class SettleDebtPaymentAction
         return $createdPayments;
     }
 }
-

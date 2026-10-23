@@ -13,12 +13,12 @@ use App\Scopes\TenantScope;
 use Illuminate\Support\Facades\Hash;
 
 beforeEach(function () {
-    $this->tenant = Tenant::create(['name' => 'Fee Test Store', 'slug' => 'fee-store-' . uniqid()]);
+    $this->tenant = Tenant::create(['name' => 'Fee Test Store', 'slug' => 'fee-store-'.uniqid()]);
     TenantScope::setForcedTenantId($this->tenant->id);
     $this->owner = User::create([
         'tenant_id' => $this->tenant->id,
         'name' => 'Fee Owner',
-        'email' => 'owner' . uniqid() . '@fee.com',
+        'email' => 'owner'.uniqid().'@fee.com',
         'password' => Hash::make('password123'),
         'role' => 'owner',
     ]);

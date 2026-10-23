@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Http\UploadedFile;
 
 class Tenant extends Model
 {
@@ -38,9 +39,10 @@ class Tenant extends Model
     public function getSettingsAttribute($value): array
     {
         $settings = is_array($value) ? $value : (json_decode($value ?? '[]', true) ?: []);
-        if (!empty($settings['logo_url']) && is_string($settings['logo_url'])) {
+        if (! empty($settings['logo_url']) && is_string($settings['logo_url'])) {
             $settings['logo_url'] = self::normalizeStorageUrl($settings['logo_url']);
         }
+
         return $settings;
     }
 
@@ -64,7 +66,8 @@ class Tenant extends Model
             if ((request()?->header('X-Forwarded-Proto') === 'https') || str_starts_with($baseUrl, 'https://')) {
                 $baseUrl = preg_replace('/^http:\/\//i', 'https://', $baseUrl);
             }
-            return rtrim($baseUrl, '/') . $path;
+
+            return rtrim($baseUrl, '/').$path;
         }
 
         return $url;
@@ -73,15 +76,16 @@ class Tenant extends Model
     /**
      * Convert an uploaded logo file to a base64 data URI for permanent DB persistence on ephemeral hosting.
      */
-    public static function convertUploadedFileToDataUri(\Illuminate\Http\UploadedFile $file): string
+    public static function convertUploadedFileToDataUri(UploadedFile $file): string
     {
         $mime = $file->getMimeType() ?: 'image/png';
         $realPath = $file->getRealPath();
 
         // If SVG or GD not loaded, return base64 data URI directly
-        if (str_contains($mime, 'svg') || !extension_loaded('gd') || !function_exists('imagecreatefromstring')) {
+        if (str_contains($mime, 'svg') || ! extension_loaded('gd') || ! function_exists('imagecreatefromstring')) {
             $contents = file_get_contents($realPath);
-            return 'data:' . $mime . ';base64,' . base64_encode($contents);
+
+            return 'data:'.$mime.';base64,'.base64_encode($contents);
         }
 
         try {
@@ -123,8 +127,8 @@ class Tenant extends Model
                 $imgData = ob_get_clean();
                 imagedestroy($srcImg);
 
-                if (!empty($imgData)) {
-                    return 'data:' . $outMime . ';base64,' . base64_encode($imgData);
+                if (! empty($imgData)) {
+                    return 'data:'.$outMime.';base64,'.base64_encode($imgData);
                 }
             }
         } catch (\Throwable $e) {
@@ -132,7 +136,8 @@ class Tenant extends Model
         }
 
         $contents = file_get_contents($realPath);
-        return 'data:' . $mime . ';base64,' . base64_encode($contents);
+
+        return 'data:'.$mime.';base64,'.base64_encode($contents);
     }
 
     public function scopeLocked(Builder $query): Builder

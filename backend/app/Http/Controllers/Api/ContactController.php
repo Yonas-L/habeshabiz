@@ -9,7 +9,10 @@ use App\Scopes\TenantScope;
 use App\Services\PdfGeneratorService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\Response;
 
 class ContactController extends Controller
 {
@@ -147,7 +150,7 @@ class ContactController extends Controller
         $endDate = $request->query('end_date');
 
         if (empty($contact->statement_token)) {
-            $contact->update(['statement_token' => \Illuminate\Support\Str::random(32)]);
+            $contact->update(['statement_token' => Str::random(32)]);
         }
 
         $data = $action->execute($contact, $startDate, $endDate);
@@ -181,7 +184,7 @@ class ContactController extends Controller
         ]);
     }
 
-    public function statementPdf(Request $request, string $id, PdfGeneratorService $pdfService): \Symfony\Component\HttpFoundation\Response
+    public function statementPdf(Request $request, string $id, PdfGeneratorService $pdfService): Response
     {
         $contact = Contact::findOrFail($id);
         $startDate = $request->query('start_date');
@@ -197,7 +200,7 @@ class ContactController extends Controller
         try {
             return $pdfService->generateVendorStatement($contact, $startDate, $endDate, $selectedAccountIds, $forceDownload)->toResponse($request);
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('PDF Statement generation failed: ' . $e->getMessage(), [
+            Log::error('PDF Statement generation failed: '.$e->getMessage(), [
                 'contact_id' => $id,
                 'contact_name' => $contact->name,
                 'exception' => $e,
@@ -206,7 +209,7 @@ class ContactController extends Controller
         }
     }
 
-    public function publicStatementPdf(Request $request, string $token, PdfGeneratorService $pdfService): \Symfony\Component\HttpFoundation\Response
+    public function publicStatementPdf(Request $request, string $token, PdfGeneratorService $pdfService): Response
     {
         $contact = Contact::withoutGlobalScopes()
             ->where('statement_token', $token)
@@ -227,12 +230,13 @@ class ContactController extends Controller
         try {
             return $pdfService->generateVendorStatement($contact, $startDate, $endDate, $selectedAccountIds, $forceDownload)->toResponse($request);
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('Public PDF Statement generation failed: ' . $e->getMessage(), [
+            Log::error('Public PDF Statement generation failed: '.$e->getMessage(), [
                 'token' => $token,
                 'contact_id' => $contact->id,
                 'contact_name' => $contact->name,
                 'exception' => $e,
             ]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'PDF generation failed on server',

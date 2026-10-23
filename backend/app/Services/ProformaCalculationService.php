@@ -7,8 +7,8 @@ class ProformaCalculationService
     /**
      * Compute full line item calculations and invoice summaries.
      *
-     * @param array $rawItems Array of raw item inputs
-     * @param array $invoiceMeta Overall invoice fields (vat_rate, withholding_rate, shipping_fee)
+     * @param  array  $rawItems  Array of raw item inputs
+     * @param  array  $invoiceMeta  Overall invoice fields (vat_rate, withholding_rate, shipping_fee)
      * @return array [ 'items' => array, 'summary' => array ]
      */
     public function calculate(array $rawItems, array $invoiceMeta = []): array
@@ -49,8 +49,8 @@ class ProformaCalculationService
                 'product_id' => $raw['product_id'] ?? null,
                 'variant_id' => $raw['variant_id'] ?? null,
                 'description' => trim((string) ($raw['description'] ?? 'Item')),
-                'sku' => !empty($raw['sku']) ? trim((string) $raw['sku']) : null,
-                'unit_of_measure' => !empty($raw['unit_of_measure']) ? trim((string) $raw['unit_of_measure']) : 'Pcs',
+                'sku' => ! empty($raw['sku']) ? trim((string) $raw['sku']) : null,
+                'unit_of_measure' => ! empty($raw['unit_of_measure']) ? trim((string) $raw['unit_of_measure']) : 'Pcs',
                 'quantity' => $qty,
                 'unit_price' => $unitPrice,
                 'subtotal' => $subtotal,

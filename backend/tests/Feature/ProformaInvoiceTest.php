@@ -8,9 +8,9 @@ use App\Models\ProformaInvoice;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Scopes\TenantScope;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
 use Spatie\LaravelPdf\Facades\Pdf;
+use Spatie\LaravelPdf\PdfBuilder;
 
 beforeEach(function () {
     Pdf::fake();
@@ -286,7 +286,7 @@ test('generates proforma invoice PDF successfully', function () {
         ->get("/api/v1/proforma-invoices/{$proforma->id}/pdf");
 
     $res->assertSuccessful();
-    Pdf::assertRespondedWithPdf(function (\Spatie\LaravelPdf\PdfBuilder $pdf) {
+    Pdf::assertRespondedWithPdf(function (PdfBuilder $pdf) {
         return $pdf->viewName === 'pdf.proforma-invoice'
             && $pdf->viewData['proforma']->proforma_number === 'PI-2026-0003';
     });
@@ -345,7 +345,7 @@ test('can download proforma pdf using query auth_token without Authorization hea
     $response = $this->get("/api/v1/proforma-invoices/{$proforma->id}/pdf?download=0&auth_token={$token}");
 
     $response->assertStatus(200);
-    Pdf::assertRespondedWithPdf(function (\Spatie\LaravelPdf\PdfBuilder $pdf) use ($proforma) {
+    Pdf::assertRespondedWithPdf(function (PdfBuilder $pdf) use ($proforma) {
         return $pdf->viewName === 'pdf.proforma-invoice'
             && $pdf->viewData['proforma']->id === $proforma->id;
     });
@@ -369,4 +369,3 @@ test('unauthenticated request to api pdf route returns 401 instead of Route [log
 
     $response->assertStatus(401);
 });
-

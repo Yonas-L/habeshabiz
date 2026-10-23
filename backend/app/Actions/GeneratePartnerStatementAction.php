@@ -77,13 +77,13 @@ class GeneratePartnerStatementAction
         }
 
         $orders = SalesOrder::where(function ($q) use ($orderIds, $paymentOrderNumbers) {
-                if ($orderIds->isNotEmpty()) {
-                    $q->whereIn('id', $orderIds);
-                }
-                if (! empty($paymentOrderNumbers)) {
-                    $q->orWhereIn('order_number', $paymentOrderNumbers);
-                }
-            })
+            if ($orderIds->isNotEmpty()) {
+                $q->whereIn('id', $orderIds);
+            }
+            if (! empty($paymentOrderNumbers)) {
+                $q->orWhereIn('order_number', $paymentOrderNumbers);
+            }
+        })
             ->with(['items.variant.product', 'items.inventoryUnit.variant.product'])
             ->get();
         $ordersById = $orders->keyBy('id');

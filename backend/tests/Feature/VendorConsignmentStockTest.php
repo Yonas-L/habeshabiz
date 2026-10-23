@@ -7,6 +7,7 @@ use App\Models\InventoryStock;
 use App\Models\InventoryUnit;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\SalesOrderItem;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Scopes\TenantScope;
@@ -198,7 +199,7 @@ test('selling a vendor consignment unit credits shop account and auto-creates pa
 
     // 5. Order Item records the shop profit: 180,000 - 160,000 = 20,000 ETB profit
     $orderId = $saleResponse->json('data.id');
-    $orderItem = \App\Models\SalesOrderItem::where('sales_order_id', $orderId)->first();
+    $orderItem = SalesOrderItem::where('sales_order_id', $orderId)->first();
     expect((float) $orderItem->unit_cost)->toBe(160000.00);
     expect((float) $orderItem->profit)->toBe(20000.00);
 });

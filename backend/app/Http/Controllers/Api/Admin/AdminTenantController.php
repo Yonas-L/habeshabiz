@@ -56,7 +56,7 @@ class AdminTenantController extends Controller
                 ->whereDoesntHave('salesOrders');
         }
 
-        if (!empty($businessType) && $businessType !== 'all') {
+        if (! empty($businessType) && $businessType !== 'all') {
             if ($businessType === 'electronics') {
                 $query->where(function ($q) {
                     $q->where('business_type', 'electronics')->orWhereNull('business_type');
@@ -66,7 +66,7 @@ class AdminTenantController extends Controller
             }
         }
 
-        if (!empty($search)) {
+        if (! empty($search)) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'ilike', "%{$search}%")
                     ->orWhere('slug', 'ilike', "%{$search}%")
@@ -153,7 +153,7 @@ class AdminTenantController extends Controller
                     'sales_count' => $salesCount,
                     'sales_volume' => (float) ($tenant->sales_volume ?? 0),
                     'categories' => $tenantCategories,
-                ]
+                ],
             ];
 
             return [
@@ -201,13 +201,13 @@ class AdminTenantController extends Controller
         $activeCount = Tenant::where('is_locked', false)
             ->where(function ($q) {
                 $q->has('inventoryUnits')
-                  ->orWhereHas('salesOrders')
-                  ->orWhereHas('inventoryStocks', fn($sq) => $sq->where('quantity_on_hand', '>', 0));
+                    ->orWhereHas('salesOrders')
+                    ->orWhereHas('inventoryStocks', fn ($sq) => $sq->where('quantity_on_hand', '>', 0));
             })->count();
         $comingSoonCount = Tenant::where('is_locked', false)
             ->whereDoesntHave('inventoryUnits')
             ->whereDoesntHave('salesOrders')
-            ->whereDoesntHave('inventoryStocks', fn($sq) => $sq->where('quantity_on_hand', '>', 0))
+            ->whereDoesntHave('inventoryStocks', fn ($sq) => $sq->where('quantity_on_hand', '>', 0))
             ->count();
 
         $verticals = [
@@ -218,13 +218,13 @@ class AdminTenantController extends Controller
                 'icon' => 'smartphone',
                 'is_enabled' => PlatformSetting::get('business_type_electronics_enabled', 'true') === 'true',
                 'setting_key' => 'business_type_electronics_enabled',
-                'stores_count' => Tenant::where(fn($q) => $q->where('business_type', 'electronics')->orWhereNull('business_type'))->count(),
-                'active_stores_count' => Tenant::where(fn($q) => $q->where('business_type', 'electronics')->orWhereNull('business_type'))->where('is_locked', false)->count(),
+                'stores_count' => Tenant::where(fn ($q) => $q->where('business_type', 'electronics')->orWhereNull('business_type'))->count(),
+                'active_stores_count' => Tenant::where(fn ($q) => $q->where('business_type', 'electronics')->orWhereNull('business_type'))->where('is_locked', false)->count(),
                 'stock_count' => (int) (
-                    InventoryUnit::whereHas('tenant', fn($q) => $q->where('business_type', 'electronics')->orWhereNull('business_type'))->where('status', 'in_stock')->count()
-                    + (int) InventoryStock::whereHas('tenant', fn($q) => $q->where('business_type', 'electronics')->orWhereNull('business_type'))->sum('quantity_on_hand')
+                    InventoryUnit::whereHas('tenant', fn ($q) => $q->where('business_type', 'electronics')->orWhereNull('business_type'))->where('status', 'in_stock')->count()
+                    + (int) InventoryStock::whereHas('tenant', fn ($q) => $q->where('business_type', 'electronics')->orWhereNull('business_type'))->sum('quantity_on_hand')
                 ),
-                'sales_volume' => (float) SalesOrder::whereHas('tenant', fn($q) => $q->where('business_type', 'electronics')->orWhereNull('business_type'))->sum('total_amount'),
+                'sales_volume' => (float) SalesOrder::whereHas('tenant', fn ($q) => $q->where('business_type', 'electronics')->orWhereNull('business_type'))->sum('total_amount'),
             ],
             [
                 'id' => 'general_retail',
@@ -236,10 +236,10 @@ class AdminTenantController extends Controller
                 'stores_count' => Tenant::where('business_type', 'general_retail')->count(),
                 'active_stores_count' => Tenant::where('business_type', 'general_retail')->where('is_locked', false)->count(),
                 'stock_count' => (int) (
-                    InventoryUnit::whereHas('tenant', fn($q) => $q->where('business_type', 'general_retail'))->where('status', 'in_stock')->count()
-                    + (int) InventoryStock::whereHas('tenant', fn($q) => $q->where('business_type', 'general_retail'))->sum('quantity_on_hand')
+                    InventoryUnit::whereHas('tenant', fn ($q) => $q->where('business_type', 'general_retail'))->where('status', 'in_stock')->count()
+                    + (int) InventoryStock::whereHas('tenant', fn ($q) => $q->where('business_type', 'general_retail'))->sum('quantity_on_hand')
                 ),
-                'sales_volume' => (float) SalesOrder::whereHas('tenant', fn($q) => $q->where('business_type', 'general_retail'))->sum('total_amount'),
+                'sales_volume' => (float) SalesOrder::whereHas('tenant', fn ($q) => $q->where('business_type', 'general_retail'))->sum('total_amount'),
             ],
             [
                 'id' => 'clothing',
@@ -251,10 +251,10 @@ class AdminTenantController extends Controller
                 'stores_count' => Tenant::where('business_type', 'clothing')->count(),
                 'active_stores_count' => Tenant::where('business_type', 'clothing')->where('is_locked', false)->count(),
                 'stock_count' => (int) (
-                    InventoryUnit::whereHas('tenant', fn($q) => $q->where('business_type', 'clothing'))->where('status', 'in_stock')->count()
-                    + (int) InventoryStock::whereHas('tenant', fn($q) => $q->where('business_type', 'clothing'))->sum('quantity_on_hand')
+                    InventoryUnit::whereHas('tenant', fn ($q) => $q->where('business_type', 'clothing'))->where('status', 'in_stock')->count()
+                    + (int) InventoryStock::whereHas('tenant', fn ($q) => $q->where('business_type', 'clothing'))->sum('quantity_on_hand')
                 ),
-                'sales_volume' => (float) SalesOrder::whereHas('tenant', fn($q) => $q->where('business_type', 'clothing'))->sum('total_amount'),
+                'sales_volume' => (float) SalesOrder::whereHas('tenant', fn ($q) => $q->where('business_type', 'clothing'))->sum('total_amount'),
             ],
             [
                 'id' => 'food_beverage',
@@ -266,10 +266,10 @@ class AdminTenantController extends Controller
                 'stores_count' => Tenant::where('business_type', 'food_beverage')->count(),
                 'active_stores_count' => Tenant::where('business_type', 'food_beverage')->where('is_locked', false)->count(),
                 'stock_count' => (int) (
-                    InventoryUnit::whereHas('tenant', fn($q) => $q->where('business_type', 'food_beverage'))->where('status', 'in_stock')->count()
-                    + (int) InventoryStock::whereHas('tenant', fn($q) => $q->where('business_type', 'food_beverage'))->sum('quantity_on_hand')
+                    InventoryUnit::whereHas('tenant', fn ($q) => $q->where('business_type', 'food_beverage'))->where('status', 'in_stock')->count()
+                    + (int) InventoryStock::whereHas('tenant', fn ($q) => $q->where('business_type', 'food_beverage'))->sum('quantity_on_hand')
                 ),
-                'sales_volume' => (float) SalesOrder::whereHas('tenant', fn($q) => $q->where('business_type', 'food_beverage'))->sum('total_amount'),
+                'sales_volume' => (float) SalesOrder::whereHas('tenant', fn ($q) => $q->where('business_type', 'food_beverage'))->sum('total_amount'),
             ],
         ];
 
@@ -337,6 +337,7 @@ class AdminTenantController extends Controller
             ->map(function ($log) {
                 $item = $log->toArray();
                 $item['device_info'] = $log->user_agent ? DeviceDetector::parse($log->user_agent) : null;
+
                 return $item;
             });
 
@@ -462,4 +463,3 @@ class AdminTenantController extends Controller
         ]);
     }
 }
-

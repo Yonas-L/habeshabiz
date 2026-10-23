@@ -874,7 +874,7 @@ class TenantOnboardingService
             InventoryStock::where('tenant_id', $tenantId)->delete();
 
             // 6. Delete products, variants, categories, contacts, and financial accounts
-            ProductVariant::withTrashed()->whereHas('product', fn($q) => $q->where('tenant_id', $tenantId))->forceDelete();
+            ProductVariant::withTrashed()->whereHas('product', fn ($q) => $q->where('tenant_id', $tenantId))->forceDelete();
             Product::withTrashed()->where('tenant_id', $tenantId)->forceDelete();
             Category::where('tenant_id', $tenantId)->delete();
             Contact::withTrashed()->where('tenant_id', $tenantId)->forceDelete();
@@ -936,7 +936,7 @@ class TenantOnboardingService
             InventoryStock::where('tenant_id', $tenantId)->delete();
 
             // 6. Delete products, variants, categories, contacts, and financial accounts
-            ProductVariant::withTrashed()->whereHas('product', fn($q) => $q->where('tenant_id', $tenantId))->forceDelete();
+            ProductVariant::withTrashed()->whereHas('product', fn ($q) => $q->where('tenant_id', $tenantId))->forceDelete();
             Product::withTrashed()->where('tenant_id', $tenantId)->forceDelete();
             Category::where('tenant_id', $tenantId)->delete();
             Contact::withTrashed()->where('tenant_id', $tenantId)->forceDelete();

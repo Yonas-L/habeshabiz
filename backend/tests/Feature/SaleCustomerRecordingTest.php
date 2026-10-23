@@ -1,10 +1,8 @@
 <?php
 
-use App\Actions\RecordSaleAction;
 use App\Models\Contact;
 use App\Models\Debt;
 use App\Models\FinancialAccount;
-use App\Models\InventoryStock;
 use App\Models\InventoryUnit;
 use App\Models\Product;
 use App\Models\ProductVariant;
@@ -228,4 +226,3 @@ test('sale with already registered phone number re-uses existing contact instead
     $matchingContacts = Contact::where('tenant_id', $this->tenant->id)->where('phone', '+251 91 777 8888')->get();
     expect($matchingContacts)->toHaveCount(1);
 });
-

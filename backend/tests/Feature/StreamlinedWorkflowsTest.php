@@ -335,4 +335,3 @@ test('pos vendor direct sale stores cycle_count and battery_health and orders so
     expect(count($soldUnits))->toBeGreaterThanOrEqual(2);
     expect($soldUnits[0]['imei_or_serial'])->toBe('NEW-DIRECT-22222');
 });
-

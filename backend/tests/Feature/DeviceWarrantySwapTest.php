@@ -3,13 +3,13 @@
 namespace Tests\Feature;
 
 use App\Actions\RecordSaleAction;
-use App\Models\Contact;
 use App\Models\FinancialAccount;
 use App\Models\InventoryUnit;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Scopes\TenantScope;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -18,11 +18,17 @@ class DeviceWarrantySwapTest extends TestCase
     use RefreshDatabase;
 
     private Tenant $tenant;
+
     private User $owner;
+
     private User $salesperson;
+
     private FinancialAccount $account;
+
     private ProductVariant $variant;
+
     private InventoryUnit $soldUnit;
+
     private InventoryUnit $stockUnit;
 
     protected function setUp(): void
@@ -30,7 +36,7 @@ class DeviceWarrantySwapTest extends TestCase
         parent::setUp();
 
         $this->tenant = Tenant::create(['name' => 'Habesha Electronics', 'slug' => 'habesha']);
-        \App\Scopes\TenantScope::setForcedTenantId($this->tenant->id);
+        TenantScope::setForcedTenantId($this->tenant->id);
 
         $this->owner = User::create([
             'tenant_id' => $this->tenant->id,
@@ -88,7 +94,7 @@ class DeviceWarrantySwapTest extends TestCase
         ]);
 
         // Sell unit 1
-        $saleAction = new RecordSaleAction();
+        $saleAction = new RecordSaleAction;
         $saleAction->execute([
             'customer_name' => 'Abebe Kebede',
             'customer_phone' => '0911000001',

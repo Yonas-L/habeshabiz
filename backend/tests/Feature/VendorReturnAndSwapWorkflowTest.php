@@ -2,18 +2,20 @@
 
 namespace Tests\Feature;
 
+use App\Actions\GeneratePartnerStatementAction;
+use App\Actions\RecordSaleAction;
+use App\Models\Category;
 use App\Models\Contact;
-use App\Models\InventoryStock;
+use App\Models\Debt;
+use App\Models\FinancialAccount;
 use App\Models\InventoryUnit;
 use App\Models\Product;
-use App\Models\Category;
 use App\Models\ProductVariant;
 use App\Models\SalesOrder;
 use App\Models\SalesOrderItem;
-use App\Models\Debt;
-use App\Models\FinancialAccount;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Scopes\TenantScope;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -22,9 +24,13 @@ class VendorReturnAndSwapWorkflowTest extends TestCase
     use RefreshDatabase;
 
     private Tenant $tenant;
+
     private User $owner;
+
     private ProductVariant $variant;
+
     private Contact $supplier;
+
     private Contact $customer;
 
     protected function setUp(): void
@@ -32,7 +38,7 @@ class VendorReturnAndSwapWorkflowTest extends TestCase
         parent::setUp();
 
         $this->tenant = Tenant::create(['name' => 'HabeshaBiz Electronics', 'slug' => 'habeshabiz']);
-        \App\Scopes\TenantScope::setForcedTenantId($this->tenant->id);
+        TenantScope::setForcedTenantId($this->tenant->id);
         $this->owner = User::factory()->create([
             'tenant_id' => $this->tenant->id,
             'role' => 'owner',
@@ -297,12 +303,12 @@ class VendorReturnAndSwapWorkflowTest extends TestCase
         $unitId = $intakeRes->json('data.id');
 
         // Check Vendor B's intake payable debt
-        $debtB = \App\Models\Debt::where('contact_id', $vendorB->id)->where('reference_type', 'stock_intake')->first();
+        $debtB = Debt::where('contact_id', $vendorB->id)->where('reference_type', 'stock_intake')->first();
         $this->assertNotNull($debtB);
         $this->assertEquals(45000.00, (float) $debtB->remaining_amount);
 
         // 3. We owe Vendor A 100,000 ETB
-        $debtA = \App\Models\Debt::create([
+        $debtA = Debt::create([
             'tenant_id' => $this->tenant->id,
             'contact_id' => $vendorA->id,
             'type' => 'payable',
@@ -349,7 +355,7 @@ class VendorReturnAndSwapWorkflowTest extends TestCase
         $this->assertTrue($debtB->payments->contains(fn ($p) => $p->reference_number === 'RETURN-TO-VENDOR'));
 
         // Check Vendor B's statement: exactly 0.00 ETB net balance!
-        $statementAction = app(\App\Actions\GeneratePartnerStatementAction::class);
+        $statementAction = app(GeneratePartnerStatementAction::class);
         $stmtB = $statementAction->execute($vendorB);
         $this->assertEquals(0.00, (float) $stmtB['kpis']['current_net_balance']);
 
@@ -523,7 +529,7 @@ class VendorReturnAndSwapWorkflowTest extends TestCase
             'roles' => ['peer_vendor'],
         ]);
 
-        $account = \App\Models\FinancialAccount::create([
+        $account = FinancialAccount::create([
             'tenant_id' => $this->tenant->id,
             'name' => 'Main Bank',
             'type' => 'bank',
@@ -864,7 +870,7 @@ class VendorReturnAndSwapWorkflowTest extends TestCase
         $this->assertEquals(0.0, (float) $customerRefundDebt->paid_amount);
 
         // C) Partner Statement for Nati shows 120k payable
-        $action = app(\App\Actions\GeneratePartnerStatementAction::class);
+        $action = app(GeneratePartnerStatementAction::class);
         $natiStmt = $action->execute($partner);
         $this->assertEquals(120000.0, (float) $natiStmt['kpis']['current_open_payable']);
         $this->assertEquals(-120000.0, (float) $natiStmt['kpis']['current_net_balance']);
@@ -936,7 +942,7 @@ class VendorReturnAndSwapWorkflowTest extends TestCase
         ]);
 
         // Record sale with brokered sourcing
-        $recordSaleAction = app(\App\Actions\RecordSaleAction::class);
+        $recordSaleAction = app(RecordSaleAction::class);
         $order = $recordSaleAction->execute([
             'tenant_id' => $this->tenant->id,
             'customer_id' => $customer->id,
@@ -1020,7 +1026,7 @@ class VendorReturnAndSwapWorkflowTest extends TestCase
         ]);
 
         // Sale to walk-in customer (no customer_id)
-        $recordSaleAction = app(\App\Actions\RecordSaleAction::class);
+        $recordSaleAction = app(RecordSaleAction::class);
         $order = $recordSaleAction->execute([
             'tenant_id' => $this->tenant->id,
             'customer_id' => null,

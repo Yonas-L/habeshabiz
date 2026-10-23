@@ -9,6 +9,7 @@ use App\Services\PdfGeneratorService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class ReportController extends Controller
 {
@@ -75,7 +76,7 @@ class ReportController extends Controller
         try {
             return $pdfService->generateBusinessReportPdf($tenant, $from, $to, $forceDownload, $section)->toResponse($request);
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('Financial Report PDF generation failed: ' . $e->getMessage(), [
+            Log::error('Financial Report PDF generation failed: '.$e->getMessage(), [
                 'tenant_id' => $tenant->id,
                 'from' => $from->toDateString(),
                 'to' => $to->toDateString(),

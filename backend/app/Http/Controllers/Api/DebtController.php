@@ -10,11 +10,13 @@ use App\Models\Debt;
 use App\Models\DebtPayment;
 use App\Models\FinancialAccount;
 use App\Models\FinancialTransaction;
+use App\Models\User;
 use App\Scopes\TenantScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class DebtController extends Controller
 {
@@ -42,7 +44,7 @@ class DebtController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->whereHas('contact', fn ($cq) => $cq->where('name', 'ilike', "%{$search}%")->orWhere('phone', 'ilike', "%{$search}%"))
-                  ->orWhere('notes', 'ilike', "%{$search}%");
+                    ->orWhere('notes', 'ilike', "%{$search}%");
             });
         }
 
@@ -56,7 +58,7 @@ class DebtController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
         if (! $user->isOwner()) {
             return response()->json([
@@ -146,8 +148,8 @@ class DebtController extends Controller
                 $hasCashMovement = true;
                 $splitSum = (float) collect($rawSplits)->sum(fn ($s) => (float) ($s['amount'] ?? 0));
                 if (abs($splitSum - $amount) > 0.01) {
-                    throw \Illuminate\Validation\ValidationException::withMessages([
-                        'payment_splits' => ["Split allocation total (".number_format($splitSum, 2)." ETB) does not match total amount (".number_format($amount, 2)." ETB)."],
+                    throw ValidationException::withMessages([
+                        'payment_splits' => ['Split allocation total ('.number_format($splitSum, 2).' ETB) does not match total amount ('.number_format($amount, 2).' ETB).'],
                     ]);
                 }
                 foreach ($rawSplits as $s) {
@@ -231,8 +233,8 @@ class DebtController extends Controller
                     foreach ($preparedSplits as $p) {
                         if ((float) $p['account']->current_balance < $p['total']) {
                             $errKey = ! empty($validated['payment_splits']) ? 'payment_splits' : 'disburse_account_id';
-                            throw \Illuminate\Validation\ValidationException::withMessages([
-                                $errKey => ["Insufficient balance in account '{$p['account_name']}'. Available: ".number_format((float) $p['account']->current_balance, 2)." ETB, Required: ".number_format($p['total'], 2)." ETB (including fee)."],
+                            throw ValidationException::withMessages([
+                                $errKey => ["Insufficient balance in account '{$p['account_name']}'. Available: ".number_format((float) $p['account']->current_balance, 2).' ETB, Required: '.number_format($p['total'], 2).' ETB (including fee).'],
                             ]);
                         }
                     }
@@ -466,7 +468,7 @@ class DebtController extends Controller
                                     'amount' => $totalOffsetApplied,
                                     'payment_date' => now(),
                                     'reference_number' => 'MUTUAL-OFFSET',
-                                    'notes' => "Offset applied against open receivable obligations",
+                                    'notes' => 'Offset applied against open receivable obligations',
                                     'created_by' => $user->id,
                                 ]);
                             }
@@ -504,7 +506,7 @@ class DebtController extends Controller
 
     public function update(Request $request, string $id): JsonResponse
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
         if (! $user->isOwner()) {
             return response()->json([
@@ -563,7 +565,7 @@ class DebtController extends Controller
 
     public function destroy(Request $request, string $id): JsonResponse
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
         if (! $user->isOwner()) {
             return response()->json([

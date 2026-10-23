@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Category;
+use App\Models\InventoryStock;
+use App\Models\InventoryUnit;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,20 +23,20 @@ class CategoryController extends Controller
 
         // Calculate in-stock units count for each category
         foreach ($categories as $cat) {
-            $serialized = \App\Models\InventoryUnit::where('status', 'in_stock')
+            $serialized = InventoryUnit::where('status', 'in_stock')
                 ->whereHas('variant.product', function ($q) use ($cat) {
                     $q->where('category_id', $cat->id)
-                      ->orWhere('category', $cat->slug);
+                        ->orWhere('category', $cat->slug);
                 })
                 ->count();
 
-            $nonSerialized = (int) \App\Models\InventoryStock::whereHas('variant.product', function ($q) use ($cat) {
-                    $q->where('has_serials', false)
-                      ->where(function ($pq) use ($cat) {
-                          $pq->where('category_id', $cat->id)
-                             ->orWhere('category', $cat->slug);
-                      });
-                })
+            $nonSerialized = (int) InventoryStock::whereHas('variant.product', function ($q) use ($cat) {
+                $q->where('has_serials', false)
+                    ->where(function ($pq) use ($cat) {
+                        $pq->where('category_id', $cat->id)
+                            ->orWhere('category', $cat->slug);
+                    });
+            })
                 ->sum('quantity_on_hand');
 
             $cat->in_stock_units_count = $serialized + $nonSerialized;

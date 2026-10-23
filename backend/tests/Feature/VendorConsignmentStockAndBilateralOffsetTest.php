@@ -2,16 +2,17 @@
 
 namespace Tests\Feature;
 
+use App\Actions\GeneratePartnerStatementAction;
 use App\Models\Contact;
 use App\Models\Debt;
 use App\Models\DebtPayment;
 use App\Models\FinancialAccount;
 use App\Models\FinancialTransaction;
-use App\Models\InventoryStock;
 use App\Models\InventoryUnit;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\SalesOrder;
+use App\Models\SalesOrderItem;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Scopes\TenantScope;
@@ -656,7 +657,7 @@ test('marking handover device as sold with paid settlement creates exactly one s
     $res->assertOk();
 
     // 3. Verify exactly ONE SalesOrder exists for this unit
-    $items = \App\Models\SalesOrderItem::where('inventory_unit_id', $unit->id)->get();
+    $items = SalesOrderItem::where('inventory_unit_id', $unit->id)->get();
     expect($items)->toHaveCount(1);
 
     $salesOrders = SalesOrder::where('id', $items->first()->sales_order_id)->get();
@@ -665,7 +666,7 @@ test('marking handover device as sold with paid settlement creates exactly one s
     expect((float) $salesOrders->first()->paid_amount)->toBe(90000.00);
 
     // 4. Verify partner statement has exactly one handover and one payment, not duplicated customer purchases
-    $statementAction = new \App\Actions\GeneratePartnerStatementAction();
+    $statementAction = new GeneratePartnerStatementAction;
     $statement = $statementAction->execute($this->partnerA);
 
     $handoverEntries = collect($statement['ledger'])->filter(fn ($e) => $e['type'] === 'handover_holding');
@@ -824,7 +825,7 @@ test('partner statement renders chronological ledger with mutual credit offset h
     ]);
 
     // 4. Generate statement
-    $statementAction = new \App\Actions\GeneratePartnerStatementAction();
+    $statementAction = new GeneratePartnerStatementAction;
     $statement = $statementAction->execute($partner);
 
     $ledger = $statement['ledger'];
@@ -890,7 +891,7 @@ test('partner statement formats incoming cash linked to payable debt as Payment 
         'created_by' => $this->user->id,
     ]);
 
-    $statementAction = new \App\Actions\GeneratePartnerStatementAction();
+    $statementAction = new GeneratePartnerStatementAction;
     $statement = $statementAction->execute($partner);
 
     $ledger = $statement['ledger'];
@@ -903,8 +904,3 @@ test('partner statement formats incoming cash linked to payable debt as Payment 
         ->and((float) $ledger[0]['running_balance'])->toBe(-50000.00)
         ->and($ledger[0]['reference_number'])->toBe('TXN-TEST1234');
 });
-
-
-
-
-

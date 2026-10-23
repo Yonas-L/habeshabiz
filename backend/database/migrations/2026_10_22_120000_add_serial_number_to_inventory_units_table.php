@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('inventory_units', function (Blueprint $table) {
-            if (!Schema::hasColumn('inventory_units', 'serial_number')) {
+            if (! Schema::hasColumn('inventory_units', 'serial_number')) {
                 $table->string('serial_number', 100)->nullable()->after('imei_or_serial');
                 $table->index(['tenant_id', 'serial_number']);
             }

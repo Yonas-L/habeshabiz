@@ -45,6 +45,7 @@ class SynchronizeInventoryStockAction
                     'action' => 'created',
                     'quantity_on_hand' => $qty,
                 ];
+
                 continue;
             }
 

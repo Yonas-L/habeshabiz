@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\GeneratePartnerStatementAction;
 use App\Actions\RecordSaleAction;
 use App\Models\Contact;
 use App\Models\FinancialAccount;
@@ -242,7 +243,7 @@ it('records a sale with vendored accessory paid now via split accounts and displ
     expect((float) $secondAccount->fresh()->current_balance)->toEqual(8000.00);
 
     // Verify partner statement
-    $statementAction = app(\App\Actions\GeneratePartnerStatementAction::class);
+    $statementAction = app(GeneratePartnerStatementAction::class);
     $statement = $statementAction->execute($this->vendor);
 
     $ledger = collect($statement['ledger']);

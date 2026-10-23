@@ -453,4 +453,3 @@ test('owner can safely delete a variant with active units preserving data', func
     expect(InventoryUnit::find($unit->id))->toBeNull();
     expect(InventoryUnit::withTrashed()->find($unit->id)->status)->toBe('archived');
 });
-

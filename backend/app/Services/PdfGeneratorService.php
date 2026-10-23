@@ -9,10 +9,13 @@ use App\Models\ProformaInvoice;
 use App\Models\SalesOrder;
 use App\Models\Tenant;
 use Carbon\Carbon;
+use Dompdf\Dompdf;
+use Dompdf\Options;
 use Illuminate\Http\Response;
 use Illuminate\Support\Str;
 use Spatie\LaravelPdf\Enums\Format;
 use Spatie\LaravelPdf\Facades\Pdf;
+use Spatie\LaravelPdf\FakePdfBuilder;
 
 class PdfGeneratorService
 {
@@ -28,20 +31,20 @@ class PdfGeneratorService
     {
         $mime = $mime ?: 'image/png';
         if (strlen($binaryData) < 60 * 1024 || ! extension_loaded('gd')) {
-            return "data:{$mime};base64," . base64_encode($binaryData);
+            return "data:{$mime};base64,".base64_encode($binaryData);
         }
 
         try {
             $src = @imagecreatefromstring($binaryData);
             if (! $src) {
-                return "data:{$mime};base64," . base64_encode($binaryData);
+                return "data:{$mime};base64,".base64_encode($binaryData);
             }
 
             $w = imagesx($src);
             $h = imagesy($src);
 
             if ($w <= $maxDim && $h <= $maxDim) {
-                return "data:{$mime};base64," . base64_encode($binaryData);
+                return "data:{$mime};base64,".base64_encode($binaryData);
             }
 
             $ratio = min($maxDim / $w, $maxDim / $h, 1.0);
@@ -60,9 +63,9 @@ class PdfGeneratorService
             imagepng($dst, null, 7);
             $compressed = ob_get_clean();
 
-            return 'data:image/png;base64,' . base64_encode($compressed);
+            return 'data:image/png;base64,'.base64_encode($compressed);
         } catch (\Throwable) {
-            return "data:{$mime};base64," . base64_encode($binaryData);
+            return "data:{$mime};base64,".base64_encode($binaryData);
         }
     }
 
@@ -107,7 +110,7 @@ class PdfGeneratorService
         // Check storage symlink: storage/... -> storage/app/public/...
         if (str_starts_with($relativePath, 'storage/')) {
             $subPath = substr($relativePath, 8);
-            $storageFile = storage_path('app/public/' . $subPath);
+            $storageFile = storage_path('app/public/'.$subPath);
             if (file_exists($storageFile) && is_file($storageFile)) {
                 $mime = mime_content_type($storageFile) ?: 'image/png';
 
@@ -159,32 +162,32 @@ class PdfGeneratorService
                     $pdfContent = file_get_contents($tempPdfPath);
                     @unlink($tempHtmlPath);
                     @unlink($tempPdfPath);
-                    exec('rm -rf ' . escapeshellarg($tempProfileDir));
+                    exec('rm -rf '.escapeshellarg($tempProfileDir));
 
                     return $pdfContent;
                 }
 
                 @unlink($tempHtmlPath);
                 @unlink($tempPdfPath);
-                exec('rm -rf ' . escapeshellarg($tempProfileDir));
+                exec('rm -rf '.escapeshellarg($tempProfileDir));
                 \Log::warning('Direct Chromium CLI returned empty or failed, trying Dompdf fallback', [
                     'exit_code' => $exitCode,
                     'output' => implode("\n", array_slice($output, -10)),
                 ]);
             } catch (\Throwable $cliException) {
-                \Log::warning('Direct Chromium CLI exception, trying Dompdf fallback: ' . $cliException->getMessage());
+                \Log::warning('Direct Chromium CLI exception, trying Dompdf fallback: '.$cliException->getMessage());
             }
         }
 
         // 2. Pure-PHP Dompdf Engine (100% resilient, runs directly inside PHP-FPM memory)
         try {
-            $options = new \Dompdf\Options();
+            $options = new Options;
             $options->set('isHtml5ParserEnabled', true);
             $options->set('isRemoteEnabled', false);
             $options->set('defaultFont', 'Helvetica');
             $options->set('dpi', 96);
 
-            $dompdf = new \Dompdf\Dompdf($options);
+            $dompdf = new Dompdf($options);
             $dompdf->loadHtml($html, 'UTF-8');
             $dompdf->setPaper('A4', 'portrait');
             $dompdf->render();
@@ -194,7 +197,7 @@ class PdfGeneratorService
                 return $output;
             }
         } catch (\Throwable $dompdfException) {
-            \Log::error('Dompdf fallback error: ' . $dompdfException->getMessage());
+            \Log::error('Dompdf fallback error: '.$dompdfException->getMessage());
         }
 
         // 3. Last-resort fallback to Spatie LaravelPdf if available
@@ -205,11 +208,10 @@ class PdfGeneratorService
                 return base64_decode($base64);
             }
         } catch (\Throwable $spatieException) {
-            \Log::error('Spatie fallback error: ' . $spatieException->getMessage());
+            \Log::error('Spatie fallback error: '.$spatieException->getMessage());
         }
 
         throw new \RuntimeException('All PDF rendering engines failed to produce output.');
-
         throw new \RuntimeException('Failed to generate PDF through both Chromium Direct CLI and Spatie engines.');
     }
 
@@ -222,7 +224,7 @@ class PdfGeneratorService
         string $filename,
         bool $forceDownload = true
     ): \Symfony\Component\HttpFoundation\Response {
-        if (Pdf::getFacadeRoot() instanceof \Spatie\LaravelPdf\FakePdfBuilder) {
+        if (Pdf::getFacadeRoot() instanceof FakePdfBuilder) {
             $builder = Pdf::view($view, $viewData)->name($filename);
             if ($forceDownload) {
                 $builder->download();
@@ -232,7 +234,8 @@ class PdfGeneratorService
 
             $res = $builder->toResponse(request());
 
-            return new class($res->getContent(), $res->getStatusCode(), $res->headers->all()) extends \Illuminate\Http\Response {
+            return new class($res->getContent(), $res->getStatusCode(), $res->headers->all()) extends Response
+            {
                 public function toResponse($request): \Symfony\Component\HttpFoundation\Response
                 {
                     return $this;
@@ -245,15 +248,8 @@ class PdfGeneratorService
 
         $disposition = $forceDownload ? 'attachment' : 'inline';
 
-        return new class($pdfBinary, 200, [
-            'Content-Type' => 'application/pdf',
-            'Content-Disposition' => "{$disposition}; filename=\"{$filename}\"",
-            'Content-Length' => strlen($pdfBinary),
-            'Cache-Control' => 'private, no-cache, no-store, must-revalidate',
-            'Pragma' => 'no-cache',
-            'Expires' => '0',
-            'X-PDF-Engine' => 'Chromium-Direct-Vector',
-        ]) extends \Illuminate\Http\Response {
+        return new class($pdfBinary, 200, ['Content-Type' => 'application/pdf', 'Content-Disposition' => "{$disposition}; filename=\"{$filename}\"", 'Content-Length' => strlen($pdfBinary), 'Cache-Control' => 'private, no-cache, no-store, must-revalidate', 'Pragma' => 'no-cache', 'Expires' => '0', 'X-PDF-Engine' => 'Chromium-Direct-Vector']) extends Response
+        {
             public function toResponse($request): \Symfony\Component\HttpFoundation\Response
             {
                 return $this;
@@ -315,9 +311,9 @@ class PdfGeneratorService
         ];
 
         $footerHtml = '<div style="width: 100%; font-size: 7.5pt; color: #94a3b8; display: flex; justify-content: space-between; align-items: center; padding: 0 12mm; font-family: -apple-system, BlinkMacSystemFont, Roboto, sans-serif;">'
-            . '<span>' . e($data['business']['name']) . ' · Verified Accounting Statement</span>'
-            . '<span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>'
-            . '</div>';
+            .'<span>'.e($data['business']['name']).' · Verified Accounting Statement</span>'
+            .'<span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>'
+            .'</div>';
 
         return $this->renderToPdfResponse('pdf.vendor-statement', $data, $filename, $forceDownload);
     }
@@ -422,9 +418,9 @@ class PdfGeneratorService
         ], $orderConfig);
 
         $footerHtml = '<div style="width: 100%; font-size: 7.5pt; color: #94a3b8; display: flex; justify-content: space-between; align-items: center; padding: 0 12mm; font-family: -apple-system, BlinkMacSystemFont, Roboto, sans-serif;">'
-            . '<span>' . e($business['name']) . ' · Official Sales Invoice & Receipt</span>'
-            . '<span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>'
-            . '</div>';
+            .'<span>'.e($business['name']).' · Official Sales Invoice & Receipt</span>'
+            .'<span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>'
+            .'</div>';
 
         return $this->renderToPdfResponse('pdf.sales-invoice', [
             'order' => $order,
@@ -513,9 +509,9 @@ class PdfGeneratorService
         $filename = "Proforma_{$proforma->proforma_number}.pdf";
 
         $footerHtml = '<div style="width: 100%; font-size: 7.5pt; color: #94a3b8; display: flex; justify-content: space-between; align-items: center; padding: 0 12mm; font-family: -apple-system, BlinkMacSystemFont, Roboto, sans-serif;">'
-            . '<span>' . e($business['name']) . ' · Proforma Invoice & Official Quotation</span>'
-            . '<span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>'
-            . '</div>';
+            .'<span>'.e($business['name']).' · Proforma Invoice & Official Quotation</span>'
+            .'<span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>'
+            .'</div>';
 
         return $this->renderToPdfResponse('pdf.proforma-invoice', [
             'proforma' => $proforma,
@@ -615,7 +611,7 @@ class PdfGeneratorService
         };
 
         $sanitizedBusiness = Str::slug($businessName, '_');
-        $rangeStr = $from->format('Y_m_d') . '_to_' . $to->format('Y_m_d');
+        $rangeStr = $from->format('Y_m_d').'_to_'.$to->format('Y_m_d');
         if ($sectionNormalized === 'all') {
             $filename = "Financial_Statement_{$sanitizedBusiness}_{$rangeStr}.pdf";
         } else {
@@ -657,9 +653,9 @@ class PdfGeneratorService
         };
 
         $footerHtml = '<div style="width: 100%; font-size: 7.5pt; color: #94a3b8; display: flex; justify-content: space-between; align-items: center; padding: 0 12mm; font-family: -apple-system, BlinkMacSystemFont, Roboto, sans-serif;">'
-            . '<span>' . e($business['name']) . ' · ' . e($footerTitle) . '</span>'
-            . '<span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>'
-            . '</div>';
+            .'<span>'.e($business['name']).' · '.e($footerTitle).'</span>'
+            .'<span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>'
+            .'</div>';
 
         return $this->renderToPdfResponse('pdf.financial-report', [
             'report' => $reportData,

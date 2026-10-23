@@ -5,6 +5,8 @@ use App\Models\Debt;
 use App\Models\DebtPayment;
 use App\Models\FinancialAccount;
 use App\Models\FinancialTransaction;
+use App\Models\InventoryStock;
+use App\Models\InventoryUnit;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\SalesOrder;
@@ -14,12 +16,12 @@ use App\Scopes\TenantScope;
 use Illuminate\Support\Facades\Hash;
 
 beforeEach(function () {
-    $this->tenant = Tenant::create(['name' => 'Split Pay Store', 'slug' => 'split-store-' . uniqid()]);
+    $this->tenant = Tenant::create(['name' => 'Split Pay Store', 'slug' => 'split-store-'.uniqid()]);
     TenantScope::setForcedTenantId($this->tenant->id);
     $this->owner = User::create([
         'tenant_id' => $this->tenant->id,
         'name' => 'Split Owner',
-        'email' => 'split' . uniqid() . '@store.com',
+        'email' => 'split'.uniqid().'@store.com',
         'password' => Hash::make('password123'),
         'role' => 'owner',
     ]);
@@ -166,7 +168,7 @@ test('stock intake funded by split accounts deducts both bank accounts and logs 
     expect((float) $this->accCbe->fresh()->current_balance)->toBe(75000.0)
         ->and((float) $this->accTelebirr->fresh()->current_balance)->toBe(35000.0);
 
-    $unit = \App\Models\InventoryUnit::where('imei_or_serial', 'IMEI-TEST-SPLIT-888')->first();
+    $unit = InventoryUnit::where('imei_or_serial', 'IMEI-TEST-SPLIT-888')->first();
     expect($unit)->not->toBeNull()
         ->and($unit->payment_splits)->toHaveCount(2);
 
@@ -351,7 +353,7 @@ test('vendor fast direct sale with split vendor payout deducts multiple accounts
         ->and($debtPayments[0]->split_group_id)->toBe($debtPayments[1]->split_group_id);
 
     // Verify InventoryUnit has payment_splits
-    $unit = \App\Models\InventoryUnit::where('imei_or_serial', '359123456789012')->first();
+    $unit = InventoryUnit::where('imei_or_serial', '359123456789012')->first();
     expect($unit)->not->toBeNull()
         ->and($unit->funding_source)->toBe('bank')
         ->and(count($unit->payment_splits))->toBe(2);
@@ -418,7 +420,7 @@ test('stock intake with split funding (debtor offset + split bank accounts) appl
         ->and((float) $this->accTelebirr->fresh()->current_balance)->toBe(40000.0);
 
     // Verify InventoryUnit
-    $unit = \App\Models\InventoryUnit::where('imei_or_serial', '861234567890123')->first();
+    $unit = InventoryUnit::where('imei_or_serial', '861234567890123')->first();
     expect($unit)->not->toBeNull()
         ->and($unit->funding_source)->toBe('split')
         ->and((float) $unit->receivable_offset_amount)->toBe(20000.0)
@@ -482,7 +484,7 @@ test('vendor direct sale with pay vendor later and split customer deposit increm
         ->and((float) $vendorDebt->remaining_amount)->toBe(120000.0);
 
     // Verify SalesOrder has payment_splits persisted
-    $order = \App\Models\SalesOrder::find($orderId);
+    $order = SalesOrder::find($orderId);
     expect($order)->not->toBeNull()
         ->and($order->payment_method)->toBe('split')
         ->and(count($order->payment_splits))->toBe(2);
@@ -589,7 +591,7 @@ test('sale with bilateral debt offset and cash transfer credits bank account wit
         'ram' => '8GB',
         'default_selling_price' => 100000,
     ]);
-    \App\Models\InventoryStock::create([
+    InventoryStock::create([
         'tenant_id' => $this->tenant->id,
         'variant_id' => $variant->id,
         'quantity_on_hand' => 5,
@@ -644,7 +646,7 @@ test('credit sale with down payment deposits down payment into receiving account
         'storage' => '512GB',
         'default_selling_price' => 80000,
     ]);
-    \App\Models\InventoryStock::create([
+    InventoryStock::create([
         'tenant_id' => $this->tenant->id,
         'variant_id' => $variant->id,
         'quantity_on_hand' => 3,
@@ -687,5 +689,3 @@ test('credit sale with down payment deposits down payment into receiving account
     expect($order->payment_status)->toBe('partially_paid')
         ->and((float) $order->paid_amount)->toBe(25000.0);
 });
-
-
