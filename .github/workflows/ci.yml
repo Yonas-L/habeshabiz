@@ -30,7 +30,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.5'
-          extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_pgsql, bcmath, redis
+          extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_pgsql, bcmath, redis, fileinfo, gd
           coverage: none
 
       - name: Check Backend Directory
@@ -47,6 +47,15 @@ jobs:
         working-directory: ./backend
         run: composer install --prefer-dist --no-interaction --no-progress
 
+      - name: Prepare Application Environment
+        if: steps.check_backend.outputs.exists == 'true'
+        working-directory: ./backend
+        run: |
+          cp -n .env.example .env || true
+          php artisan key:generate --ansi
+          mkdir -p storage/framework/sessions storage/framework/views storage/framework/cache storage/logs bootstrap/cache
+          chmod -R 775 storage bootstrap/cache
+
       - name: Run Laravel Pint (Code Style)
         if: steps.check_backend.outputs.exists == 'true'
         working-directory: ./backend
@@ -61,13 +70,14 @@ jobs:
         if: steps.check_backend.outputs.exists == 'true'
         working-directory: ./backend
         env:
+          APP_KEY: base64:ZKTY1S5GVMLhXLZjT89yXqzFrcurd9lmMnK5rSDUFyk=
           DB_CONNECTION: pgsql
           DB_HOST: 127.0.0.1
           DB_PORT: 5432
           DB_DATABASE: habeshabiz_testing
           DB_USERNAME: test_user
           DB_PASSWORD: test_password
-        run: vendor/bin/pest
+        run: vendor/bin/pest --ci
 
   frontend-ci:
     name: Frontend CI (React / TypeScript)
