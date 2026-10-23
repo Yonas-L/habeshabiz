@@ -1,12 +1,14 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import type { NavTab } from './Sidebar';
-import type { User } from '../api/client';
+import type { User, Tenant } from '../api/client';
+import { resolveImageUrl } from '../api/client';
 import { Menu, Plus, Calendar, Sun, Moon, ChevronLeft, ChevronRight, ChevronDown, Check, Eye, EyeOff } from 'lucide-react';
 import { useBalancePrivacy } from '../context/BalancePrivacyContext';
  
 interface TopbarProps {
   activeTab: NavTab;
   user: User | null;
+  tenant?: Tenant | null;
   selectedMonth?: string; // Format: "YYYY-MM"
   onMonthChange?: (month: string) => void;
   theme?: 'light' | 'dark';
@@ -45,6 +47,7 @@ export const getCurrentMonth = (): string => {
 export const Topbar: React.FC<TopbarProps> = ({
   activeTab,
   user,
+  tenant,
   selectedMonth = getCurrentMonth(),
   onMonthChange,
   theme = 'light',
@@ -57,6 +60,17 @@ export const Topbar: React.FC<TopbarProps> = ({
   const { isBalancesHidden, toggleHideBalances } = useBalancePrivacy();
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
+
+  const rawLogoUrl = tenant?.settings?.logo_url || (tenant as any)?.logo_url || null;
+  const [logoLoadFailed, setLogoLoadFailed] = useState(false);
+
+  useEffect(() => {
+    setLogoLoadFailed(false);
+  }, [rawLogoUrl]);
+
+  const resolvedLogoUrl = useMemo(() => {
+    return resolveImageUrl(rawLogoUrl);
+  }, [rawLogoUrl]);
 
   // Parse current selected year and month
   const [selectedYear, selectedMonthIndex] = (() => {
@@ -127,14 +141,26 @@ export const Topbar: React.FC<TopbarProps> = ({
           type="button"
           onClick={onOpenMobileSidebar}
           aria-label="Open Navigation Menu"
-          className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-[#0c4436] via-[#073228] to-[#032019] border border-emerald-400/35 shadow-md shadow-emerald-950/25 flex items-center justify-center shrink-0 active:scale-95 transition-transform cursor-pointer"
+          className={`w-11 h-11 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center shrink-0 active:scale-95 transition-all cursor-pointer shadow-md overflow-hidden ${
+            resolvedLogoUrl && !logoLoadFailed
+              ? 'bg-white dark:bg-[#111C2D] border border-slate-200/90 dark:border-emerald-500/30 p-1'
+              : 'bg-gradient-to-br from-[#0c4436] via-[#073228] to-[#032019] border border-emerald-400/35 shadow-emerald-950/25'
+          }`}
         >
-          <div className="grid grid-cols-2 gap-1 w-5 h-5 place-items-center pointer-events-none">
-            <span className="w-2 h-2 rounded-[2px] bg-white shadow-xs" />
-            <span className="w-2 h-2 rounded-[2px] bg-white shadow-xs" />
-            <span className="w-2 h-2 rounded-[2px] bg-white shadow-xs" />
-            <span className="w-2 h-2 rounded-[2px] bg-white shadow-xs" />
-          </div>
+          {resolvedLogoUrl && !logoLoadFailed ? (
+            <img
+              src={resolvedLogoUrl}
+              alt={tenant?.name || 'Company Logo'}
+              className="w-full h-full object-contain rounded-[12px]"
+              onError={() => setLogoLoadFailed(true)}
+            />
+          ) : (
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
+              <path d="M4 7H20" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
+              <path d="M4 12H14" stroke="#34D399" strokeWidth="2.2" strokeLinecap="round" />
+              <path d="M4 17H18" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
+            </svg>
+          )}
         </button>
 
         <div className="min-w-0">

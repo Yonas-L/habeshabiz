@@ -685,6 +685,7 @@ export default function App() {
         <Topbar
           activeTab={activeTab}
           user={user}
+          tenant={tenant}
           selectedMonth={selectedMonth}
           onMonthChange={handleMonthChange}
           theme={theme}
