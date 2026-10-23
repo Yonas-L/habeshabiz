@@ -504,18 +504,18 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
       </div>
 
       {/* ── 3. MONTHLY PERFORMANCE SECTION (2x2 Grid with Pinched Organic Cards & Exact Beams) ── */}
-      <div className="rounded-[28px] bg-white dark:bg-[#111C2D] border border-slate-200/80 dark:border-slate-800/80 p-3 min-[390px]:p-4 shadow-[0_4px_24px_-4px_rgba(0,0,0,0.05)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] space-y-3.5 select-none">
+      <div className="rounded-[28px] bg-white dark:bg-[#111C2D] border border-slate-200/80 dark:border-slate-800/80 p-3 min-[390px]:p-3.5 shadow-[0_4px_24px_-4px_rgba(0,0,0,0.05)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] space-y-3 select-none">
         {/* Section Heading */}
         <div className="flex items-center justify-between px-0.5">
           <div className="flex items-center gap-2.5">
-            <div className="size-9 rounded-[13px] bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center shrink-0">
-              <TrendingUp className="w-5 h-5 text-emerald-700 dark:text-emerald-400 stroke-[2.4]" />
+            <div className="size-8 min-[390px]:size-8.5 rounded-[11px] bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center shrink-0">
+              <TrendingUp className="w-4 h-4 text-emerald-700 dark:text-emerald-400 stroke-[2.4]" />
             </div>
             <div className="leading-tight">
-              <span className="text-[10px] font-bold tracking-wider uppercase text-slate-500 dark:text-slate-400 block">
+              <span className="text-[9px] font-bold tracking-wider uppercase text-slate-500 dark:text-slate-400 block">
                 {monthDisplayLabel}
               </span>
-              <h2 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white tracking-tight">
+              <h2 className="text-base min-[390px]:text-lg font-black text-slate-900 dark:text-white tracking-tight">
                 Performance
               </h2>
             </div>
@@ -525,7 +525,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               type="button"
               onClick={() => onNavigateTab('staff')}
               title="View Staff & Team Dashboard"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/80 shadow-xs text-xs font-bold text-slate-800 dark:text-slate-200 active:scale-95 cursor-pointer transition-transform"
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/80 shadow-xs text-[11px] font-bold text-slate-800 dark:text-slate-200 active:scale-95 cursor-pointer transition-transform"
             >
               <span>
                 Top: <span className="font-extrabold text-slate-900 dark:text-white">{topSeller.name}</span>
@@ -536,11 +536,11 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
         </div>
 
         {/* 2x2 Performance Grid */}
-        <div className="grid grid-cols-2 gap-2.5 min-[390px]:gap-3">
+        <div className="grid grid-cols-2 gap-2 min-[390px]:gap-2.5">
           {/* Card 1: Revenue (Dark Mesh Surface with Multi-Node Spline & Luminous Beam) */}
-          <div className="relative min-h-[126px] min-[390px]:min-h-[132px] flex flex-col justify-between overflow-visible">
+          <div className="relative h-[106px] min-[390px]:h-[110px] flex flex-col overflow-visible">
             {/* Pinched Card Background */}
-            <svg viewBox="0 0 180 130" className="absolute inset-0 w-full h-full pointer-events-none drop-shadow-md overflow-visible" preserveAspectRatio="none">
+            <svg viewBox="0 0 172 108" className="absolute inset-0 w-full h-full pointer-events-none drop-shadow-sm overflow-visible" preserveAspectRatio="none">
               <defs>
                 <radialGradient id="cardRevGrad" cx="85%" cy="15%" r="95%">
                   <stop offset="0%" stopColor="#1a443a" />
@@ -554,63 +554,64 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                   <stop offset="100%" stopColor="#064e3b" stopOpacity="0.0" />
                 </linearGradient>
                 <filter id="revDotGlow" x="-50%" y="-50%" width="200%" height="200%">
-                  <feDropShadow dx="0" dy="0" stdDeviation="2.5" floodColor="#34d399" floodOpacity="0.95" />
+                  <feDropShadow dx="0" dy="0" stdDeviation="2" floodColor="#34d399" floodOpacity="0.9" />
                 </filter>
               </defs>
               <path
-                d="M 18 0 L 162 0 C 172 0, 180 8, 180 18 C 177 45, 175.5 65, 175.5 65 C 175.5 65, 177 85, 180 112 C 180 122, 172 130, 162 130 L 18 130 C 8 130, 0 122, 0 112 C 3 85, 4.5 65, 4.5 65 C 4.5 65, 3 45, 0 18 C 0 8, 8 0, 18 0 Z"
+                d="M 16 0 L 156 0 C 165 0, 172 7, 172 16 C 170 35, 169.2 54, 169.2 54 C 169.2 54, 170 73, 172 92 C 172 101, 165 108, 156 108 L 16 108 C 7 108, 0 101, 0 92 C 2 73, 2.8 54, 2.8 54 C 2.8 54, 2 35, 0 16 C 0 7, 7 0, 16 0 Z"
                 fill="url(#cardRevGrad)"
-                stroke="rgba(255,255,255,0.14)"
-                strokeWidth="1.2"
+                stroke="rgba(255,255,255,0.12)"
+                strokeWidth="1"
               />
               {/* Spline Beam under the chart */}
               <path
-                d="M 10 102 C 25 100, 42 106, 62 98 C 82 90, 102 102, 122 96 C 138 90, 150 82, 165 72 L 165 130 L 10 130 Z"
+                d="M 2 108 L 2 92 C 25 90, 50 96, 75 91 C 100 86, 115 92, 135 84 C 148 78, 158 68, 164 62 L 164 108 Z"
                 fill="url(#cardRevBeam)"
               />
               {/* Spline Line */}
               <path
-                d="M 10 102 C 25 100, 42 106, 62 98 C 82 90, 102 102, 122 96 C 138 90, 150 82, 165 72"
+                d="M 2 92 C 25 90, 50 96, 75 91 C 100 86, 115 92, 135 84 C 148 78, 158 68, 164 62"
                 fill="none"
                 stroke="#34d399"
                 strokeWidth="1.8"
                 strokeLinecap="round"
+                strokeLinejoin="round"
               />
               {/* Vertex Nodes */}
-              <circle cx="28" cy="101" r="2" fill="#34d399" />
-              <circle cx="62" cy="98" r="2" fill="#34d399" />
-              <circle cx="102" cy="101" r="2" fill="#34d399" />
-              <circle cx="132" cy="94" r="2" fill="#34d399" />
-              <circle cx="165" cy="72" r="4.5" fill="#ffffff" filter="url(#revDotGlow)" />
-              <circle cx="165" cy="72" r="2.5" fill="#10b981" />
+              <circle cx="28" cy="91" r="1.8" fill="#34d399" />
+              <circle cx="75" cy="91" r="1.8" fill="#34d399" />
+              <circle cx="110" cy="89" r="1.8" fill="#34d399" />
+              <circle cx="135" cy="84" r="1.8" fill="#34d399" />
+              <circle cx="164" cy="62" r="4.5" fill="#34d399" fillOpacity="0.25" />
+              <circle cx="164" cy="62" r="2.5" fill="#10b981" stroke="#ffffff" strokeWidth="1" />
             </svg>
 
             {/* Foreground Content */}
-            <div className="relative z-10 flex flex-col justify-between h-full p-3 min-[390px]:p-3.5 text-white">
-              <div className="flex items-center justify-between">
+            <div className="relative z-10 flex flex-col h-full p-2.5 min-[390px]:p-3 text-white">
+              <div className="flex items-center justify-between h-6">
                 <div className="flex items-center gap-1.5 min-w-0">
-                  <div className="size-7 min-[390px]:size-8 rounded-[10px] bg-[#a7f3d0] flex items-center justify-center shrink-0 shadow-xs">
-                    <svg className="w-4 h-4" viewBox="0 0 20 20" fill="none">
+                  <div className="size-6 rounded-[7px] bg-[#a7f3d0] flex items-center justify-center shrink-0 shadow-2xs">
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="none">
                       <rect x="3.5" y="9" width="3" height="8" rx="1" fill="#064e3b" />
                       <rect x="8.5" y="4" width="3" height="13" rx="1" fill="#064e3b" />
                       <rect x="13.5" y="11" width="3" height="6" rx="1" fill="#064e3b" />
                     </svg>
                   </div>
-                  <span className="text-xs min-[390px]:text-[13px] font-bold text-white truncate">
+                  <span className="text-[11.5px] min-[390px]:text-xs font-bold text-white shrink-0">
                     Revenue
                   </span>
                 </div>
-                <MoreHorizontal className="w-4 h-4 text-slate-400 shrink-0" />
+                <MoreHorizontal className="w-3.5 h-3.5 text-slate-400 shrink-0 opacity-80" />
               </div>
 
-              <div className="mt-1.5 min-[390px]:mt-2">
-                <div className="text-[17px] min-[390px]:text-xl font-extrabold font-mono tracking-tight text-white flex items-baseline">
+              <div className="mt-2 min-[390px]:mt-2.5">
+                <div className="text-base min-[390px]:text-[17px] font-black font-mono tracking-tight text-white flex items-baseline leading-none">
                   {isBalancesHidden ? '••••••' : <AnimatedNumber value={monthly_performance.revenue} />}
-                  <span className="text-[11px] min-[390px]:text-xs font-semibold text-slate-300 ml-1 font-sans">
+                  <span className="text-[9.5px] min-[390px]:text-[10px] font-semibold text-slate-300 ml-1 font-sans opacity-80">
                     ETB
                   </span>
                 </div>
-                <span className="text-[9.5px] min-[390px]:text-[10.5px] text-slate-400 mt-0.5 block truncate">
+                <span className="text-[8.5px] min-[390px]:text-[9px] text-slate-300/80 mt-1 block truncate max-w-[70%] font-normal leading-tight">
                   Gross sales before discounts
                 </span>
               </div>
@@ -619,14 +620,13 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
 
           {/* Card 2: Gross Profit (Soft Mint Surface with Rising Curve & Beam) */}
           {canViewCost ? (
-            <div className="relative min-h-[126px] min-[390px]:min-h-[132px] flex flex-col justify-between overflow-visible">
+            <div className="relative h-[106px] min-[390px]:h-[110px] flex flex-col overflow-visible">
               {/* Pinched Card Background */}
-              <svg viewBox="0 0 180 130" className="absolute inset-0 w-full h-full pointer-events-none drop-shadow-xs overflow-visible" preserveAspectRatio="none">
+              <svg viewBox="0 0 172 108" className="absolute inset-0 w-full h-full pointer-events-none drop-shadow-2xs overflow-visible" preserveAspectRatio="none">
                 <defs>
-                  <linearGradient id="cardGrossGrad" x1="0" y1="0" x2="1" y2="1">
+                  <linearGradient id="cardGrossGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#f2faf5" />
-                    <stop offset="50%" stopColor="#e8f6ee" />
-                    <stop offset="100%" stopColor="#dcf1e4" />
+                    <stop offset="100%" stopColor="#e7f6ee" />
                   </linearGradient>
                   <linearGradient id="cardGrossBeam" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#10b981" stopOpacity="0.4" />
@@ -634,47 +634,49 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                   </linearGradient>
                 </defs>
                 <path
-                  d="M 18 0 L 162 0 C 172 0, 180 8, 180 18 C 177 45, 175.5 65, 175.5 65 C 175.5 65, 177 85, 180 112 C 180 122, 172 130, 162 130 L 18 130 C 8 130, 0 122, 0 112 C 3 85, 4.5 65, 4.5 65 C 4.5 65, 3 45, 0 18 C 0 8, 8 0, 18 0 Z"
+                  d="M 16 0 L 156 0 C 165 0, 172 7, 172 16 C 170 35, 169.2 54, 169.2 54 C 169.2 54, 170 73, 172 92 C 172 101, 165 108, 156 108 L 16 108 C 7 108, 0 101, 0 92 C 2 73, 2.8 54, 2.8 54 C 2.8 54, 2 35, 0 16 C 0 7, 7 0, 16 0 Z"
                   fill="url(#cardGrossGrad)"
                   stroke="#a7f3d0"
-                  strokeOpacity="0.75"
-                  strokeWidth="1.2"
+                  strokeOpacity="0.8"
+                  strokeWidth="1"
                 />
                 {/* Soft radiant beam under rising curve */}
                 <path
-                  d="M 80 130 C 105 126, 122 118, 140 121 C 152 122, 160 110, 168 96 L 168 130 Z"
+                  d="M 70 108 L 70 102 C 95 103, 115 97, 135 91 C 150 85, 158 74, 164 64 L 164 108 Z"
                   fill="url(#cardGrossBeam)"
                 />
                 <path
-                  d="M 80 130 C 105 126, 122 118, 140 121 C 152 122, 160 110, 168 96"
+                  d="M 70 102 C 95 103, 115 97, 135 91 C 150 85, 158 74, 164 64"
                   fill="none"
-                  stroke="#059669"
+                  stroke="#10b981"
                   strokeWidth="1.8"
                   strokeLinecap="round"
+                  strokeLinejoin="round"
                 />
-                <circle cx="168" cy="96" r="3" fill="#047857" />
+                <circle cx="164" cy="64" r="4.5" fill="#10b981" fillOpacity="0.25" />
+                <circle cx="164" cy="64" r="2.5" fill="#047857" stroke="#ffffff" strokeWidth="1" />
               </svg>
 
               {/* Foreground Content */}
-              <div className="relative z-10 flex flex-col justify-between h-full p-3 min-[390px]:p-3.5">
-                <div className="flex items-center justify-between">
+              <div className="relative z-10 flex flex-col h-full p-2.5 min-[390px]:p-3">
+                <div className="flex items-center justify-between h-6">
                   <div className="flex items-center gap-1.5 min-w-0">
-                    <div className="size-7 min-[390px]:size-8 rounded-[10px] bg-[#a7f3d0] flex items-center justify-center shrink-0 shadow-xs">
-                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
+                    <div className="size-6 rounded-[7px] bg-[#a7f3d0] flex items-center justify-center shrink-0 shadow-2xs">
+                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
                         <ellipse cx="9" cy="8" rx="5" ry="2.5" fill="#047857" />
                         <ellipse cx="9" cy="12" rx="5" ry="2.5" fill="#065f46" />
                         <ellipse cx="14" cy="15" rx="5" ry="2.5" fill="#047857" />
                       </svg>
                     </div>
-                    <span className="text-xs min-[390px]:text-[13px] font-bold text-slate-900 truncate">
+                    <span className="text-[11.5px] min-[390px]:text-xs font-bold text-slate-900 shrink-0">
                       Gross Profit
                     </span>
                   </div>
-                  <MoreHorizontal className="w-4 h-4 text-slate-400 shrink-0" />
+                  <MoreHorizontal className="w-3.5 h-3.5 text-slate-400 shrink-0 opacity-80" />
                 </div>
 
-                <div className="mt-1.5 min-[390px]:mt-2">
-                  <div className={`text-[17px] min-[390px]:text-xl font-extrabold font-mono tracking-tight flex items-baseline ${
+                <div className="mt-2 min-[390px]:mt-2.5">
+                  <div className={`text-base min-[390px]:text-[17px] font-black font-mono tracking-tight flex items-baseline leading-none ${
                     monthly_performance.gross_profit < 0 ? 'text-rose-600' : 'text-slate-900'
                   }`}>
                     {isBalancesHidden ? (
@@ -685,71 +687,72 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                         <AnimatedNumber value={Math.abs(monthly_performance.gross_profit)} />
                       </>
                     )}
-                    <span className="text-[11px] min-[390px]:text-xs font-semibold text-slate-500 ml-1 font-sans">
+                    <span className="text-[9.5px] min-[390px]:text-[10px] font-semibold text-slate-500 ml-1 font-sans">
                       ETB
                     </span>
                   </div>
-                  <span className="text-[9.5px] min-[390px]:text-[10.5px] text-slate-500 mt-0.5 block truncate">
+                  <span className="text-[8.5px] min-[390px]:text-[9px] text-slate-500 mt-1 block truncate max-w-[70%] font-normal leading-tight">
                     Net sales − stock cost
                   </span>
                 </div>
               </div>
             </div>
           ) : (
-            <div className="relative min-h-[126px] min-[390px]:min-h-[132px] flex flex-col justify-between overflow-visible">
-              <svg viewBox="0 0 180 130" className="absolute inset-0 w-full h-full pointer-events-none drop-shadow-xs" preserveAspectRatio="none">
+            <div className="relative h-[106px] min-[390px]:h-[110px] flex flex-col overflow-visible">
+              <svg viewBox="0 0 172 108" className="absolute inset-0 w-full h-full pointer-events-none drop-shadow-2xs" preserveAspectRatio="none">
                 <path
-                  d="M 18 0 L 162 0 C 172 0, 180 8, 180 18 C 177 45, 175.5 65, 175.5 65 C 175.5 65, 177 85, 180 112 C 180 122, 172 130, 162 130 L 18 130 C 8 130, 0 122, 0 112 C 3 85, 4.5 65, 4.5 65 C 4.5 65, 3 45, 0 18 C 0 8, 8 0, 18 0 Z"
+                  d="M 16 0 L 156 0 C 165 0, 172 7, 172 16 C 170 35, 169.2 54, 169.2 54 C 169.2 54, 170 73, 172 92 C 172 101, 165 108, 156 108 L 16 108 C 7 108, 0 101, 0 92 C 2 73, 2.8 54, 2.8 54 C 2.8 54, 2 35, 0 16 C 0 7, 7 0, 16 0 Z"
                   fill="#f2faf5"
                   stroke="#a7f3d0"
-                  strokeWidth="1.2"
+                  strokeWidth="1"
                 />
               </svg>
-              <div className="relative z-10 flex flex-col justify-between h-full p-3 min-[390px]:p-3.5">
+              <div className="relative z-10 flex flex-col h-full p-2.5 min-[390px]:p-3">
                 <span className="text-xs font-bold text-emerald-800">Store Activity</span>
-                <div className="text-lg font-bold font-mono text-emerald-700">Active Store</div>
-                <span className="text-[10px] text-emerald-600">Operational records active</span>
+                <div className="text-base font-bold font-mono text-emerald-700 mt-2">Active Store</div>
+                <span className="text-[9px] text-emerald-600 mt-1">Operational records active</span>
               </div>
             </div>
           )}
 
           {/* Card 3: Expenses (Soft Rose Surface with Overlapping Waves & Record Button) */}
-          <div className="relative min-h-[126px] min-[390px]:min-h-[132px] flex flex-col justify-between overflow-visible">
+          <div className="relative h-[106px] min-[390px]:h-[110px] flex flex-col overflow-visible">
             {/* Pinched Card Background */}
-            <svg viewBox="0 0 180 130" className="absolute inset-0 w-full h-full pointer-events-none drop-shadow-xs overflow-visible" preserveAspectRatio="none">
+            <svg viewBox="0 0 172 108" className="absolute inset-0 w-full h-full pointer-events-none drop-shadow-2xs overflow-visible" preserveAspectRatio="none">
               <defs>
-                <linearGradient id="cardExpGrad" x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0%" stopColor="#fff6f6" />
-                  <stop offset="50%" stopColor="#ffeded" />
-                  <stop offset="100%" stopColor="#ffe4e4" />
+                <linearGradient id="cardExpGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#fff5f5" />
+                  <stop offset="100%" stopColor="#fee8e8" />
                 </linearGradient>
               </defs>
               <path
-                d="M 18 0 L 162 0 C 172 0, 180 8, 180 18 C 177 45, 175.5 65, 175.5 65 C 175.5 65, 177 85, 180 112 C 180 122, 172 130, 162 130 L 18 130 C 8 130, 0 122, 0 112 C 3 85, 4.5 65, 4.5 65 C 4.5 65, 3 45, 0 18 C 0 8, 8 0, 18 0 Z"
+                d="M 16 0 L 156 0 C 165 0, 172 7, 172 16 C 170 35, 169.2 54, 169.2 54 C 169.2 54, 170 73, 172 92 C 172 101, 165 108, 156 108 L 16 108 C 7 108, 0 101, 0 92 C 2 73, 2.8 54, 2.8 54 C 2.8 54, 2 35, 0 16 C 0 7, 7 0, 16 0 Z"
                 fill="url(#cardExpGrad)"
                 stroke="#fecdd3"
                 strokeOpacity="0.8"
-                strokeWidth="1.2"
+                strokeWidth="1"
               />
               {/* Overlapping Rose Waves in Bottom Right */}
               <path
-                d="M 65 130 C 95 130, 115 116, 140 120 C 160 123, 170 112, 180 108 L 180 130 Z"
-                fill="rgba(244,63,94,0.12)"
+                d="M 85 108 C 110 108, 125 96, 142 98 C 155 100, 164 94, 172 88 L 172 108 Z"
+                fill="#fda4af"
+                fillOpacity="0.3"
               />
               <path
-                d="M 95 130 C 120 130, 135 121, 150 123 C 165 125, 173 116, 180 114 L 180 130 Z"
-                fill="rgba(244,63,94,0.18)"
+                d="M 105 108 C 122 108, 135 102, 148 103 C 160 104, 166 99, 172 96 L 172 108 Z"
+                fill="#fb7185"
+                fillOpacity="0.35"
               />
             </svg>
 
             {/* Foreground Content */}
-            <div className="relative z-10 flex flex-col justify-between h-full p-3 min-[390px]:p-3.5">
-              <div className="flex items-center justify-between">
+            <div className="relative z-10 flex flex-col h-full p-2.5 min-[390px]:p-3">
+              <div className="flex items-center justify-between h-6">
                 <div className="flex items-center gap-1.5 min-w-0">
-                  <div className="size-7 min-[390px]:size-8 rounded-[10px] bg-[#fecdd3] flex items-center justify-center shrink-0 shadow-xs">
-                    <Wallet className="w-4 h-4 text-[#be123c] stroke-[2.2]" />
+                  <div className="size-6 rounded-[7px] bg-[#fecdd3] flex items-center justify-center shrink-0 shadow-2xs">
+                    <Wallet className="w-3.5 h-3.5 text-[#be123c] stroke-[2.2]" />
                   </div>
-                  <span className="text-xs min-[390px]:text-[13px] font-bold text-slate-900 truncate">
+                  <span className="text-[11.5px] min-[390px]:text-xs font-bold text-slate-900 shrink-0">
                     Expenses
                   </span>
                 </div>
@@ -759,16 +762,16 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                     type="button"
                     onClick={onOpenExpenseModal}
                     title="Quickly record expense"
-                    className="px-2 py-0.5 rounded-full bg-[#ffe4e6] border border-[#fecdd3] text-[#e11d48] text-[9.5px] font-extrabold active:scale-95 cursor-pointer shadow-2xs hover:bg-rose-200/60 transition-colors"
+                    className="px-1.5 py-0.5 rounded-full bg-[#fee2e2] hover:bg-[#fecdd3] border border-[#fecdd3] text-[#e11d48] text-[8.5px] font-extrabold active:scale-95 cursor-pointer shadow-2xs transition-colors shrink-0"
                   >
                     + Record
                   </button>
-                  <MoreHorizontal className="w-4 h-4 text-slate-400" />
+                  <MoreHorizontal className="w-3.5 h-3.5 text-slate-400 shrink-0 opacity-80" />
                 </div>
               </div>
 
-              <div className="mt-1.5 min-[390px]:mt-2">
-                <div className="text-[17px] min-[390px]:text-xl font-extrabold font-mono tracking-tight text-[#e11d48] flex items-baseline">
+              <div className="mt-2 min-[390px]:mt-2.5">
+                <div className="text-base min-[390px]:text-[17px] font-black font-mono tracking-tight text-[#e11d48] flex items-baseline leading-none">
                   {isBalancesHidden ? (
                     '••••••'
                   ) : (
@@ -777,11 +780,11 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                       <AnimatedNumber value={monthly_performance.operating_expenses} />
                     </>
                   )}
-                  <span className="text-[11px] min-[390px]:text-xs font-semibold text-rose-500/80 ml-1 font-sans">
+                  <span className="text-[9.5px] min-[390px]:text-[10px] font-semibold text-rose-500/80 ml-1 font-sans">
                     ETB
                   </span>
                 </div>
-                <span className="text-[9.5px] min-[390px]:text-[10.5px] text-slate-500 mt-0.5 block truncate">
+                <span className="text-[8.5px] min-[390px]:text-[9px] text-slate-500 mt-1 block truncate max-w-[70%] font-normal leading-tight">
                   Rent, ride, bills...
                 </span>
               </div>
@@ -789,43 +792,43 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
           </div>
 
           {/* Card 4: Net Profit (Soft Mint Surface with 5 Rounded Ascending Pillar Bars) */}
-          <div className="relative min-h-[126px] min-[390px]:min-h-[132px] flex flex-col justify-between overflow-visible">
+          <div className="relative h-[106px] min-[390px]:h-[110px] flex flex-col overflow-visible">
             {/* Pinched Card Background */}
-            <svg viewBox="0 0 180 130" className="absolute inset-0 w-full h-full pointer-events-none drop-shadow-xs overflow-visible" preserveAspectRatio="none">
+            <svg viewBox="0 0 172 108" className="absolute inset-0 w-full h-full pointer-events-none drop-shadow-2xs overflow-visible" preserveAspectRatio="none">
               <path
-                d="M 18 0 L 162 0 C 172 0, 180 8, 180 18 C 177 45, 175.5 65, 175.5 65 C 175.5 65, 177 85, 180 112 C 180 122, 172 130, 162 130 L 18 130 C 8 130, 0 122, 0 112 C 3 85, 4.5 65, 4.5 65 C 4.5 65, 3 45, 0 18 C 0 8, 8 0, 18 0 Z"
+                d="M 16 0 L 156 0 C 165 0, 172 7, 172 16 C 170 35, 169.2 54, 169.2 54 C 169.2 54, 170 73, 172 92 C 172 101, 165 108, 156 108 L 16 108 C 7 108, 0 101, 0 92 C 2 73, 2.8 54, 2.8 54 C 2.8 54, 2 35, 0 16 C 0 7, 7 0, 16 0 Z"
                 fill="url(#cardGrossGrad)"
                 stroke="#a7f3d0"
-                strokeOpacity="0.75"
-                strokeWidth="1.2"
+                strokeOpacity="0.8"
+                strokeWidth="1"
               />
             </svg>
 
             {/* 5 Rounded Ascending Pillar Bars in Bottom Right */}
-            <div className="flex items-end justify-end gap-1.5 h-8 absolute right-3.5 bottom-2.5 pointer-events-none z-10">
-              <div className="w-1.5 h-[26%] bg-[#6ee7b7] rounded-full" />
-              <div className="w-1.5 h-[42%] bg-[#34d399] rounded-full" />
-              <div className="w-1.5 h-[60%] bg-[#10b981] rounded-full" />
-              <div className="w-1.5 h-[80%] bg-[#059669] rounded-full" />
-              <div className="w-1.5 h-[100%] bg-[#047857] rounded-full" />
+            <div className="flex items-end justify-end gap-1 h-5 absolute right-2.5 bottom-2 pointer-events-none z-10">
+              <div className="w-1 min-[390px]:w-1.2 h-[30%] bg-[#6ee7b7] rounded-full" />
+              <div className="w-1 min-[390px]:w-1.2 h-[45%] bg-[#34d399] rounded-full" />
+              <div className="w-1 min-[390px]:w-1.2 h-[65%] bg-[#10b981] rounded-full" />
+              <div className="w-1 min-[390px]:w-1.2 h-[82%] bg-[#059669] rounded-full" />
+              <div className="w-1 min-[390px]:w-1.2 h-[100%] bg-[#047857] rounded-full" />
             </div>
 
             {/* Foreground Content */}
-            <div className="relative z-10 flex flex-col justify-between h-full p-3 min-[390px]:p-3.5">
-              <div className="flex items-center justify-between">
+            <div className="relative z-10 flex flex-col h-full p-2.5 min-[390px]:p-3">
+              <div className="flex items-center justify-between h-6">
                 <div className="flex items-center gap-1.5 min-w-0">
-                  <div className="size-7 min-[390px]:size-8 rounded-[10px] bg-[#a7f3d0] flex items-center justify-center shrink-0 shadow-xs">
-                    <Sprout className="w-4 h-4 text-[#047857] stroke-[2.4]" />
+                  <div className="size-6 rounded-[7px] bg-[#a7f3d0] flex items-center justify-center shrink-0 shadow-2xs">
+                    <Sprout className="w-3.5 h-3.5 text-[#047857] stroke-[2.4]" />
                   </div>
-                  <span className="text-xs min-[390px]:text-[13px] font-bold text-slate-900 truncate">
+                  <span className="text-[11.5px] min-[390px]:text-xs font-bold text-slate-900 shrink-0">
                     Net Profit
                   </span>
                 </div>
-                <MoreHorizontal className="w-4 h-4 text-slate-400 shrink-0" />
+                <MoreHorizontal className="w-3.5 h-3.5 text-slate-400 shrink-0 opacity-80" />
               </div>
 
-              <div className="mt-1.5 min-[390px]:mt-2">
-                <div className={`text-[17px] min-[390px]:text-xl font-extrabold font-mono tracking-tight flex items-baseline ${
+              <div className="mt-2 min-[390px]:mt-2.5">
+                <div className={`text-base min-[390px]:text-[17px] font-black font-mono tracking-tight flex items-baseline leading-none ${
                   monthly_performance.net_profit < 0 ? 'text-rose-600' : 'text-slate-900'
                 }`}>
                   {isBalancesHidden ? (
@@ -836,11 +839,11 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                       <AnimatedNumber value={Math.abs(monthly_performance.net_profit)} />
                     </>
                   )}
-                  <span className="text-[11px] min-[390px]:text-xs font-semibold text-slate-500 ml-1 font-sans">
+                  <span className="text-[9.5px] min-[390px]:text-[10px] font-semibold text-slate-500 ml-1 font-sans">
                     ETB
                   </span>
                 </div>
-                <span className="text-[9.5px] min-[390px]:text-[10.5px] text-slate-500 mt-0.5 block truncate">
+                <span className="text-[8.5px] min-[390px]:text-[9px] text-slate-500 mt-1 block truncate max-w-[65%] font-normal leading-tight">
                   After operating expenses
                 </span>
               </div>
