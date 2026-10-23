@@ -138,15 +138,16 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                 <stop offset="100%" stopColor="#0a1820" stopOpacity="0.92" />
               </linearGradient>
 
-              {/* Chart Wave Gradients */}
+              {/* Chart Wave Downward Radiant Beam Gradients (Under each line) */}
               <linearGradient id="frontChartGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#34d399" stopOpacity="0.4" />
-                <stop offset="60%" stopColor="#10b981" stopOpacity="0.12" />
-                <stop offset="100%" stopColor="#064e3b" stopOpacity="0.0" />
+                <stop offset="0%" stopColor="#34d399" stopOpacity="0.45" />
+                <stop offset="50%" stopColor="#10b981" stopOpacity="0.15" />
+                <stop offset="100%" stopColor="#071118" stopOpacity="0.0" />
               </linearGradient>
               <linearGradient id="backChartGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#059669" stopOpacity="0.22" />
-                <stop offset="100%" stopColor="#064e3b" stopOpacity="0.0" />
+                <stop offset="0%" stopColor="#10b981" stopOpacity="0.26" />
+                <stop offset="60%" stopColor="#059669" stopOpacity="0.08" />
+                <stop offset="100%" stopColor="#071118" stopOpacity="0.0" />
               </linearGradient>
 
               {/* Smooth Fade-In and Fade-Out Stroke Gradients */}
@@ -202,11 +203,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
 
             {/* 4. Elements Clipped Inside Main Card */}
             <g clipPath="url(#mainCardClip)">
-              {/* Ambient glows */}
-              <circle cx="360" cy="65" r="95" fill="#15966b" opacity="0.28" />
-              <circle cx="60" cy="80" r="65" fill="#0d3349" opacity="0.22" />
-
-              {/* Back wave shape (Rolling peaks on the right side) */}
+              {/* Back wave radiant beam (downward gradient beam under the line) */}
               <path
                 d="
                   M 165 160
