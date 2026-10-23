@@ -150,6 +150,22 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                 <stop offset="100%" stopColor="#064e3b" stopOpacity="0.0" />
               </linearGradient>
 
+              {/* Smooth Fade-In and Fade-Out Stroke Gradients */}
+              <linearGradient id="frontLineGrad" x1="175" y1="0" x2="408" y2="0" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stopColor="#34d399" stopOpacity="0.0" />
+                <stop offset="14%" stopColor="#34d399" stopOpacity="0.75" />
+                <stop offset="80%" stopColor="#34d399" stopOpacity="0.95" />
+                <stop offset="97%" stopColor="#34d399" stopOpacity="0.8" />
+                <stop offset="100%" stopColor="#34d399" stopOpacity="0.0" />
+              </linearGradient>
+
+              <linearGradient id="backLineGrad" x1="165" y1="0" x2="408" y2="0" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stopColor="#10b981" stopOpacity="0.0" />
+                <stop offset="18%" stopColor="#10b981" stopOpacity="0.32" />
+                <stop offset="78%" stopColor="#10b981" stopOpacity="0.32" />
+                <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
+              </linearGradient>
+
               {/* Clip Path using the exact canonical Card Silhouette */}
               <clipPath id="mainCardClip">
                 <path d={HERO_CARD_PATH} />
@@ -194,61 +210,61 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               {/* Back wave shape (Rolling peaks on the right side) */}
               <path
                 d="
-                  M 175 160
-                  C 200 156, 222 130, 246 132
-                  C 270 134, 290 112, 312 114
-                  C 334 116, 354 92, 374 94
-                  C 386 95, 396 82, 402 76
-                  L 412 160
-                  L 175 160
+                  M 165 160
+                  C 190 156, 215 130, 240 132
+                  C 265 134, 288 112, 310 114
+                  C 332 116, 354 92, 374 94
+                  C 386 95, 398 82, 408 76
+                  L 408 160
+                  L 165 160
                   Z"
                 fill="url(#backChartGrad)"
               />
               <path
                 d="
-                  M 175 160
-                  C 200 156, 222 130, 246 132
-                  C 270 134, 290 112, 312 114
-                  C 334 116, 354 92, 374 94
-                  C 386 95, 396 82, 402 76"
+                  M 165 160
+                  C 190 156, 215 130, 240 132
+                  C 265 134, 288 112, 310 114
+                  C 332 116, 354 92, 374 94
+                  C 386 95, 398 82, 408 76"
                 fill="none"
-                stroke="#10b981"
-                strokeWidth="1.5"
-                strokeOpacity="0.38"
+                stroke="url(#backLineGrad)"
+                strokeWidth="1.1"
+                strokeLinecap="round"
               />
 
-              {/* Front luminous wave shape (3 Rolling peaks crescendoing cleanly to top right) */}
+              {/* Front luminous wave shape (Minimal 1.5px stroke, smooth start/end fade) */}
               <path
                 d="
-                  M 185 160
-                  C 210 144, 230 118, 252 120
-                  C 270 122, 282 130, 298 128
+                  M 175 160
+                  C 200 144, 225 118, 248 120
+                  C 268 122, 282 130, 298 128
                   C 318 125, 332 104, 350 102
                   C 366 101, 378 108, 388 96
-                  C 394 86, 397 72, 400 60
-                  L 412 160
-                  L 185 160
+                  C 394 86, 398 72, 405 58
+                  L 408 160
+                  L 175 160
                   Z"
                 fill="url(#frontChartGrad)"
               />
               <path
                 d="
-                  M 185 160
-                  C 210 144, 230 118, 252 120
-                  C 270 122, 282 130, 298 128
+                  M 175 160
+                  C 200 144, 225 118, 248 120
+                  C 268 122, 282 130, 298 128
                   C 318 125, 332 104, 350 102
                   C 366 101, 378 108, 388 96
-                  C 394 86, 397 72, 400 60"
+                  C 394 86, 398 72, 405 58"
                 fill="none"
-                stroke="#34d399"
-                strokeWidth="2.6"
+                stroke="url(#frontLineGrad)"
+                strokeWidth="1.5"
                 strokeLinecap="round"
               />
             </g>
 
-            {/* Glowing Endpoint Bead: Solid white with luminous green aura */}
-            <circle cx="400" cy="60" r="5.5" fill="#ffffff" filter="url(#beadGlow)" />
-            <circle cx="400" cy="60" r="3.5" fill="#ffffff" stroke="#10b981" strokeWidth="1" />
+            {/* Glowing Endpoint Bead: Soft, subtle beacon */}
+            <circle cx="403" cy="60" r="5" fill="#ffffff" filter="url(#beadGlow)" opacity="0.95" />
+            <circle cx="403" cy="60" r="3" fill="#ffffff" stroke="#10b981" strokeWidth="0.8" />
           </svg>
 
           {/* ── Foreground Interactive Content ── */}
@@ -262,43 +278,46 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               padding: '12px 14px 6px 14px',
             }}
           >
-            {/* Top Row: WORKING CAPITAL > and Strong Growth (Comfortable Top Margin) */}
-            <div className="flex items-center justify-between pt-1">
-              <button
-                type="button"
-                onClick={() => openVital('inventory')}
-                className="flex items-center gap-1.5 group cursor-pointer active:scale-98 transition-transform"
-              >
-                <span className="w-2.5 h-2.5 rounded-full bg-[#34d399] shadow-[0_0_8px_#34d399]" />
-                <span className="text-[12px] font-bold tracking-wider text-white">
-                  WORKING CAPITAL
-                </span>
-                <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-white group-hover:translate-x-0.5 transition-all stroke-[2.5]" />
-              </button>
+            {/* Header Block: Top Row + Working Capital Number + Growth (Grouped with tight, elegant vertical spacing) */}
+            <div className="flex flex-col pt-0.5">
+              {/* Top Row: WORKING CAPITAL > and Strong Growth */}
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => openVital('inventory')}
+                  className="flex items-center gap-1.5 group cursor-pointer active:scale-98 transition-transform"
+                >
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#34d399] shadow-[0_0_8px_#34d399]" />
+                  <span className="text-[12px] font-bold tracking-wider text-white">
+                    WORKING CAPITAL
+                  </span>
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-white group-hover:translate-x-0.5 transition-all stroke-[2.5]" />
+                </button>
 
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#082f23]/90 border border-[#34d399]/40 text-[#e6f7ef] text-[11px] font-semibold shadow-xs">
-                <ArrowUpRight className="w-3.5 h-3.5 text-[#34d399] stroke-[2.5]" />
-                <span>Strong Growth</span>
-              </div>
-            </div>
-
-            {/* Middle Section: Big Financial Number + Growth */}
-            <div className="mt-1 mb-1.5">
-              <div className="flex items-baseline gap-2">
-                <span className="text-[33px] sm:text-[37px] font-black tracking-tight text-white font-sans [font-feature-settings:'normal'] leading-none drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]">
-                  {isBalancesHidden ? '••••••••' : <AnimatedNumber value={capital_overview.net_capital || 10293682} />}
-                </span>
-                <span className="text-[15px] font-bold text-slate-300 font-sans tracking-wide">
-                  ETB
-                </span>
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#082f23]/90 border border-[#34d399]/40 text-[#e6f7ef] text-[11px] font-semibold shadow-xs">
+                  <ArrowUpRight className="w-3.5 h-3.5 text-[#34d399] stroke-[2.5]" />
+                  <span>Strong Growth</span>
+                </div>
               </div>
 
-              <div className="mt-1 flex items-center gap-1.5 text-xs">
-                <span className="flex items-center text-[#34d399] font-extrabold">
-                  <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />
-                  <span>+12.5%</span>
-                </span>
-                <span className="text-slate-400 font-normal">vs last month</span>
+              {/* Big Financial Number + Growth (Tightly placed below WORKING CAPITAL) */}
+              <div className="mt-2 sm:mt-2.5">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-[36px] sm:text-[42px] font-black tracking-tight text-white font-sans [font-feature-settings:'normal'] leading-none drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]">
+                    {isBalancesHidden ? '••••••••' : <AnimatedNumber value={capital_overview.net_capital || 10293682} />}
+                  </span>
+                  <span className="text-[16px] sm:text-[18px] font-bold text-slate-300 font-sans tracking-wide">
+                    ETB
+                  </span>
+                </div>
+
+                <div className="mt-1 sm:mt-1.5 flex items-center gap-1.5 text-xs">
+                  <span className="flex items-center text-[#34d399] font-extrabold">
+                    <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />
+                    <span>+12.5%</span>
+                  </span>
+                  <span className="text-slate-400 font-normal">vs last month</span>
+                </div>
               </div>
             </div>
 
