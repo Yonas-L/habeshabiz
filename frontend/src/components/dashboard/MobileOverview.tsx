@@ -399,98 +399,109 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
         </div>
       </div>
 
-      {/* ── 2. QUICK FINANCIAL ACTIONS ROW (5 Jewel-Tone Containers) ── */}
-      <div className="grid grid-cols-5 gap-2 pt-1 pb-1">
-        {/* 1. Stock */}
-        <button
-          type="button"
-          onClick={() => openVital('inventory')}
-          className="flex flex-col items-center text-center group cursor-pointer active:scale-90 transition-transform"
-          title={`Stock: ${isBalancesHidden ? '••••••' : capital_overview.stock_value.toLocaleString()} ETB`}
-        >
-          <div className="w-13 h-13 rounded-2xl bg-[#063e2e] dark:bg-[#072c21] border border-emerald-600/30 flex items-center justify-center text-emerald-300 shadow-sm mx-auto group-hover:bg-[#084b38] transition-colors">
-            <Package className="w-6 h-6 stroke-[2]" />
-          </div>
-          <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-1.5 truncate max-w-full block">
-            Stock
-          </span>
-          <span className="text-[11px] font-bold font-mono tracking-tight text-slate-900 dark:text-slate-100 mt-0.5 truncate max-w-full block">
-            <AnimatedNumber value={capital_overview.stock_value} />
-          </span>
-        </button>
+      {/* ── 2. QUICK FINANCIAL METRICS & VITAL STATS (Minimal Floating Card with Squircle Holders) ── */}
+      <div className="w-full rounded-[24px] sm:rounded-[28px] bg-white dark:bg-[#111C2D] border border-slate-200/80 dark:border-slate-800/80 shadow-[0_4px_24px_-4px_rgba(0,0,0,0.06)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] p-2.5 min-[390px]:p-3.5 sm:p-4 select-none">
+        <div className="grid grid-cols-5 gap-1 min-[390px]:gap-2 sm:gap-3">
+          {/* 1. Stock */}
+          <button
+            type="button"
+            onClick={() => openVital('inventory')}
+            className="flex flex-col items-center text-center group cursor-pointer active:scale-95 transition-transform"
+            title={`Stock: ${isBalancesHidden ? '••••••' : capital_overview.stock_value.toLocaleString()} ETB`}
+          >
+            <div className="size-11 min-[390px]:size-[48px] rounded-[18px] min-[390px]:rounded-[20px] p-0.5 min-[390px]:p-1 bg-emerald-500/10 dark:bg-emerald-950/40 border border-emerald-400/25 dark:border-emerald-500/25 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 transition-all">
+              <div className="w-full h-full rounded-[14px] min-[390px]:rounded-[16px] bg-[#0c392c] dark:bg-[#072d22] flex items-center justify-center shadow-xs">
+                <Package className="w-5 h-5 min-[390px]:w-5.5 min-[390px]:h-5.5 text-white stroke-[2.2]" />
+              </div>
+            </div>
+            <span className="text-[11px] min-[390px]:text-xs font-semibold text-slate-800 dark:text-slate-200 mt-1.5 min-[390px]:mt-2 truncate max-w-full block">
+              Stock
+            </span>
+            <span className="text-[10px] min-[390px]:text-[11.5px] font-medium font-mono tracking-tight text-slate-500 dark:text-slate-400 mt-0.5 truncate max-w-full block">
+              {isBalancesHidden ? '••••••' : <AnimatedNumber value={capital_overview.stock_value} />}
+            </span>
+          </button>
 
-        {/* 2. Bank */}
-        <button
-          type="button"
-          onClick={() => openVital('cash')}
-          className="flex flex-col items-center text-center group cursor-pointer active:scale-90 transition-transform"
-          title={`Bank: ${isBalancesHidden ? '••••••' : capital_overview.cash_and_banks.toLocaleString()} ETB`}
-        >
-          <div className="w-13 h-13 rounded-2xl bg-[#0a3547] dark:bg-[#072836] border border-cyan-500/30 flex items-center justify-center text-cyan-300 shadow-sm mx-auto group-hover:bg-[#0e445b] transition-colors">
-            <Landmark className="w-6 h-6 stroke-[2]" />
-          </div>
-          <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-1.5 truncate max-w-full block">
-            Bank
-          </span>
-          <span className="text-[11px] font-bold font-mono tracking-tight text-slate-900 dark:text-slate-100 mt-0.5 truncate max-w-full block">
-            <AnimatedNumber value={capital_overview.cash_and_banks} />
-          </span>
-        </button>
+          {/* 2. Bank */}
+          <button
+            type="button"
+            onClick={() => openVital('cash')}
+            className="flex flex-col items-center text-center group cursor-pointer active:scale-95 transition-transform"
+            title={`Bank: ${isBalancesHidden ? '••••••' : capital_overview.cash_and_banks.toLocaleString()} ETB`}
+          >
+            <div className="size-11 min-[390px]:size-[48px] rounded-[18px] min-[390px]:rounded-[20px] p-0.5 min-[390px]:p-1 bg-blue-500/10 dark:bg-blue-950/40 border border-blue-400/25 dark:border-blue-500/25 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 transition-all">
+              <div className="w-full h-full rounded-[14px] min-[390px]:rounded-[16px] bg-gradient-to-b from-[#eaf4ff] to-[#d6ebff] dark:from-[#0d273a] dark:to-[#091b29] border border-blue-200/60 dark:border-blue-800/40 flex items-center justify-center shadow-xs">
+                <Landmark className="w-5 h-5 min-[390px]:w-5.5 min-[390px]:h-5.5 text-[#0284c7] dark:text-sky-400 stroke-[2.2]" />
+              </div>
+            </div>
+            <span className="text-[11px] min-[390px]:text-xs font-semibold text-slate-800 dark:text-slate-200 mt-1.5 min-[390px]:mt-2 truncate max-w-full block">
+              Bank
+            </span>
+            <span className="text-[10px] min-[390px]:text-[11.5px] font-medium font-mono tracking-tight text-slate-500 dark:text-slate-400 mt-0.5 truncate max-w-full block">
+              {isBalancesHidden ? '••••••' : <AnimatedNumber value={capital_overview.cash_and_banks} />}
+            </span>
+          </button>
 
-        {/* 3. Owed to You */}
-        <button
-          type="button"
-          onClick={() => openVital('receivables')}
-          className="flex flex-col items-center text-center group cursor-pointer active:scale-90 transition-transform"
-          title={`Owed to You: ${isBalancesHidden ? '••••••' : capital_overview.receivables.toLocaleString()} ETB`}
-        >
-          <div className="w-13 h-13 rounded-2xl bg-[#0d4530] dark:bg-[#093324] border border-emerald-500/30 flex items-center justify-center text-emerald-300 shadow-sm mx-auto group-hover:bg-[#11543b] transition-colors">
-            <ArrowDown className="w-6 h-6 stroke-[2.2]" />
-          </div>
-          <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-1.5 truncate max-w-full block">
-            Owed
-          </span>
-          <span className="text-[11px] font-bold font-mono tracking-tight text-emerald-600 dark:text-emerald-400 mt-0.5 truncate max-w-full block">
-            +<AnimatedNumber value={capital_overview.receivables} />
-          </span>
-        </button>
+          {/* 3. Owed to You */}
+          <button
+            type="button"
+            onClick={() => openVital('receivables')}
+            className="flex flex-col items-center text-center group cursor-pointer active:scale-95 transition-transform"
+            title={`Owed to You: ${isBalancesHidden ? '••••••' : capital_overview.receivables.toLocaleString()} ETB`}
+          >
+            <div className="size-11 min-[390px]:size-[48px] rounded-[18px] min-[390px]:rounded-[20px] p-0.5 min-[390px]:p-1 bg-emerald-500/10 dark:bg-emerald-950/40 border border-emerald-400/25 dark:border-emerald-500/25 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 transition-all">
+              <div className="w-full h-full rounded-[14px] min-[390px]:rounded-[16px] bg-gradient-to-b from-[#eef9f2] to-[#ddf4e6] dark:from-[#0b2b1d] dark:to-[#071f15] border border-emerald-200/60 dark:border-emerald-800/40 flex items-center justify-center shadow-xs">
+                <ArrowDown className="w-5 h-5 min-[390px]:w-5.5 min-[390px]:h-5.5 text-[#065f46] dark:text-emerald-400 stroke-[2.4]" />
+              </div>
+            </div>
+            <span className="text-[11px] min-[390px]:text-xs font-semibold text-slate-800 dark:text-slate-200 mt-1.5 min-[390px]:mt-2 truncate max-w-full block">
+              Owed
+            </span>
+            <span className="text-[10px] min-[390px]:text-[11.5px] font-semibold font-mono tracking-tight text-emerald-600 dark:text-emerald-400 mt-0.5 truncate max-w-full block">
+              {isBalancesHidden ? '••••••' : <>+<AnimatedNumber value={capital_overview.receivables} /></>}
+            </span>
+          </button>
 
-        {/* 4. You Owe */}
-        <button
-          type="button"
-          onClick={() => openVital('payables')}
-          className="flex flex-col items-center text-center group cursor-pointer active:scale-90 transition-transform"
-          title={`You Owe: ${isBalancesHidden ? '••••••' : capital_overview.payables.toLocaleString()} ETB`}
-        >
-          <div className="w-13 h-13 rounded-2xl bg-[#451e24] dark:bg-[#38151a] border border-rose-500/30 flex items-center justify-center text-rose-300 shadow-sm mx-auto group-hover:bg-[#57242c] transition-colors">
-            <ArrowUp className="w-6 h-6 stroke-[2.2]" />
-          </div>
-          <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-1.5 truncate max-w-full block">
-            You Owe
-          </span>
-          <span className="text-[11px] font-bold font-mono tracking-tight text-rose-600 dark:text-rose-400 mt-0.5 truncate max-w-full block">
-            {(capital_overview.payables || 0) > 0 ? '−' : ''}
-            <AnimatedNumber value={capital_overview.payables} />
-          </span>
-        </button>
+          {/* 4. You Owe */}
+          <button
+            type="button"
+            onClick={() => openVital('payables')}
+            className="flex flex-col items-center text-center group cursor-pointer active:scale-95 transition-transform"
+            title={`You Owe: ${isBalancesHidden ? '••••••' : capital_overview.payables.toLocaleString()} ETB`}
+          >
+            <div className="size-11 min-[390px]:size-[48px] rounded-[18px] min-[390px]:rounded-[20px] p-0.5 min-[390px]:p-1 bg-emerald-500/10 dark:bg-emerald-950/40 border border-emerald-400/25 dark:border-emerald-500/25 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 transition-all">
+              <div className="w-full h-full rounded-[14px] min-[390px]:rounded-[16px] bg-gradient-to-b from-[#eef9f2] to-[#ddf4e6] dark:from-[#0b2b1d] dark:to-[#071f15] border border-emerald-200/60 dark:border-emerald-800/40 flex items-center justify-center shadow-xs">
+                <ArrowUp className="w-5 h-5 min-[390px]:w-5.5 min-[390px]:h-5.5 text-[#065f46] dark:text-emerald-400 stroke-[2.4]" />
+              </div>
+            </div>
+            <span className="text-[11px] min-[390px]:text-xs font-semibold text-slate-800 dark:text-slate-200 mt-1.5 min-[390px]:mt-2 truncate max-w-full block">
+              You Owe
+            </span>
+            <span className="text-[10px] min-[390px]:text-[11.5px] font-semibold font-mono tracking-tight text-rose-500 dark:text-rose-400 mt-0.5 truncate max-w-full block">
+              {isBalancesHidden ? '••••••' : <>{(capital_overview.payables || 0) > 0 ? '-' : ''}<AnimatedNumber value={capital_overview.payables} /></>}
+            </span>
+          </button>
 
-        {/* 5. Other Assets */}
-        <button
-          type="button"
-          onClick={() => openVital('reserves')}
-          className="flex flex-col items-center text-center group cursor-pointer active:scale-90 transition-transform"
-          title={`Other Assets: ${isBalancesHidden ? '••••••' : capital_overview.custom_assets.toLocaleString()} ETB`}
-        >
-          <div className="w-13 h-13 rounded-2xl bg-[#362711] dark:bg-[#2c1e0a] border border-amber-500/30 flex items-center justify-center text-amber-300 shadow-sm mx-auto group-hover:bg-[#473417] transition-colors">
-            <Coins className="w-6 h-6 stroke-[2]" />
-          </div>
-          <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-1.5 truncate max-w-full block">
-            Other
-          </span>
-          <span className="text-[11px] font-bold font-mono tracking-tight text-slate-900 dark:text-slate-100 mt-0.5 truncate max-w-full block">
-            <AnimatedNumber value={capital_overview.custom_assets} />
-          </span>
-        </button>
+          {/* 5. Other Assets */}
+          <button
+            type="button"
+            onClick={() => openVital('reserves')}
+            className="flex flex-col items-center text-center group cursor-pointer active:scale-95 transition-transform"
+            title={`Other Assets: ${isBalancesHidden ? '••••••' : capital_overview.custom_assets.toLocaleString()} ETB`}
+          >
+            <div className="size-11 min-[390px]:size-[48px] rounded-[18px] min-[390px]:rounded-[20px] p-0.5 min-[390px]:p-1 bg-purple-500/10 dark:bg-purple-950/40 border border-purple-400/25 dark:border-purple-500/25 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 transition-all">
+              <div className="w-full h-full rounded-[14px] min-[390px]:rounded-[16px] bg-gradient-to-b from-[#f3eefe] to-[#e7dbfc] dark:from-[#25153d] dark:to-[#1a0e2b] border border-purple-200/60 dark:border-purple-800/40 flex items-center justify-center shadow-xs">
+                <Coins className="w-5 h-5 min-[390px]:w-5.5 min-[390px]:h-5.5 text-[#6b21a8] dark:text-purple-300 stroke-[2.2]" />
+              </div>
+            </div>
+            <span className="text-[11px] min-[390px]:text-xs font-semibold text-slate-800 dark:text-slate-200 mt-1.5 min-[390px]:mt-2 truncate max-w-full block">
+              Other
+            </span>
+            <span className="text-[10px] min-[390px]:text-[11.5px] font-medium font-mono tracking-tight text-slate-500 dark:text-slate-400 mt-0.5 truncate max-w-full block">
+              {isBalancesHidden ? '••••••' : <AnimatedNumber value={capital_overview.custom_assets} />}
+            </span>
+          </button>
+        </div>
       </div>
 
       {/* ── 3. MONTHLY PERFORMANCE SECTION (2x2 Grid) ── */}
