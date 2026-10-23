@@ -46,7 +46,7 @@ interface MobileOverviewProps {
 }
 
 const HERO_CARD_PATH =
-  'M 26 44 C 26 28, 38 16, 56 16 C 118 16, 165 23, 215 23 C 265 23, 312 16, 374 16 C 392 16, 404 28, 404 44 L 404 192 C 404 208, 392 220, 374 220 C 312 220, 265 217, 215 217 C 165 217, 118 220, 56 220 C 38 220, 26 208, 26 192 L 26 44 Z';
+  'M 8 35 C 8 20, 20 9, 36 9 C 102 9, 150 16, 200 16 C 250 16, 298 9, 364 9 C 380 9, 392 20, 392 35 L 392 195 C 392 210, 380 221, 364 221 C 298 221, 250 218, 200 218 C 150 218, 102 221, 36 221 C 20 221, 8 210, 8 195 L 8 35 Z';
 
 export const MobileOverview: React.FC<MobileOverviewProps> = ({
   data,
@@ -101,63 +101,48 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
   return (
     <div className="space-y-4 px-0.5 animate-page-enter">
       {/* ── 1. WORKING CAPITAL HERO WIDGET (Exact Match to Premium Reference Deck) ── */}
-      <div className="relative w-full select-none -mx-2.5 px-0.5 py-0.5">
-        <div className="relative w-full aspect-[430/236] overflow-visible">
+      <div className="relative w-full select-none -mx-1 px-0.5 py-0.5">
+        <div className="relative w-full aspect-[400/230] overflow-visible">
           {/* Unified SVG Deck (Congruent Stacked Cards + Main Card + Spline Chart) */}
           <svg
-            viewBox="0 0 430 236"
+            viewBox="0 0 400 230"
             className="w-full h-full overflow-visible drop-shadow-sm"
             preserveAspectRatio="none"
           >
             <defs>
-              {/* Drop Shadows & Glows */}
-              <filter id="heroShadow" x="-15%" y="-15%" width="135%" height="140%">
-                <feDropShadow dx="0" dy="12" stdDeviation="10" floodColor="#040910" floodOpacity="0.42" />
-              </filter>
-              <filter id="pineShadow" x="-20%" y="-20%" width="145%" height="150%">
-                <feDropShadow dx="-4" dy="8" stdDeviation="8" floodColor="#020b08" floodOpacity="0.35" />
+              {/* Strong, deep, commanding drop shadow for main card */}
+              <filter id="heroShadow" x="-10%" y="-10%" width="125%" height="130%">
+                <feDropShadow dx="0" dy="14" stdDeviation="12" floodColor="#01060c" floodOpacity="0.58" />
               </filter>
               <filter id="beadGlow" x="-50%" y="-50%" width="200%" height="200%">
                 <feDropShadow dx="0" dy="0" stdDeviation="4" floodColor="#34d399" floodOpacity="0.95" />
               </filter>
 
-              {/* Main Front Card Mesh Gradient */}
-              <radialGradient id="heroMeshGrad" cx="80%" cy="18%" r="85%">
-                <stop offset="0%" stopColor="#183a34" />
-                <stop offset="30%" stopColor="#11242d" />
-                <stop offset="65%" stopColor="#0e1a25" />
-                <stop offset="100%" stopColor="#08121a" />
+              {/* Rich bold mesh gradient for the main focus card */}
+              <radialGradient id="heroMeshGrad" cx="82%" cy="18%" r="85%">
+                <stop offset="0%" stopColor="#183d36" />
+                <stop offset="28%" stopColor="#112630" />
+                <stop offset="62%" stopColor="#0c1a25" />
+                <stop offset="100%" stopColor="#071118" />
               </radialGradient>
 
-              {/* Top-Right Stack 1: Sage green card */}
+              {/* Top-Right Stack: Single refined Sage green card */}
               <linearGradient id="cardBackSage" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stopColor="#3d685c" stopOpacity="0.55" />
-                <stop offset="50%" stopColor="#609887" stopOpacity="0.78" />
-                <stop offset="100%" stopColor="#8ec2b0" stopOpacity="0.92" />
+                <stop offset="0%" stopColor="#34594e" stopOpacity="0.55" />
+                <stop offset="50%" stopColor="#508575" stopOpacity="0.78" />
+                <stop offset="100%" stopColor="#79ad9c" stopOpacity="0.92" />
               </linearGradient>
 
-              {/* Top-Right Stack 2: Deeper muted teal card */}
-              <linearGradient id="cardBackTeal" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stopColor="#183b33" stopOpacity="0.45" />
-                <stop offset="100%" stopColor="#2e584c" stopOpacity="0.75" />
-              </linearGradient>
-
-              {/* Bottom-Left Stack 1: Dark Midnight Navy card with rich blue-slate tone */}
+              {/* Bottom-Left Stack: Single refined Midnight Navy card */}
               <linearGradient id="cardBackNavy" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#142436" stopOpacity="0.98" />
-                <stop offset="100%" stopColor="#09131e" stopOpacity="0.95" />
-              </linearGradient>
-
-              {/* Bottom-Left Stack 2: Deep Forest Pine card with distinct emerald-pine depth */}
-              <linearGradient id="cardBackPine" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stopColor="#0f322a" stopOpacity="0.92" />
-                <stop offset="100%" stopColor="#1a4e42" stopOpacity="0.75" />
+                <stop offset="0%" stopColor="#122432" stopOpacity="0.96" />
+                <stop offset="100%" stopColor="#0a1820" stopOpacity="0.92" />
               </linearGradient>
 
               {/* Chart Wave Gradients */}
               <linearGradient id="frontChartGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#34d399" stopOpacity="0.42" />
-                <stop offset="50%" stopColor="#10b981" stopOpacity="0.15" />
+                <stop offset="0%" stopColor="#34d399" stopOpacity="0.45" />
+                <stop offset="50%" stopColor="#10b981" stopOpacity="0.16" />
                 <stop offset="100%" stopColor="#064e3b" stopOpacity="0.0" />
               </linearGradient>
               <linearGradient id="backChartGrad" x1="0" y1="0" x2="0" y2="1">
@@ -171,82 +156,61 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               </clipPath>
             </defs>
 
-            {/* 1. Deepest Bottom-Left Stacked Card (Pine, offset -22px, +13px) */}
-            <g transform="translate(-22, 13)">
-              <path
-                d={HERO_CARD_PATH}
-                fill="url(#cardBackPine)"
-                stroke="rgba(52,211,153,0.38)"
-                strokeWidth="1.2"
-                filter="url(#pineShadow)"
-              />
-            </g>
-
-            {/* 2. Middle Bottom-Left Stacked Card (Navy, offset -11px, +7px) */}
-            <g transform="translate(-11, 7)">
+            {/* 1. Single Bottom-Left Stacked Card (Refined, offset -5px, +4px) */}
+            <g transform="translate(-5, 4)">
               <path
                 d={HERO_CARD_PATH}
                 fill="url(#cardBackNavy)"
-                stroke="rgba(255,255,255,0.14)"
-                strokeWidth="1"
-              />
-            </g>
-
-            {/* 3. Deeper Top-Right Stacked Card (Teal, offset +22px, -13px) */}
-            <g transform="translate(22, -13)">
-              <path
-                d={HERO_CARD_PATH}
-                fill="url(#cardBackTeal)"
-                stroke="rgba(168,203,182,0.3)"
-                strokeWidth="1"
-              />
-            </g>
-
-            {/* 4. Top-Right Stacked Card (Sage, offset +11px, -7px) */}
-            <g transform="translate(11, -7)">
-              <path
-                d={HERO_CARD_PATH}
-                fill="url(#cardBackSage)"
-                stroke="rgba(168,203,182,0.6)"
+                stroke="rgba(52,211,153,0.3)"
                 strokeWidth="1.2"
               />
             </g>
 
-            {/* 5. Main Front Card (At 0, 0, exact congruent master) */}
+            {/* 2. Single Top-Right Stacked Card (Refined, offset +5px, -4px) */}
+            <g transform="translate(5, -4)">
+              <path
+                d={HERO_CARD_PATH}
+                fill="url(#cardBackSage)"
+                stroke="rgba(168,203,182,0.65)"
+                strokeWidth="1.2"
+              />
+            </g>
+
+            {/* 3. Main Front Card (At 0, 0, MASSIVE, DOMINANT, BOLD FOCUS) */}
             <path
               d={HERO_CARD_PATH}
               fill="url(#heroMeshGrad)"
-              stroke="rgba(255,255,255,0.15)"
-              strokeWidth="1.2"
+              stroke="rgba(255,255,255,0.18)"
+              strokeWidth="1.4"
               filter="url(#heroShadow)"
             />
 
-            {/* 6. Spline Wave Chart + Glows (Clipped cleanly inside main front card) */}
+            {/* 4. Elements Clipped Inside Main Card */}
             <g clipPath="url(#mainCardClip)">
               {/* Ambient glows */}
-              <circle cx="350" cy="65" r="85" fill="#15966b" opacity="0.24" />
-              <circle cx="70" cy="75" r="55" fill="#0d3349" opacity="0.2" />
+              <circle cx="340" cy="60" r="90" fill="#15966b" opacity="0.28" />
+              <circle cx="55" cy="75" r="60" fill="#0d3349" opacity="0.22" />
 
               {/* Back wave shape (Rolling peaks) */}
               <path
                 d="
-                  M 155 135
-                  C 185 132, 205 110, 230 112
-                  C 253 114, 273 92, 297 94
-                  C 319 96, 337 76, 357 78
-                  C 369 79, 377 66, 385 60
-                  L 404 135
-                  L 155 135
+                  M 140 138
+                  C 170 135, 190 112, 215 114
+                  C 238 116, 258 94, 282 96
+                  C 304 98, 324 78, 344 80
+                  C 356 81, 366 68, 374 62
+                  L 392 138
+                  L 140 138
                   Z"
                 fill="url(#backChartGrad)"
               />
               <path
                 d="
-                  M 155 135
-                  C 185 132, 205 110, 230 112
-                  C 253 114, 273 92, 297 94
-                  C 319 96, 337 76, 357 78
-                  C 369 79, 377 66, 385 60"
+                  M 140 138
+                  C 170 135, 190 112, 215 114
+                  C 238 116, 258 94, 282 96
+                  C 304 98, 324 78, 344 80
+                  C 356 81, 366 68, 374 62"
                 fill="none"
                 stroke="#10b981"
                 strokeWidth="1.6"
@@ -256,46 +220,46 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               {/* Front luminous wave shape (3 Rolling peaks crescendoing to top right) */}
               <path
                 d="
-                  M 165 135
-                  C 191 124, 211 96, 235 98
-                  C 255 100, 265 112, 281 110
-                  C 299 107, 313 84, 331 82
-                  C 347 81, 357 88, 367 76
-                  C 375 66, 379 58, 383 52
-                  L 404 135
-                  L 165 135
+                  M 150 138
+                  C 176 126, 196 98, 220 100
+                  C 240 102, 250 114, 266 112
+                  C 284 109, 298 86, 316 84
+                  C 332 83, 344 90, 354 78
+                  C 362 68, 368 60, 372 54
+                  L 392 138
+                  L 150 138
                   Z"
                 fill="url(#frontChartGrad)"
               />
               <path
                 d="
-                  M 165 135
-                  C 191 124, 211 96, 235 98
-                  C 255 100, 265 112, 281 110
-                  C 299 107, 313 84, 331 82
-                  C 347 81, 357 88, 367 76
-                  C 375 66, 379 58, 383 52"
+                  M 150 138
+                  C 176 126, 196 98, 220 100
+                  C 240 102, 250 114, 266 112
+                  C 284 109, 298 86, 316 84
+                  C 332 83, 344 90, 354 78
+                  C 362 68, 368 60, 372 54"
                 fill="none"
                 stroke="#34d399"
-                strokeWidth="2.6"
+                strokeWidth="2.8"
                 strokeLinecap="round"
               />
             </g>
 
             {/* Glowing Endpoint Bead: Solid white with luminous green aura */}
-            <circle cx="383" cy="52" r="5.5" fill="#ffffff" filter="url(#beadGlow)" />
-            <circle cx="383" cy="52" r="3.5" fill="#ffffff" stroke="#10b981" strokeWidth="1" />
+            <circle cx="372" cy="54" r="5.5" fill="#ffffff" filter="url(#beadGlow)" />
+            <circle cx="372" cy="54" r="3.5" fill="#ffffff" stroke="#10b981" strokeWidth="1" />
           </svg>
 
           {/* ── Foreground Interactive Content ── */}
           <div
             className="absolute z-10 flex flex-col justify-between"
             style={{
-              left: '6.05%',
-              width: '87.9%',
-              top: '6.78%',
-              height: '86.44%',
-              padding: '10px 14px 8px 14px',
+              left: '2%',
+              width: '96%',
+              top: '3.9%',
+              height: '92.2%',
+              padding: '12px 14px 10px 14px',
             }}
           >
             {/* Top Row: WORKING CAPITAL > and Strong Growth */}
@@ -306,13 +270,13 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                 className="flex items-center gap-1.5 group cursor-pointer active:scale-98 transition-transform"
               >
                 <span className="w-2.5 h-2.5 rounded-full bg-[#34d399] shadow-[0_0_8px_#34d399]" />
-                <span className="text-[11.5px] font-bold tracking-wider text-white">
+                <span className="text-[12px] font-extrabold tracking-wider text-white">
                   WORKING CAPITAL
                 </span>
                 <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-white group-hover:translate-x-0.5 transition-all stroke-[2.5]" />
               </button>
 
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#0c3327]/85 border border-[#34d399]/40 text-[#e6f7ef] text-[11px] font-semibold shadow-xs">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#0c3327]/90 border border-[#34d399]/50 text-[#e6f7ef] text-[11px] font-semibold shadow-xs">
                 <ArrowUpRight className="w-3.5 h-3.5 text-[#34d399] stroke-[2.5]" />
                 <span>Strong Growth</span>
               </div>
@@ -321,16 +285,16 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
             {/* Middle Section: Big Financial Number + Growth */}
             <div className="mt-0.5 mb-1.5">
               <div className="flex items-baseline gap-2">
-                <span className="text-[27px] sm:text-[31px] font-extrabold tracking-tight text-white font-sans tabular-nums leading-none">
+                <span className="text-[31px] sm:text-[35px] font-black tracking-tight text-white font-sans tabular-nums leading-none drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]">
                   {isBalancesHidden ? '••••••••' : <AnimatedNumber value={capital_overview.net_capital || 10293682} />}
                 </span>
-                <span className="text-sm font-semibold text-slate-300 font-sans tracking-wide">
+                <span className="text-[15px] font-bold text-slate-300 font-sans tracking-wide">
                   ETB
                 </span>
               </div>
 
               <div className="mt-1 flex items-center gap-1.5 text-xs">
-                <span className="flex items-center text-[#34d399] font-bold">
+                <span className="flex items-center text-[#34d399] font-extrabold">
                   <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />
                   <span>+12.5%</span>
                 </span>
@@ -339,7 +303,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
             </div>
 
             {/* Inset Glassmorphic Breakdown Sub-Card */}
-            <div className="rounded-[16px] bg-[#08121c]/80 backdrop-blur-md border border-white/10 p-2 sm:p-2.5 shadow-lg">
+            <div className="rounded-[16px] bg-[#060f18]/85 backdrop-blur-md border border-white/12 p-2 sm:p-2.5 shadow-lg">
               {/* Row 1: Stock, Liquid, Owed, Forex */}
               <div className="grid grid-cols-4 gap-1 text-[10px] sm:text-[11px]">
                 <button
