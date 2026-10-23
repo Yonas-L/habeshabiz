@@ -275,7 +275,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               width: '95%',
               top: '5%',
               height: '88%',
-              padding: '12px 14px 6px 14px',
+              padding: '12px 14px 10px 14px',
             }}
           >
             {/* Header Block: Top Row + Working Capital Number + Growth (Grouped with tight, elegant vertical spacing) */}
@@ -303,10 +303,10 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               {/* Big Financial Number + Growth (Tightly placed below WORKING CAPITAL) */}
               <div className="mt-2 sm:mt-2.5">
                 <div className="flex items-baseline gap-2">
-                  <span className="text-[36px] sm:text-[42px] font-black tracking-tight text-white font-sans [font-feature-settings:'normal'] leading-none drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]">
+                  <span className="text-[41px] sm:text-[47px] font-black tracking-tight text-white font-sans [font-feature-settings:'normal'] leading-none drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]">
                     {isBalancesHidden ? '••••••••' : <AnimatedNumber value={capital_overview.net_capital || 10293682} />}
                   </span>
-                  <span className="text-[16px] sm:text-[18px] font-bold text-slate-300 font-sans tracking-wide">
+                  <span className="text-[17px] sm:text-[19px] font-bold text-slate-300 font-sans tracking-wide">
                     ETB
                   </span>
                 </div>
@@ -321,8 +321,8 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               </div>
             </div>
 
-            {/* Inset Glassmorphic Breakdown Sub-Card (Translucent, Frosted, Blurry, Even Spacing) */}
-            <div className="rounded-[16px] bg-[#102434]/50 backdrop-blur-xl border border-white/16 shadow-[inset_0_1px_1px_rgba(255,255,255,0.18)] p-2.5 sm:p-3 mx-0.5">
+            {/* Inset Glassmorphic Breakdown Sub-Card (Positioned upward with clean clearance) */}
+            <div className="rounded-[16px] bg-[#102434]/50 backdrop-blur-xl border border-white/16 shadow-[inset_0_1px_1px_rgba(255,255,255,0.18)] p-2.5 sm:p-3 mx-0.5 mb-2 sm:mb-2.5">
               {/* Row 1: Stock, Liquid, Owed, Forex (Even, generous horizontal gaps) */}
               <div className="grid grid-cols-4 gap-2 sm:gap-3 text-[10.5px] sm:text-[11.5px]">
                 <button
