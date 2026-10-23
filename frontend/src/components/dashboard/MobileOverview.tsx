@@ -46,7 +46,7 @@ interface MobileOverviewProps {
 }
 
 const HERO_CARD_PATH =
-  'M 10 38 C 10 22, 22 14, 38 14 C 95 14, 145 28, 200 28 C 255 28, 305 14, 362 14 C 378 14, 390 22, 390 38 L 390 192 C 390 208, 378 220, 362 220 C 305 220, 255 208, 200 208 C 145 208, 95 220, 38 220 C 22 220, 10 208, 10 192 L 10 38 Z';
+  'M 8 36 C 8 20, 20 12, 38 12 C 105 12, 155 26, 210 26 C 265 26, 315 12, 382 12 C 400 12, 412 20, 412 36 L 412 202 C 412 218, 400 228, 382 228 C 315 228, 265 216, 210 216 C 155 216, 105 228, 38 228 C 20 228, 8 218, 8 202 L 8 36 Z';
 
 export const MobileOverview: React.FC<MobileOverviewProps> = ({
   data,
@@ -101,11 +101,11 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
   return (
     <div className="space-y-4 px-0.5 animate-page-enter">
       {/* ── 1. WORKING CAPITAL HERO WIDGET (Exact Match to Premium Reference Deck) ── */}
-      <div className="relative w-full select-none -mx-1 px-0.5 py-0.5">
-        <div className="relative w-full aspect-[400/230] overflow-visible">
+      <div className="relative w-full select-none -mx-1.5 px-0.5 py-0.5">
+        <div className="relative w-full aspect-[420/240] overflow-visible">
           {/* Unified SVG Deck (Congruent Stacked Cards + Main Card + Spline Chart) */}
           <svg
-            viewBox="0 0 400 230"
+            viewBox="0 0 420 240"
             className="w-full h-full overflow-visible drop-shadow-sm"
             preserveAspectRatio="none"
           >
@@ -141,12 +141,12 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
 
               {/* Chart Wave Gradients */}
               <linearGradient id="frontChartGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#34d399" stopOpacity="0.45" />
-                <stop offset="50%" stopColor="#10b981" stopOpacity="0.16" />
+                <stop offset="0%" stopColor="#34d399" stopOpacity="0.4" />
+                <stop offset="60%" stopColor="#10b981" stopOpacity="0.12" />
                 <stop offset="100%" stopColor="#064e3b" stopOpacity="0.0" />
               </linearGradient>
               <linearGradient id="backChartGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#059669" stopOpacity="0.24" />
+                <stop offset="0%" stopColor="#059669" stopOpacity="0.22" />
                 <stop offset="100%" stopColor="#064e3b" stopOpacity="0.0" />
               </linearGradient>
 
@@ -188,57 +188,57 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
             {/* 4. Elements Clipped Inside Main Card */}
             <g clipPath="url(#mainCardClip)">
               {/* Ambient glows */}
-              <circle cx="340" cy="55" r="90" fill="#15966b" opacity="0.28" />
-              <circle cx="55" cy="72" r="60" fill="#0d3349" opacity="0.22" />
+              <circle cx="360" cy="60" r="95" fill="#15966b" opacity="0.28" />
+              <circle cx="60" cy="75" r="65" fill="#0d3349" opacity="0.22" />
 
               {/* Back wave shape (Rolling peaks on the right side) */}
               <path
                 d="
-                  M 160 146
-                  C 185 142, 205 118, 228 120
-                  C 250 122, 270 98, 292 100
-                  C 314 102, 334 78, 354 80
-                  C 362 81, 368 70, 374 64
-                  L 390 146
-                  L 160 146
+                  M 175 152
+                  C 200 148, 222 124, 246 126
+                  C 270 128, 290 106, 312 108
+                  C 334 110, 354 86, 374 88
+                  C 386 89, 396 76, 402 70
+                  L 412 152
+                  L 175 152
                   Z"
                 fill="url(#backChartGrad)"
               />
               <path
                 d="
-                  M 160 146
-                  C 185 142, 205 118, 228 120
-                  C 250 122, 270 98, 292 100
-                  C 314 102, 334 78, 354 80
-                  C 362 81, 368 70, 374 64"
+                  M 175 152
+                  C 200 148, 222 124, 246 126
+                  C 270 128, 290 106, 312 108
+                  C 334 110, 354 86, 374 88
+                  C 386 89, 396 76, 402 70"
                 fill="none"
                 stroke="#10b981"
                 strokeWidth="1.5"
-                strokeOpacity="0.4"
+                strokeOpacity="0.38"
               />
 
-              {/* Front luminous wave shape (3 Rolling peaks crescendoing to top right) */}
+              {/* Front luminous wave shape (3 Rolling peaks crescendoing cleanly to top right) */}
               <path
                 d="
-                  M 170 146
-                  C 192 134, 210 106, 232 108
-                  C 250 110, 260 118, 274 116
-                  C 292 113, 305 92, 322 90
-                  C 336 89, 346 95, 354 84
-                  C 360 74, 364 62, 368 54
-                  L 390 146
-                  L 170 146
+                  M 185 152
+                  C 210 138, 230 112, 252 114
+                  C 270 116, 282 124, 298 122
+                  C 318 119, 332 98, 350 96
+                  C 366 95, 378 102, 388 90
+                  C 394 80, 397 66, 400 54
+                  L 412 152
+                  L 185 152
                   Z"
                 fill="url(#frontChartGrad)"
               />
               <path
                 d="
-                  M 170 146
-                  C 192 134, 210 106, 232 108
-                  C 250 110, 260 118, 274 116
-                  C 292 113, 305 92, 322 90
-                  C 336 89, 346 95, 354 84
-                  C 360 74, 364 62, 368 54"
+                  M 185 152
+                  C 210 138, 230 112, 252 114
+                  C 270 116, 282 124, 298 122
+                  C 318 119, 332 98, 350 96
+                  C 366 95, 378 102, 388 90
+                  C 394 80, 397 66, 400 54"
                 fill="none"
                 stroke="#34d399"
                 strokeWidth="2.6"
@@ -247,19 +247,19 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
             </g>
 
             {/* Glowing Endpoint Bead: Solid white with luminous green aura */}
-            <circle cx="368" cy="54" r="5" fill="#ffffff" filter="url(#beadGlow)" />
-            <circle cx="368" cy="54" r="3" fill="#ffffff" stroke="#10b981" strokeWidth="1" />
+            <circle cx="400" cy="54" r="5.5" fill="#ffffff" filter="url(#beadGlow)" />
+            <circle cx="400" cy="54" r="3.5" fill="#ffffff" stroke="#10b981" strokeWidth="1" />
           </svg>
 
           {/* ── Foreground Interactive Content ── */}
           <div
             className="absolute z-10 flex flex-col justify-between"
             style={{
-              left: '3%',
-              width: '94%',
-              top: '4.5%',
-              height: '88%',
-              padding: '8px 12px 6px 12px',
+              left: '2.5%',
+              width: '95%',
+              top: '4%',
+              height: '90%',
+              padding: '10px 14px 6px 14px',
             }}
           >
             {/* Top Row: WORKING CAPITAL > and Strong Growth */}
@@ -285,7 +285,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
             {/* Middle Section: Big Financial Number + Growth */}
             <div className="mt-0.5 mb-1.5">
               <div className="flex items-baseline gap-2">
-                <span className="text-[32px] sm:text-[36px] font-black tracking-tight text-white font-sans [font-feature-settings:'normal'] leading-none drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]">
+                <span className="text-[33px] sm:text-[37px] font-black tracking-tight text-white font-sans [font-feature-settings:'normal'] leading-none drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]">
                   {isBalancesHidden ? '••••••••' : <AnimatedNumber value={capital_overview.net_capital || 10293682} />}
                 </span>
                 <span className="text-[15px] font-bold text-slate-300 font-sans tracking-wide">
@@ -302,14 +302,14 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               </div>
             </div>
 
-            {/* Inset Glassmorphic Breakdown Sub-Card (Legend Card strictly inside) */}
-            <div className="rounded-[16px] bg-[#0b1824]/85 backdrop-blur-md border border-white/12 px-3 py-2 shadow-lg mx-0.5">
-              {/* Row 1: Stock, Liquid, Owed, Forex */}
-              <div className="grid grid-cols-4 gap-1 text-[10px] sm:text-[11px]">
+            {/* Inset Glassmorphic Breakdown Sub-Card (Translucent, Frosted, Blurry, Even Spacing) */}
+            <div className="rounded-[16px] bg-[#102434]/50 backdrop-blur-xl border border-white/16 shadow-[inset_0_1px_1px_rgba(255,255,255,0.18)] p-2.5 sm:p-3 mx-0.5">
+              {/* Row 1: Stock, Liquid, Owed, Forex (Even, generous horizontal gaps) */}
+              <div className="grid grid-cols-4 gap-2 sm:gap-3 text-[10.5px] sm:text-[11.5px]">
                 <button
                   type="button"
                   onClick={() => openVital('inventory')}
-                  className="flex items-center gap-1 text-slate-300 hover:text-white transition-colors cursor-pointer text-left truncate active:scale-98"
+                  className="flex items-center gap-1.5 text-slate-300 hover:text-white transition-colors cursor-pointer text-left truncate active:scale-98"
                 >
                   <span className="w-2 h-2 rounded-full bg-[#34d399] shrink-0" />
                   <span className="truncate">Stock <strong className="text-white font-bold">{stockPct || 37}%</strong></span>
@@ -318,7 +318,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                 <button
                   type="button"
                   onClick={() => openVital('cash')}
-                  className="flex items-center gap-1 text-slate-300 hover:text-white transition-colors cursor-pointer text-left truncate active:scale-98"
+                  className="flex items-center gap-1.5 text-slate-300 hover:text-white transition-colors cursor-pointer text-left truncate active:scale-98"
                 >
                   <span className="w-2 h-2 rounded-full bg-[#3b82f6] shrink-0" />
                   <span className="truncate">Liquid <strong className="text-white font-bold">{cashPct || 5}%</strong></span>
@@ -327,7 +327,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                 <button
                   type="button"
                   onClick={() => openVital('receivables')}
-                  className="flex items-center gap-1 text-slate-300 hover:text-white transition-colors cursor-pointer text-left truncate active:scale-98"
+                  className="flex items-center gap-1.5 text-slate-300 hover:text-white transition-colors cursor-pointer text-left truncate active:scale-98"
                 >
                   <span className="w-2 h-2 rounded-full bg-[#f59e0b] shrink-0" />
                   <span className="truncate">Owed <strong className="text-white font-bold">{recPct || 20}%</strong></span>
@@ -336,7 +336,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                 <button
                   type="button"
                   onClick={() => openVital('reserves')}
-                  className="flex items-center gap-1 text-slate-300 hover:text-white transition-colors cursor-pointer text-left truncate active:scale-98"
+                  className="flex items-center gap-1.5 text-slate-300 hover:text-white transition-colors cursor-pointer text-left truncate active:scale-98"
                 >
                   <span className="w-2 h-2 rounded-full bg-[#a855f7] shrink-0" />
                   <span className="truncate">Forex <strong className="text-white font-bold">{forexPct || 25}%</strong></span>
@@ -344,11 +344,11 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               </div>
 
               {/* Row 2: Gold, Other, and Owe */}
-              <div className="grid grid-cols-4 gap-1 text-[10px] sm:text-[11px] mt-1 pt-1 border-t border-white/5 items-center">
+              <div className="grid grid-cols-4 gap-2 sm:gap-3 text-[10.5px] sm:text-[11.5px] mt-1.5 pt-1.5 border-t border-white/8 items-center">
                 <button
                   type="button"
                   onClick={() => openVital('reserves')}
-                  className="flex items-center gap-1 text-slate-300 hover:text-white transition-colors cursor-pointer text-left truncate active:scale-98"
+                  className="flex items-center gap-1.5 text-slate-300 hover:text-white transition-colors cursor-pointer text-left truncate active:scale-98"
                 >
                   <span className="w-2 h-2 rounded-full bg-[#eab308] shrink-0" />
                   <span className="truncate">Gold <strong className="text-white font-bold">{goldPct || 7}%</strong></span>
@@ -357,7 +357,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                 <button
                   type="button"
                   onClick={() => openVital('reserves')}
-                  className="flex items-center gap-1 text-slate-300 hover:text-white transition-colors cursor-pointer text-left truncate active:scale-98"
+                  className="flex items-center gap-1.5 text-slate-300 hover:text-white transition-colors cursor-pointer text-left truncate active:scale-98"
                 >
                   <span className="w-2 h-2 rounded-full bg-[#94a3b8] shrink-0" />
                   <span className="truncate">Other <strong className="text-white font-bold">{otherPct || 6}%</strong></span>
@@ -367,7 +367,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                   <button
                     type="button"
                     onClick={() => openVital('payables')}
-                    className="flex items-center gap-1 text-rose-400 hover:text-rose-300 transition-colors cursor-pointer active:scale-98"
+                    className="flex items-center gap-1.5 text-rose-400 hover:text-rose-300 transition-colors cursor-pointer active:scale-98"
                   >
                     <span className="w-2 h-2 rounded-full bg-[#f87171] shrink-0" />
                     <span>Owe <strong className="text-rose-400 font-bold font-mono">
