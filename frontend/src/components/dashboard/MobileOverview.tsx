@@ -98,9 +98,9 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
     : "This Month's";
 
   return (
-    <div className="space-y-4 px-0.5 animate-page-enter">
+    <div className="space-y-4 px-0.5 select-none scroll-smooth animate-card-glide">
       {/* ── 1. WORKING CAPITAL HERO WIDGET (Exact Match to Premium Reference Deck) ── */}
-      <div className="relative w-full select-none -mx-1.5 px-0.5 py-0.5">
+      <div className="relative w-full select-none -mx-1.5 px-0.5 py-0.5 animate-stagger-1">
         <div className="relative w-full aspect-[420/270] min-[410px]:aspect-[420/256] overflow-visible">
           {/* Unified SVG Deck (Congruent Stacked Cards + Main Card + Spline Chart) */}
           <svg
@@ -215,6 +215,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                   L 165 160
                   Z"
                 fill="url(#backChartGrad)"
+                className="animate-beam-reveal"
               />
               <path
                 d="
@@ -227,6 +228,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                 stroke="url(#backLineGrad)"
                 strokeWidth="1.1"
                 strokeLinecap="round"
+                className="animate-chart-line-delayed"
               />
 
               {/* Front luminous wave shape (Minimal 1.5px stroke, smooth start/end fade) */}
@@ -242,6 +244,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                   L 175 160
                   Z"
                 fill="url(#frontChartGrad)"
+                className="animate-beam-reveal"
               />
               <path
                 d="
@@ -255,11 +258,12 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                 stroke="url(#frontLineGrad)"
                 strokeWidth="1.5"
                 strokeLinecap="round"
+                className="animate-chart-line"
               />
             </g>
 
-            {/* Glowing Endpoint Bead: Soft, subtle beacon */}
-            <circle cx="403" cy="60" r="5" fill="#ffffff" filter="url(#beadGlow)" opacity="0.95" />
+            {/* Glowing Endpoint Bead: Soft, subtle breathing beacon */}
+            <circle cx="403" cy="60" r="5" fill="#ffffff" filter="url(#beadGlow)" opacity="0.95" className="animate-beacon-pulse" />
             <circle cx="403" cy="60" r="3" fill="#ffffff" stroke="#10b981" strokeWidth="0.8" />
           </svg>
 
@@ -396,16 +400,16 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
       </div>
 
       {/* ── 2. QUICK FINANCIAL METRICS & VITAL STATS (Minimal Floating Card with Squircle Holders) ── */}
-      <div className="w-full rounded-[24px] sm:rounded-[28px] bg-white dark:bg-[#111C2D] border border-slate-200/80 dark:border-slate-800/80 shadow-[0_4px_24px_-4px_rgba(0,0,0,0.06)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] p-2.5 min-[390px]:p-3.5 sm:p-4 select-none">
+      <div className="w-full rounded-[24px] sm:rounded-[28px] bg-white dark:bg-[#111C2D] border border-slate-200/80 dark:border-slate-800/80 shadow-[0_4px_24px_-4px_rgba(0,0,0,0.06)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] p-2.5 min-[390px]:p-3.5 sm:p-4 select-none animate-stagger-2">
         <div className="grid grid-cols-5 gap-1 min-[390px]:gap-2 sm:gap-3">
           {/* 1. Stock */}
           <button
             type="button"
             onClick={() => openVital('inventory')}
-            className="flex flex-col items-center text-center group cursor-pointer active:scale-95 transition-transform"
+            className="flex flex-col items-center text-center group cursor-pointer active:scale-[0.92] hover:scale-[1.04] transition-all duration-200 ease-out"
             title={`Stock: ${isBalancesHidden ? '••••••' : capital_overview.stock_value.toLocaleString()} ETB`}
           >
-            <div className="size-12 min-[390px]:size-[52px] rounded-[18px] min-[390px]:rounded-[20px] p-1 bg-slate-100/80 dark:bg-slate-800/50 border border-slate-200/60 dark:border-white/5 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 transition-all">
+            <div className="size-12 min-[390px]:size-[52px] rounded-[18px] min-[390px]:rounded-[20px] p-1 bg-slate-100/80 dark:bg-slate-800/50 border border-slate-200/60 dark:border-white/5 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 group-active:scale-95 transition-all duration-200">
               <div className="w-full h-full rounded-[14px] min-[390px]:rounded-[16px] bg-gradient-to-b from-[#eef9f2] to-[#ddf4e6] dark:from-[#0b2b1d] dark:to-[#071f15] flex items-center justify-center shadow-xs">
                 <Package className="w-6 h-6 min-[390px]:w-[26px] min-[390px]:h-[26px] text-[#047857] dark:text-emerald-400 stroke-[2.2]" />
               </div>
@@ -413,7 +417,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
             <span className="text-[11px] min-[390px]:text-xs font-semibold text-slate-800 dark:text-slate-200 mt-1.5 min-[390px]:mt-2 truncate max-w-full block">
               Stock
             </span>
-            <span className="text-[10px] min-[390px]:text-[11.5px] font-medium font-mono tracking-tight text-slate-500 dark:text-slate-400 mt-0.5 truncate max-w-full block">
+            <span className="text-[10px] min-[390px]:text-[11.5px] font-medium font-mono tracking-tight text-slate-500 dark:text-slate-400 mt-0.5 truncate max-w-full block transition-opacity duration-200">
               {isBalancesHidden ? '••••••' : <AnimatedNumber value={capital_overview.stock_value} compact />}
             </span>
           </button>
@@ -422,10 +426,10 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
           <button
             type="button"
             onClick={() => openVital('cash')}
-            className="flex flex-col items-center text-center group cursor-pointer active:scale-95 transition-transform"
+            className="flex flex-col items-center text-center group cursor-pointer active:scale-[0.92] hover:scale-[1.04] transition-all duration-200 ease-out"
             title={`Bank: ${isBalancesHidden ? '••••••' : capital_overview.cash_and_banks.toLocaleString()} ETB`}
           >
-            <div className="size-12 min-[390px]:size-[52px] rounded-[18px] min-[390px]:rounded-[20px] p-1 bg-slate-100/80 dark:bg-slate-800/50 border border-slate-200/60 dark:border-white/5 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 transition-all">
+            <div className="size-12 min-[390px]:size-[52px] rounded-[18px] min-[390px]:rounded-[20px] p-1 bg-slate-100/80 dark:bg-slate-800/50 border border-slate-200/60 dark:border-white/5 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 group-active:scale-95 transition-all duration-200">
               <div className="w-full h-full rounded-[14px] min-[390px]:rounded-[16px] bg-gradient-to-b from-[#eaf4ff] to-[#d6ebff] dark:from-[#0d273a] dark:to-[#091b29] flex items-center justify-center shadow-xs">
                 <Landmark className="w-6 h-6 min-[390px]:w-[26px] min-[390px]:h-[26px] text-[#0284c7] dark:text-sky-400 stroke-[2.2]" />
               </div>
@@ -433,7 +437,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
             <span className="text-[11px] min-[390px]:text-xs font-semibold text-slate-800 dark:text-slate-200 mt-1.5 min-[390px]:mt-2 truncate max-w-full block">
               Bank
             </span>
-            <span className="text-[10px] min-[390px]:text-[11.5px] font-medium font-mono tracking-tight text-slate-500 dark:text-slate-400 mt-0.5 truncate max-w-full block">
+            <span className="text-[10px] min-[390px]:text-[11.5px] font-medium font-mono tracking-tight text-slate-500 dark:text-slate-400 mt-0.5 truncate max-w-full block transition-opacity duration-200">
               {isBalancesHidden ? '••••••' : <AnimatedNumber value={capital_overview.cash_and_banks} compact />}
             </span>
           </button>
@@ -442,10 +446,10 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
           <button
             type="button"
             onClick={() => openVital('receivables')}
-            className="flex flex-col items-center text-center group cursor-pointer active:scale-95 transition-transform"
+            className="flex flex-col items-center text-center group cursor-pointer active:scale-[0.92] hover:scale-[1.04] transition-all duration-200 ease-out"
             title={`Owed to You: ${isBalancesHidden ? '••••••' : capital_overview.receivables.toLocaleString()} ETB`}
           >
-            <div className="size-12 min-[390px]:size-[52px] rounded-[18px] min-[390px]:rounded-[20px] p-1 bg-slate-100/80 dark:bg-slate-800/50 border border-slate-200/60 dark:border-white/5 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 transition-all">
+            <div className="size-12 min-[390px]:size-[52px] rounded-[18px] min-[390px]:rounded-[20px] p-1 bg-slate-100/80 dark:bg-slate-800/50 border border-slate-200/60 dark:border-white/5 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 group-active:scale-95 transition-all duration-200">
               <div className="w-full h-full rounded-[14px] min-[390px]:rounded-[16px] bg-gradient-to-b from-[#eef9f2] to-[#ddf4e6] dark:from-[#0b2b1d] dark:to-[#071f15] flex items-center justify-center shadow-xs">
                 <ArrowDown className="w-6 h-6 min-[390px]:w-[26px] min-[390px]:h-[26px] text-[#065f46] dark:text-emerald-400 stroke-[2.4]" />
               </div>
@@ -453,7 +457,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
             <span className="text-[11px] min-[390px]:text-xs font-semibold text-slate-800 dark:text-slate-200 mt-1.5 min-[390px]:mt-2 truncate max-w-full block">
               Owed
             </span>
-            <span className="text-[10px] min-[390px]:text-[11.5px] font-semibold font-mono tracking-tight text-emerald-600 dark:text-emerald-400 mt-0.5 truncate max-w-full block">
+            <span className="text-[10px] min-[390px]:text-[11.5px] font-semibold font-mono tracking-tight text-emerald-600 dark:text-emerald-400 mt-0.5 truncate max-w-full block transition-opacity duration-200">
               {isBalancesHidden ? '••••••' : <AnimatedNumber value={capital_overview.receivables} compact prefix="+" />}
             </span>
           </button>
@@ -462,10 +466,10 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
           <button
             type="button"
             onClick={() => openVital('payables')}
-            className="flex flex-col items-center text-center group cursor-pointer active:scale-95 transition-transform"
+            className="flex flex-col items-center text-center group cursor-pointer active:scale-[0.92] hover:scale-[1.04] transition-all duration-200 ease-out"
             title={`You Owe: ${isBalancesHidden ? '••••••' : capital_overview.payables.toLocaleString()} ETB`}
           >
-            <div className="size-12 min-[390px]:size-[52px] rounded-[18px] min-[390px]:rounded-[20px] p-1 bg-slate-100/80 dark:bg-slate-800/50 border border-slate-200/60 dark:border-white/5 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 transition-all">
+            <div className="size-12 min-[390px]:size-[52px] rounded-[18px] min-[390px]:rounded-[20px] p-1 bg-slate-100/80 dark:bg-slate-800/50 border border-slate-200/60 dark:border-white/5 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 group-active:scale-95 transition-all duration-200">
               <div className="w-full h-full rounded-[14px] min-[390px]:rounded-[16px] bg-gradient-to-b from-[#eef9f2] to-[#ddf4e6] dark:from-[#0b2b1d] dark:to-[#071f15] flex items-center justify-center shadow-xs">
                 <ArrowUp className="w-6 h-6 min-[390px]:w-[26px] min-[390px]:h-[26px] text-[#065f46] dark:text-emerald-400 stroke-[2.4]" />
               </div>
@@ -473,7 +477,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
             <span className="text-[11px] min-[390px]:text-xs font-semibold text-slate-800 dark:text-slate-200 mt-1.5 min-[390px]:mt-2 truncate max-w-full block">
               You Owe
             </span>
-            <span className="text-[10px] min-[390px]:text-[11.5px] font-semibold font-mono tracking-tight text-rose-500 dark:text-rose-400 mt-0.5 truncate max-w-full block">
+            <span className="text-[10px] min-[390px]:text-[11.5px] font-semibold font-mono tracking-tight text-rose-500 dark:text-rose-400 mt-0.5 truncate max-w-full block transition-opacity duration-200">
               {isBalancesHidden ? '••••••' : <AnimatedNumber value={capital_overview.payables} compact prefix={(capital_overview.payables || 0) > 0 ? '-' : ''} />}
             </span>
           </button>
@@ -482,10 +486,10 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
           <button
             type="button"
             onClick={() => openVital('reserves')}
-            className="flex flex-col items-center text-center group cursor-pointer active:scale-95 transition-transform"
+            className="flex flex-col items-center text-center group cursor-pointer active:scale-[0.92] hover:scale-[1.04] transition-all duration-200 ease-out"
             title={`Other Assets: ${isBalancesHidden ? '••••••' : capital_overview.custom_assets.toLocaleString()} ETB`}
           >
-            <div className="size-12 min-[390px]:size-[52px] rounded-[18px] min-[390px]:rounded-[20px] p-1 bg-slate-100/80 dark:bg-slate-800/50 border border-slate-200/60 dark:border-white/5 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 transition-all">
+            <div className="size-12 min-[390px]:size-[52px] rounded-[18px] min-[390px]:rounded-[20px] p-1 bg-slate-100/80 dark:bg-slate-800/50 border border-slate-200/60 dark:border-white/5 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 group-active:scale-95 transition-all duration-200">
               <div className="w-full h-full rounded-[14px] min-[390px]:rounded-[16px] bg-gradient-to-b from-[#f3eefe] to-[#e7dbfc] dark:from-[#25153d] dark:to-[#1a0e2b] flex items-center justify-center shadow-xs">
                 <Coins className="w-6 h-6 min-[390px]:w-[26px] min-[390px]:h-[26px] text-[#6b21a8] dark:text-purple-300 stroke-[2.2]" />
               </div>
@@ -493,7 +497,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
             <span className="text-[11px] min-[390px]:text-xs font-semibold text-slate-800 dark:text-slate-200 mt-1.5 min-[390px]:mt-2 truncate max-w-full block">
               Other
             </span>
-            <span className="text-[10px] min-[390px]:text-[11.5px] font-medium font-mono tracking-tight text-slate-500 dark:text-slate-400 mt-0.5 truncate max-w-full block">
+            <span className="text-[10px] min-[390px]:text-[11.5px] font-medium font-mono tracking-tight text-slate-500 dark:text-slate-400 mt-0.5 truncate max-w-full block transition-opacity duration-200">
               {isBalancesHidden ? '••••••' : <AnimatedNumber value={capital_overview.custom_assets} compact />}
             </span>
           </button>
@@ -501,7 +505,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
       </div>
 
       {/* ── 3. MONTHLY PERFORMANCE SECTION (2x2 Grid with Pinched Organic Cards & Exact Beams) ── */}
-      <div className="rounded-[28px] bg-white dark:bg-[#111C2D] border border-slate-200/80 dark:border-slate-800/80 p-3 min-[390px]:p-3.5 shadow-[0_4px_24px_-4px_rgba(0,0,0,0.05)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] space-y-3 select-none">
+      <div className="rounded-[28px] bg-white dark:bg-[#111C2D] border border-slate-200/80 dark:border-slate-800/80 p-3 min-[390px]:p-3.5 shadow-[0_4px_24px_-4px_rgba(0,0,0,0.05)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] space-y-3 select-none animate-stagger-3">
         {/* Section Heading */}
         <div className="flex items-center justify-between px-0.5">
           <div className="flex items-center gap-2.5">
@@ -522,7 +526,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               type="button"
               onClick={() => onNavigateTab('staff')}
               title="View Staff & Team Dashboard"
-              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/80 shadow-xs text-[11px] font-bold text-slate-800 dark:text-slate-200 active:scale-95 cursor-pointer transition-transform"
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/80 shadow-xs text-[11px] font-bold text-slate-800 dark:text-slate-200 active:scale-95 hover:scale-[1.03] cursor-pointer transition-all duration-150"
             >
               <span>
                 Top: <span className="font-extrabold text-slate-900 dark:text-white">{topSeller.name}</span>
@@ -535,7 +539,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
         {/* 2x2 Performance Grid */}
         <div className="grid grid-cols-2 gap-2 min-[390px]:gap-2.5">
           {/* Card 1: Revenue (Dark Mesh Surface with Multi-Node Spline & Luminous Beam) */}
-          <div className="relative h-[106px] min-[390px]:h-[110px] flex flex-col overflow-visible">
+          <div className="relative h-[106px] min-[390px]:h-[110px] flex flex-col overflow-visible active:scale-[0.97] hover:scale-[1.01] transition-all duration-200 ease-out cursor-pointer group">
             {/* Pinched Card Background */}
             <svg viewBox="0 0 172 108" className="absolute inset-0 w-full h-full pointer-events-none drop-shadow-sm overflow-visible" preserveAspectRatio="none">
               <defs>
@@ -564,6 +568,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               <path
                 d="M 2 108 L 2 92 C 25 90, 50 96, 75 91 C 100 86, 115 92, 135 84 C 148 78, 158 68, 164 62 L 164 108 Z"
                 fill="url(#cardRevBeam)"
+                className="animate-beam-reveal"
               />
               {/* Spline Line */}
               <path
@@ -573,13 +578,14 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                 strokeWidth="1.8"
                 strokeLinecap="round"
                 strokeLinejoin="round"
+                className="animate-chart-line"
               />
               {/* Vertex Nodes */}
               <circle cx="28" cy="91" r="1.8" fill="#34d399" />
               <circle cx="75" cy="91" r="1.8" fill="#34d399" />
               <circle cx="110" cy="89" r="1.8" fill="#34d399" />
               <circle cx="135" cy="84" r="1.8" fill="#34d399" />
-              <circle cx="164" cy="62" r="4.5" fill="#34d399" fillOpacity="0.25" />
+              <circle cx="164" cy="62" r="4.5" fill="#34d399" fillOpacity="0.25" className="animate-beacon-pulse" />
               <circle cx="164" cy="62" r="2.5" fill="#10b981" stroke="#ffffff" strokeWidth="1" />
             </svg>
 
@@ -587,7 +593,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
             <div className="relative z-10 flex flex-col h-full p-2.5 min-[390px]:p-3 text-white">
               <div className="flex items-center justify-between h-6">
                 <div className="flex items-center gap-1.5 min-w-0">
-                  <div className="size-6 rounded-[7px] bg-[#a7f3d0] flex items-center justify-center shrink-0 shadow-2xs">
+                  <div className="size-6 rounded-[7px] bg-[#a7f3d0] flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform duration-200">
                     <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="none">
                       <rect x="3.5" y="9" width="3" height="8" rx="1" fill="#064e3b" />
                       <rect x="8.5" y="4" width="3" height="13" rx="1" fill="#064e3b" />
@@ -602,7 +608,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               </div>
 
               <div className="mt-2 min-[390px]:mt-2.5">
-                <div className="text-base min-[390px]:text-[17px] font-black font-mono tracking-tight text-white flex items-baseline leading-none">
+                <div className="text-base min-[390px]:text-[17px] font-black font-mono tracking-tight text-white flex items-baseline leading-none transition-opacity duration-200">
                   {isBalancesHidden ? '••••••' : <AnimatedNumber value={monthly_performance.revenue} />}
                   <span className="text-[9.5px] min-[390px]:text-[10px] font-semibold text-slate-300 ml-1 font-sans opacity-80">
                     ETB
@@ -617,7 +623,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
 
           {/* Card 2: Gross Profit (Soft Mint Surface with Rising Curve & Beam) */}
           {canViewCost ? (
-            <div className="relative h-[106px] min-[390px]:h-[110px] flex flex-col overflow-visible">
+            <div className="relative h-[106px] min-[390px]:h-[110px] flex flex-col overflow-visible active:scale-[0.97] hover:scale-[1.01] transition-all duration-200 ease-out cursor-pointer group">
               {/* Pinched Card Background */}
               <svg viewBox="0 0 172 108" className="absolute inset-0 w-full h-full pointer-events-none drop-shadow-2xs overflow-visible" preserveAspectRatio="none">
                 <defs>
@@ -641,6 +647,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                 <path
                   d="M 70 108 L 70 102 C 95 103, 115 97, 135 91 C 150 85, 158 74, 164 64 L 164 108 Z"
                   fill="url(#cardGrossBeam)"
+                  className="animate-beam-reveal"
                 />
                 <path
                   d="M 70 102 C 95 103, 115 97, 135 91 C 150 85, 158 74, 164 64"
@@ -649,8 +656,9 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                   strokeWidth="1.8"
                   strokeLinecap="round"
                   strokeLinejoin="round"
+                  className="animate-chart-line-delayed"
                 />
-                <circle cx="164" cy="64" r="4.5" fill="#10b981" fillOpacity="0.25" />
+                <circle cx="164" cy="64" r="4.5" fill="#10b981" fillOpacity="0.25" className="animate-beacon-pulse" />
                 <circle cx="164" cy="64" r="2.5" fill="#047857" stroke="#ffffff" strokeWidth="1" />
               </svg>
 
@@ -658,7 +666,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               <div className="relative z-10 flex flex-col h-full p-2.5 min-[390px]:p-3">
                 <div className="flex items-center justify-between h-6">
                   <div className="flex items-center gap-1.5 min-w-0">
-                    <div className="size-6 rounded-[7px] bg-[#a7f3d0] flex items-center justify-center shrink-0 shadow-2xs">
+                    <div className="size-6 rounded-[7px] bg-[#a7f3d0] flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform duration-200">
                       <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
                         <ellipse cx="9" cy="8" rx="5" ry="2.5" fill="#047857" />
                         <ellipse cx="9" cy="12" rx="5" ry="2.5" fill="#065f46" />
@@ -673,7 +681,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                 </div>
 
                 <div className="mt-2 min-[390px]:mt-2.5">
-                  <div className={`text-base min-[390px]:text-[17px] font-black font-mono tracking-tight flex items-baseline leading-none ${
+                  <div className={`text-base min-[390px]:text-[17px] font-black font-mono tracking-tight flex items-baseline leading-none transition-opacity duration-200 ${
                     monthly_performance.gross_profit < 0 ? 'text-rose-600' : 'text-slate-900'
                   }`}>
                     {isBalancesHidden ? (
@@ -695,7 +703,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               </div>
             </div>
           ) : (
-            <div className="relative h-[106px] min-[390px]:h-[110px] flex flex-col overflow-visible">
+            <div className="relative h-[106px] min-[390px]:h-[110px] flex flex-col overflow-visible active:scale-[0.97] transition-transform duration-200">
               <svg viewBox="0 0 172 108" className="absolute inset-0 w-full h-full pointer-events-none drop-shadow-2xs" preserveAspectRatio="none">
                 <path
                   d="M 16 0 L 156 0 C 165 0, 172 7, 172 16 C 170 35, 169.2 54, 169.2 54 C 169.2 54, 170 73, 172 92 C 172 101, 165 108, 156 108 L 16 108 C 7 108, 0 101, 0 92 C 2 73, 2.8 54, 2.8 54 C 2.8 54, 2 35, 0 16 C 0 7, 7 0, 16 0 Z"
@@ -713,7 +721,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
           )}
 
           {/* Card 3: Expenses (Soft Rose Surface with Overlapping Waves & Record Button) */}
-          <div className="relative h-[106px] min-[390px]:h-[110px] flex flex-col overflow-visible">
+          <div className="relative h-[106px] min-[390px]:h-[110px] flex flex-col overflow-visible active:scale-[0.97] hover:scale-[1.01] transition-all duration-200 ease-out cursor-pointer group">
             {/* Pinched Card Background */}
             <svg viewBox="0 0 172 108" className="absolute inset-0 w-full h-full pointer-events-none drop-shadow-2xs overflow-visible" preserveAspectRatio="none">
               <defs>
@@ -734,11 +742,13 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                 d="M 85 108 C 110 108, 125 96, 142 98 C 155 100, 164 94, 172 88 L 172 108 Z"
                 fill="#fda4af"
                 fillOpacity="0.3"
+                className="animate-beam-reveal"
               />
               <path
                 d="M 105 108 C 122 108, 135 102, 148 103 C 160 104, 166 99, 172 96 L 172 108 Z"
                 fill="#fb7185"
                 fillOpacity="0.35"
+                className="animate-beam-reveal"
               />
             </svg>
 
@@ -746,7 +756,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
             <div className="relative z-10 flex flex-col h-full p-2.5 min-[390px]:p-3">
               <div className="flex items-center justify-between h-6">
                 <div className="flex items-center gap-1.5 min-w-0">
-                  <div className="size-6 rounded-[7px] bg-[#fecdd3] flex items-center justify-center shrink-0 shadow-2xs">
+                  <div className="size-6 rounded-[7px] bg-[#fecdd3] flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform duration-200">
                     <Wallet className="w-3.5 h-3.5 text-[#be123c] stroke-[2.2]" />
                   </div>
                   <span className="text-[11.5px] min-[390px]:text-xs font-bold text-slate-900 shrink-0">
@@ -759,7 +769,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                     type="button"
                     onClick={onOpenExpenseModal}
                     title="Quickly record expense"
-                    className="px-1.5 py-0.5 rounded-full bg-[#fee2e2] hover:bg-[#fecdd3] border border-[#fecdd3] text-[#e11d48] text-[8.5px] font-extrabold active:scale-95 cursor-pointer shadow-2xs transition-colors shrink-0"
+                    className="px-1.5 py-0.5 rounded-full bg-[#fee2e2] hover:bg-[#fecdd3] border border-[#fecdd3] text-[#e11d48] text-[8.5px] font-extrabold active:scale-90 hover:scale-105 cursor-pointer shadow-2xs transition-all duration-150 shrink-0"
                   >
                     + Record
                   </button>
@@ -768,7 +778,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               </div>
 
               <div className="mt-2 min-[390px]:mt-2.5">
-                <div className="text-base min-[390px]:text-[17px] font-black font-mono tracking-tight text-[#e11d48] flex items-baseline leading-none">
+                <div className="text-base min-[390px]:text-[17px] font-black font-mono tracking-tight text-[#e11d48] flex items-baseline leading-none transition-opacity duration-200">
                   {isBalancesHidden ? (
                     '••••••'
                   ) : (
@@ -789,7 +799,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
           </div>
 
           {/* Card 4: Net Profit (Soft Mint Surface with 5 Rounded Ascending Pillar Bars) */}
-          <div className="relative h-[106px] min-[390px]:h-[110px] flex flex-col overflow-visible">
+          <div className="relative h-[106px] min-[390px]:h-[110px] flex flex-col overflow-visible active:scale-[0.97] hover:scale-[1.01] transition-all duration-200 ease-out cursor-pointer group">
             {/* Pinched Card Background */}
             <svg viewBox="0 0 172 108" className="absolute inset-0 w-full h-full pointer-events-none drop-shadow-2xs overflow-visible" preserveAspectRatio="none">
               <path
@@ -803,18 +813,18 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
 
             {/* 5 Rounded Ascending Pillar Bars in Bottom Right */}
             <div className="flex items-end justify-end gap-1 h-5 absolute right-2.5 bottom-2 pointer-events-none z-10">
-              <div className="w-1 min-[390px]:w-1.2 h-[30%] bg-[#6ee7b7] rounded-full" />
-              <div className="w-1 min-[390px]:w-1.2 h-[45%] bg-[#34d399] rounded-full" />
-              <div className="w-1 min-[390px]:w-1.2 h-[65%] bg-[#10b981] rounded-full" />
-              <div className="w-1 min-[390px]:w-1.2 h-[82%] bg-[#059669] rounded-full" />
-              <div className="w-1 min-[390px]:w-1.2 h-[100%] bg-[#047857] rounded-full" />
+              <div className="w-1 min-[390px]:w-1.2 h-[30%] bg-[#6ee7b7] rounded-full animate-bar-pillar [animation-delay:100ms]" />
+              <div className="w-1 min-[390px]:w-1.2 h-[45%] bg-[#34d399] rounded-full animate-bar-pillar [animation-delay:160ms]" />
+              <div className="w-1 min-[390px]:w-1.2 h-[65%] bg-[#10b981] rounded-full animate-bar-pillar [animation-delay:220ms]" />
+              <div className="w-1 min-[390px]:w-1.2 h-[82%] bg-[#059669] rounded-full animate-bar-pillar [animation-delay:280ms]" />
+              <div className="w-1 min-[390px]:w-1.2 h-[100%] bg-[#047857] rounded-full animate-bar-pillar [animation-delay:340ms]" />
             </div>
 
             {/* Foreground Content */}
             <div className="relative z-10 flex flex-col h-full p-2.5 min-[390px]:p-3">
               <div className="flex items-center justify-between h-6">
                 <div className="flex items-center gap-1.5 min-w-0">
-                  <div className="size-6 rounded-[7px] bg-[#a7f3d0] flex items-center justify-center shrink-0 shadow-2xs">
+                  <div className="size-6 rounded-[7px] bg-[#a7f3d0] flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform duration-200">
                     <Sprout className="w-3.5 h-3.5 text-[#047857] stroke-[2.4]" />
                   </div>
                   <span className="text-[11.5px] min-[390px]:text-xs font-bold text-slate-900 shrink-0">
@@ -825,7 +835,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               </div>
 
               <div className="mt-2 min-[390px]:mt-2.5">
-                <div className={`text-base min-[390px]:text-[17px] font-black font-mono tracking-tight flex items-baseline leading-none ${
+                <div className={`text-base min-[390px]:text-[17px] font-black font-mono tracking-tight flex items-baseline leading-none transition-opacity duration-200 ${
                   monthly_performance.net_profit < 0 ? 'text-rose-600' : 'text-slate-900'
                 }`}>
                   {isBalancesHidden ? (
@@ -871,7 +881,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
       </div>
 
       {/* ── 4. DEBT LEDGERS (Refined Mobile Lists) ── */}
-      <div className="space-y-3 pt-1">
+      <div className="space-y-3 pt-1 animate-stagger-4">
         {/* Receivables: Owed to You */}
         <div className="bg-white dark:bg-[#131926] rounded-[24px] border border-slate-200/80 dark:border-slate-800/80 p-4 shadow-xs">
           <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-slate-800/60 mb-2">
@@ -882,7 +892,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               <button
                 type="button"
                 onClick={() => onOpenDebtModal('receivable')}
-                className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 flex items-center gap-0.5 cursor-pointer py-0.5 px-1.5 rounded-md hover:bg-emerald-50 dark:hover:bg-emerald-950/50"
+                className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 flex items-center gap-0.5 cursor-pointer py-0.5 px-1.5 rounded-md hover:bg-emerald-50 dark:hover:bg-emerald-950/50 active:scale-95 transition-all duration-150"
               >
                 <Plus className="w-3 h-3" />
                 <span>Record</span>
@@ -891,7 +901,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               <button
                 type="button"
                 onClick={() => onNavigateTab('debts')}
-                className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 hover:text-emerald-600 transition-colors cursor-pointer"
+                className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 hover:text-emerald-600 transition-colors cursor-pointer active:scale-95"
               >
                 View all · {counts.open_receivables} →
               </button>
@@ -909,7 +919,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                   key={group.contactId}
                   type="button"
                   onClick={() => openVital('receivables', group.contactId)}
-                  className="w-full flex items-center justify-between min-h-[46px] p-2.5 rounded-xl text-xs bg-slate-50/70 dark:bg-[#0c1017]/70 border border-slate-100/90 dark:border-slate-800/70 hover:bg-slate-100/80 active:scale-[0.99] transition-all group text-left cursor-pointer"
+                  className="w-full flex items-center justify-between min-h-[46px] p-2.5 rounded-xl text-xs bg-slate-50/70 dark:bg-[#0c1017]/70 border border-slate-100/90 dark:border-slate-800/70 hover:bg-slate-100/80 active:scale-[0.985] transition-all duration-150 group text-left cursor-pointer"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div
@@ -940,7 +950,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0 pl-2">
-                    <span className="font-semibold text-emerald-600 dark:text-emerald-400 font-mono tracking-tight">
+                    <span className="font-semibold text-emerald-600 dark:text-emerald-400 font-mono tracking-tight transition-opacity duration-200">
                       {isBalancesHidden ? '+••••••' : `+${group.netRemaining.toLocaleString()}`}
                     </span>
                     <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0" />
@@ -961,7 +971,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               <button
                 type="button"
                 onClick={() => onOpenDebtModal('payable')}
-                className="text-[10px] font-semibold text-rose-600 dark:text-rose-400 hover:text-rose-700 flex items-center gap-0.5 cursor-pointer py-0.5 px-1.5 rounded-md hover:bg-rose-50 dark:hover:bg-rose-950/50"
+                className="text-[10px] font-semibold text-rose-600 dark:text-rose-400 hover:text-rose-700 flex items-center gap-0.5 cursor-pointer py-0.5 px-1.5 rounded-md hover:bg-rose-50 dark:hover:bg-rose-950/50 active:scale-95 transition-all duration-150"
               >
                 <Plus className="w-3 h-3" />
                 <span>Record</span>
@@ -970,7 +980,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               <button
                 type="button"
                 onClick={() => onNavigateTab('debts')}
-                className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 hover:text-rose-600 transition-colors cursor-pointer"
+                className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 hover:text-rose-600 transition-colors cursor-pointer active:scale-95"
               >
                 View all · {counts.open_payables} →
               </button>
@@ -988,7 +998,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                   key={group.contactId}
                   type="button"
                   onClick={() => openVital('payables', group.contactId)}
-                  className="w-full flex items-center justify-between min-h-[46px] p-2.5 rounded-xl text-xs bg-slate-50/70 dark:bg-[#0c1017]/70 border border-slate-100/90 dark:border-slate-800/70 hover:bg-slate-100/80 active:scale-[0.99] transition-all group text-left cursor-pointer"
+                  className="w-full flex items-center justify-between min-h-[46px] p-2.5 rounded-xl text-xs bg-slate-50/70 dark:bg-[#0c1017]/70 border border-slate-100/90 dark:border-slate-800/70 hover:bg-slate-100/80 active:scale-[0.985] transition-all duration-150 group text-left cursor-pointer"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div className="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-700 dark:text-rose-400 font-semibold flex items-center justify-center text-[10px] uppercase shrink-0 border border-rose-200/60 dark:border-rose-800/50">
@@ -1006,7 +1016,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0 pl-2">
-                    <span className="font-semibold text-rose-600 dark:text-rose-400 font-mono tracking-tight">
+                    <span className="font-semibold text-rose-600 dark:text-rose-400 font-mono tracking-tight transition-opacity duration-200">
                       {isBalancesHidden ? '−••••••' : `−${group.netRemaining.toLocaleString()}`}
                     </span>
                     <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0" />

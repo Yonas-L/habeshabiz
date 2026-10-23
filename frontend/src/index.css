@@ -534,6 +534,100 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   animation: speedDialOpen 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* ── Mobile Smooth Momentum Scrolling & Cinematic Animations ── */
+@media (max-width: 639px) {
+  html, body {
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+  }
+}
+
+@keyframes chartDrawLine {
+  0% {
+    stroke-dashoffset: 500;
+    opacity: 0.15;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+
+@keyframes beamReveal {
+  0% {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes beaconPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.95;
+  }
+  50% {
+    transform: scale(1.65);
+    opacity: 0.3;
+  }
+}
+
+@keyframes barPillarRise {
+  0% {
+    transform: scaleY(0);
+    opacity: 0.2;
+  }
+  100% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+@keyframes cardGlideIn {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-chart-line {
+  stroke-dasharray: 500;
+  stroke-dashoffset: 500;
+  animation: chartDrawLine 1.1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-chart-line-delayed {
+  stroke-dasharray: 500;
+  stroke-dashoffset: 500;
+  animation: chartDrawLine 1.3s cubic-bezier(0.16, 1, 0.3, 1) 0.15s forwards;
+}
+
+.animate-beam-reveal {
+  animation: beamReveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.18s both;
+}
+
+.animate-beacon-pulse {
+  transform-origin: center;
+  transform-box: fill-box;
+  animation: beaconPulse 2.6s ease-in-out infinite;
+}
+
+.animate-bar-pillar {
+  transform-origin: bottom;
+  animation: barPillarRise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-card-glide {
+  animation: cardGlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
 
 @media (prefers-reduced-motion: reduce) {
   .animate-fluid-sidebar,
@@ -544,11 +638,18 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   .animate-stagger-4,
   .animate-stagger-5,
   .animate-stagger-6,
-  .animate-modal-spring {
+  .animate-modal-spring,
+  .animate-chart-line,
+  .animate-chart-line-delayed,
+  .animate-beam-reveal,
+  .animate-beacon-pulse,
+  .animate-bar-pillar,
+  .animate-card-glide {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
     filter: none !important;
+    stroke-dashoffset: 0 !important;
   }
 }
 
