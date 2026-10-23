@@ -39,7 +39,6 @@ import { getAdminToken } from './api/adminClient';
 import { ProfileSettingsModal } from './components/ProfileSettingsModal';
 import { QuickSearchModal, type NavigationPayload } from './components/QuickSearchModal';
 import { MobileBottomNav } from './components/navigation/MobileBottomNav';
-import { SpeedDialFAB } from './components/navigation/SpeedDialFAB';
 import { CustomPageLoader } from './components/loading/CustomPageLoader';
 import { LdrsSpinner } from './components/loading/LdrsSpinner';
 import { TopProgressBar } from './components/loading/TopProgressBar';
@@ -833,28 +832,23 @@ export default function App() {
         onNavigate={handleQuickSearchNavigate}
       />
 
-      {/* Mobile Floating Action Button (Speed Dial) - hidden on counter so it never obstructs checkout */}
-      {activeTab !== 'counter' && (
-        <SpeedDialFAB
-          onNewSale={() => handleNavigateTab('counter')}
-          onRecordExpense={() => {
-            setNavContext({ showRecordExpense: true });
-            handleNavigateTab('expenses');
-          }}
-          onStockIntake={() => {
-            setNavContext({ showIntake: true });
-            handleNavigateTab('inventory');
-          }}
-          isOwner={user?.role === 'owner'}
-        />
-      )}
-
-      {/* Mobile Native Bottom Navigation Bar */}
+      {/* Mobile Native Bottom Navigation Bar with Central Elevated Action Hub */}
       <MobileBottomNav
         activeTab={activeTab}
         onChangeTab={handleNavigateTab}
         onOpenDrawer={handleOpenMobileSidebar}
         openDebtsCount={openDebtsCount}
+        onNewSale={() => handleNavigateTab('counter')}
+        onRecordExpense={() => {
+          setNavContext({ showRecordExpense: true });
+          handleNavigateTab('expenses');
+        }}
+        onStockIntake={() => {
+          setNavContext({ showIntake: true });
+          handleNavigateTab('inventory');
+        }}
+        onRecordDebt={() => handleNavigateTab('debts')}
+        isOwner={user?.role === 'owner'}
       />
     </div>
     </BalancePrivacyProvider>

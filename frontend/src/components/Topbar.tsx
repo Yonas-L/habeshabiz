@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { NavTab } from './Sidebar';
 import type { User } from '../api/client';
-import { Menu, Plus, Calendar, Sun, Moon, ChevronLeft, ChevronRight, Check, Eye, EyeOff } from 'lucide-react';
+import { Menu, Plus, Calendar, Sun, Moon, ChevronLeft, ChevronRight, ChevronDown, Check, Eye, EyeOff } from 'lucide-react';
 import { useBalancePrivacy } from '../context/BalancePrivacyContext';
  
 interface TopbarProps {
@@ -107,10 +107,47 @@ export const Topbar: React.FC<TopbarProps> = ({
 
   const displayLabel = `${MONTH_NAMES[selectedMonthIndex]} ${selectedYear}`;
 
+  const timeGreeting = (() => {
+    const h = new Date().getHours();
+    if (h < 12) return 'Good morning,';
+    if (h < 18) return 'Good afternoon,';
+    return 'Good evening,';
+  })();
+
+  const mobileTitle =
+    activeTab === 'overview'
+      ? (user?.role === 'owner' ? 'Investor' : (user?.name || 'Store Staff'))
+      : current.title;
+
   return (
     <header className="sticky top-0 z-40 h-14 sm:h-16 px-3 sm:px-4 lg:px-8 flex items-center justify-between bg-[#f6f8fa]/95 dark:bg-[#0b0f17]/95 backdrop-blur-md transition-colors border-b border-slate-200/60 dark:border-slate-800/60 animate-fluid-topbar">
-      <div className="flex items-center gap-2 sm:gap-3 min-w-0 pr-2">
-        {/* Mobile Hamburger */}
+      {/* Mobile Branding & Personalized Title (< md) */}
+      <div className="flex md:hidden items-center gap-2.5 min-w-0 pr-1">
+        <button
+          type="button"
+          onClick={onOpenMobileSidebar}
+          aria-label="Open Navigation Menu"
+          className="w-10 h-10 rounded-full bg-[#111C2D] border border-slate-200/20 shadow-md flex items-center justify-center shrink-0 active:scale-95 transition-transform cursor-pointer"
+        >
+          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
+            <path d="M5 18C5 18 4 10 10 6C15 2 19 3 19 3C19 3 18 8 13 13C8 18 5 18 5 18Z" fill="#34D399" />
+            <path d="M9 18C9 18 10 12 15 9C19 6 22 7 22 7C22 7 21 11 17 15C13 19 9 18 9 18Z" fill="#10B981" />
+          </svg>
+        </button>
+
+        <div className="min-w-0">
+          <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 block leading-tight">
+            {timeGreeting}
+          </span>
+          <div className="text-sm font-extrabold text-[#111C2D] dark:text-white tracking-tight leading-tight truncate relative inline-block mt-0.5">
+            <span>{mobileTitle}</span>
+            <span className="absolute -bottom-0.5 left-0 w-3.5 h-0.5 bg-emerald-500 rounded-full" />
+          </div>
+        </div>
+      </div>
+
+      {/* Desktop Header Left Area (>= md) */}
+      <div className="hidden md:flex items-center gap-2 sm:gap-3 min-w-0 pr-2">
         <button
           type="button"
           onClick={onOpenMobileSidebar}
@@ -155,7 +192,7 @@ export const Topbar: React.FC<TopbarProps> = ({
             type="button"
             onClick={() => setIsMonthPickerOpen((prev) => !prev)}
             title="Filter by month"
-            className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl bg-white dark:bg-[#131926] border text-xs font-medium shadow-xs transition-all cursor-pointer select-none ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-full md:rounded-xl bg-white dark:bg-[#131926] border text-xs font-medium shadow-xs transition-all cursor-pointer select-none ${
               isMonthPickerOpen
                 ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400 ring-2 ring-emerald-500/20'
                 : 'border-slate-200/80 dark:border-slate-800/90 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700'
@@ -166,6 +203,7 @@ export const Topbar: React.FC<TopbarProps> = ({
             <span className="sm:hidden font-mono font-bold text-[11px] whitespace-nowrap">
               {MONTH_NAMES[selectedMonthIndex].slice(0, 3)} '{String(selectedYear).slice(-2)}
             </span>
+            <ChevronDown className="w-3 h-3 text-slate-400 sm:hidden shrink-0" />
           </button>
 
           {/* Month Picker Dropdown */}
@@ -244,7 +282,7 @@ export const Topbar: React.FC<TopbarProps> = ({
             onClick={toggleHideBalances}
             title={isBalancesHidden ? 'Reveal balances & financial numbers' : 'Hide balances & financial numbers'}
             aria-label={isBalancesHidden ? 'Reveal balances & financial numbers' : 'Hide balances & financial numbers'}
-            className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl border flex items-center justify-center transition-all shadow-xs active:scale-95 cursor-pointer shrink-0 ${
+            className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full md:rounded-xl border flex items-center justify-center transition-all shadow-xs active:scale-95 cursor-pointer shrink-0 ${
               isBalancesHidden
                 ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-600 dark:text-amber-400'
                 : 'bg-white dark:bg-[#131926] border-slate-200/80 dark:border-slate-800/90 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
@@ -264,7 +302,7 @@ export const Topbar: React.FC<TopbarProps> = ({
             type="button"
             onClick={onToggleTheme}
             title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-            className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/90 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition-colors shadow-xs active:scale-95 cursor-pointer shrink-0"
+            className="w-8 h-8 sm:w-9 sm:h-9 rounded-full md:rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/90 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition-colors shadow-xs active:scale-95 cursor-pointer shrink-0"
           >
             {theme === 'dark' ? (
               <Sun className="w-4 h-4 text-amber-400" />
