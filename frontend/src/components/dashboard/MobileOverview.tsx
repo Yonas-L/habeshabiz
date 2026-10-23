@@ -46,7 +46,7 @@ interface MobileOverviewProps {
 }
 
 const HERO_CARD_PATH =
-  'M 8 35 C 8 20, 20 9, 36 9 C 102 9, 150 16, 200 16 C 250 16, 298 9, 364 9 C 380 9, 392 20, 392 35 L 392 195 C 392 210, 380 221, 364 221 C 298 221, 250 218, 200 218 C 150 218, 102 221, 36 221 C 20 221, 8 210, 8 195 L 8 35 Z';
+  'M 10 38 C 10 22, 22 14, 38 14 C 95 14, 145 28, 200 28 C 255 28, 305 14, 362 14 C 378 14, 390 22, 390 38 L 390 192 C 390 208, 378 220, 362 220 C 305 220, 255 208, 200 208 C 145 208, 95 220, 38 220 C 22 220, 10 208, 10 192 L 10 38 Z';
 
 export const MobileOverview: React.FC<MobileOverviewProps> = ({
   data,
@@ -188,78 +188,78 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
             {/* 4. Elements Clipped Inside Main Card */}
             <g clipPath="url(#mainCardClip)">
               {/* Ambient glows */}
-              <circle cx="340" cy="60" r="90" fill="#15966b" opacity="0.28" />
-              <circle cx="55" cy="75" r="60" fill="#0d3349" opacity="0.22" />
+              <circle cx="340" cy="55" r="90" fill="#15966b" opacity="0.28" />
+              <circle cx="55" cy="72" r="60" fill="#0d3349" opacity="0.22" />
 
-              {/* Back wave shape (Rolling peaks) */}
+              {/* Back wave shape (Rolling peaks on the right side) */}
               <path
                 d="
-                  M 140 138
-                  C 170 135, 190 112, 215 114
-                  C 238 116, 258 94, 282 96
-                  C 304 98, 324 78, 344 80
-                  C 356 81, 366 68, 374 62
-                  L 392 138
-                  L 140 138
+                  M 160 146
+                  C 185 142, 205 118, 228 120
+                  C 250 122, 270 98, 292 100
+                  C 314 102, 334 78, 354 80
+                  C 362 81, 368 70, 374 64
+                  L 390 146
+                  L 160 146
                   Z"
                 fill="url(#backChartGrad)"
               />
               <path
                 d="
-                  M 140 138
-                  C 170 135, 190 112, 215 114
-                  C 238 116, 258 94, 282 96
-                  C 304 98, 324 78, 344 80
-                  C 356 81, 366 68, 374 62"
+                  M 160 146
+                  C 185 142, 205 118, 228 120
+                  C 250 122, 270 98, 292 100
+                  C 314 102, 334 78, 354 80
+                  C 362 81, 368 70, 374 64"
                 fill="none"
                 stroke="#10b981"
-                strokeWidth="1.6"
+                strokeWidth="1.5"
                 strokeOpacity="0.4"
               />
 
               {/* Front luminous wave shape (3 Rolling peaks crescendoing to top right) */}
               <path
                 d="
-                  M 150 138
-                  C 176 126, 196 98, 220 100
-                  C 240 102, 250 114, 266 112
-                  C 284 109, 298 86, 316 84
-                  C 332 83, 344 90, 354 78
-                  C 362 68, 368 60, 372 54
-                  L 392 138
-                  L 150 138
+                  M 170 146
+                  C 192 134, 210 106, 232 108
+                  C 250 110, 260 118, 274 116
+                  C 292 113, 305 92, 322 90
+                  C 336 89, 346 95, 354 84
+                  C 360 74, 364 62, 368 54
+                  L 390 146
+                  L 170 146
                   Z"
                 fill="url(#frontChartGrad)"
               />
               <path
                 d="
-                  M 150 138
-                  C 176 126, 196 98, 220 100
-                  C 240 102, 250 114, 266 112
-                  C 284 109, 298 86, 316 84
-                  C 332 83, 344 90, 354 78
-                  C 362 68, 368 60, 372 54"
+                  M 170 146
+                  C 192 134, 210 106, 232 108
+                  C 250 110, 260 118, 274 116
+                  C 292 113, 305 92, 322 90
+                  C 336 89, 346 95, 354 84
+                  C 360 74, 364 62, 368 54"
                 fill="none"
                 stroke="#34d399"
-                strokeWidth="2.8"
+                strokeWidth="2.6"
                 strokeLinecap="round"
               />
             </g>
 
             {/* Glowing Endpoint Bead: Solid white with luminous green aura */}
-            <circle cx="372" cy="54" r="5.5" fill="#ffffff" filter="url(#beadGlow)" />
-            <circle cx="372" cy="54" r="3.5" fill="#ffffff" stroke="#10b981" strokeWidth="1" />
+            <circle cx="368" cy="54" r="5" fill="#ffffff" filter="url(#beadGlow)" />
+            <circle cx="368" cy="54" r="3" fill="#ffffff" stroke="#10b981" strokeWidth="1" />
           </svg>
 
           {/* ── Foreground Interactive Content ── */}
           <div
             className="absolute z-10 flex flex-col justify-between"
             style={{
-              left: '2%',
-              width: '96%',
-              top: '3.9%',
-              height: '92.2%',
-              padding: '12px 14px 10px 14px',
+              left: '3%',
+              width: '94%',
+              top: '4.5%',
+              height: '88%',
+              padding: '8px 12px 6px 12px',
             }}
           >
             {/* Top Row: WORKING CAPITAL > and Strong Growth */}
@@ -270,13 +270,13 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                 className="flex items-center gap-1.5 group cursor-pointer active:scale-98 transition-transform"
               >
                 <span className="w-2.5 h-2.5 rounded-full bg-[#34d399] shadow-[0_0_8px_#34d399]" />
-                <span className="text-[12px] font-extrabold tracking-wider text-white">
+                <span className="text-[12px] font-bold tracking-wider text-white">
                   WORKING CAPITAL
                 </span>
                 <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-white group-hover:translate-x-0.5 transition-all stroke-[2.5]" />
               </button>
 
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#0c3327]/90 border border-[#34d399]/50 text-[#e6f7ef] text-[11px] font-semibold shadow-xs">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#082f23]/90 border border-[#34d399]/40 text-[#e6f7ef] text-[11px] font-semibold shadow-xs">
                 <ArrowUpRight className="w-3.5 h-3.5 text-[#34d399] stroke-[2.5]" />
                 <span>Strong Growth</span>
               </div>
@@ -285,7 +285,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
             {/* Middle Section: Big Financial Number + Growth */}
             <div className="mt-0.5 mb-1.5">
               <div className="flex items-baseline gap-2">
-                <span className="text-[31px] sm:text-[35px] font-black tracking-tight text-white font-sans tabular-nums leading-none drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]">
+                <span className="text-[32px] sm:text-[36px] font-black tracking-tight text-white font-sans [font-feature-settings:'normal'] leading-none drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]">
                   {isBalancesHidden ? '••••••••' : <AnimatedNumber value={capital_overview.net_capital || 10293682} />}
                 </span>
                 <span className="text-[15px] font-bold text-slate-300 font-sans tracking-wide">
@@ -302,8 +302,8 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               </div>
             </div>
 
-            {/* Inset Glassmorphic Breakdown Sub-Card */}
-            <div className="rounded-[16px] bg-[#060f18]/85 backdrop-blur-md border border-white/12 p-2 sm:p-2.5 shadow-lg">
+            {/* Inset Glassmorphic Breakdown Sub-Card (Legend Card strictly inside) */}
+            <div className="rounded-[16px] bg-[#0b1824]/85 backdrop-blur-md border border-white/12 px-3 py-2 shadow-lg mx-0.5">
               {/* Row 1: Stock, Liquid, Owed, Forex */}
               <div className="grid grid-cols-4 gap-1 text-[10px] sm:text-[11px]">
                 <button
