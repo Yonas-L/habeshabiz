@@ -116,32 +116,34 @@ export const Topbar: React.FC<TopbarProps> = ({
 
   const mobileTitle =
     activeTab === 'overview'
-      ? (user?.role === 'owner' ? 'Investor' : (user?.name || 'Store Staff'))
+      ? (user?.name || (user?.role === 'owner' ? 'Store Owner' : 'Store Staff'))
       : current.title;
 
   return (
-    <header className="sticky top-0 z-40 h-14 sm:h-16 px-3 sm:px-4 lg:px-8 flex items-center justify-between bg-[#f6f8fa]/95 dark:bg-[#0b0f17]/95 backdrop-blur-md transition-colors border-b border-slate-200/60 dark:border-slate-800/60 animate-fluid-topbar">
+    <header className="sticky top-0 z-40 h-16 px-3 sm:px-4 lg:px-8 flex items-center justify-between bg-[#f6f8fa]/95 dark:bg-[#0b0f17]/95 backdrop-blur-md transition-colors border-b border-slate-200/60 dark:border-slate-800/60 animate-fluid-topbar">
       {/* Mobile Branding & Personalized Title (< md) */}
       <div className="flex md:hidden items-center gap-2.5 min-w-0 pr-1">
         <button
           type="button"
           onClick={onOpenMobileSidebar}
           aria-label="Open Navigation Menu"
-          className="w-10 h-10 rounded-full bg-[#111C2D] border border-slate-200/20 shadow-md flex items-center justify-center shrink-0 active:scale-95 transition-transform cursor-pointer"
+          className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-[#0c4436] via-[#073228] to-[#032019] border border-emerald-400/35 shadow-md shadow-emerald-950/25 flex items-center justify-center shrink-0 active:scale-95 transition-transform cursor-pointer"
         >
-          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
-            <path d="M5 18C5 18 4 10 10 6C15 2 19 3 19 3C19 3 18 8 13 13C8 18 5 18 5 18Z" fill="#34D399" />
-            <path d="M9 18C9 18 10 12 15 9C19 6 22 7 22 7C22 7 21 11 17 15C13 19 9 18 9 18Z" fill="#10B981" />
-          </svg>
+          <div className="grid grid-cols-2 gap-1 w-5 h-5 place-items-center pointer-events-none">
+            <span className="w-2 h-2 rounded-[2px] bg-white shadow-xs" />
+            <span className="w-2 h-2 rounded-[2px] bg-white shadow-xs" />
+            <span className="w-2 h-2 rounded-[2px] bg-white shadow-xs" />
+            <span className="w-2 h-2 rounded-[2px] bg-white shadow-xs" />
+          </div>
         </button>
 
         <div className="min-w-0">
-          <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 block leading-tight">
-            {timeGreeting}
+          <span className="text-xs sm:text-[13px] font-semibold text-slate-500 dark:text-slate-400 block leading-tight truncate">
+            {activeTab === 'overview' ? timeGreeting : (user?.name || 'Workspace')}
           </span>
-          <div className="text-sm font-extrabold text-[#111C2D] dark:text-white tracking-tight leading-tight truncate relative inline-block mt-0.5">
+          <div className="text-base sm:text-lg font-black text-[#111C2D] dark:text-white tracking-tight leading-tight truncate relative inline-block mt-0.5">
             <span>{mobileTitle}</span>
-            <span className="absolute -bottom-0.5 left-0 w-3.5 h-0.5 bg-emerald-500 rounded-full" />
+            <span className="absolute -bottom-0.5 left-0 w-4 sm:w-5 h-0.5 bg-emerald-500 rounded-full" />
           </div>
         </div>
       </div>
@@ -168,17 +170,17 @@ export const Topbar: React.FC<TopbarProps> = ({
       </div>
 
       {/* Right Header Area */}
-      <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         {/* User Persona Pill (Clickable for Account Settings) */}
         {user && (
           <button
             type="button"
             onClick={onOpenProfile}
             title="Manage account details & password"
-            className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/90 shadow-xs text-xs font-semibold text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700 transition-colors"
+            className="hidden md:flex items-center gap-2 px-3 h-10 sm:h-11 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/90 shadow-xs text-xs font-semibold text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700 transition-colors"
           >
             <span
-              className={`w-1.5 h-1.5 rounded-full ${
+              className={`w-2 h-2 rounded-full ${
                 user.role === 'owner' ? 'bg-purple-500' : 'bg-emerald-500'
               }`}
             />
@@ -192,18 +194,18 @@ export const Topbar: React.FC<TopbarProps> = ({
             type="button"
             onClick={() => setIsMonthPickerOpen((prev) => !prev)}
             title="Filter by month"
-            className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-full md:rounded-xl bg-white dark:bg-[#131926] border text-xs font-medium shadow-xs transition-all cursor-pointer select-none ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 h-10 sm:h-11 rounded-xl bg-white dark:bg-[#131926] border text-xs sm:text-sm font-semibold shadow-xs transition-all cursor-pointer select-none ${
               isMonthPickerOpen
                 ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400 ring-2 ring-emerald-500/20'
                 : 'border-slate-200/80 dark:border-slate-800/90 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700'
             }`}
           >
-            <Calendar className={`w-3.5 h-3.5 shrink-0 ${isMonthPickerOpen ? 'text-emerald-500' : 'text-slate-400'}`} />
-            <span className="hidden sm:inline font-medium">{displayLabel}</span>
-            <span className="sm:hidden font-mono font-bold text-[11px] whitespace-nowrap">
+            <Calendar className={`w-4 h-4 sm:w-4.5 sm:h-4.5 shrink-0 ${isMonthPickerOpen ? 'text-emerald-500' : 'text-slate-400'}`} />
+            <span className="hidden sm:inline font-semibold">{displayLabel}</span>
+            <span className="sm:hidden font-mono font-bold text-xs whitespace-nowrap">
               {MONTH_NAMES[selectedMonthIndex].slice(0, 3)} '{String(selectedYear).slice(-2)}
             </span>
-            <ChevronDown className="w-3 h-3 text-slate-400 sm:hidden shrink-0" />
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 sm:hidden shrink-0" />
           </button>
 
           {/* Month Picker Dropdown */}
@@ -282,16 +284,16 @@ export const Topbar: React.FC<TopbarProps> = ({
             onClick={toggleHideBalances}
             title={isBalancesHidden ? 'Reveal balances & financial numbers' : 'Hide balances & financial numbers'}
             aria-label={isBalancesHidden ? 'Reveal balances & financial numbers' : 'Hide balances & financial numbers'}
-            className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full md:rounded-xl border flex items-center justify-center transition-all shadow-xs active:scale-95 cursor-pointer shrink-0 ${
+            className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl border flex items-center justify-center transition-all shadow-xs active:scale-95 cursor-pointer shrink-0 ${
               isBalancesHidden
                 ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-600 dark:text-amber-400'
                 : 'bg-white dark:bg-[#131926] border-slate-200/80 dark:border-slate-800/90 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             {isBalancesHidden ? (
-              <EyeOff className="w-4 h-4 text-amber-500" />
+              <EyeOff className="w-5 h-5 text-amber-500" />
             ) : (
-              <Eye className="w-4 h-4 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300" />
+              <Eye className="w-5 h-5 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300" />
             )}
           </button>
         )}
@@ -302,12 +304,12 @@ export const Topbar: React.FC<TopbarProps> = ({
             type="button"
             onClick={onToggleTheme}
             title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-            className="w-8 h-8 sm:w-9 sm:h-9 rounded-full md:rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/90 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition-colors shadow-xs active:scale-95 cursor-pointer shrink-0"
+            className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/90 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition-colors shadow-xs active:scale-95 cursor-pointer shrink-0"
           >
             {theme === 'dark' ? (
-              <Sun className="w-4 h-4 text-amber-400" />
+              <Sun className="w-5 h-5 text-amber-400" />
             ) : (
-              <Moon className="w-4 h-4 text-slate-600" />
+              <Moon className="w-5 h-5 text-slate-600" />
             )}
           </button>
         )}
@@ -317,9 +319,9 @@ export const Topbar: React.FC<TopbarProps> = ({
           <button
             type="button"
             onClick={onQuickAction}
-            className="hidden md:flex h-9 px-3.5 rounded-xl bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 text-white dark:text-slate-900 text-xs font-bold transition-all shadow-sm items-center gap-1.5 active:scale-[0.98]"
+            className="hidden md:flex h-10 sm:h-11 px-4 rounded-xl bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 text-white dark:text-slate-900 text-xs font-bold transition-all shadow-sm items-center gap-1.5 active:scale-[0.98]"
           >
-            <Plus className="w-3.5 h-3.5 text-emerald-400 dark:text-emerald-600" />
+            <Plus className="w-4 h-4 text-emerald-400 dark:text-emerald-600" />
             <span>Record Sale</span>
           </button>
         )}
