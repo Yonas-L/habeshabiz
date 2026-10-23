@@ -46,7 +46,7 @@ interface MobileOverviewProps {
 }
 
 const HERO_CARD_PATH =
-  'M 8 36 C 8 20, 20 12, 38 12 C 105 12, 155 26, 210 26 C 265 26, 315 12, 382 12 C 400 12, 412 20, 412 36 L 412 202 C 412 218, 400 228, 382 228 C 315 228, 265 216, 210 216 C 155 216, 105 228, 38 228 C 20 228, 8 218, 8 202 L 8 36 Z';
+  'M 8 36 C 8 20, 20 12, 38 12 C 105 12, 155 26, 210 26 C 265 26, 315 12, 382 12 C 400 12, 412 20, 412 36 L 412 220 C 412 236, 400 246, 382 246 C 315 246, 265 234, 210 234 C 155 234, 105 246, 38 246 C 20 246, 8 236, 8 220 L 8 36 Z';
 
 export const MobileOverview: React.FC<MobileOverviewProps> = ({
   data,
@@ -102,10 +102,10 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
     <div className="space-y-4 px-0.5 animate-page-enter">
       {/* ── 1. WORKING CAPITAL HERO WIDGET (Exact Match to Premium Reference Deck) ── */}
       <div className="relative w-full select-none -mx-1.5 px-0.5 py-0.5">
-        <div className="relative w-full aspect-[420/240] overflow-visible">
+        <div className="relative w-full aspect-[420/256] overflow-visible">
           {/* Unified SVG Deck (Congruent Stacked Cards + Main Card + Spline Chart) */}
           <svg
-            viewBox="0 0 420 240"
+            viewBox="0 0 420 256"
             className="w-full h-full overflow-visible drop-shadow-sm"
             preserveAspectRatio="none"
           >
@@ -188,29 +188,29 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
             {/* 4. Elements Clipped Inside Main Card */}
             <g clipPath="url(#mainCardClip)">
               {/* Ambient glows */}
-              <circle cx="360" cy="60" r="95" fill="#15966b" opacity="0.28" />
-              <circle cx="60" cy="75" r="65" fill="#0d3349" opacity="0.22" />
+              <circle cx="360" cy="65" r="95" fill="#15966b" opacity="0.28" />
+              <circle cx="60" cy="80" r="65" fill="#0d3349" opacity="0.22" />
 
               {/* Back wave shape (Rolling peaks on the right side) */}
               <path
                 d="
-                  M 175 152
-                  C 200 148, 222 124, 246 126
-                  C 270 128, 290 106, 312 108
-                  C 334 110, 354 86, 374 88
-                  C 386 89, 396 76, 402 70
-                  L 412 152
-                  L 175 152
+                  M 175 160
+                  C 200 156, 222 130, 246 132
+                  C 270 134, 290 112, 312 114
+                  C 334 116, 354 92, 374 94
+                  C 386 95, 396 82, 402 76
+                  L 412 160
+                  L 175 160
                   Z"
                 fill="url(#backChartGrad)"
               />
               <path
                 d="
-                  M 175 152
-                  C 200 148, 222 124, 246 126
-                  C 270 128, 290 106, 312 108
-                  C 334 110, 354 86, 374 88
-                  C 386 89, 396 76, 402 70"
+                  M 175 160
+                  C 200 156, 222 130, 246 132
+                  C 270 134, 290 112, 312 114
+                  C 334 116, 354 92, 374 94
+                  C 386 95, 396 82, 402 76"
                 fill="none"
                 stroke="#10b981"
                 strokeWidth="1.5"
@@ -220,25 +220,25 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               {/* Front luminous wave shape (3 Rolling peaks crescendoing cleanly to top right) */}
               <path
                 d="
-                  M 185 152
-                  C 210 138, 230 112, 252 114
-                  C 270 116, 282 124, 298 122
-                  C 318 119, 332 98, 350 96
-                  C 366 95, 378 102, 388 90
-                  C 394 80, 397 66, 400 54
-                  L 412 152
-                  L 185 152
+                  M 185 160
+                  C 210 144, 230 118, 252 120
+                  C 270 122, 282 130, 298 128
+                  C 318 125, 332 104, 350 102
+                  C 366 101, 378 108, 388 96
+                  C 394 86, 397 72, 400 60
+                  L 412 160
+                  L 185 160
                   Z"
                 fill="url(#frontChartGrad)"
               />
               <path
                 d="
-                  M 185 152
-                  C 210 138, 230 112, 252 114
-                  C 270 116, 282 124, 298 122
-                  C 318 119, 332 98, 350 96
-                  C 366 95, 378 102, 388 90
-                  C 394 80, 397 66, 400 54"
+                  M 185 160
+                  C 210 144, 230 118, 252 120
+                  C 270 122, 282 130, 298 128
+                  C 318 125, 332 104, 350 102
+                  C 366 101, 378 108, 388 96
+                  C 394 86, 397 72, 400 60"
                 fill="none"
                 stroke="#34d399"
                 strokeWidth="2.6"
@@ -247,8 +247,8 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
             </g>
 
             {/* Glowing Endpoint Bead: Solid white with luminous green aura */}
-            <circle cx="400" cy="54" r="5.5" fill="#ffffff" filter="url(#beadGlow)" />
-            <circle cx="400" cy="54" r="3.5" fill="#ffffff" stroke="#10b981" strokeWidth="1" />
+            <circle cx="400" cy="60" r="5.5" fill="#ffffff" filter="url(#beadGlow)" />
+            <circle cx="400" cy="60" r="3.5" fill="#ffffff" stroke="#10b981" strokeWidth="1" />
           </svg>
 
           {/* ── Foreground Interactive Content ── */}
@@ -257,13 +257,13 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
             style={{
               left: '2.5%',
               width: '95%',
-              top: '4%',
-              height: '90%',
-              padding: '10px 14px 6px 14px',
+              top: '5%',
+              height: '88%',
+              padding: '12px 14px 6px 14px',
             }}
           >
-            {/* Top Row: WORKING CAPITAL > and Strong Growth */}
-            <div className="flex items-center justify-between">
+            {/* Top Row: WORKING CAPITAL > and Strong Growth (Comfortable Top Margin) */}
+            <div className="flex items-center justify-between pt-1">
               <button
                 type="button"
                 onClick={() => openVital('inventory')}
@@ -283,7 +283,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
             </div>
 
             {/* Middle Section: Big Financial Number + Growth */}
-            <div className="mt-0.5 mb-1.5">
+            <div className="mt-1 mb-1.5">
               <div className="flex items-baseline gap-2">
                 <span className="text-[33px] sm:text-[37px] font-black tracking-tight text-white font-sans [font-feature-settings:'normal'] leading-none drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]">
                   {isBalancesHidden ? '••••••••' : <AnimatedNumber value={capital_overview.net_capital || 10293682} />}
