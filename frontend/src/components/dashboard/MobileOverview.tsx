@@ -410,15 +410,15 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
             title={`Stock: ${isBalancesHidden ? '••••••' : capital_overview.stock_value.toLocaleString()} ETB`}
           >
             <div className="size-12 min-[390px]:size-[52px] rounded-[18px] min-[390px]:rounded-[20px] p-1 bg-slate-100/80 dark:bg-slate-800/50 border border-slate-200/60 dark:border-white/5 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 transition-all">
-              <div className="w-full h-full rounded-[14px] min-[390px]:rounded-[16px] bg-[#0c392c] dark:bg-[#072d22] flex items-center justify-center shadow-xs">
-                <Package className="w-6 h-6 min-[390px]:w-[26px] min-[390px]:h-[26px] text-white stroke-[2.2]" />
+              <div className="w-full h-full rounded-[14px] min-[390px]:rounded-[16px] bg-gradient-to-b from-[#eef9f2] to-[#ddf4e6] dark:from-[#0b2b1d] dark:to-[#071f15] flex items-center justify-center shadow-xs">
+                <Package className="w-6 h-6 min-[390px]:w-[26px] min-[390px]:h-[26px] text-[#047857] dark:text-emerald-400 stroke-[2.2]" />
               </div>
             </div>
             <span className="text-[11px] min-[390px]:text-xs font-semibold text-slate-800 dark:text-slate-200 mt-1.5 min-[390px]:mt-2 truncate max-w-full block">
               Stock
             </span>
             <span className="text-[10px] min-[390px]:text-[11.5px] font-medium font-mono tracking-tight text-slate-500 dark:text-slate-400 mt-0.5 truncate max-w-full block">
-              {isBalancesHidden ? '••••••' : <AnimatedNumber value={capital_overview.stock_value} />}
+              {isBalancesHidden ? '••••••' : <AnimatedNumber value={capital_overview.stock_value} compact />}
             </span>
           </button>
 
@@ -438,7 +438,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               Bank
             </span>
             <span className="text-[10px] min-[390px]:text-[11.5px] font-medium font-mono tracking-tight text-slate-500 dark:text-slate-400 mt-0.5 truncate max-w-full block">
-              {isBalancesHidden ? '••••••' : <AnimatedNumber value={capital_overview.cash_and_banks} />}
+              {isBalancesHidden ? '••••••' : <AnimatedNumber value={capital_overview.cash_and_banks} compact />}
             </span>
           </button>
 
@@ -458,7 +458,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               Owed
             </span>
             <span className="text-[10px] min-[390px]:text-[11.5px] font-semibold font-mono tracking-tight text-emerald-600 dark:text-emerald-400 mt-0.5 truncate max-w-full block">
-              {isBalancesHidden ? '••••••' : <>+<AnimatedNumber value={capital_overview.receivables} /></>}
+              {isBalancesHidden ? '••••••' : <AnimatedNumber value={capital_overview.receivables} compact prefix="+" />}
             </span>
           </button>
 
@@ -478,7 +478,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               You Owe
             </span>
             <span className="text-[10px] min-[390px]:text-[11.5px] font-semibold font-mono tracking-tight text-rose-500 dark:text-rose-400 mt-0.5 truncate max-w-full block">
-              {isBalancesHidden ? '••••••' : <>{(capital_overview.payables || 0) > 0 ? '-' : ''}<AnimatedNumber value={capital_overview.payables} /></>}
+              {isBalancesHidden ? '••••••' : <AnimatedNumber value={capital_overview.payables} compact prefix={(capital_overview.payables || 0) > 0 ? '-' : ''} />}
             </span>
           </button>
 
@@ -498,7 +498,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               Other
             </span>
             <span className="text-[10px] min-[390px]:text-[11.5px] font-medium font-mono tracking-tight text-slate-500 dark:text-slate-400 mt-0.5 truncate max-w-full block">
-              {isBalancesHidden ? '••••••' : <AnimatedNumber value={capital_overview.custom_assets} />}
+              {isBalancesHidden ? '••••••' : <AnimatedNumber value={capital_overview.custom_assets} compact />}
             </span>
           </button>
         </div>

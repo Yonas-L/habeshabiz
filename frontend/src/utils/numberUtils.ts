@@ -29,3 +29,26 @@ export function parseFormattedNumber(val: string | number | null | undefined): n
   if (!cleaned || isNaN(Number(cleaned))) return null;
   return parseFloat(cleaned);
 }
+
+/**
+ * Format numbers into clean compact strings with K or M or B suffix.
+ * Prevents text truncation on compact mobile cards (e.g. 3,958,500 -> 3.96M, 536,460 -> 536K).
+ */
+export function formatCompactKMB(val: number | null | undefined): string {
+  if (val === null || val === undefined || isNaN(val)) return '0';
+  const abs = Math.abs(val);
+  const sign = val < 0 ? '-' : '';
+  if (abs >= 1_000_000_000) {
+    const num = abs / 1_000_000_000;
+    return `${sign}${num >= 10 ? num.toFixed(1) : num.toFixed(2).replace(/\.?0+$/, '')}B`;
+  }
+  if (abs >= 1_000_000) {
+    const num = abs / 1_000_000;
+    return `${sign}${num >= 10 ? num.toFixed(1) : num.toFixed(2).replace(/\.?0+$/, '')}M`;
+  }
+  if (abs >= 10_000) {
+    const num = abs / 1_000;
+    return `${sign}${num >= 100 ? Math.round(num) : num.toFixed(1).replace(/\.?0+$/, '')}K`;
+  }
+  return `${sign}${abs.toLocaleString('en-US')}`;
+}

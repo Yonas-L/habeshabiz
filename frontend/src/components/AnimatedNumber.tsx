@@ -1,10 +1,12 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useBalancePrivacy } from '../context/BalancePrivacyContext';
+import { formatCompactKMB } from '../utils/numberUtils';
 
 interface AnimatedNumberProps {
   value: number;
   duration?: number;
   decimals?: number;
+  compact?: boolean;
   prefix?: string;
   suffix?: string;
   className?: string;
@@ -16,6 +18,7 @@ export const AnimatedNumber: React.FC<AnimatedNumberProps> = ({
   value,
   duration = 600,
   decimals = 0,
+  compact = false,
   prefix = '',
   suffix = '',
   className = '',
@@ -97,10 +100,12 @@ export const AnimatedNumber: React.FC<AnimatedNumberProps> = ({
     };
   }, [numericValue, duration, prefersReducedMotion]);
 
-  const formatted = displayValue.toLocaleString('en-US', {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  });
+  const formatted = compact
+    ? formatCompactKMB(displayValue)
+    : displayValue.toLocaleString('en-US', {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+      });
 
   return (
     <span className={`tabular-nums font-mono ${className}`}>
