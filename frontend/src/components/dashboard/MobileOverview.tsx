@@ -10,7 +10,6 @@ import {
   ArrowUp,
   Coins,
   TrendingUp,
-  BarChart3,
   MoreHorizontal,
   Wallet,
   Sprout,
@@ -504,215 +503,347 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
         </div>
       </div>
 
-      {/* ── 3. MONTHLY PERFORMANCE SECTION (2x2 Grid) ── */}
-      <div className="space-y-3">
+      {/* ── 3. MONTHLY PERFORMANCE SECTION (2x2 Grid with Pinched Organic Cards & Exact Beams) ── */}
+      <div className="rounded-[28px] bg-white dark:bg-[#111C2D] border border-slate-200/80 dark:border-slate-800/80 p-3 min-[390px]:p-4 shadow-[0_4px_24px_-4px_rgba(0,0,0,0.05)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] space-y-3.5 select-none">
         {/* Section Heading */}
         <div className="flex items-center justify-between px-0.5">
-          <div className="flex items-center gap-2">
-            <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white truncate">
-              {monthDisplayLabel} Performance
-            </h2>
+          <div className="flex items-center gap-2.5">
+            <div className="size-9 rounded-[13px] bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center shrink-0">
+              <TrendingUp className="w-5 h-5 text-emerald-700 dark:text-emerald-400 stroke-[2.4]" />
+            </div>
+            <div className="leading-tight">
+              <span className="text-[10px] font-bold tracking-wider uppercase text-slate-500 dark:text-slate-400 block">
+                {monthDisplayLabel}
+              </span>
+              <h2 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white tracking-tight">
+                Performance
+              </h2>
+            </div>
           </div>
           {topSeller && user?.role === 'owner' && (
             <button
               type="button"
               onClick={() => onNavigateTab('staff')}
               title="View Staff & Team Dashboard"
-              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-amber-50/90 dark:bg-amber-950/40 border border-amber-200/70 dark:border-amber-900/50 text-amber-900 dark:text-amber-300 text-[10px] font-semibold active:scale-[0.98] cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/80 shadow-xs text-xs font-bold text-slate-800 dark:text-slate-200 active:scale-95 cursor-pointer transition-transform"
             >
               <span>
-                Top: <span className="font-bold">{topSeller.name}</span>
+                Top: <span className="font-extrabold text-slate-900 dark:text-white">{topSeller.name}</span>
               </span>
-              <ChevronRight className="w-3 h-3 opacity-60" />
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
             </button>
           )}
         </div>
 
         {/* 2x2 Performance Grid */}
-        <div className="grid grid-cols-2 gap-3">
-          {/* Card 1: Revenue (Dark Navy Surface with Glowing Sparkline) */}
-          <div className="rounded-[24px] bg-[#111C2D] text-white p-4 border border-slate-800 shadow-md relative overflow-hidden flex flex-col justify-between min-h-[148px]">
-            {/* Ambient card tint */}
-            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full blur-xl pointer-events-none" />
+        <div className="grid grid-cols-2 gap-2.5 min-[390px]:gap-3">
+          {/* Card 1: Revenue (Dark Mesh Surface with Multi-Node Spline & Luminous Beam) */}
+          <div className="relative min-h-[126px] min-[390px]:min-h-[132px] flex flex-col justify-between overflow-visible">
+            {/* Pinched Card Background */}
+            <svg viewBox="0 0 180 130" className="absolute inset-0 w-full h-full pointer-events-none drop-shadow-md overflow-visible" preserveAspectRatio="none">
+              <defs>
+                <radialGradient id="cardRevGrad" cx="85%" cy="15%" r="95%">
+                  <stop offset="0%" stopColor="#1a443a" />
+                  <stop offset="35%" stopColor="#122f3c" />
+                  <stop offset="70%" stopColor="#0d212c" />
+                  <stop offset="100%" stopColor="#08141b" />
+                </radialGradient>
+                <linearGradient id="cardRevBeam" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#34d399" stopOpacity="0.45" />
+                  <stop offset="60%" stopColor="#10b981" stopOpacity="0.12" />
+                  <stop offset="100%" stopColor="#064e3b" stopOpacity="0.0" />
+                </linearGradient>
+                <filter id="revDotGlow" x="-50%" y="-50%" width="200%" height="200%">
+                  <feDropShadow dx="0" dy="0" stdDeviation="2.5" floodColor="#34d399" floodOpacity="0.95" />
+                </filter>
+              </defs>
+              <path
+                d="M 18 0 L 162 0 C 172 0, 180 8, 180 18 C 177 45, 175.5 65, 175.5 65 C 175.5 65, 177 85, 180 112 C 180 122, 172 130, 162 130 L 18 130 C 8 130, 0 122, 0 112 C 3 85, 4.5 65, 4.5 65 C 4.5 65, 3 45, 0 18 C 0 8, 8 0, 18 0 Z"
+                fill="url(#cardRevGrad)"
+                stroke="rgba(255,255,255,0.14)"
+                strokeWidth="1.2"
+              />
+              {/* Spline Beam under the chart */}
+              <path
+                d="M 10 102 C 25 100, 42 106, 62 98 C 82 90, 102 102, 122 96 C 138 90, 150 82, 165 72 L 165 130 L 10 130 Z"
+                fill="url(#cardRevBeam)"
+              />
+              {/* Spline Line */}
+              <path
+                d="M 10 102 C 25 100, 42 106, 62 98 C 82 90, 102 102, 122 96 C 138 90, 150 82, 165 72"
+                fill="none"
+                stroke="#34d399"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+              {/* Vertex Nodes */}
+              <circle cx="28" cy="101" r="2" fill="#34d399" />
+              <circle cx="62" cy="98" r="2" fill="#34d399" />
+              <circle cx="102" cy="101" r="2" fill="#34d399" />
+              <circle cx="132" cy="94" r="2" fill="#34d399" />
+              <circle cx="165" cy="72" r="4.5" fill="#ffffff" filter="url(#revDotGlow)" />
+              <circle cx="165" cy="72" r="2.5" fill="#10b981" />
+            </svg>
 
-            <div className="flex items-center justify-between relative z-10">
-              <div className="flex items-center gap-1.5">
-                <BarChart3 className="w-4 h-4 text-emerald-400 stroke-[2.2]" />
-                <span className="text-[10px] font-bold tracking-wider uppercase text-slate-400">
-                  Revenue
-                </span>
-              </div>
-              <MoreHorizontal className="w-4 h-4 text-slate-500" />
-            </div>
-
-            <div className="mt-2.5 relative z-10">
-              <div className="text-xl sm:text-2xl font-extrabold font-mono tracking-tight text-white">
-                <AnimatedNumber value={monthly_performance.revenue} />
-                <span className="text-[11px] font-semibold text-slate-400 ml-1 font-sans">
-                  ETB
-                </span>
-              </div>
-              <span className="text-[10px] text-slate-400 mt-0.5 block truncate">
-                Gross sales before discounts
-              </span>
-            </div>
-
-            {/* Glowing Mini Sparkline Graphic */}
-            <div className="relative h-6 w-full mt-2 overflow-visible">
-              <svg viewBox="0 0 140 24" className="w-full h-full overflow-visible" preserveAspectRatio="none">
-                <path
-                  d="M 0 20 Q 30 18, 55 12 T 95 10 T 135 4"
-                  fill="none"
-                  stroke="#10b981"
-                  strokeWidth="2.2"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </div>
-          </div>
-
-          {/* Card 2: Gross Profit (Soft Mint Surface with Wave Curve) */}
-          {canViewCost ? (
-            <div className="rounded-[24px] bg-[#f0fbf5] dark:bg-[#0c241a] p-4 border border-emerald-200/80 dark:border-emerald-800/60 shadow-xs relative overflow-hidden flex flex-col justify-between min-h-[148px]">
-              <div className="flex items-center justify-between relative z-10">
-                <div className="flex items-center gap-1.5">
-                  <Coins className="w-4 h-4 text-emerald-600 dark:text-emerald-400 stroke-[2.2]" />
-                  <span className="text-[10px] font-bold tracking-wider uppercase text-emerald-800 dark:text-emerald-300">
-                    Gross Profit
+            {/* Foreground Content */}
+            <div className="relative z-10 flex flex-col justify-between h-full p-3 min-[390px]:p-3.5 text-white">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <div className="size-7 min-[390px]:size-8 rounded-[10px] bg-[#a7f3d0] flex items-center justify-center shrink-0 shadow-xs">
+                    <svg className="w-4 h-4" viewBox="0 0 20 20" fill="none">
+                      <rect x="3.5" y="9" width="3" height="8" rx="1" fill="#064e3b" />
+                      <rect x="8.5" y="4" width="3" height="13" rx="1" fill="#064e3b" />
+                      <rect x="13.5" y="11" width="3" height="6" rx="1" fill="#064e3b" />
+                    </svg>
+                  </div>
+                  <span className="text-xs min-[390px]:text-[13px] font-bold text-white truncate">
+                    Revenue
                   </span>
                 </div>
+                <MoreHorizontal className="w-4 h-4 text-slate-400 shrink-0" />
               </div>
 
-              <div className="mt-2.5 relative z-10">
-                <div className={`text-xl sm:text-2xl font-extrabold font-mono tracking-tight ${
-                  monthly_performance.gross_profit < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-700 dark:text-emerald-400'
-                }`}>
-                  {monthly_performance.gross_profit > 0 ? '+' : monthly_performance.gross_profit < 0 ? '−' : ''}
-                  <AnimatedNumber value={Math.abs(monthly_performance.gross_profit)} />
-                  <span className="text-[11px] font-semibold text-emerald-600/70 dark:text-emerald-400/70 ml-1 font-sans">
+              <div className="mt-1.5 min-[390px]:mt-2">
+                <div className="text-[17px] min-[390px]:text-xl font-extrabold font-mono tracking-tight text-white flex items-baseline">
+                  {isBalancesHidden ? '••••••' : <AnimatedNumber value={monthly_performance.revenue} />}
+                  <span className="text-[11px] min-[390px]:text-xs font-semibold text-slate-300 ml-1 font-sans">
                     ETB
                   </span>
                 </div>
-                <span className="text-[10px] text-emerald-700/80 dark:text-emerald-400/80 mt-0.5 block truncate">
-                  Net sales − stock cost
+                <span className="text-[9.5px] min-[390px]:text-[10.5px] text-slate-400 mt-0.5 block truncate">
+                  Gross sales before discounts
                 </span>
               </div>
-
-              {/* Soft Mint Wave Graphic */}
-              <div className="relative h-6 w-full mt-2 overflow-visible">
-                <svg viewBox="0 0 140 24" className="w-full h-full overflow-visible" preserveAspectRatio="none">
-                  <path
-                    d="M 0 18 Q 35 15, 70 8 T 135 3"
-                    fill="none"
-                    stroke="#059669"
-                    strokeWidth="2.2"
-                    strokeLinecap="round"
-                    className="opacity-80"
-                  />
-                </svg>
-              </div>
-            </div>
-          ) : (
-            /* Fallback for staff who cannot view costs */
-            <div className="rounded-[24px] bg-[#f0fbf5] dark:bg-[#0c241a] p-4 border border-emerald-200/80 dark:border-emerald-800/60 shadow-xs relative overflow-hidden flex flex-col justify-between min-h-[148px]">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold tracking-wider uppercase text-emerald-800 dark:text-emerald-300">
-                  Store Activity
-                </span>
-              </div>
-              <div className="text-xl font-bold font-mono tracking-tight text-emerald-700 dark:text-emerald-400">
-                Active Store
-              </div>
-              <span className="text-[10px] text-emerald-600 dark:text-emerald-400">
-                Operational records active
-              </span>
-            </div>
-          )}
-
-          {/* Card 3: Expenses (Soft Rose Surface with Interactive +Record pill) */}
-          <div className="rounded-[24px] bg-[#fdf4f4] dark:bg-[#281318] p-4 border border-rose-200/80 dark:border-rose-900/60 shadow-xs relative overflow-hidden flex flex-col justify-between min-h-[148px]">
-            <div className="flex items-center justify-between relative z-10">
-              <div className="flex items-center gap-1.5">
-                <Wallet className="w-4 h-4 text-rose-600 dark:text-rose-400 stroke-[2.2]" />
-                <span className="text-[10px] font-bold tracking-wider uppercase text-rose-800 dark:text-rose-300">
-                  Expenses
-                </span>
-              </div>
-
-              {/* Interactive + Record badge pill */}
-              <button
-                type="button"
-                onClick={onOpenExpenseModal}
-                title="Quickly record expense"
-                className="px-2 py-0.5 rounded-full bg-rose-500/15 border border-rose-500/25 text-rose-600 dark:text-rose-300 text-[9px] font-bold flex items-center gap-0.5 active:scale-95 cursor-pointer hover:bg-rose-500/25 transition-all"
-              >
-                <Plus className="w-2.5 h-2.5" />
-                <span>Record</span>
-              </button>
-            </div>
-
-            <div className="mt-2.5 relative z-10">
-              <div className="text-xl sm:text-2xl font-extrabold font-mono tracking-tight text-rose-600 dark:text-rose-400">
-                {(monthly_performance.operating_expenses || 0) > 0 ? '−' : ''}
-                <AnimatedNumber value={monthly_performance.operating_expenses} />
-                <span className="text-[11px] font-semibold text-rose-500/70 dark:text-rose-400/70 ml-1 font-sans">
-                  ETB
-                </span>
-              </div>
-              <span className="text-[10px] text-rose-600/80 dark:text-rose-400/80 mt-0.5 block truncate">
-                Bills + Bank Fees
-              </span>
-            </div>
-
-            {/* Soft Rose Wave Graphic */}
-            <div className="relative h-6 w-full mt-2 overflow-visible">
-              <svg viewBox="0 0 140 24" className="w-full h-full overflow-visible" preserveAspectRatio="none">
-                <path
-                  d="M 0 10 Q 40 18, 75 14 T 135 20"
-                  fill="none"
-                  stroke="#e11d48"
-                  strokeWidth="2.2"
-                  strokeLinecap="round"
-                  className="opacity-75"
-                />
-              </svg>
             </div>
           </div>
 
-          {/* Card 4: Net Profit (Clean Light Surface with 5-Step Bar Graphic) */}
-          <div className="rounded-[24px] bg-white dark:bg-[#131926] p-4 border border-slate-200/80 dark:border-slate-800 shadow-xs relative overflow-hidden flex flex-col justify-between min-h-[148px]">
-            <div className="flex items-center justify-between relative z-10">
-              <div className="flex items-center gap-1.5">
-                <Sprout className="w-4 h-4 text-emerald-600 dark:text-emerald-400 stroke-[2.2]" />
-                <span className="text-[10px] font-bold tracking-wider uppercase text-slate-700 dark:text-slate-300">
-                  Net Profit
+          {/* Card 2: Gross Profit (Soft Mint Surface with Rising Curve & Beam) */}
+          {canViewCost ? (
+            <div className="relative min-h-[126px] min-[390px]:min-h-[132px] flex flex-col justify-between overflow-visible">
+              {/* Pinched Card Background */}
+              <svg viewBox="0 0 180 130" className="absolute inset-0 w-full h-full pointer-events-none drop-shadow-xs overflow-visible" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="cardGrossGrad" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stopColor="#f2faf5" />
+                    <stop offset="50%" stopColor="#e8f6ee" />
+                    <stop offset="100%" stopColor="#dcf1e4" />
+                  </linearGradient>
+                  <linearGradient id="cardGrossBeam" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#10b981" stopOpacity="0.4" />
+                    <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
+                  </linearGradient>
+                </defs>
+                <path
+                  d="M 18 0 L 162 0 C 172 0, 180 8, 180 18 C 177 45, 175.5 65, 175.5 65 C 175.5 65, 177 85, 180 112 C 180 122, 172 130, 162 130 L 18 130 C 8 130, 0 122, 0 112 C 3 85, 4.5 65, 4.5 65 C 4.5 65, 3 45, 0 18 C 0 8, 8 0, 18 0 Z"
+                  fill="url(#cardGrossGrad)"
+                  stroke="#a7f3d0"
+                  strokeOpacity="0.75"
+                  strokeWidth="1.2"
+                />
+                {/* Soft radiant beam under rising curve */}
+                <path
+                  d="M 80 130 C 105 126, 122 118, 140 121 C 152 122, 160 110, 168 96 L 168 130 Z"
+                  fill="url(#cardGrossBeam)"
+                />
+                <path
+                  d="M 80 130 C 105 126, 122 118, 140 121 C 152 122, 160 110, 168 96"
+                  fill="none"
+                  stroke="#059669"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
+                <circle cx="168" cy="96" r="3" fill="#047857" />
+              </svg>
+
+              {/* Foreground Content */}
+              <div className="relative z-10 flex flex-col justify-between h-full p-3 min-[390px]:p-3.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <div className="size-7 min-[390px]:size-8 rounded-[10px] bg-[#a7f3d0] flex items-center justify-center shrink-0 shadow-xs">
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
+                        <ellipse cx="9" cy="8" rx="5" ry="2.5" fill="#047857" />
+                        <ellipse cx="9" cy="12" rx="5" ry="2.5" fill="#065f46" />
+                        <ellipse cx="14" cy="15" rx="5" ry="2.5" fill="#047857" />
+                      </svg>
+                    </div>
+                    <span className="text-xs min-[390px]:text-[13px] font-bold text-slate-900 truncate">
+                      Gross Profit
+                    </span>
+                  </div>
+                  <MoreHorizontal className="w-4 h-4 text-slate-400 shrink-0" />
+                </div>
+
+                <div className="mt-1.5 min-[390px]:mt-2">
+                  <div className={`text-[17px] min-[390px]:text-xl font-extrabold font-mono tracking-tight flex items-baseline ${
+                    monthly_performance.gross_profit < 0 ? 'text-rose-600' : 'text-slate-900'
+                  }`}>
+                    {isBalancesHidden ? (
+                      '••••••'
+                    ) : (
+                      <>
+                        {monthly_performance.gross_profit > 0 ? '+' : monthly_performance.gross_profit < 0 ? '−' : ''}
+                        <AnimatedNumber value={Math.abs(monthly_performance.gross_profit)} />
+                      </>
+                    )}
+                    <span className="text-[11px] min-[390px]:text-xs font-semibold text-slate-500 ml-1 font-sans">
+                      ETB
+                    </span>
+                  </div>
+                  <span className="text-[9.5px] min-[390px]:text-[10.5px] text-slate-500 mt-0.5 block truncate">
+                    Net sales − stock cost
+                  </span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="relative min-h-[126px] min-[390px]:min-h-[132px] flex flex-col justify-between overflow-visible">
+              <svg viewBox="0 0 180 130" className="absolute inset-0 w-full h-full pointer-events-none drop-shadow-xs" preserveAspectRatio="none">
+                <path
+                  d="M 18 0 L 162 0 C 172 0, 180 8, 180 18 C 177 45, 175.5 65, 175.5 65 C 175.5 65, 177 85, 180 112 C 180 122, 172 130, 162 130 L 18 130 C 8 130, 0 122, 0 112 C 3 85, 4.5 65, 4.5 65 C 4.5 65, 3 45, 0 18 C 0 8, 8 0, 18 0 Z"
+                  fill="#f2faf5"
+                  stroke="#a7f3d0"
+                  strokeWidth="1.2"
+                />
+              </svg>
+              <div className="relative z-10 flex flex-col justify-between h-full p-3 min-[390px]:p-3.5">
+                <span className="text-xs font-bold text-emerald-800">Store Activity</span>
+                <div className="text-lg font-bold font-mono text-emerald-700">Active Store</div>
+                <span className="text-[10px] text-emerald-600">Operational records active</span>
+              </div>
+            </div>
+          )}
+
+          {/* Card 3: Expenses (Soft Rose Surface with Overlapping Waves & Record Button) */}
+          <div className="relative min-h-[126px] min-[390px]:min-h-[132px] flex flex-col justify-between overflow-visible">
+            {/* Pinched Card Background */}
+            <svg viewBox="0 0 180 130" className="absolute inset-0 w-full h-full pointer-events-none drop-shadow-xs overflow-visible" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="cardExpGrad" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stopColor="#fff6f6" />
+                  <stop offset="50%" stopColor="#ffeded" />
+                  <stop offset="100%" stopColor="#ffe4e4" />
+                </linearGradient>
+              </defs>
+              <path
+                d="M 18 0 L 162 0 C 172 0, 180 8, 180 18 C 177 45, 175.5 65, 175.5 65 C 175.5 65, 177 85, 180 112 C 180 122, 172 130, 162 130 L 18 130 C 8 130, 0 122, 0 112 C 3 85, 4.5 65, 4.5 65 C 4.5 65, 3 45, 0 18 C 0 8, 8 0, 18 0 Z"
+                fill="url(#cardExpGrad)"
+                stroke="#fecdd3"
+                strokeOpacity="0.8"
+                strokeWidth="1.2"
+              />
+              {/* Overlapping Rose Waves in Bottom Right */}
+              <path
+                d="M 65 130 C 95 130, 115 116, 140 120 C 160 123, 170 112, 180 108 L 180 130 Z"
+                fill="rgba(244,63,94,0.12)"
+              />
+              <path
+                d="M 95 130 C 120 130, 135 121, 150 123 C 165 125, 173 116, 180 114 L 180 130 Z"
+                fill="rgba(244,63,94,0.18)"
+              />
+            </svg>
+
+            {/* Foreground Content */}
+            <div className="relative z-10 flex flex-col justify-between h-full p-3 min-[390px]:p-3.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <div className="size-7 min-[390px]:size-8 rounded-[10px] bg-[#fecdd3] flex items-center justify-center shrink-0 shadow-xs">
+                    <Wallet className="w-4 h-4 text-[#be123c] stroke-[2.2]" />
+                  </div>
+                  <span className="text-xs min-[390px]:text-[13px] font-bold text-slate-900 truncate">
+                    Expenses
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={onOpenExpenseModal}
+                    title="Quickly record expense"
+                    className="px-2 py-0.5 rounded-full bg-[#ffe4e6] border border-[#fecdd3] text-[#e11d48] text-[9.5px] font-extrabold active:scale-95 cursor-pointer shadow-2xs hover:bg-rose-200/60 transition-colors"
+                  >
+                    + Record
+                  </button>
+                  <MoreHorizontal className="w-4 h-4 text-slate-400" />
+                </div>
+              </div>
+
+              <div className="mt-1.5 min-[390px]:mt-2">
+                <div className="text-[17px] min-[390px]:text-xl font-extrabold font-mono tracking-tight text-[#e11d48] flex items-baseline">
+                  {isBalancesHidden ? (
+                    '••••••'
+                  ) : (
+                    <>
+                      {(monthly_performance.operating_expenses || 0) > 0 ? '-' : ''}
+                      <AnimatedNumber value={monthly_performance.operating_expenses} />
+                    </>
+                  )}
+                  <span className="text-[11px] min-[390px]:text-xs font-semibold text-rose-500/80 ml-1 font-sans">
+                    ETB
+                  </span>
+                </div>
+                <span className="text-[9.5px] min-[390px]:text-[10.5px] text-slate-500 mt-0.5 block truncate">
+                  Rent, ride, bills...
                 </span>
               </div>
             </div>
+          </div>
 
-            <div className="mt-2.5 relative z-10">
-              <div className={`text-xl sm:text-2xl font-extrabold font-mono tracking-tight ${
-                monthly_performance.net_profit < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-700 dark:text-emerald-400'
-              }`}>
-                {monthly_performance.net_profit > 0 ? '+' : monthly_performance.net_profit < 0 ? '−' : ''}
-                <AnimatedNumber value={Math.abs(monthly_performance.net_profit)} />
-                <span className="text-[11px] font-semibold text-emerald-600/70 dark:text-emerald-400/70 ml-1 font-sans">
-                  ETB
-                </span>
-              </div>
-              <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 block truncate">
-                After operating expenses
-              </span>
+          {/* Card 4: Net Profit (Soft Mint Surface with 5 Rounded Ascending Pillar Bars) */}
+          <div className="relative min-h-[126px] min-[390px]:min-h-[132px] flex flex-col justify-between overflow-visible">
+            {/* Pinched Card Background */}
+            <svg viewBox="0 0 180 130" className="absolute inset-0 w-full h-full pointer-events-none drop-shadow-xs overflow-visible" preserveAspectRatio="none">
+              <path
+                d="M 18 0 L 162 0 C 172 0, 180 8, 180 18 C 177 45, 175.5 65, 175.5 65 C 175.5 65, 177 85, 180 112 C 180 122, 172 130, 162 130 L 18 130 C 8 130, 0 122, 0 112 C 3 85, 4.5 65, 4.5 65 C 4.5 65, 3 45, 0 18 C 0 8, 8 0, 18 0 Z"
+                fill="url(#cardGrossGrad)"
+                stroke="#a7f3d0"
+                strokeOpacity="0.75"
+                strokeWidth="1.2"
+              />
+            </svg>
+
+            {/* 5 Rounded Ascending Pillar Bars in Bottom Right */}
+            <div className="flex items-end justify-end gap-1.5 h-8 absolute right-3.5 bottom-2.5 pointer-events-none z-10">
+              <div className="w-1.5 h-[26%] bg-[#6ee7b7] rounded-full" />
+              <div className="w-1.5 h-[42%] bg-[#34d399] rounded-full" />
+              <div className="w-1.5 h-[60%] bg-[#10b981] rounded-full" />
+              <div className="w-1.5 h-[80%] bg-[#059669] rounded-full" />
+              <div className="w-1.5 h-[100%] bg-[#047857] rounded-full" />
             </div>
 
-            {/* Miniature 5-Step Ascending Bar Visual */}
-            <div className="flex items-end justify-end gap-1.5 h-6 mt-2">
-              <div className="w-1.5 h-[30%] bg-emerald-400/50 rounded-xs" />
-              <div className="w-1.5 h-[45%] bg-emerald-400/65 rounded-xs" />
-              <div className="w-1.5 h-[62%] bg-emerald-500/80 rounded-xs" />
-              <div className="w-1.5 h-[80%] bg-emerald-500/90 rounded-xs" />
-              <div className="w-1.5 h-[100%] bg-emerald-600 rounded-xs" />
+            {/* Foreground Content */}
+            <div className="relative z-10 flex flex-col justify-between h-full p-3 min-[390px]:p-3.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <div className="size-7 min-[390px]:size-8 rounded-[10px] bg-[#a7f3d0] flex items-center justify-center shrink-0 shadow-xs">
+                    <Sprout className="w-4 h-4 text-[#047857] stroke-[2.4]" />
+                  </div>
+                  <span className="text-xs min-[390px]:text-[13px] font-bold text-slate-900 truncate">
+                    Net Profit
+                  </span>
+                </div>
+                <MoreHorizontal className="w-4 h-4 text-slate-400 shrink-0" />
+              </div>
+
+              <div className="mt-1.5 min-[390px]:mt-2">
+                <div className={`text-[17px] min-[390px]:text-xl font-extrabold font-mono tracking-tight flex items-baseline ${
+                  monthly_performance.net_profit < 0 ? 'text-rose-600' : 'text-slate-900'
+                }`}>
+                  {isBalancesHidden ? (
+                    '••••••'
+                  ) : (
+                    <>
+                      {monthly_performance.net_profit > 0 ? '+' : monthly_performance.net_profit < 0 ? '−' : ''}
+                      <AnimatedNumber value={Math.abs(monthly_performance.net_profit)} />
+                    </>
+                  )}
+                  <span className="text-[11px] min-[390px]:text-xs font-semibold text-slate-500 ml-1 font-sans">
+                    ETB
+                  </span>
+                </div>
+                <span className="text-[9.5px] min-[390px]:text-[10.5px] text-slate-500 mt-0.5 block truncate">
+                  After operating expenses
+                </span>
+              </div>
             </div>
           </div>
         </div>
