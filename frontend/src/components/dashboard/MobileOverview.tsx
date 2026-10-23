@@ -46,7 +46,7 @@ interface MobileOverviewProps {
 }
 
 const HERO_CARD_PATH =
-  'M 13 42 C 13 26, 25 14, 43 14 C 105 14, 150 21, 200 21 C 250 21, 295 14, 357 14 C 375 14, 387 26, 387 42 L 387 190 C 387 206, 375 218, 357 218 C 295 218, 250 215, 200 215 C 150 215, 105 218, 43 218 C 25 218, 13 206, 13 190 L 13 42 Z';
+  'M 26 44 C 26 28, 38 16, 56 16 C 118 16, 165 23, 215 23 C 265 23, 312 16, 374 16 C 392 16, 404 28, 404 44 L 404 192 C 404 208, 392 220, 374 220 C 312 220, 265 217, 215 217 C 165 217, 118 220, 56 220 C 38 220, 26 208, 26 192 L 26 44 Z';
 
 export const MobileOverview: React.FC<MobileOverviewProps> = ({
   data,
@@ -101,18 +101,21 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
   return (
     <div className="space-y-4 px-0.5 animate-page-enter">
       {/* ── 1. WORKING CAPITAL HERO WIDGET (Exact Match to Premium Reference Deck) ── */}
-      <div className="relative w-full select-none -mx-2 px-2 py-0.5">
-        <div className="relative w-full aspect-[400/236] overflow-visible">
+      <div className="relative w-full select-none -mx-2.5 px-0.5 py-0.5">
+        <div className="relative w-full aspect-[430/236] overflow-visible">
           {/* Unified SVG Deck (Congruent Stacked Cards + Main Card + Spline Chart) */}
           <svg
-            viewBox="0 0 400 236"
+            viewBox="0 0 430 236"
             className="w-full h-full overflow-visible drop-shadow-sm"
             preserveAspectRatio="none"
           >
             <defs>
               {/* Drop Shadows & Glows */}
-              <filter id="heroShadow" x="-10%" y="-10%" width="125%" height="135%">
+              <filter id="heroShadow" x="-15%" y="-15%" width="135%" height="140%">
                 <feDropShadow dx="0" dy="12" stdDeviation="10" floodColor="#040910" floodOpacity="0.42" />
+              </filter>
+              <filter id="pineShadow" x="-20%" y="-20%" width="145%" height="150%">
+                <feDropShadow dx="-4" dy="8" stdDeviation="8" floodColor="#020b08" floodOpacity="0.35" />
               </filter>
               <filter id="beadGlow" x="-50%" y="-50%" width="200%" height="200%">
                 <feDropShadow dx="0" dy="0" stdDeviation="4" floodColor="#34d399" floodOpacity="0.95" />
@@ -128,27 +131,27 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
 
               {/* Top-Right Stack 1: Sage green card */}
               <linearGradient id="cardBackSage" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stopColor="#3d685c" stopOpacity="0.45" />
-                <stop offset="50%" stopColor="#609887" stopOpacity="0.7" />
-                <stop offset="100%" stopColor="#8ec2b0" stopOpacity="0.88" />
+                <stop offset="0%" stopColor="#3d685c" stopOpacity="0.55" />
+                <stop offset="50%" stopColor="#609887" stopOpacity="0.78" />
+                <stop offset="100%" stopColor="#8ec2b0" stopOpacity="0.92" />
               </linearGradient>
 
               {/* Top-Right Stack 2: Deeper muted teal card */}
               <linearGradient id="cardBackTeal" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stopColor="#16352e" stopOpacity="0.35" />
-                <stop offset="100%" stopColor="#2b5448" stopOpacity="0.65" />
+                <stop offset="0%" stopColor="#183b33" stopOpacity="0.45" />
+                <stop offset="100%" stopColor="#2e584c" stopOpacity="0.75" />
               </linearGradient>
 
-              {/* Bottom-Left Stack 1: Dark Midnight Navy card */}
+              {/* Bottom-Left Stack 1: Dark Midnight Navy card with rich blue-slate tone */}
               <linearGradient id="cardBackNavy" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#0f1d2c" stopOpacity="0.98" />
-                <stop offset="100%" stopColor="#07101a" stopOpacity="0.95" />
+                <stop offset="0%" stopColor="#142436" stopOpacity="0.98" />
+                <stop offset="100%" stopColor="#09131e" stopOpacity="0.95" />
               </linearGradient>
 
-              {/* Bottom-Left Stack 2: Deep Forest Pine card */}
+              {/* Bottom-Left Stack 2: Deep Forest Pine card with distinct emerald-pine depth */}
               <linearGradient id="cardBackPine" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stopColor="#0c2620" stopOpacity="0.9" />
-                <stop offset="100%" stopColor="#174238" stopOpacity="0.6" />
+                <stop offset="0%" stopColor="#0f322a" stopOpacity="0.92" />
+                <stop offset="100%" stopColor="#1a4e42" stopOpacity="0.75" />
               </linearGradient>
 
               {/* Chart Wave Gradients */}
@@ -168,42 +171,43 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               </clipPath>
             </defs>
 
-            {/* 1. Deepest Bottom-Left Stacked Card (Pine, congruent) */}
-            <g transform="translate(-11, 10)">
+            {/* 1. Deepest Bottom-Left Stacked Card (Pine, offset -22px, +13px) */}
+            <g transform="translate(-22, 13)">
               <path
                 d={HERO_CARD_PATH}
                 fill="url(#cardBackPine)"
-                stroke="rgba(52,211,153,0.25)"
-                strokeWidth="1"
+                stroke="rgba(52,211,153,0.38)"
+                strokeWidth="1.2"
+                filter="url(#pineShadow)"
               />
             </g>
 
-            {/* 2. Middle Bottom-Left Stacked Card (Navy, congruent) */}
-            <g transform="translate(-6, 5)">
+            {/* 2. Middle Bottom-Left Stacked Card (Navy, offset -11px, +7px) */}
+            <g transform="translate(-11, 7)">
               <path
                 d={HERO_CARD_PATH}
                 fill="url(#cardBackNavy)"
-                stroke="rgba(255,255,255,0.08)"
+                stroke="rgba(255,255,255,0.14)"
                 strokeWidth="1"
               />
             </g>
 
-            {/* 3. Deeper Top-Right Stacked Card (Teal, congruent) */}
-            <g transform="translate(11, -9)">
+            {/* 3. Deeper Top-Right Stacked Card (Teal, offset +22px, -13px) */}
+            <g transform="translate(22, -13)">
               <path
                 d={HERO_CARD_PATH}
                 fill="url(#cardBackTeal)"
-                stroke="rgba(168,203,182,0.22)"
+                stroke="rgba(168,203,182,0.3)"
                 strokeWidth="1"
               />
             </g>
 
-            {/* 4. Top-Right Stacked Card (Sage, congruent) */}
-            <g transform="translate(7, -6)">
+            {/* 4. Top-Right Stacked Card (Sage, offset +11px, -7px) */}
+            <g transform="translate(11, -7)">
               <path
                 d={HERO_CARD_PATH}
                 fill="url(#cardBackSage)"
-                stroke="rgba(168,203,182,0.55)"
+                stroke="rgba(168,203,182,0.6)"
                 strokeWidth="1.2"
               />
             </g>
@@ -220,29 +224,29 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
             {/* 6. Spline Wave Chart + Glows (Clipped cleanly inside main front card) */}
             <g clipPath="url(#mainCardClip)">
               {/* Ambient glows */}
-              <circle cx="335" cy="65" r="85" fill="#15966b" opacity="0.24" />
-              <circle cx="55" cy="75" r="55" fill="#0d3349" opacity="0.2" />
+              <circle cx="350" cy="65" r="85" fill="#15966b" opacity="0.24" />
+              <circle cx="70" cy="75" r="55" fill="#0d3349" opacity="0.2" />
 
               {/* Back wave shape (Rolling peaks) */}
               <path
                 d="
-                  M 140 135
-                  C 170 132, 190 110, 215 112
-                  C 238 114, 258 92, 282 94
-                  C 304 96, 322 76, 342 78
-                  C 354 79, 362 66, 370 60
-                  L 387 135
-                  L 140 135
+                  M 155 135
+                  C 185 132, 205 110, 230 112
+                  C 253 114, 273 92, 297 94
+                  C 319 96, 337 76, 357 78
+                  C 369 79, 377 66, 385 60
+                  L 404 135
+                  L 155 135
                   Z"
                 fill="url(#backChartGrad)"
               />
               <path
                 d="
-                  M 140 135
-                  C 170 132, 190 110, 215 112
-                  C 238 114, 258 92, 282 94
-                  C 304 96, 322 76, 342 78
-                  C 354 79, 362 66, 370 60"
+                  M 155 135
+                  C 185 132, 205 110, 230 112
+                  C 253 114, 273 92, 297 94
+                  C 319 96, 337 76, 357 78
+                  C 369 79, 377 66, 385 60"
                 fill="none"
                 stroke="#10b981"
                 strokeWidth="1.6"
@@ -252,25 +256,25 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               {/* Front luminous wave shape (3 Rolling peaks crescendoing to top right) */}
               <path
                 d="
-                  M 150 135
-                  C 176 124, 196 96, 220 98
-                  C 240 100, 250 112, 266 110
-                  C 284 107, 298 84, 316 82
-                  C 332 81, 342 88, 352 76
-                  C 360 66, 364 58, 368 52
-                  L 387 135
-                  L 150 135
+                  M 165 135
+                  C 191 124, 211 96, 235 98
+                  C 255 100, 265 112, 281 110
+                  C 299 107, 313 84, 331 82
+                  C 347 81, 357 88, 367 76
+                  C 375 66, 379 58, 383 52
+                  L 404 135
+                  L 165 135
                   Z"
                 fill="url(#frontChartGrad)"
               />
               <path
                 d="
-                  M 150 135
-                  C 176 124, 196 96, 220 98
-                  C 240 100, 250 112, 266 110
-                  C 284 107, 298 84, 316 82
-                  C 332 81, 342 88, 352 76
-                  C 360 66, 364 58, 368 52"
+                  M 165 135
+                  C 191 124, 211 96, 235 98
+                  C 255 100, 265 112, 281 110
+                  C 299 107, 313 84, 331 82
+                  C 347 81, 357 88, 367 76
+                  C 375 66, 379 58, 383 52"
                 fill="none"
                 stroke="#34d399"
                 strokeWidth="2.6"
@@ -279,18 +283,18 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
             </g>
 
             {/* Glowing Endpoint Bead: Solid white with luminous green aura */}
-            <circle cx="368" cy="52" r="5.5" fill="#ffffff" filter="url(#beadGlow)" />
-            <circle cx="368" cy="52" r="3.5" fill="#ffffff" stroke="#10b981" strokeWidth="1" />
+            <circle cx="383" cy="52" r="5.5" fill="#ffffff" filter="url(#beadGlow)" />
+            <circle cx="383" cy="52" r="3.5" fill="#ffffff" stroke="#10b981" strokeWidth="1" />
           </svg>
 
           {/* ── Foreground Interactive Content ── */}
           <div
             className="absolute z-10 flex flex-col justify-between"
             style={{
-              left: '3.25%',
-              width: '93.5%',
-              top: '5.9%',
-              height: '86.4%',
+              left: '6.05%',
+              width: '87.9%',
+              top: '6.78%',
+              height: '86.44%',
               padding: '10px 14px 8px 14px',
             }}
           >
