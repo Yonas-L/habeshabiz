@@ -102,7 +102,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
     <div className="space-y-4 px-0.5 animate-page-enter">
       {/* ── 1. WORKING CAPITAL HERO WIDGET (Exact Match to Premium Reference Deck) ── */}
       <div className="relative w-full select-none -mx-1.5 px-0.5 py-0.5">
-        <div className="relative w-full aspect-[420/256] overflow-visible">
+        <div className="relative w-full aspect-[420/270] min-[410px]:aspect-[420/256] overflow-visible">
           {/* Unified SVG Deck (Congruent Stacked Cards + Main Card + Spline Chart) */}
           <svg
             viewBox="0 0 420 256"
@@ -269,17 +269,16 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
 
           {/* ── Foreground Interactive Content ── */}
           <div
-            className="absolute z-10 flex flex-col justify-between"
+            className="absolute z-10 flex flex-col justify-between px-3 min-[390px]:px-3.5 sm:px-4 py-2 min-[390px]:py-2.5 min-[410px]:py-3"
             style={{
               left: '2.5%',
               width: '95%',
-              top: '5%',
-              height: '88%',
-              padding: '12px 14px 10px 14px',
+              top: '4%',
+              height: '90%',
             }}
           >
-            {/* Header Block: Top Row + Working Capital Number + Growth (Grouped with tight, elegant vertical spacing) */}
-            <div className="flex flex-col pt-0.5">
+            {/* Header Block: Top Row + Working Capital Number + Growth (Grouped with responsive, dynamic vertical spacing) */}
+            <div className="flex flex-col pt-1 min-[390px]:pt-1.5 min-[410px]:pt-0.5">
               {/* Top Row: WORKING CAPITAL > and Strong Growth */}
               <div className="flex items-center justify-between">
                 <button
@@ -288,30 +287,30 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                   className="flex items-center gap-1.5 group cursor-pointer active:scale-98 transition-transform"
                 >
                   <span className="w-2.5 h-2.5 rounded-full bg-[#34d399] shadow-[0_0_8px_#34d399]" />
-                  <span className="text-[12px] font-bold tracking-wider text-white">
+                  <span className="text-[11px] min-[390px]:text-[11.5px] min-[410px]:text-[12px] font-bold tracking-wider text-white">
                     WORKING CAPITAL
                   </span>
                   <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-white group-hover:translate-x-0.5 transition-all stroke-[2.5]" />
                 </button>
 
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#082f23]/90 border border-[#34d399]/40 text-[#e6f7ef] text-[11px] font-semibold shadow-xs">
-                  <ArrowUpRight className="w-3.5 h-3.5 text-[#34d399] stroke-[2.5]" />
+                <div className="inline-flex items-center gap-1.5 px-2.5 min-[390px]:px-3 py-0.5 min-[390px]:py-1 rounded-full bg-[#082f23]/90 border border-[#34d399]/40 text-[#e6f7ef] text-[10px] min-[390px]:text-[10.5px] min-[410px]:text-[11px] font-semibold shadow-xs">
+                  <ArrowUpRight className="w-3 min-[390px]:w-3.5 h-3 min-[390px]:h-3.5 text-[#34d399] stroke-[2.5]" />
                   <span>Strong Growth</span>
                 </div>
               </div>
 
-              {/* Big Financial Number + Growth (Tightly placed below WORKING CAPITAL) */}
-              <div className="mt-2 sm:mt-2.5">
-                <div className="flex items-baseline gap-2">
-                  <span className="text-[41px] sm:text-[47px] font-black tracking-tight text-white font-sans [font-feature-settings:'normal'] leading-none drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]">
+              {/* Big Financial Number + Growth (Dynamic fluid sizing for iPhone while preserving exact 41px on Samsung/Pixel) */}
+              <div className="mt-1.5 min-[390px]:mt-2 min-[410px]:mt-2.5">
+                <div className="flex items-baseline gap-1.5 min-[390px]:gap-2">
+                  <span className="text-[clamp(31px,8.2vw,36px)] min-[410px]:text-[41px] sm:text-[47px] font-black tracking-tight text-white font-sans [font-feature-settings:'normal'] leading-none drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]">
                     {isBalancesHidden ? '••••••••' : <AnimatedNumber value={capital_overview.net_capital || 10293682} />}
                   </span>
-                  <span className="text-[17px] sm:text-[19px] font-bold text-slate-300 font-sans tracking-wide">
+                  <span className="text-[clamp(14px,3.8vw,16px)] min-[410px]:text-[17px] sm:text-[19px] font-bold text-slate-300 font-sans tracking-wide">
                     ETB
                   </span>
                 </div>
 
-                <div className="mt-1 sm:mt-1.5 flex items-center gap-1.5 text-xs">
+                <div className="mt-1 min-[390px]:mt-1.5 flex items-center gap-1.5 text-[11px] min-[390px]:text-xs">
                   <span className="flex items-center text-[#34d399] font-extrabold">
                     <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />
                     <span>+12.5%</span>
@@ -321,10 +320,10 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               </div>
             </div>
 
-            {/* Inset Glassmorphic Breakdown Sub-Card (Positioned upward with clean clearance) */}
-            <div className="rounded-[16px] bg-[#102434]/50 backdrop-blur-xl border border-white/16 shadow-[inset_0_1px_1px_rgba(255,255,255,0.18)] p-2.5 sm:p-3 mx-0.5 mb-2 sm:mb-2.5">
+            {/* Inset Glassmorphic Breakdown Sub-Card (Balanced positioning and dynamic padding) */}
+            <div className="rounded-[14px] min-[390px]:rounded-[16px] bg-[#102434]/50 backdrop-blur-xl border border-white/16 shadow-[inset_0_1px_1px_rgba(255,255,255,0.18)] p-2 min-[390px]:p-2.5 min-[410px]:p-2.5 sm:p-3 mx-0.5 mb-1.5 min-[390px]:mb-2 min-[410px]:mb-2 sm:mb-2.5">
               {/* Row 1: Stock, Liquid, Owed, Forex (Even, generous horizontal gaps) */}
-              <div className="grid grid-cols-4 gap-2 sm:gap-3 text-[10.5px] sm:text-[11.5px]">
+              <div className="grid grid-cols-4 gap-1.5 min-[390px]:gap-2 sm:gap-3 text-[9.5px] min-[390px]:text-[10px] min-[410px]:text-[10.5px] sm:text-[11.5px]">
                 <button
                   type="button"
                   onClick={() => openVital('inventory')}
@@ -363,7 +362,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               </div>
 
               {/* Row 2: Gold, Other, and Owe */}
-              <div className="grid grid-cols-4 gap-2 sm:gap-3 text-[10.5px] sm:text-[11.5px] mt-1.5 pt-1.5 border-t border-white/8 items-center">
+              <div className="grid grid-cols-4 gap-1.5 min-[390px]:gap-2 sm:gap-3 text-[9.5px] min-[390px]:text-[10px] min-[410px]:text-[10.5px] sm:text-[11.5px] mt-1 min-[390px]:mt-1.5 pt-1 min-[390px]:pt-1.5 border-t border-white/8 items-center">
                 <button
                   type="button"
                   onClick={() => openVital('reserves')}
