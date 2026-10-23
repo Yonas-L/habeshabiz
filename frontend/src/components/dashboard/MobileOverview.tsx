@@ -409,9 +409,9 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
             className="flex flex-col items-center text-center group cursor-pointer active:scale-95 transition-transform"
             title={`Stock: ${isBalancesHidden ? '••••••' : capital_overview.stock_value.toLocaleString()} ETB`}
           >
-            <div className="size-11 min-[390px]:size-[48px] rounded-[18px] min-[390px]:rounded-[20px] p-0.5 min-[390px]:p-1 bg-emerald-500/10 dark:bg-emerald-950/40 border border-emerald-400/25 dark:border-emerald-500/25 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 transition-all">
+            <div className="size-12 min-[390px]:size-[52px] rounded-[18px] min-[390px]:rounded-[20px] p-1 bg-slate-100/80 dark:bg-slate-800/50 border border-slate-200/60 dark:border-white/5 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 transition-all">
               <div className="w-full h-full rounded-[14px] min-[390px]:rounded-[16px] bg-[#0c392c] dark:bg-[#072d22] flex items-center justify-center shadow-xs">
-                <Package className="w-5 h-5 min-[390px]:w-5.5 min-[390px]:h-5.5 text-white stroke-[2.2]" />
+                <Package className="w-6 h-6 min-[390px]:w-[26px] min-[390px]:h-[26px] text-white stroke-[2.2]" />
               </div>
             </div>
             <span className="text-[11px] min-[390px]:text-xs font-semibold text-slate-800 dark:text-slate-200 mt-1.5 min-[390px]:mt-2 truncate max-w-full block">
@@ -429,9 +429,9 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
             className="flex flex-col items-center text-center group cursor-pointer active:scale-95 transition-transform"
             title={`Bank: ${isBalancesHidden ? '••••••' : capital_overview.cash_and_banks.toLocaleString()} ETB`}
           >
-            <div className="size-11 min-[390px]:size-[48px] rounded-[18px] min-[390px]:rounded-[20px] p-0.5 min-[390px]:p-1 bg-blue-500/10 dark:bg-blue-950/40 border border-blue-400/25 dark:border-blue-500/25 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 transition-all">
-              <div className="w-full h-full rounded-[14px] min-[390px]:rounded-[16px] bg-gradient-to-b from-[#eaf4ff] to-[#d6ebff] dark:from-[#0d273a] dark:to-[#091b29] border border-blue-200/60 dark:border-blue-800/40 flex items-center justify-center shadow-xs">
-                <Landmark className="w-5 h-5 min-[390px]:w-5.5 min-[390px]:h-5.5 text-[#0284c7] dark:text-sky-400 stroke-[2.2]" />
+            <div className="size-12 min-[390px]:size-[52px] rounded-[18px] min-[390px]:rounded-[20px] p-1 bg-slate-100/80 dark:bg-slate-800/50 border border-slate-200/60 dark:border-white/5 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 transition-all">
+              <div className="w-full h-full rounded-[14px] min-[390px]:rounded-[16px] bg-gradient-to-b from-[#eaf4ff] to-[#d6ebff] dark:from-[#0d273a] dark:to-[#091b29] flex items-center justify-center shadow-xs">
+                <Landmark className="w-6 h-6 min-[390px]:w-[26px] min-[390px]:h-[26px] text-[#0284c7] dark:text-sky-400 stroke-[2.2]" />
               </div>
             </div>
             <span className="text-[11px] min-[390px]:text-xs font-semibold text-slate-800 dark:text-slate-200 mt-1.5 min-[390px]:mt-2 truncate max-w-full block">
@@ -449,9 +449,9 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
             className="flex flex-col items-center text-center group cursor-pointer active:scale-95 transition-transform"
             title={`Owed to You: ${isBalancesHidden ? '••••••' : capital_overview.receivables.toLocaleString()} ETB`}
           >
-            <div className="size-11 min-[390px]:size-[48px] rounded-[18px] min-[390px]:rounded-[20px] p-0.5 min-[390px]:p-1 bg-emerald-500/10 dark:bg-emerald-950/40 border border-emerald-400/25 dark:border-emerald-500/25 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 transition-all">
-              <div className="w-full h-full rounded-[14px] min-[390px]:rounded-[16px] bg-gradient-to-b from-[#eef9f2] to-[#ddf4e6] dark:from-[#0b2b1d] dark:to-[#071f15] border border-emerald-200/60 dark:border-emerald-800/40 flex items-center justify-center shadow-xs">
-                <ArrowDown className="w-5 h-5 min-[390px]:w-5.5 min-[390px]:h-5.5 text-[#065f46] dark:text-emerald-400 stroke-[2.4]" />
+            <div className="size-12 min-[390px]:size-[52px] rounded-[18px] min-[390px]:rounded-[20px] p-1 bg-slate-100/80 dark:bg-slate-800/50 border border-slate-200/60 dark:border-white/5 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 transition-all">
+              <div className="w-full h-full rounded-[14px] min-[390px]:rounded-[16px] bg-gradient-to-b from-[#eef9f2] to-[#ddf4e6] dark:from-[#0b2b1d] dark:to-[#071f15] flex items-center justify-center shadow-xs">
+                <ArrowDown className="w-6 h-6 min-[390px]:w-[26px] min-[390px]:h-[26px] text-[#065f46] dark:text-emerald-400 stroke-[2.4]" />
               </div>
             </div>
             <span className="text-[11px] min-[390px]:text-xs font-semibold text-slate-800 dark:text-slate-200 mt-1.5 min-[390px]:mt-2 truncate max-w-full block">
@@ -469,9 +469,9 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
             className="flex flex-col items-center text-center group cursor-pointer active:scale-95 transition-transform"
             title={`You Owe: ${isBalancesHidden ? '••••••' : capital_overview.payables.toLocaleString()} ETB`}
           >
-            <div className="size-11 min-[390px]:size-[48px] rounded-[18px] min-[390px]:rounded-[20px] p-0.5 min-[390px]:p-1 bg-emerald-500/10 dark:bg-emerald-950/40 border border-emerald-400/25 dark:border-emerald-500/25 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 transition-all">
-              <div className="w-full h-full rounded-[14px] min-[390px]:rounded-[16px] bg-gradient-to-b from-[#eef9f2] to-[#ddf4e6] dark:from-[#0b2b1d] dark:to-[#071f15] border border-emerald-200/60 dark:border-emerald-800/40 flex items-center justify-center shadow-xs">
-                <ArrowUp className="w-5 h-5 min-[390px]:w-5.5 min-[390px]:h-5.5 text-[#065f46] dark:text-emerald-400 stroke-[2.4]" />
+            <div className="size-12 min-[390px]:size-[52px] rounded-[18px] min-[390px]:rounded-[20px] p-1 bg-slate-100/80 dark:bg-slate-800/50 border border-slate-200/60 dark:border-white/5 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 transition-all">
+              <div className="w-full h-full rounded-[14px] min-[390px]:rounded-[16px] bg-gradient-to-b from-[#eef9f2] to-[#ddf4e6] dark:from-[#0b2b1d] dark:to-[#071f15] flex items-center justify-center shadow-xs">
+                <ArrowUp className="w-6 h-6 min-[390px]:w-[26px] min-[390px]:h-[26px] text-[#065f46] dark:text-emerald-400 stroke-[2.4]" />
               </div>
             </div>
             <span className="text-[11px] min-[390px]:text-xs font-semibold text-slate-800 dark:text-slate-200 mt-1.5 min-[390px]:mt-2 truncate max-w-full block">
@@ -489,9 +489,9 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
             className="flex flex-col items-center text-center group cursor-pointer active:scale-95 transition-transform"
             title={`Other Assets: ${isBalancesHidden ? '••••••' : capital_overview.custom_assets.toLocaleString()} ETB`}
           >
-            <div className="size-11 min-[390px]:size-[48px] rounded-[18px] min-[390px]:rounded-[20px] p-0.5 min-[390px]:p-1 bg-purple-500/10 dark:bg-purple-950/40 border border-purple-400/25 dark:border-purple-500/25 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 transition-all">
-              <div className="w-full h-full rounded-[14px] min-[390px]:rounded-[16px] bg-gradient-to-b from-[#f3eefe] to-[#e7dbfc] dark:from-[#25153d] dark:to-[#1a0e2b] border border-purple-200/60 dark:border-purple-800/40 flex items-center justify-center shadow-xs">
-                <Coins className="w-5 h-5 min-[390px]:w-5.5 min-[390px]:h-5.5 text-[#6b21a8] dark:text-purple-300 stroke-[2.2]" />
+            <div className="size-12 min-[390px]:size-[52px] rounded-[18px] min-[390px]:rounded-[20px] p-1 bg-slate-100/80 dark:bg-slate-800/50 border border-slate-200/60 dark:border-white/5 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 transition-all">
+              <div className="w-full h-full rounded-[14px] min-[390px]:rounded-[16px] bg-gradient-to-b from-[#f3eefe] to-[#e7dbfc] dark:from-[#25153d] dark:to-[#1a0e2b] flex items-center justify-center shadow-xs">
+                <Coins className="w-6 h-6 min-[390px]:w-[26px] min-[390px]:h-[26px] text-[#6b21a8] dark:text-purple-300 stroke-[2.2]" />
               </div>
             </div>
             <span className="text-[11px] min-[390px]:text-xs font-semibold text-slate-800 dark:text-slate-200 mt-1.5 min-[390px]:mt-2 truncate max-w-full block">
