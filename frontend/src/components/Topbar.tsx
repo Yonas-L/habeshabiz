@@ -1,7 +1,6 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import type { NavTab } from './Sidebar';
 import type { User, Tenant } from '../api/client';
-import { resolveImageUrl } from '../api/client';
 import { Menu, Plus, Calendar, Sun, Moon, ChevronLeft, ChevronRight, ChevronDown, Check, Eye, EyeOff } from 'lucide-react';
 import { useBalancePrivacy } from '../context/BalancePrivacyContext';
  
@@ -61,16 +60,6 @@ export const Topbar: React.FC<TopbarProps> = ({
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
 
-  const rawLogoUrl = tenant?.settings?.logo_url || (tenant as any)?.logo_url || null;
-  const [logoLoadFailed, setLogoLoadFailed] = useState(false);
-
-  useEffect(() => {
-    setLogoLoadFailed(false);
-  }, [rawLogoUrl]);
-
-  const resolvedLogoUrl = useMemo(() => {
-    return resolveImageUrl(rawLogoUrl);
-  }, [rawLogoUrl]);
 
   // Parse current selected year and month
   const [selectedYear, selectedMonthIndex] = (() => {
@@ -130,46 +119,42 @@ export const Topbar: React.FC<TopbarProps> = ({
 
   const mobileTitle =
     activeTab === 'overview'
-      ? (user?.name || (user?.role === 'owner' ? 'Store Owner' : 'Store Staff'))
+      ? (user?.name || tenant?.name || (user?.role === 'owner' ? 'Store Owner' : 'Store Staff'))
       : current.title;
 
   return (
     <header className="sticky top-0 z-40 h-16 px-3 sm:px-4 lg:px-8 flex items-center justify-between bg-[#f6f8fa]/95 dark:bg-[#0b0f17]/95 backdrop-blur-md transition-colors border-b border-slate-200/60 dark:border-slate-800/60 animate-fluid-topbar">
       {/* Mobile Branding & Personalized Title (< md) */}
       <div className="flex md:hidden items-center gap-2.5 min-w-0 pr-1">
+        {/* Flat Uncolored Mobile Navigation Button */}
         <button
           type="button"
           onClick={onOpenMobileSidebar}
           aria-label="Open Navigation Menu"
-          className={`w-11 h-11 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center shrink-0 active:scale-95 transition-all cursor-pointer shadow-md overflow-hidden ${
-            resolvedLogoUrl && !logoLoadFailed
-              ? 'bg-white dark:bg-[#111C2D] border border-slate-200/90 dark:border-emerald-500/30 p-1'
-              : 'bg-gradient-to-br from-[#0c4436] via-[#073228] to-[#032019] border border-emerald-400/35 shadow-emerald-950/25'
-          }`}
+          className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center shrink-0 active:scale-95 transition-all cursor-pointer select-none bg-white dark:bg-[#111C2D] border border-slate-200/90 dark:border-slate-800 text-slate-800 dark:text-white shadow-xs hover:border-slate-300 dark:hover:border-slate-700"
         >
-          {resolvedLogoUrl && !logoLoadFailed ? (
-            <img
-              src={resolvedLogoUrl}
-              alt={tenant?.name || 'Company Logo'}
-              className="w-full h-full object-contain rounded-[12px]"
-              onError={() => setLogoLoadFailed(true)}
-            />
-          ) : (
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
-              <path d="M4 7H20" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
-              <path d="M4 12H14" stroke="#34D399" strokeWidth="2.2" strokeLinecap="round" />
-              <path d="M4 17H18" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
-            </svg>
-          )}
+          {/* Geometric flat bento icon: Sidebar drawer layout matching bottom nav tile language */}
+          <svg
+            className="w-5 h-5 sm:w-5.5 sm:h-5.5 text-slate-800 dark:text-white pointer-events-none"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            {/* Left vertical sidebar drawer bar */}
+            <rect x="2" y="2" width="6.5" height="20" rx="2.5" />
+            {/* Right top block */}
+            <rect x="11.5" y="2" width="10.5" height="8.5" rx="2.5" />
+            {/* Right bottom block */}
+            <rect x="11.5" y="13.5" width="10.5" height="8.5" rx="2.5" />
+          </svg>
         </button>
 
         <div className="min-w-0">
           <span className="text-xs sm:text-[13px] font-semibold text-slate-500 dark:text-slate-400 block leading-tight truncate">
-            {activeTab === 'overview' ? timeGreeting : (user?.name || 'Workspace')}
+            {activeTab === 'overview' ? timeGreeting : (tenant?.name || user?.name || 'Workspace')}
           </span>
-          <div className="text-base sm:text-lg font-black text-[#111C2D] dark:text-white tracking-tight leading-tight truncate relative inline-block mt-0.5">
-            <span>{mobileTitle}</span>
-            <span className="absolute -bottom-0.5 left-0 w-4 sm:w-5 h-0.5 bg-emerald-500 rounded-full" />
+          <div className="text-base sm:text-lg font-black text-[#111C2D] dark:text-white tracking-tight leading-tight truncate mt-0.5">
+            {mobileTitle}
           </div>
         </div>
       </div>
