@@ -98,7 +98,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
     : "This Month's";
 
   return (
-    <div className="space-y-4 px-0.5 select-none scroll-smooth animate-card-glide">
+    <div className="space-y-4 px-0.5 select-none scroll-smooth">
       {/* ── 1. WORKING CAPITAL HERO WIDGET (Exact Match to Premium Reference Deck) ── */}
       <div className="relative w-full select-none -mx-1.5 px-0.5 py-0.5 animate-stagger-1">
         <div className="relative w-full aspect-[420/270] min-[410px]:aspect-[420/256] overflow-visible">
@@ -262,10 +262,35 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               />
             </g>
 
-            {/* Glowing Endpoint Bead: Soft, subtle breathing beacon */}
-            <circle cx="403" cy="60" r="5" fill="#ffffff" filter="url(#beadGlow)" opacity="0.95" className="animate-beacon-pulse" />
-            <circle cx="403" cy="60" r="3" fill="#ffffff" stroke="#10b981" strokeWidth="0.8" />
+            {/* Glowing Endpoint Bead: Dual Concentric Sonar Radar Rings (100% Native WebKit & Blink Engine) */}
+            <g>
+              <circle cx="403" cy="60" r="3" fill="none" stroke="#34d399" strokeWidth="1.5">
+                <animate attributeName="r" values="3;18" dur="2.4s" repeatCount="indefinite" />
+                <animate attributeName="opacity" values="0.85;0" dur="2.4s" repeatCount="indefinite" />
+                <animate attributeName="stroke-width" values="1.8;0.3" dur="2.4s" repeatCount="indefinite" />
+              </circle>
+              <circle cx="403" cy="60" r="3" fill="none" stroke="#34d399" strokeWidth="1.5">
+                <animate attributeName="r" values="3;18" dur="2.4s" begin="1.2s" repeatCount="indefinite" />
+                <animate attributeName="opacity" values="0.85;0" dur="2.4s" begin="1.2s" repeatCount="indefinite" />
+                <animate attributeName="stroke-width" values="1.8;0.3" dur="2.4s" begin="1.2s" repeatCount="indefinite" />
+              </circle>
+              <circle cx="403" cy="60" r="5" fill="#ffffff" filter="url(#beadGlow)" opacity="0.95" />
+              <circle cx="403" cy="60" r="3" fill="#ffffff" stroke="#10b981" strokeWidth="0.8" />
+            </g>
           </svg>
+
+          {/* Holographic Aurora Ray (Iridescent luxury metallic sheen sweep across card face) */}
+          <div
+            className="absolute pointer-events-none overflow-hidden rounded-[24px] z-10"
+            style={{
+              left: '2.5%',
+              width: '95%',
+              top: '4%',
+              height: '90%',
+            }}
+          >
+            <div className="absolute -inset-[100%] bg-gradient-to-r from-transparent via-emerald-400/15 via-white/30 to-transparent animate-holo-sweep pointer-events-none" />
+          </div>
 
           {/* ── Foreground Interactive Content ── */}
           <div
@@ -406,10 +431,10 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
           <button
             type="button"
             onClick={() => openVital('inventory')}
-            className="flex flex-col items-center text-center group cursor-pointer active:scale-[0.92] hover:scale-[1.04] transition-all duration-200 ease-out"
+            className="flex flex-col items-center text-center group cursor-pointer haptic-press"
             title={`Stock: ${isBalancesHidden ? '••••••' : capital_overview.stock_value.toLocaleString()} ETB`}
           >
-            <div className="size-12 min-[390px]:size-[52px] rounded-[18px] min-[390px]:rounded-[20px] p-1 bg-slate-100/80 dark:bg-slate-800/50 border border-slate-200/60 dark:border-white/5 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 group-active:scale-95 transition-all duration-200">
+            <div className="size-12 min-[390px]:size-[52px] rounded-[18px] min-[390px]:rounded-[20px] p-1 bg-slate-100/80 dark:bg-slate-800/50 border border-slate-200/60 dark:border-white/5 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 transition-all duration-200">
               <div className="w-full h-full rounded-[14px] min-[390px]:rounded-[16px] bg-gradient-to-b from-[#eef9f2] to-[#ddf4e6] dark:from-[#0b2b1d] dark:to-[#071f15] flex items-center justify-center shadow-xs">
                 <Package className="w-6 h-6 min-[390px]:w-[26px] min-[390px]:h-[26px] text-[#047857] dark:text-emerald-400 stroke-[2.2]" />
               </div>
@@ -426,10 +451,10 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
           <button
             type="button"
             onClick={() => openVital('cash')}
-            className="flex flex-col items-center text-center group cursor-pointer active:scale-[0.92] hover:scale-[1.04] transition-all duration-200 ease-out"
+            className="flex flex-col items-center text-center group cursor-pointer haptic-press"
             title={`Bank: ${isBalancesHidden ? '••••••' : capital_overview.cash_and_banks.toLocaleString()} ETB`}
           >
-            <div className="size-12 min-[390px]:size-[52px] rounded-[18px] min-[390px]:rounded-[20px] p-1 bg-slate-100/80 dark:bg-slate-800/50 border border-slate-200/60 dark:border-white/5 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 group-active:scale-95 transition-all duration-200">
+            <div className="size-12 min-[390px]:size-[52px] rounded-[18px] min-[390px]:rounded-[20px] p-1 bg-slate-100/80 dark:bg-slate-800/50 border border-slate-200/60 dark:border-white/5 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 transition-all duration-200">
               <div className="w-full h-full rounded-[14px] min-[390px]:rounded-[16px] bg-gradient-to-b from-[#eaf4ff] to-[#d6ebff] dark:from-[#0d273a] dark:to-[#091b29] flex items-center justify-center shadow-xs">
                 <Landmark className="w-6 h-6 min-[390px]:w-[26px] min-[390px]:h-[26px] text-[#0284c7] dark:text-sky-400 stroke-[2.2]" />
               </div>
@@ -446,10 +471,10 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
           <button
             type="button"
             onClick={() => openVital('receivables')}
-            className="flex flex-col items-center text-center group cursor-pointer active:scale-[0.92] hover:scale-[1.04] transition-all duration-200 ease-out"
+            className="flex flex-col items-center text-center group cursor-pointer haptic-press"
             title={`Owed to You: ${isBalancesHidden ? '••••••' : capital_overview.receivables.toLocaleString()} ETB`}
           >
-            <div className="size-12 min-[390px]:size-[52px] rounded-[18px] min-[390px]:rounded-[20px] p-1 bg-slate-100/80 dark:bg-slate-800/50 border border-slate-200/60 dark:border-white/5 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 group-active:scale-95 transition-all duration-200">
+            <div className="size-12 min-[390px]:size-[52px] rounded-[18px] min-[390px]:rounded-[20px] p-1 bg-slate-100/80 dark:bg-slate-800/50 border border-slate-200/60 dark:border-white/5 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 transition-all duration-200">
               <div className="w-full h-full rounded-[14px] min-[390px]:rounded-[16px] bg-gradient-to-b from-[#eef9f2] to-[#ddf4e6] dark:from-[#0b2b1d] dark:to-[#071f15] flex items-center justify-center shadow-xs">
                 <ArrowDown className="w-6 h-6 min-[390px]:w-[26px] min-[390px]:h-[26px] text-[#065f46] dark:text-emerald-400 stroke-[2.4]" />
               </div>
@@ -466,10 +491,10 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
           <button
             type="button"
             onClick={() => openVital('payables')}
-            className="flex flex-col items-center text-center group cursor-pointer active:scale-[0.92] hover:scale-[1.04] transition-all duration-200 ease-out"
+            className="flex flex-col items-center text-center group cursor-pointer haptic-press"
             title={`You Owe: ${isBalancesHidden ? '••••••' : capital_overview.payables.toLocaleString()} ETB`}
           >
-            <div className="size-12 min-[390px]:size-[52px] rounded-[18px] min-[390px]:rounded-[20px] p-1 bg-slate-100/80 dark:bg-slate-800/50 border border-slate-200/60 dark:border-white/5 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 group-active:scale-95 transition-all duration-200">
+            <div className="size-12 min-[390px]:size-[52px] rounded-[18px] min-[390px]:rounded-[20px] p-1 bg-slate-100/80 dark:bg-slate-800/50 border border-slate-200/60 dark:border-white/5 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 transition-all duration-200">
               <div className="w-full h-full rounded-[14px] min-[390px]:rounded-[16px] bg-gradient-to-b from-[#eef9f2] to-[#ddf4e6] dark:from-[#0b2b1d] dark:to-[#071f15] flex items-center justify-center shadow-xs">
                 <ArrowUp className="w-6 h-6 min-[390px]:w-[26px] min-[390px]:h-[26px] text-[#065f46] dark:text-emerald-400 stroke-[2.4]" />
               </div>
@@ -486,10 +511,10 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
           <button
             type="button"
             onClick={() => openVital('reserves')}
-            className="flex flex-col items-center text-center group cursor-pointer active:scale-[0.92] hover:scale-[1.04] transition-all duration-200 ease-out"
+            className="flex flex-col items-center text-center group cursor-pointer haptic-press"
             title={`Other Assets: ${isBalancesHidden ? '••••••' : capital_overview.custom_assets.toLocaleString()} ETB`}
           >
-            <div className="size-12 min-[390px]:size-[52px] rounded-[18px] min-[390px]:rounded-[20px] p-1 bg-slate-100/80 dark:bg-slate-800/50 border border-slate-200/60 dark:border-white/5 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 group-active:scale-95 transition-all duration-200">
+            <div className="size-12 min-[390px]:size-[52px] rounded-[18px] min-[390px]:rounded-[20px] p-1 bg-slate-100/80 dark:bg-slate-800/50 border border-slate-200/60 dark:border-white/5 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 transition-all duration-200">
               <div className="w-full h-full rounded-[14px] min-[390px]:rounded-[16px] bg-gradient-to-b from-[#f3eefe] to-[#e7dbfc] dark:from-[#25153d] dark:to-[#1a0e2b] flex items-center justify-center shadow-xs">
                 <Coins className="w-6 h-6 min-[390px]:w-[26px] min-[390px]:h-[26px] text-[#6b21a8] dark:text-purple-300 stroke-[2.2]" />
               </div>
@@ -539,7 +564,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
         {/* 2x2 Performance Grid */}
         <div className="grid grid-cols-2 gap-2 min-[390px]:gap-2.5">
           {/* Card 1: Revenue (Dark Mesh Surface with Multi-Node Spline & Luminous Beam) */}
-          <div className="relative h-[106px] min-[390px]:h-[110px] flex flex-col overflow-visible active:scale-[0.97] hover:scale-[1.01] transition-all duration-200 ease-out cursor-pointer group">
+          <div className="relative h-[106px] min-[390px]:h-[110px] flex flex-col overflow-visible active:scale-[0.97] hover:scale-[1.01] transition-all duration-200 ease-out cursor-pointer group haptic-press">
             {/* Pinched Card Background */}
             <svg viewBox="0 0 172 108" className="absolute inset-0 w-full h-full pointer-events-none drop-shadow-sm overflow-visible" preserveAspectRatio="none">
               <defs>
@@ -585,8 +610,15 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               <circle cx="75" cy="91" r="1.8" fill="#34d399" />
               <circle cx="110" cy="89" r="1.8" fill="#34d399" />
               <circle cx="135" cy="84" r="1.8" fill="#34d399" />
-              <circle cx="164" cy="62" r="4.5" fill="#34d399" fillOpacity="0.25" className="animate-beacon-pulse" />
-              <circle cx="164" cy="62" r="2.5" fill="#10b981" stroke="#ffffff" strokeWidth="1" />
+              {/* Native Sonar Radar Ripple on Beacon */}
+              <g>
+                <circle cx="164" cy="62" r="2.5" fill="none" stroke="#34d399" strokeWidth="1.2">
+                  <animate attributeName="r" values="2.5;13" dur="2.2s" repeatCount="indefinite" />
+                  <animate attributeName="opacity" values="0.85;0" dur="2.2s" repeatCount="indefinite" />
+                </circle>
+                <circle cx="164" cy="62" r="4.5" fill="#34d399" fillOpacity="0.25" />
+                <circle cx="164" cy="62" r="2.5" fill="#10b981" stroke="#ffffff" strokeWidth="1" />
+              </g>
             </svg>
 
             {/* Foreground Content */}
@@ -623,7 +655,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
 
           {/* Card 2: Gross Profit (Soft Mint Surface with Rising Curve & Beam) */}
           {canViewCost ? (
-            <div className="relative h-[106px] min-[390px]:h-[110px] flex flex-col overflow-visible active:scale-[0.97] hover:scale-[1.01] transition-all duration-200 ease-out cursor-pointer group">
+            <div className="relative h-[106px] min-[390px]:h-[110px] flex flex-col overflow-visible active:scale-[0.97] hover:scale-[1.01] transition-all duration-200 ease-out cursor-pointer group haptic-press">
               {/* Pinched Card Background */}
               <svg viewBox="0 0 172 108" className="absolute inset-0 w-full h-full pointer-events-none drop-shadow-2xs overflow-visible" preserveAspectRatio="none">
                 <defs>
@@ -658,8 +690,15 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                   strokeLinejoin="round"
                   className="animate-chart-line-delayed"
                 />
-                <circle cx="164" cy="64" r="4.5" fill="#10b981" fillOpacity="0.25" className="animate-beacon-pulse" />
-                <circle cx="164" cy="64" r="2.5" fill="#047857" stroke="#ffffff" strokeWidth="1" />
+                {/* Native Sonar Radar Ripple on Beacon */}
+                <g>
+                  <circle cx="164" cy="64" r="2.5" fill="none" stroke="#10b981" strokeWidth="1.2">
+                    <animate attributeName="r" values="2.5;13" dur="2.2s" begin="1.1s" repeatCount="indefinite" />
+                    <animate attributeName="opacity" values="0.85;0" dur="2.2s" begin="1.1s" repeatCount="indefinite" />
+                  </circle>
+                  <circle cx="164" cy="64" r="4.5" fill="#10b981" fillOpacity="0.25" />
+                  <circle cx="164" cy="64" r="2.5" fill="#047857" stroke="#ffffff" strokeWidth="1" />
+                </g>
               </svg>
 
               {/* Foreground Content */}
@@ -721,7 +760,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
           )}
 
           {/* Card 3: Expenses (Soft Rose Surface with Overlapping Waves & Record Button) */}
-          <div className="relative h-[106px] min-[390px]:h-[110px] flex flex-col overflow-visible active:scale-[0.97] hover:scale-[1.01] transition-all duration-200 ease-out cursor-pointer group">
+          <div className="relative h-[106px] min-[390px]:h-[110px] flex flex-col overflow-visible active:scale-[0.97] hover:scale-[1.01] transition-all duration-200 ease-out cursor-pointer group haptic-press">
             {/* Pinched Card Background */}
             <svg viewBox="0 0 172 108" className="absolute inset-0 w-full h-full pointer-events-none drop-shadow-2xs overflow-visible" preserveAspectRatio="none">
               <defs>
@@ -769,7 +808,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                     type="button"
                     onClick={onOpenExpenseModal}
                     title="Quickly record expense"
-                    className="px-1.5 py-0.5 rounded-full bg-[#fee2e2] hover:bg-[#fecdd3] border border-[#fecdd3] text-[#e11d48] text-[8.5px] font-extrabold active:scale-90 hover:scale-105 cursor-pointer shadow-2xs transition-all duration-150 shrink-0"
+                    className="px-2 py-0.5 rounded-full bg-[#fee2e2] hover:bg-[#fecdd3] border border-[#fecdd3] text-[#e11d48] text-[8.5px] font-extrabold animate-record-pulse active:scale-90 hover:scale-105 cursor-pointer shadow-2xs transition-all duration-150 shrink-0"
                   >
                     + Record
                   </button>
@@ -798,8 +837,8 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
             </div>
           </div>
 
-          {/* Card 4: Net Profit (Soft Mint Surface with 5 Rounded Ascending Pillar Bars) */}
-          <div className="relative h-[106px] min-[390px]:h-[110px] flex flex-col overflow-visible active:scale-[0.97] hover:scale-[1.01] transition-all duration-200 ease-out cursor-pointer group">
+          {/* Card 4: Net Profit (Soft Mint Surface with Living Equalizer Rhythm) */}
+          <div className="relative h-[106px] min-[390px]:h-[110px] flex flex-col overflow-visible active:scale-[0.97] hover:scale-[1.01] transition-all duration-200 ease-out cursor-pointer group haptic-press">
             {/* Pinched Card Background */}
             <svg viewBox="0 0 172 108" className="absolute inset-0 w-full h-full pointer-events-none drop-shadow-2xs overflow-visible" preserveAspectRatio="none">
               <path
@@ -811,13 +850,13 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               />
             </svg>
 
-            {/* 5 Rounded Ascending Pillar Bars in Bottom Right */}
+            {/* 5 Living Ascending Equalizer Pillar Bars in Bottom Right */}
             <div className="flex items-end justify-end gap-1 h-5 absolute right-2.5 bottom-2 pointer-events-none z-10">
-              <div className="w-1 min-[390px]:w-1.2 h-[30%] bg-[#6ee7b7] rounded-full animate-bar-pillar [animation-delay:100ms]" />
-              <div className="w-1 min-[390px]:w-1.2 h-[45%] bg-[#34d399] rounded-full animate-bar-pillar [animation-delay:160ms]" />
-              <div className="w-1 min-[390px]:w-1.2 h-[65%] bg-[#10b981] rounded-full animate-bar-pillar [animation-delay:220ms]" />
-              <div className="w-1 min-[390px]:w-1.2 h-[82%] bg-[#059669] rounded-full animate-bar-pillar [animation-delay:280ms]" />
-              <div className="w-1 min-[390px]:w-1.2 h-[100%] bg-[#047857] rounded-full animate-bar-pillar [animation-delay:340ms]" />
+              <div className="w-1 min-[390px]:w-1.2 bg-[#6ee7b7] rounded-full animate-eq-1" />
+              <div className="w-1 min-[390px]:w-1.2 bg-[#34d399] rounded-full animate-eq-2" />
+              <div className="w-1 min-[390px]:w-1.2 bg-[#10b981] rounded-full animate-eq-3" />
+              <div className="w-1 min-[390px]:w-1.2 bg-[#059669] rounded-full animate-eq-4" />
+              <div className="w-1 min-[390px]:w-1.2 bg-[#047857] rounded-full animate-eq-5" />
             </div>
 
             {/* Foreground Content */}
