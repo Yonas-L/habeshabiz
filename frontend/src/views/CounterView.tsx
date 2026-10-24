@@ -878,8 +878,55 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
 
   return (
     <div className="animate-page-enter space-y-4">
-      {/* Step progress & Back Navigation */}
-      <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
+      {/* ── Mobile Native Step Tracker (< sm) ── */}
+      <div className="sm:hidden space-y-2.5">
+        {selectedProductId && (
+          <button
+            type="button"
+            onClick={handleBackToProducts}
+            className="w-full inline-flex items-center justify-between px-3.5 py-2.5 rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-[#131926] text-xs font-black text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-xs active:scale-95 transition-all cursor-pointer"
+            title="Return to product selection"
+          >
+            <span className="flex items-center gap-2">
+              <ArrowLeft className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <span>Back to Products</span>
+            </span>
+            <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">Step 1</span>
+          </button>
+        )}
+        <div className="flex items-center justify-between w-full bg-white dark:bg-[#131926] p-3 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 flex items-center justify-center font-black text-xs shrink-0 shadow-2xs">
+              {currentStep}
+            </div>
+            <div className="min-w-0">
+              <span className="text-[10px] uppercase font-black text-slate-400 dark:text-slate-500 tracking-wider block leading-none">
+                Step {currentStep} of 4
+              </span>
+              <span className="text-xs font-black text-slate-900 dark:text-white leading-tight truncate block mt-0.5">
+                {currentStep === 1 ? 'Pick Device' : currentStep === 2 ? 'Choose Variant' : currentStep === 3 ? 'Qty & Pricing' : 'Review & Confirm'}
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {[1, 2, 3, 4].map((s) => (
+              <span
+                key={s}
+                className={`h-2 rounded-full transition-all duration-300 ${
+                  s === currentStep
+                    ? 'w-7 bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]'
+                    : s < currentStep
+                    ? 'w-3.5 bg-emerald-400 dark:bg-emerald-600'
+                    : 'w-2 bg-slate-200 dark:bg-slate-700'
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Desktop Step progress & Back Navigation (>= sm) ── */}
+      <div className="hidden sm:flex items-center gap-3 sm:gap-4 flex-wrap">
         {selectedProductId && (
           <>
             <button
@@ -891,7 +938,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
               <ArrowLeft className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors" />
               <span>Back to Products</span>
             </button>
-            <div className="h-4 w-px bg-slate-200 dark:bg-slate-800 hidden sm:block" />
+            <div className="h-4 w-px bg-slate-200 dark:bg-slate-800" />
           </>
         )}
         <div className="flex items-center gap-3 sm:gap-4">
@@ -917,11 +964,11 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
               <>
                 <div className="p-3.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-xs">
+                    <div className="w-7 h-7 sm:w-6 sm:h-6 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-black sm:font-bold text-xs">
                       1
                     </div>
                     <div>
-                      <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white">
+                      <h2 className="text-xs font-black sm:font-bold uppercase tracking-wider text-slate-900 dark:text-white">
                         Device / Model Selection
                       </h2>
                     </div>
@@ -934,7 +981,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                         <select
                           value={selectedCategoryFilter}
                           onChange={(e) => setSelectedCategoryFilter(e.target.value)}
-                          className="h-9 sm:h-9.5 pl-3 pr-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/60 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-800/80 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all appearance-none cursor-pointer max-w-[130px] sm:max-w-[170px] truncate dark:[&>option]:bg-slate-900 dark:[&>option]:text-white"
+                          className="h-10 sm:h-9.5 pl-3 pr-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/60 text-xs font-bold sm:semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-800/80 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all appearance-none cursor-pointer max-w-[130px] sm:max-w-[170px] truncate dark:[&>option]:bg-slate-900 dark:[&>option]:text-white"
                           aria-label="Filter products by category"
                         >
                           <option value="all">All Categories</option>
@@ -952,12 +999,12 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                     <button
                       type="button"
                       onClick={() => setIsVendorDirectModalOpen(true)}
-                      className="h-9 sm:h-9.5 px-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-800/80 dark:border-slate-800 text-emerald-400 dark:text-emerald-400 active:scale-95 text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all shrink-0 cursor-pointer group"
+                      className="h-10 sm:h-9.5 px-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-800/80 dark:border-slate-800 text-emerald-400 dark:text-emerald-400 active:scale-95 text-xs font-black sm:font-bold flex items-center gap-1.5 shadow-xs transition-all shrink-0 cursor-pointer group"
                       title="Source device directly from vendor (1-Step POS Sale)"
                     >
                       <Handshake className="w-4 h-4 text-emerald-400 transition-transform group-hover:scale-105" />
                       <span className="hidden sm:inline text-emerald-400">Source from Vendor</span>
-                      <span className="sm:hidden text-emerald-400">Vendor</span>
+                      <span className="sm:hidden text-emerald-400 font-bold">Vendor</span>
                     </button>
                   </div>
                 </div>
@@ -966,7 +1013,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                 <div className="p-4 sm:p-5 space-y-3.5">
                   <div ref={modelSearchContainerRef} className="relative w-full">
                     <div className="relative flex items-center">
-                      <Search className="w-4 h-4 text-slate-400 absolute left-3.5 pointer-events-none" />
+                      <Search className="w-5 h-5 sm:w-4 sm:h-4 text-slate-400 absolute left-3.5 pointer-events-none" />
                       <input
                         ref={searchRef}
                         type="text"
@@ -979,7 +1026,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                         }}
                         onKeyDown={handleSearchKeyDown}
                         placeholder="Search model, brand, or serial..."
-                        className="w-full h-11 pl-10 pr-10 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/60 text-xs font-semibold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-2xs"
+                        className="w-full h-12 sm:h-11 pl-11 sm:pl-10 pr-10 rounded-2xl sm:rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/60 text-sm sm:text-xs font-bold sm:font-semibold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-xs sm:shadow-2xs"
                       />
                       {productSearch ? (
                         <button
@@ -992,7 +1039,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                           className="absolute right-3 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
                           title="Clear search"
                         >
-                          <X className="w-3.5 h-3.5" />
+                          <X className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                         </button>
                       ) : (
                         <button
@@ -1004,19 +1051,19 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                           className="absolute right-3 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
                           title="Toggle models list"
                         >
-                          <ChevronDown className="w-3.5 h-3.5" />
+                          <ChevronDown className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                         </button>
                       )}
                     </div>
 
                     {/* Floating Suggestions Overlay Dropdown */}
                     {isModelSearchOpen && (
-                      <div className="absolute left-0 right-0 top-full mt-2 py-1 bg-white dark:bg-[#131926] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl z-50 max-h-80 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
+                      <div className="absolute left-0 right-0 top-full mt-2 py-1.5 sm:py-1 bg-white dark:bg-[#131926] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl z-50 max-h-80 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
                         {/* Recently Sold / Sourced Models (Shown before typing) */}
                         {recentModels.length > 0 && !productSearch.trim() && (
                           <div className="py-1 bg-slate-50/50 dark:bg-slate-900/40">
-                            <div className="px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
-                              <Clock className="w-3 h-3 text-emerald-500" />
+                            <div className="px-4 sm:px-3.5 py-1.5 text-xs sm:text-[10px] font-black sm:font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+                              <Clock className="w-3.5 h-3.5 sm:w-3 sm:h-3 text-emerald-500" />
                               <span>Recent Models</span>
                             </div>
                             {recentModels.map((p) => {
@@ -1029,28 +1076,28 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                                     handleSelectProduct(p.id);
                                     setIsModelSearchOpen(false);
                                   }}
-                                  className="w-full text-left px-3.5 py-2.5 text-xs flex items-center justify-between hover:bg-slate-100/70 dark:hover:bg-slate-800/80 transition-colors cursor-pointer group"
+                                  className="w-full text-left px-4 sm:px-3.5 py-3 sm:py-2.5 text-sm sm:text-xs flex items-center justify-between hover:bg-slate-100/70 dark:hover:bg-slate-800/80 transition-colors cursor-pointer group"
                                 >
-                                  <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                                    <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 flex items-center justify-center shrink-0 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                                      {p.has_serials ? <Smartphone className="w-3.5 h-3.5" /> : <Package className="w-3.5 h-3.5" />}
+                                  <div className="flex items-center gap-3 sm:gap-2.5 min-w-0 pr-2">
+                                    <div className="w-9 h-9 sm:w-7 sm:h-7 rounded-xl sm:rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 flex items-center justify-center shrink-0 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors shadow-2xs">
+                                      {p.has_serials ? <Smartphone className="w-4.5 h-4.5 sm:w-3.5 sm:h-3.5" /> : <Package className="w-4.5 h-4.5 sm:w-3.5 sm:h-3.5" />}
                                     </div>
                                     <div className="min-w-0">
-                                      <div className="font-semibold text-slate-900 dark:text-white truncate flex items-center gap-1.5">
+                                      <div className="font-black sm:font-semibold text-slate-900 dark:text-white truncate flex items-center gap-1.5 text-sm sm:text-xs">
                                         <span>{p.name}</span>
-                                        <span className="text-[9px] font-normal px-1 py-0.2 rounded bg-emerald-100/60 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">
+                                        <span className="text-[10px] sm:text-[9px] font-bold sm:font-normal px-1.5 sm:px-1 py-0.5 sm:py-0.2 rounded bg-emerald-100/60 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">
                                           Recent
                                         </span>
                                       </div>
                                       {p.brand && (
-                                        <div className="text-[10px] text-slate-400 dark:text-slate-500 font-normal truncate">
+                                        <div className="text-xs sm:text-[10px] text-slate-400 dark:text-slate-500 font-medium sm:font-normal truncate">
                                           {p.brand}{p.category_rel?.name || p.category ? ` · ${p.category_rel?.name || p.category}` : ''}
                                         </div>
                                       )}
                                     </div>
                                   </div>
                                   <div className="text-right shrink-0">
-                                    <span className={`text-[11px] font-mono font-bold ${
+                                    <span className={`text-xs sm:text-[11px] font-mono font-black sm:font-bold ${
                                       hasStock ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'
                                     }`}>
                                       {hasStock ? `${p.stockCount} in stock` : 'Out of stock'}
@@ -1066,7 +1113,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                         {filteredProducts.length > 0 ? (
                           <div className="py-1">
                             {!productSearch.trim() && recentModels.length > 0 && (
-                              <div className="px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                              <div className="px-4 sm:px-3.5 py-1.5 text-xs sm:text-[10px] font-black sm:font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                                 All Category Models ({filteredProducts.length})
                               </div>
                             )}
@@ -1080,25 +1127,25 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                                     handleSelectProduct(p.id);
                                     setIsModelSearchOpen(false);
                                   }}
-                                  className="w-full text-left px-3.5 py-2.5 text-xs flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/70 transition-colors cursor-pointer group"
+                                  className="w-full text-left px-4 sm:px-3.5 py-3 sm:py-2.5 text-sm sm:text-xs flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/70 transition-colors cursor-pointer group"
                                 >
-                                  <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                                    <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 flex items-center justify-center shrink-0 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                                      {p.has_serials ? <Smartphone className="w-3.5 h-3.5" /> : <Package className="w-3.5 h-3.5" />}
+                                  <div className="flex items-center gap-3 sm:gap-2.5 min-w-0 pr-2">
+                                    <div className="w-9 h-9 sm:w-7 sm:h-7 rounded-xl sm:rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 flex items-center justify-center shrink-0 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors shadow-2xs">
+                                      {p.has_serials ? <Smartphone className="w-4.5 h-4.5 sm:w-3.5 sm:h-3.5" /> : <Package className="w-4.5 h-4.5 sm:w-3.5 sm:h-3.5" />}
                                     </div>
                                     <div className="min-w-0">
-                                      <div className="font-semibold text-slate-900 dark:text-white truncate">
+                                      <div className="font-black sm:font-semibold text-slate-900 dark:text-white truncate text-sm sm:text-xs">
                                         {p.name}
                                       </div>
                                       {p.brand && (
-                                        <div className="text-[10px] text-slate-400 dark:text-slate-500 font-normal truncate">
+                                        <div className="text-xs sm:text-[10px] text-slate-400 dark:text-slate-500 font-medium sm:font-normal truncate">
                                           {p.brand}{p.category_rel?.name || p.category ? ` · ${p.category_rel?.name || p.category}` : ''}
                                         </div>
                                       )}
                                     </div>
                                   </div>
                                   <div className="text-right shrink-0">
-                                    <span className={`text-[11px] font-mono font-bold ${
+                                    <span className={`text-xs sm:text-[11px] font-mono font-black sm:font-bold ${
                                       hasStock ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'
                                     }`}>
                                       {hasStock ? `${p.stockCount} in stock` : 'Out of stock'}
@@ -1109,7 +1156,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                             })}
                           </div>
                         ) : (
-                          <div className="px-4 py-6 text-xs text-slate-400 text-center">
+                          <div className="px-4 py-6 text-sm sm:text-xs text-slate-400 text-center font-medium">
                             No models found matching "{productSearch}"
                           </div>
                         )}
@@ -1120,8 +1167,8 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                   {/* Quick Recent Models Chips Under the Search Bar */}
                   {recentModels.length > 0 && !isModelSearchOpen && (
                     <div className="flex items-center gap-2 flex-wrap pt-1">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1 shrink-0">
-                        <Clock className="w-3 h-3 text-emerald-500" />
+                      <span className="text-xs sm:text-[10px] font-black sm:font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1 shrink-0">
+                        <Clock className="w-3.5 h-3.5 sm:w-3 sm:h-3 text-emerald-500" />
                         <span>Recent:</span>
                       </span>
                       {recentModels.slice(0, 6).map((p) => (
@@ -1129,12 +1176,12 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                           key={`chip-${p.id}`}
                           type="button"
                           onClick={() => handleSelectProduct(p.id)}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 text-slate-700 dark:text-slate-300 hover:border-emerald-500 hover:text-emerald-600 dark:hover:text-emerald-400 active:scale-95 transition-all shadow-2xs cursor-pointer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-2.5 sm:py-1 rounded-xl sm:rounded-lg text-xs font-bold sm:font-semibold bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 text-slate-700 dark:text-slate-300 hover:border-emerald-500 hover:text-emerald-600 dark:hover:text-emerald-400 active:scale-95 transition-all shadow-2xs cursor-pointer"
                           title={`${p.name} (${p.stockCount} in stock)`}
                         >
                           <span className="truncate max-w-[130px]">{p.name}</span>
                           {p.stockCount > 0 && (
-                            <span className="text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                            <span className="text-xs sm:text-[10px] font-mono font-black text-emerald-600 dark:text-emerald-400">
                               ({p.stockCount})
                             </span>
                           )}
@@ -1150,15 +1197,15 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                         searchRef.current?.focus();
                         setIsModelSearchOpen(true);
                       }}
-                      className="p-8 sm:p-10 text-center flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50/40 dark:hover:bg-slate-900/20 rounded-xl transition-colors group border border-dashed border-slate-200/80 dark:border-slate-800/80 mt-2"
+                      className="p-8 sm:p-10 text-center flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50/40 dark:hover:bg-slate-900/20 rounded-2xl sm:rounded-xl transition-colors group border border-dashed border-slate-200/80 dark:border-slate-800/80 mt-2"
                     >
-                      <div className="w-11 h-11 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-2.5 group-hover:scale-105 transition-transform">
-                        <Search className="w-5 h-5" />
+                      <div className="w-14 h-14 sm:w-11 sm:h-11 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-3 sm:mb-2.5 group-hover:scale-105 transition-transform shadow-xs">
+                        <Search className="w-6 h-6 sm:w-5 sm:h-5" />
                       </div>
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">
+                      <h3 className="text-sm sm:text-xs font-black sm:font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
                         Search or Pick a Model
                       </h3>
-                      <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 max-w-sm">
+                      <p className="text-xs sm:text-[11px] font-medium sm:font-normal text-slate-500 dark:text-slate-400 mt-1 max-w-sm">
                         Click or type in the search bar above to filter models as you type, choose from recent sales, or source directly from a vendor.
                       </p>
                     </div>
@@ -1169,21 +1216,21 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
 
             {/* Selected product header */}
             {selectedProduct && (
-              <div className="p-4">
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+              <div className="p-4 sm:p-4">
+                <div className="flex items-center justify-between mb-2 sm:mb-1 gap-2">
+                  <div className="flex items-center gap-3 sm:gap-2.5 min-w-0">
+                    <div className="w-11 h-11 sm:w-8 sm:h-8 rounded-xl sm:rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 shadow-2xs">
                       {selectedProduct.has_serials ? (
-                        <Smartphone className="w-4 h-4" />
+                        <Smartphone className="w-5 h-5 sm:w-4 sm:h-4" />
                       ) : (
-                        <Package className="w-4 h-4" />
+                        <Package className="w-5 h-5 sm:w-4 sm:h-4" />
                       )}
                     </div>
                     <div className="min-w-0">
-                      <div className="text-sm font-bold text-slate-900 dark:text-white truncate" title={selectedProduct.name}>
+                      <div className="text-base sm:text-sm font-black sm:font-bold text-slate-900 dark:text-white truncate" title={selectedProduct.name}>
                         {selectedProduct.name}
                       </div>
-                      <div className="text-[11px] text-slate-400 dark:text-slate-500">
+                      <div className="text-xs sm:text-[11px] font-medium sm:font-normal text-slate-400 dark:text-slate-500">
                         {selectedProduct.brand ? `${selectedProduct.brand} · ` : ''}{selectedProduct.category_rel?.name || selectedProduct.category || ''}
                       </div>
                     </div>
@@ -1191,20 +1238,20 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                   <button
                     type="button"
                     onClick={handleBackToProducts}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white active:scale-95 transition-all cursor-pointer shrink-0"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 sm:px-3 sm:py-1.5 rounded-xl text-xs font-black sm:font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white active:scale-95 transition-all cursor-pointer shrink-0"
                     title="Change selected product"
                   >
-                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <ArrowLeft className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                     <span>Change Product</span>
                   </button>
                 </div>
 
                 {/* ── STEP 2: Variant Chips ── */}
                 <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2 block">
+                  <span className="text-xs sm:text-[10px] font-black sm:font-bold uppercase tracking-wider text-slate-400 mb-2.5 sm:mb-2 block">
                     Choose Variant
                   </span>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-2.5 sm:gap-2">
                     {variants.map((v) => {
                       const isSelected = selectedVariantId === v.id;
                       const vUnits = availableUnits.filter((u) => u.variant_id === v.id);
@@ -1215,14 +1262,14 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                           key={v.id}
                           type="button"
                           onClick={() => handleSelectVariant(v)}
-                          className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                          className={`px-3.5 py-2.5 sm:px-3 sm:py-2 rounded-xl text-xs font-black sm:font-semibold transition-all cursor-pointer ${
                             isSelected
                               ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
                               : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
                           }`}
                         >
                           <span>{variantLabel(v)}</span>
-                          <span className={`ml-2 text-[10px] font-mono font-bold ${
+                          <span className={`ml-2 text-[11px] sm:text-[10px] font-mono font-black ${
                             isSelected
                               ? 'text-emerald-400 dark:text-emerald-600'
                               : vStock > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'
@@ -1243,30 +1290,30 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
             <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800/90 p-4 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
               <div className="flex items-center justify-between mb-3">
                 <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                  <span className="text-xs sm:text-[10px] font-black sm:font-bold uppercase tracking-wider text-slate-400 block">
                     {tradeInAllowance > 0 ? 'Outgoing Device to Hand Over' : 'Serial Units'} · {unitsForVariant.length} in stock
                   </span>
                   {tradeInAllowance > 0 && (
-                    <span className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">
+                    <span className="text-xs sm:text-[10px] text-purple-600 dark:text-purple-400 font-bold sm:font-medium">
                       Select the stock unit to give to customer
                     </span>
                   )}
                 </div>
                 {selectedUnitIds.length > 0 && (
-                  <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                  <span className="text-xs sm:text-[11px] font-black sm:font-bold text-emerald-600 dark:text-emerald-400">
                     {selectedUnitIds.length} selected
                   </span>
                 )}
               </div>
 
               {unitsForVariant.length === 0 ? (
-                <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400">
+                <div className="flex items-center gap-2 text-sm sm:text-xs text-amber-700 dark:text-amber-400 font-bold sm:font-normal">
                   <AlertTriangle className="w-4 h-4 shrink-0" />
                   <span>Out of stock in shop inventory.</span>
                 </div>
               ) : (
-                <div className="max-h-52 overflow-y-auto pr-1">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="max-h-60 sm:max-h-52 overflow-y-auto pr-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-2">
                     {unitsForVariant.map((u) => {
                       const isSelected = selectedUnitIds.includes(u.id);
                       const isExchange = u.source_type === 'exchange';
@@ -1275,7 +1322,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                           key={u.id}
                           type="button"
                           onClick={() => handleToggleUnit(u.id)}
-                          className={`p-2.5 rounded-xl border text-left text-xs transition-all ${
+                          className={`p-3 sm:p-2.5 rounded-xl border text-left text-xs transition-all ${
                             isSelected
                               ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/20'
                               : isExchange
@@ -1292,30 +1339,30 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                                   <>
                                     {ident.hasBoth ? (
                                       <div className="flex flex-col text-left">
-                                        <span className="font-mono font-bold text-slate-900 dark:text-white text-[11px] leading-tight">
+                                        <span className="font-mono font-black sm:font-bold text-slate-900 dark:text-white text-xs sm:text-[11px] leading-tight">
                                           SN: {ident.serial}
                                         </span>
-                                        <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
+                                        <span className="font-mono font-bold sm:font-normal text-[11px] sm:text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
                                           IMEI: {ident.imei}
                                         </span>
                                       </div>
                                     ) : (
-                                      <span className="font-mono font-bold text-slate-900 dark:text-white text-[11px] truncate">
+                                      <span className="font-mono font-black sm:font-bold text-slate-900 dark:text-white text-xs sm:text-[11px] truncate">
                                         {ident.primaryLabel}
                                       </span>
                                     )}
                                     {u.sim_type === 'esim' && (
-                                      <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200/50">
+                                      <span className="inline-flex items-center px-1.5 py-0.5 sm:py-0.2 rounded text-[10px] sm:text-[9px] font-black sm:font-bold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200/50">
                                         eSIM
                                       </span>
                                     )}
                                     {u.sim_type === 'dual' && (
-                                      <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/50">
+                                      <span className="inline-flex items-center px-1.5 py-0.5 sm:py-0.2 rounded text-[10px] sm:text-[9px] font-black sm:font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/50">
                                         Dual SIM
                                       </span>
                                     )}
                                     {isTablet && u.sim_type === 'na' && (
-                                      <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                                      <span className="inline-flex items-center px-1.5 py-0.5 sm:py-0.2 rounded text-[10px] sm:text-[9px] font-black sm:font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
                                         Wi-Fi
                                       </span>
                                     )}
@@ -1323,44 +1370,44 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                                 );
                               })()}
                               {selectedVariant && (selectedVariant.storage || selectedVariant.ram) && (
-                                <span className="inline-flex items-center text-[9px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/80 px-1.5 py-0.2 rounded font-mono">
+                                <span className="inline-flex items-center text-[10px] sm:text-[9px] font-black sm:font-semibold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/80 px-1.5 py-0.5 sm:py-0.2 rounded font-mono">
                                   {[selectedVariant.storage, selectedVariant.ram ? (selectedVariant.ram.toLowerCase().includes('ram') ? selectedVariant.ram : `${selectedVariant.ram} RAM`) : null].filter(Boolean).join('/')}
                                 </span>
                               )}
                               {u.battery_health && (
-                                <span className="inline-flex items-center gap-0.5 text-[10px] font-mono font-medium text-slate-500 dark:text-slate-400">
-                                  <Battery className="w-3 h-3 text-slate-400 shrink-0" />
+                                <span className="inline-flex items-center gap-0.5 text-[11px] sm:text-[10px] font-mono font-black sm:font-medium text-slate-600 dark:text-slate-400">
+                                  <Battery className="w-3.5 h-3.5 sm:w-3 sm:h-3 text-slate-400 shrink-0" />
                                   {u.battery_health}%
                                 </span>
                               )}
                               {u.cycle_count !== null && u.cycle_count !== undefined && (
-                                <span className="text-[10px] font-mono text-slate-400">
+                                <span className="text-[11px] sm:text-[10px] font-mono font-bold sm:font-normal text-slate-400">
                                   ({u.cycle_count}c)
                                 </span>
                               )}
                               {u.source_type === 'consignment' && (
-                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400">
-                                  <Handshake className="w-2.5 h-2.5" />
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] sm:text-[9px] font-black sm:font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400">
+                                  <Handshake className="w-3 h-3 sm:w-2.5 sm:h-2.5" />
                                   Vendor
                                 </span>
                               )}
                               {isExchange && (
-                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/50">
-                                  <Repeat className="w-2.5 h-2.5" />
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] sm:text-[9px] font-black sm:font-bold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/50">
+                                  <Repeat className="w-3 h-3 sm:w-2.5 sm:h-2.5" />
                                   Exchanged
                                 </span>
                               )}
                               {(u.is_repaired || (u.maintenance_records && u.maintenance_records.length > 0)) && (
-                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 border border-teal-200/60 dark:border-teal-800/50">
-                                  <Wrench className="w-2.5 h-2.5" />
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] sm:text-[9px] font-black sm:font-bold bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 border border-teal-200/60 dark:border-teal-800/50">
+                                  <Wrench className="w-3 h-3 sm:w-2.5 sm:h-2.5" />
                                   Repaired
                                 </span>
                               )}
                             </div>
-                            <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${
+                            <div className={`w-5 h-5 sm:w-4 sm:h-4 rounded-full flex items-center justify-center shrink-0 ${
                               isSelected ? 'bg-emerald-500 text-white' : 'border border-slate-300 dark:border-slate-700'
                             }`}>
-                              {isSelected && <Check className="w-2.5 h-2.5" />}
+                              {isSelected && <Check className="w-3 h-3 sm:w-2.5 sm:h-2.5" />}
                             </div>
                           </div>
                         </button>
@@ -1379,8 +1426,8 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
               {/* ── Quantity Stepper Section ── */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Qty</span>
-                  <span className={`text-[10px] font-semibold ${
+                  <span className="text-xs sm:text-[10px] font-black sm:font-bold uppercase tracking-wider text-slate-400">Qty</span>
+                  <span className={`text-xs sm:text-[10px] font-black sm:font-semibold ${
                     maxAvailableStock > 0
                       ? 'text-emerald-600 dark:text-emerald-400'
                       : 'text-rose-500 dark:text-rose-400'
@@ -1389,15 +1436,15 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                   </span>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <div className="inline-flex items-center rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-1">
+                <div className="flex items-center gap-2 sm:gap-2">
+                  <div className="inline-flex items-center rounded-2xl sm:rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-1 shadow-2xs">
                     <button
                       type="button"
                       onClick={() => handleQuantityChange(quantity - 1)}
                       disabled={quantity <= 1 || maxAvailableStock <= 0}
-                      className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-30 transition-colors"
+                      className="w-10 h-10 sm:w-8 sm:h-8 rounded-xl sm:rounded-lg flex items-center justify-center text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-30 transition-colors"
                     >
-                      <Minus className="w-3.5 h-3.5" />
+                      <Minus className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                     </button>
                     <input
                       type="number"
@@ -1406,19 +1453,19 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                       value={quantity}
                       onChange={(e) => handleQuantityChange(parseInt(e.target.value) || 1)}
                       disabled={maxAvailableStock <= 0}
-                      className="w-12 text-center font-mono font-black text-sm text-slate-900 dark:text-white bg-transparent focus:outline-none disabled:opacity-30"
+                      className="w-14 sm:w-12 text-center font-mono font-black text-base sm:text-sm text-slate-900 dark:text-white bg-transparent focus:outline-none disabled:opacity-30"
                     />
                     <button
                       type="button"
                       onClick={() => handleQuantityChange(quantity + 1)}
                       disabled={quantity >= maxAvailableStock}
-                      className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-30 transition-colors"
+                      className="w-10 h-10 sm:w-8 sm:h-8 rounded-xl sm:rounded-lg flex items-center justify-center text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-30 transition-colors"
                     >
-                      <Plus className="w-3.5 h-3.5" />
+                      <Plus className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                     </button>
                   </div>
 
-                  <div className="hidden sm:flex items-center gap-1">
+                  <div className="flex items-center gap-1.5 sm:gap-1 overflow-x-auto py-0.5">
                     {[1, 2, 3, 5, 10].map((count) => {
                       const isOverStock = count > maxAvailableStock;
                       return (
@@ -1427,12 +1474,12 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                           type="button"
                           onClick={() => handleQuantityChange(count)}
                           disabled={isOverStock}
-                          className={`h-8 px-2.5 rounded-lg text-xs font-mono font-bold transition-all ${
+                          className={`h-10 sm:h-8 px-3 sm:px-2.5 rounded-xl sm:rounded-lg text-xs font-mono font-black transition-all ${
                             quantity === count
-                              ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
+                              ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-2xs'
                               : isOverStock
                               ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed opacity-40'
-                              : 'border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-400'
+                              : 'border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-400 bg-white dark:bg-slate-800'
                           }`}
                         >
                           {count}
@@ -1444,17 +1491,17 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
               </div>
 
               {/* ── Price & Discount Inputs ── */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 sm:gap-3">
                 {/* 1. Unit Price */}
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                      <Tag className="w-3 h-3 inline mr-0.5" />
+                    <label className="block text-xs sm:text-[10px] font-black sm:font-bold uppercase tracking-wider text-slate-400">
+                      <Tag className="w-3.5 h-3.5 sm:w-3 sm:h-3 inline mr-1" />
                       Unit Price (ETB) *
                     </label>
                     {settedPrice > 0 && (
-                      <span className="text-[10px] font-mono text-slate-400">
-                        Base: <strong className="text-slate-600 dark:text-slate-300 font-medium">{settedPrice.toLocaleString()} ETB</strong>
+                      <span className="text-xs sm:text-[10px] font-mono text-slate-400">
+                        Base: <strong className="text-slate-700 dark:text-slate-300 font-bold">{settedPrice.toLocaleString()} ETB</strong>
                       </span>
                     )}
                   </div>
@@ -1464,24 +1511,24 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                     value={unitSellingPrice}
                     onChange={(e) => handleUnitPriceChange(e.target.value)}
                     placeholder="0.00"
-                    className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-sm font-mono font-black text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                    className="w-full h-12 sm:h-10 px-3.5 sm:px-3 rounded-2xl sm:rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-base sm:text-sm font-mono font-black text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 shadow-2xs"
                     required
                   />
                   {quantity > 1 && unitPriceNum > 0 && (
-                    <span className="text-[10px] text-slate-400 mt-1 block font-mono">
+                    <span className="text-xs sm:text-[10px] text-slate-400 mt-1 block font-mono font-bold">
                       Subtotal: {grossSubtotal.toLocaleString()} ETB
                     </span>
                   )}
                   {isUpsell && (
-                    <div className="mt-1.5 flex items-center gap-1.5 px-2 py-1 rounded-lg bg-purple-50 dark:bg-purple-950/40 border border-purple-200/60 dark:border-purple-800/40 text-[10px] text-purple-700 dark:text-purple-300 font-bold">
-                      <TrendingUp className="w-3 h-3 text-purple-600 dark:text-purple-400 shrink-0" />
+                    <div className="mt-1.5 flex items-center gap-1.5 px-2.5 py-1.5 sm:py-1 rounded-xl sm:rounded-lg bg-purple-50 dark:bg-purple-950/40 border border-purple-200/60 dark:border-purple-800/40 text-xs sm:text-[10px] text-purple-700 dark:text-purple-300 font-black">
+                      <TrendingUp className="w-3.5 h-3.5 sm:w-3 sm:h-3 text-purple-600 dark:text-purple-400 shrink-0" />
                       <span>
                         +{netEstimatedBonus.toLocaleString()} ETB Bonus · +{upsellBonusPerUnit.toLocaleString()} above target
                       </span>
                     </div>
                   )}
                   {unitPriceNum > 0 && outgoingUnitCost > 0 && unitPriceNum < outgoingUnitCost && (
-                    <div className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-[11px] font-semibold text-rose-700 dark:text-rose-300">
+                    <div className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-xs sm:text-[11px] font-bold sm:font-semibold text-rose-700 dark:text-rose-300">
                       <AlertTriangle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
                       <span>Below cost by {(outgoingUnitCost - unitPriceNum).toLocaleString()} ETB</span>
                     </div>
@@ -1491,19 +1538,19 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                 {/* 2. Discount with % vs ETB Mode Switcher */}
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    <label className="text-xs sm:text-[10px] font-black sm:font-bold uppercase tracking-wider text-slate-400">
                       Discount
                     </label>
-                    <div className="inline-flex rounded-lg bg-slate-100 dark:bg-slate-800 p-0.5 text-[10px] font-bold">
+                    <div className="inline-flex rounded-lg bg-slate-100 dark:bg-slate-800 p-0.5 text-xs sm:text-[10px] font-black">
                       <button
                         type="button"
                         onClick={() => {
                           setDiscountType('percent');
                           handleDiscountChange(discountValue, 'percent');
                         }}
-                        className={`px-2 py-0.5 rounded-md transition-all ${
+                        className={`px-2.5 sm:px-2 py-0.5 rounded-md transition-all ${
                           discountType === 'percent'
-                            ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs'
+                            ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs font-black'
                             : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
                         }`}
                       >
@@ -1515,9 +1562,9 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                           setDiscountType('fixed');
                           handleDiscountChange(discountValue, 'fixed');
                         }}
-                        className={`px-2 py-0.5 rounded-md transition-all ${
+                        className={`px-2.5 sm:px-2 py-0.5 rounded-md transition-all ${
                           discountType === 'fixed'
-                            ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs'
+                            ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs font-black'
                             : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
                         }`}
                       >
@@ -1536,15 +1583,15 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                       onChange={(e) => handleDiscountChange(e.target.value, discountType)}
                       disabled={user ? !user.can_discount : false}
                       placeholder={discountType === 'percent' ? '0%' : '0 ETB'}
-                      className="w-full h-10 pl-3 pr-10 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-sm font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 disabled:opacity-40"
+                      className="w-full h-12 sm:h-10 pl-3.5 sm:pl-3 pr-11 sm:pr-10 rounded-2xl sm:rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-base sm:text-sm font-mono font-black sm:font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 disabled:opacity-40 shadow-2xs"
                     />
-                    <div className="absolute right-3 top-2.5 text-xs font-mono font-bold text-slate-400 pointer-events-none">
+                    <div className="absolute right-3.5 sm:right-3 top-3.5 sm:top-2.5 text-xs font-mono font-black text-slate-400 pointer-events-none">
                       {discountType === 'percent' ? '%' : 'ETB'}
                     </div>
                   </div>
 
                   {calculatedDiscountAmount > 0 && (
-                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-1 block font-mono font-bold">
+                    <span className="text-xs sm:text-[10px] text-emerald-600 dark:text-emerald-400 mt-1 block font-mono font-black sm:font-bold">
                       -{calculatedDiscountAmount.toLocaleString()} ETB ({discountType === 'percent' ? `${rawDiscountVal}%` : `${((calculatedDiscountAmount / (grossSubtotal || 1)) * 100).toFixed(1)}%`})
                     </span>
                   )}
@@ -1553,19 +1600,19 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                 {/* 3. Paid Now */}
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    <label className="block text-xs sm:text-[10px] font-black sm:font-bold uppercase tracking-wider text-slate-400">
                       Amount Paid (ETB)
                     </label>
                     <button
                       type="button"
                       onClick={() => setIsExchangeModalOpen(true)}
-                      className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md transition-colors ${
+                      className={`inline-flex items-center gap-1 text-xs sm:text-[10px] font-black px-2.5 sm:px-2 py-0.5 rounded-lg sm:rounded-md transition-colors ${
                         exchangeDevice
                           ? 'bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
                           : 'bg-slate-100 dark:bg-slate-800 hover:bg-purple-50 dark:hover:bg-purple-950/40 text-slate-800 dark:text-slate-200 hover:text-purple-700'
                       }`}
                     >
-                      <Repeat className="w-3 h-3 text-purple-500" />
+                      <Repeat className="w-3.5 h-3.5 sm:w-3 sm:h-3 text-purple-500" />
                       {exchangeDevice ? 'Exchange Added' : 'Exchange'}
                     </button>
                   </div>
@@ -1575,29 +1622,29 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                     value={paidAmount}
                     onChange={(e) => handlePaidAmountChange(e.target.value)}
                     placeholder="0.00"
-                    className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-sm font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+                    className="w-full h-12 sm:h-10 px-3.5 sm:px-3 rounded-2xl sm:rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-base sm:text-sm font-mono font-black sm:font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 shadow-2xs"
                     required
                   />
 
                   {/* Active Exchange Chip (Minimal 1-line) */}
                   {exchangeDevice ? (
-                    <div className="mt-2 px-2.5 py-1.5 rounded-lg bg-purple-50/80 dark:bg-purple-950/40 border border-purple-200/70 dark:border-purple-800/50 flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-1.5 min-w-0 pr-2">
-                        <Repeat className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
-                        <span className="font-semibold text-purple-900 dark:text-purple-200 truncate">
+                    <div className="mt-2 px-3 sm:px-2.5 py-2 sm:py-1.5 rounded-xl sm:rounded-lg bg-purple-50/80 dark:bg-purple-950/40 border border-purple-200/70 dark:border-purple-800/50 flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2 sm:gap-1.5 min-w-0 pr-2">
+                        <Repeat className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
+                        <span className="font-black sm:font-semibold text-purple-900 dark:text-purple-200 truncate text-xs">
                           Exchange: {exchangeDevice.product_name}
                         </span>
                         {exchangeDevice.imei_or_serial && (
-                          <span className="text-[10px] text-purple-600/80 dark:text-purple-400/80 font-mono truncate">
+                          <span className="text-[11px] sm:text-[10px] text-purple-600/80 dark:text-purple-400/80 font-mono truncate">
                             ({exchangeDevice.imei_or_serial})
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-1 shrink-0">
+                      <div className="flex items-center gap-1.5 sm:gap-1 shrink-0">
                         <button
                           type="button"
                           onClick={() => setIsExchangeModalOpen(true)}
-                          className="text-[10px] font-bold text-purple-700 dark:text-purple-300 hover:underline px-1"
+                          className="text-xs sm:text-[10px] font-black text-purple-700 dark:text-purple-300 hover:underline px-1"
                         >
                           Edit
                         </button>
@@ -1607,10 +1654,10 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                             setExchangeDevice(null);
                             setPaidAmount(String(totalAfterDiscount));
                           }}
-                          className="w-5 h-5 rounded flex items-center justify-center text-purple-400 hover:text-purple-700 hover:bg-purple-100 dark:hover:bg-purple-900/50 transition-colors"
+                          className="w-6 h-6 sm:w-5 sm:h-5 rounded-lg flex items-center justify-center text-purple-400 hover:text-purple-700 hover:bg-purple-100 dark:hover:bg-purple-900/50 transition-colors"
                           title="Remove exchange"
                         >
-                          <X className="w-3 h-3" />
+                          <X className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
                         </button>
                       </div>
                     </div>
@@ -1618,12 +1665,12 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
 
                   {/* Warning if total trade-in credit + cash does not cover outgoing unit cost */}
                   {exchangeDevice && outgoingUnitCost > 0 && (Number(exchangeDevice.trade_in_value) + paidNum < outgoingUnitCost) && (
-                    <div className="mt-1.5 flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/60 text-red-700 dark:text-red-300 text-[11px] font-semibold">
+                    <div className="mt-1.5 flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/60 text-red-700 dark:text-red-300 text-xs sm:text-[11px] font-bold sm:font-semibold">
                       <span className="flex items-center gap-1.5">
                         <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0" />
                         Below shop cost by {(outgoingUnitCost - (Number(exchangeDevice.trade_in_value) + paidNum)).toLocaleString()} ETB
                       </span>
-                      <span className="text-[10px] font-bold text-red-600 dark:text-red-400 font-mono uppercase">Loss Deal</span>
+                      <span className="text-xs sm:text-[10px] font-black text-red-600 dark:text-red-400 font-mono uppercase">Loss Deal</span>
                     </div>
                   )}
 
@@ -1631,7 +1678,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                     <button
                       type="button"
                       onClick={() => setPaidAmount(String(netCashDue))}
-                      className="text-[10px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 mt-1 block font-medium underline"
+                      className="text-xs sm:text-[10px] text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300 mt-1.5 block font-bold sm:font-medium underline"
                     >
                       Set extra cash customer pays ({netCashDue.toLocaleString()} ETB)
                     </button>
@@ -1658,10 +1705,10 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
 
               {/* Payment Method Quick Selector */}
               <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                <label className="block text-xs sm:text-[10px] font-black sm:font-bold uppercase tracking-wider text-slate-400 mb-2.5 sm:mb-2">
                   Payment Method
                 </label>
-                <div className="flex flex-wrap gap-2">
+                <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2.5 sm:gap-2">
                   {[
                     { value: 'cash', label: 'Cash transfer', icon: Banknote },
                     { value: 'debt_offset', label: 'Debt offset', icon: ArrowLeftRight },
@@ -1695,7 +1742,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                             setPaidAmount('0');
                           }
                         }}
-                        className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[11px] font-semibold transition-all cursor-pointer ${
+                        className={`h-12 sm:h-auto px-3.5 py-2.5 sm:px-3 sm:py-2 rounded-2xl sm:rounded-xl border text-xs sm:text-[11px] font-black sm:font-semibold transition-all cursor-pointer flex items-center justify-center sm:justify-start gap-2 sm:gap-1.5 ${
                           isSelected
                             ? m.value === 'credit'
                               ? 'border-slate-800 bg-slate-900 dark:bg-slate-900 text-amber-400 dark:text-amber-400 shadow-xs font-bold ring-1 ring-amber-500/20'
@@ -1704,11 +1751,11 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                               : m.value === 'debt_offset'
                               ? 'border-slate-800 bg-slate-900 dark:bg-slate-900 text-indigo-400 dark:text-indigo-400 shadow-xs font-bold ring-1 ring-indigo-500/20'
                               : 'border-slate-800 bg-slate-900 dark:bg-slate-900 text-emerald-400 dark:text-emerald-400 shadow-xs font-bold ring-1 ring-emerald-500/20'
-                            : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700 bg-white dark:bg-slate-900'
+                            : 'border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700 bg-white dark:bg-slate-900'
                         }`}
                       >
-                        <Icon className={`w-3.5 h-3.5 ${isSelected ? (m.value === 'credit' ? 'text-amber-400' : m.value === 'writeoff' ? 'text-rose-400' : m.value === 'debt_offset' ? 'text-indigo-400' : 'text-emerald-400') : 'text-slate-400 dark:text-slate-500'}`} />
-                        {m.label}
+                        <Icon className={`w-4.5 h-4.5 sm:w-3.5 sm:h-3.5 shrink-0 ${isSelected ? (m.value === 'credit' ? 'text-amber-400' : m.value === 'writeoff' ? 'text-rose-400' : m.value === 'debt_offset' ? 'text-indigo-400' : 'text-emerald-400') : 'text-slate-400 dark:text-slate-500'}`} />
+                        <span className="truncate">{m.label}</span>
                       </button>
                     );
                   })}
@@ -1826,13 +1873,13 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
               {/* Customer Selection / New Customer */}
               <div className="space-y-2 pt-1 border-t border-slate-100 dark:border-slate-800/80">
                 <div className="flex items-center justify-between">
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    <UserIcon className="w-3 h-3 inline mr-1" />
+                  <label className="block text-xs sm:text-[10px] font-black sm:font-bold uppercase tracking-wider text-slate-400">
+                    <UserIcon className="w-3.5 h-3.5 sm:w-3 sm:h-3 inline mr-1" />
                     Customer
                   </label>
 
                   {/* Customer Mode Pills */}
-                  <div className="flex bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg text-[10px] font-semibold">
+                  <div className="flex bg-slate-100 dark:bg-slate-800 p-1 sm:p-0.5 rounded-xl sm:rounded-lg text-xs sm:text-[10px] font-black sm:font-semibold">
                     <button
                       type="button"
                       onClick={() => {
@@ -1841,9 +1888,9 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                         setCustomerName('');
                         setCustomerPhone('');
                       }}
-                      className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                      className={`px-3 sm:px-2 py-1 sm:py-0.5 rounded-lg sm:rounded-md transition-all cursor-pointer ${
                         customerMode === 'walk_in'
-                          ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-bold'
+                          ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-black sm:font-bold'
                           : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
                       }`}
                     >
@@ -1855,9 +1902,9 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                         setCustomerMode('new');
                         setCustomerId('');
                       }}
-                      className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                      className={`px-3 sm:px-2 py-1 sm:py-0.5 rounded-lg sm:rounded-md transition-all cursor-pointer ${
                         customerMode === 'new'
-                          ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-bold'
+                          ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-black sm:font-bold'
                           : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
                       }`}
                     >
@@ -1866,9 +1913,9 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                     <button
                       type="button"
                       onClick={() => setCustomerMode('existing')}
-                      className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                      className={`px-3 sm:px-2 py-1 sm:py-0.5 rounded-lg sm:rounded-md transition-all cursor-pointer ${
                         customerMode === 'existing'
-                          ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-bold'
+                          ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-black sm:font-bold'
                           : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
                       }`}
                     >
@@ -1878,9 +1925,9 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                 </div>
 
                 {customerMode === 'walk_in' && (
-                  <div className="h-9 px-3 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 flex items-center justify-between text-xs text-slate-500">
+                  <div className="h-11 sm:h-9 px-3.5 sm:px-3 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 flex items-center justify-between text-xs font-bold sm:font-medium text-slate-600 dark:text-slate-400">
                     <span>Walk-in Customer (Anonymous)</span>
-                    <span className="text-[10px] text-slate-400">Default</span>
+                    <span className="text-xs sm:text-[10px] text-slate-400 font-bold sm:font-normal">Default</span>
                   </div>
                 )}
 
@@ -1891,14 +1938,14 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                       value={customerName}
                       onChange={(e) => setCustomerName(e.target.value)}
                       placeholder="Customer Name (optional)"
-                      className="h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+                      className="h-11 sm:h-9 px-3.5 sm:px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs font-bold sm:font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
                     />
                     <input
                       type="text"
                       value={customerPhone}
                       onChange={(e) => setCustomerPhone(e.target.value)}
                       placeholder="Phone (optional, 09...)"
-                      className="h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+                      className="h-11 sm:h-9 px-3.5 sm:px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs font-bold sm:font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
                     />
                   </div>
                 )}
@@ -1907,7 +1954,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                   <select
                     value={customerId}
                     onChange={(e) => setCustomerId(e.target.value)}
-                    className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+                    className="w-full h-11 sm:h-9 px-3.5 sm:px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs font-bold sm:font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
                   >
                     <option value="">— Select Existing Customer —</option>
                     {customerList.map((c) => (
@@ -1925,7 +1972,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Sale notes (optional)..."
-                className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+                className="w-full h-11 sm:h-9 px-3.5 sm:px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs font-bold sm:font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
               />
             </div>
           )}
@@ -1935,9 +1982,9 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
         <div id="counter-order-summary" className="lg:col-span-2">
           <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800/90 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] sticky top-4 overflow-hidden">
             {/* Receipt Header */}
-            <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
-              <Receipt className="w-3.5 h-3.5 text-slate-400" />
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2.5">
+              <Receipt className="w-5 h-5 sm:w-3.5 sm:h-3.5 text-slate-500" />
+              <span className="text-xs sm:text-[10px] font-black sm:font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 Summary
               </span>
             </div>
@@ -1946,8 +1993,8 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
               {/* Empty State */}
               {!selectedProduct ? (
                 <div className="py-8 text-center">
-                  <ShoppingBag className="w-8 h-8 text-slate-200 dark:text-slate-700 mx-auto mb-3" />
-                  <p className="text-xs text-slate-400 font-medium">Select a product to begin</p>
+                  <ShoppingBag className="w-9 h-9 sm:w-8 sm:h-8 text-slate-200 dark:text-slate-700 mx-auto mb-3" />
+                  <p className="text-sm sm:text-xs text-slate-400 font-bold sm:font-medium">Select a product to begin</p>
                 </div>
               ) : (
                 <>
@@ -1955,16 +2002,16 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                   <div className="py-3 border-b border-slate-100 dark:border-slate-800">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
-                        <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                        <div className="text-sm sm:text-xs font-black sm:font-bold text-slate-900 dark:text-white truncate">
                           {selectedProduct.name}
                         </div>
                         {selectedVariant && (
-                          <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                          <div className="text-xs sm:text-[11px] font-bold sm:font-normal text-slate-500 dark:text-slate-400 mt-0.5">
                             {variantLabel(selectedVariant)}
                           </div>
                         )}
                         {selectedUnitIds.length > 0 && (
-                          <div className="text-[10px] text-slate-400 font-mono mt-1 space-y-0.5">
+                          <div className="text-[11px] sm:text-[10px] text-slate-400 font-mono mt-1 space-y-0.5">
                             {selectedUnitIds.map((uId) => {
                               const u = availableUnits.find((unit) => unit.id === uId);
                               return (
@@ -1978,18 +2025,18 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                                     })()}
                                   </span>
                                   {u?.source_type === 'consignment' && (
-                                    <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-600 dark:text-amber-400">
+                                    <span className="inline-flex items-center gap-0.5 text-[10px] sm:text-[9px] font-black sm:font-bold text-amber-600 dark:text-amber-400">
                                       <Handshake className="w-2.5 h-2.5" />
                                       Vendor
                                     </span>
                                   )}
                                   {(u?.source_type === 'exchange' || Boolean(u?.exchange_sales_order_id)) && (
-                                    <span className="text-[9px] text-slate-400 font-sans">
+                                    <span className="text-[10px] sm:text-[9px] text-slate-400 font-sans font-bold sm:font-normal">
                                       (Exchanged)
                                     </span>
                                   )}
                                   {(u?.is_repaired || (u?.maintenance_records && u.maintenance_records.length > 0)) && (
-                                    <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-teal-600 dark:text-teal-400">
+                                    <span className="inline-flex items-center gap-0.5 text-[10px] sm:text-[9px] font-black sm:font-bold text-teal-600 dark:text-teal-400">
                                       <Wrench className="w-2.5 h-2.5" />
                                       Repaired
                                     </span>
@@ -2000,17 +2047,17 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                           </div>
                         )}
                         {selectedUnitsHaveConsignment && (
-                          <div className="text-[10px] text-amber-600 dark:text-amber-400 font-medium mt-1">
+                          <div className="text-xs sm:text-[10px] text-amber-600 dark:text-amber-400 font-bold sm:font-medium mt-1">
                             Vendor consignment unit
                           </div>
                         )}
                         {selectedUnitsHaveExchange && (
-                          <div className="text-[10px] text-slate-400 font-medium mt-0.5">
+                          <div className="text-xs sm:text-[10px] text-slate-400 font-bold sm:font-medium mt-0.5">
                             Exchanged stock unit
                           </div>
                         )}
                       </div>
-                      <span className="text-xs font-mono font-bold text-slate-500 dark:text-slate-400 shrink-0">
+                      <span className="text-sm sm:text-xs font-mono font-black sm:font-bold text-slate-600 dark:text-slate-300 shrink-0">
                         ×{quantity}
                       </span>
                     </div>
@@ -2018,22 +2065,22 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
 
                   {/* Out of Stock Warning */}
                   {selectedVariant && maxAvailableStock <= 0 && (
-                    <div className="flex items-center gap-2 text-xs text-rose-600 dark:text-rose-400">
-                      <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                    <div className="flex items-center gap-2 text-sm sm:text-xs text-rose-600 dark:text-rose-400 font-bold sm:font-normal">
+                      <AlertTriangle className="w-4 h-4 sm:w-3.5 sm:h-3.5 shrink-0" />
                       <span>Out of stock in shop inventory.</span>
                     </div>
                   )}
 
                   {/* Price Breakdown */}
-                  <div className="space-y-2 text-xs">
+                  <div className="space-y-2.5 sm:space-y-2 text-xs">
                     {/* Customer in Summary */}
                     {((customerMode === 'new' && (customerName.trim() || customerPhone.trim())) || (customerMode === 'existing' && customerId)) ? (
-                      <div className="flex justify-between items-center text-slate-600 dark:text-slate-400 pb-1.5 border-b border-slate-100 dark:border-slate-800">
-                        <span className="flex items-center gap-1 text-[11px]">
-                          <UserIcon className="w-3 h-3 text-slate-400" />
+                      <div className="flex justify-between items-center text-slate-600 dark:text-slate-400 pb-2 sm:pb-1.5 border-b border-slate-100 dark:border-slate-800">
+                        <span className="flex items-center gap-1.5 sm:gap-1 text-xs sm:text-[11px] font-bold sm:font-normal">
+                          <UserIcon className="w-3.5 h-3.5 sm:w-3 sm:h-3 text-slate-400" />
                           Customer
                         </span>
-                        <span className="font-semibold text-slate-900 dark:text-white truncate max-w-[160px] text-right">
+                        <span className="font-black sm:font-semibold text-slate-900 dark:text-white truncate max-w-[180px] sm:max-w-[160px] text-right text-xs">
                           {customerMode === 'new'
                             ? `${customerName.trim() || 'Customer'}${customerPhone.trim() ? ` · ${customerPhone.trim()}` : ''}`
                             : (customerList.find((c) => c.id === customerId)?.name || 'Walk-in')}
@@ -2042,16 +2089,16 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                     ) : null}
 
                     <div className="flex justify-between text-slate-600 dark:text-slate-400">
-                      <span>Unit Price</span>
-                      <span className="font-mono font-bold text-slate-900 dark:text-white whitespace-nowrap">
+                      <span className="font-bold sm:font-normal text-xs sm:text-xs">Unit Price</span>
+                      <span className="font-mono font-black sm:font-bold text-slate-900 dark:text-white whitespace-nowrap text-sm sm:text-xs">
                         {unitPriceNum > 0 ? unitPriceNum.toLocaleString() : '—'} ETB
                       </span>
                     </div>
 
                     {quantity > 1 && (
                       <div className="flex justify-between text-slate-600 dark:text-slate-400">
-                        <span>Subtotal ({quantity}x)</span>
-                        <span className="font-mono font-bold text-slate-900 dark:text-white whitespace-nowrap">
+                        <span className="font-bold sm:font-normal text-xs sm:text-xs">Subtotal ({quantity}x)</span>
+                        <span className="font-mono font-black sm:font-bold text-slate-900 dark:text-white whitespace-nowrap text-sm sm:text-xs">
                           {grossSubtotal > 0 ? grossSubtotal.toLocaleString() : '—'} ETB
                         </span>
                       </div>
@@ -2059,19 +2106,19 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
 
                     {calculatedDiscountAmount > 0 && (
                       <div className="flex justify-between text-rose-600 dark:text-rose-400">
-                        <span>
+                        <span className="font-bold sm:font-normal text-xs sm:text-xs">
                           Discount {discountType === 'percent' ? `(${rawDiscountVal}%)` : ''}
                         </span>
-                        <span className="font-mono font-bold whitespace-nowrap">
+                        <span className="font-mono font-black sm:font-bold whitespace-nowrap text-sm sm:text-xs">
                           -{calculatedDiscountAmount.toLocaleString()} ETB
                         </span>
                       </div>
                     )}
 
                     {tradeInAllowance > 0 && (
-                      <div className="flex justify-between text-slate-700 dark:text-slate-300 font-medium">
-                        <span>Exchanged Device</span>
-                        <span className="font-mono font-bold whitespace-nowrap text-purple-600 dark:text-purple-400">
+                      <div className="flex justify-between text-slate-700 dark:text-slate-300 font-bold sm:font-medium">
+                        <span className="text-xs sm:text-xs">Exchanged Device</span>
+                        <span className="font-mono font-black sm:font-bold whitespace-nowrap text-purple-600 dark:text-purple-400 text-sm sm:text-xs">
                           −{tradeInAllowance.toLocaleString()} ETB
                         </span>
                       </div>
@@ -2079,18 +2126,18 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
 
                     {attachedAccessories.length > 0 && (
                       <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1">
-                        <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        <div className="flex items-center justify-between text-xs sm:text-[10px] font-black sm:font-bold uppercase tracking-wider text-slate-400">
                           <span>Accessories ({attachedAccessories.length})</span>
                           <span>+{accessoriesTotal.toLocaleString()} ETB</span>
                         </div>
                         {attachedAccessories.map((a) => (
-                          <div key={a.id} className="flex justify-between items-center text-[11px] text-slate-600 dark:text-slate-300">
+                          <div key={a.id} className="flex justify-between items-center text-xs sm:text-[11px] text-slate-700 dark:text-slate-300 font-bold sm:font-normal">
                             <span className="truncate max-w-[150px]">{a.name || 'Accessory'}</span>
-                            <span className="font-mono whitespace-nowrap">
+                            <span className="font-mono font-black sm:font-normal whitespace-nowrap">
                               {Number(a.price) > 0 ? (
                                 `+${(Number(a.price) * (a.quantity || 1)).toLocaleString()} ETB`
                               ) : (
-                                <span className="text-amber-600 dark:text-amber-400 font-semibold">Free Gift</span>
+                                <span className="text-amber-600 dark:text-amber-400 font-black sm:font-semibold">Free Gift</span>
                               )}
                             </span>
                           </div>
@@ -2098,11 +2145,11 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                       </div>
                     )}
 
-                    <div className="flex justify-between pt-2 border-t border-dashed border-slate-200 dark:border-slate-700">
-                      <span className="font-bold text-slate-900 dark:text-white">
+                    <div className="flex justify-between items-baseline pt-2.5 sm:pt-2 border-t border-dashed border-slate-200 dark:border-slate-700">
+                      <span className="font-black text-slate-900 dark:text-white text-sm sm:text-xs uppercase tracking-wider">
                         {tradeInAllowance > 0 ? 'Cash Difference to Pay' : 'Net Total'}
                       </span>
-                      <span className="font-mono font-black text-base text-slate-900 dark:text-white whitespace-nowrap">
+                      <span className="font-mono font-black text-xl sm:text-base text-slate-900 dark:text-white whitespace-nowrap">
                         {netCashDue > 0 ? netCashDue.toLocaleString() : '0'} ETB
                       </span>
                     </div>
@@ -2110,14 +2157,14 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                     {unitPriceNum > 0 && (
                       <>
                         <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
-                          <span>Cash/Transfer Paid</span>
-                          <span className="font-mono font-bold whitespace-nowrap">{paidNum.toLocaleString()} ETB</span>
+                          <span className="font-bold sm:font-normal text-xs sm:text-xs">Cash/Transfer Paid</span>
+                          <span className="font-mono font-black sm:font-bold whitespace-nowrap text-sm sm:text-xs">{paidNum.toLocaleString()} ETB</span>
                         </div>
 
                         {isCredit && (
-                          <div className={`flex justify-between font-bold ${isCreditSale ? 'text-amber-600 dark:text-amber-400' : isWriteOff ? 'text-rose-600 dark:text-rose-400' : 'text-orange-600 dark:text-orange-400'}`}>
+                          <div className={`flex justify-between font-black sm:font-bold text-xs sm:text-xs ${isCreditSale ? 'text-amber-600 dark:text-amber-400' : isWriteOff ? 'text-rose-600 dark:text-rose-400' : 'text-orange-600 dark:text-orange-400'}`}>
                             <span className="flex items-center gap-1">
-                              <AlertTriangle className="w-3 h-3" />
+                              <AlertTriangle className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
                               {isCreditSale ? 'Balance Due (Credit Sale)' : isWriteOff ? 'Intentional Shortfall (Written Off)' : 'Payment Shortfall — choose an option'}
                             </span>
                             <span className="font-mono whitespace-nowrap">{balanceDue.toLocaleString()} ETB</span>
@@ -2125,9 +2172,9 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                         )}
 
                         {(user?.role === 'owner' || !!user?.permissions?.can_view_costs) && (outgoingUnitCost > 0 || accessoriesCostTotal > 0) && (
-                          <div className="flex justify-between items-center text-[11px] pt-1.5 border-t border-slate-100 dark:border-slate-800 text-slate-500">
+                          <div className="flex justify-between items-center text-xs sm:text-[11px] pt-1.5 border-t border-slate-100 dark:border-slate-800 text-slate-500 font-bold sm:font-normal">
                             <span>Estimated Net Profit</span>
-                            <span className={`font-mono font-bold ${
+                            <span className={`font-mono font-black sm:font-bold ${
                               (totalAfterDiscount - ((outgoingUnitCost * quantity) + accessoriesCostTotal)) >= 0
                                 ? 'text-emerald-600 dark:text-emerald-400'
                                 : 'text-rose-600 dark:text-rose-400'
@@ -2159,12 +2206,12 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                   quantity > maxAvailableStock ||
                   hasUnmarkedBalance
                 }
-                className="w-full h-11 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 dark:disabled:bg-slate-800 text-white disabled:text-slate-700 dark:disabled:text-slate-300 text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2 active:scale-[0.98] disabled:cursor-not-allowed"
+                className="w-full h-13 sm:h-11 rounded-2xl sm:rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 dark:disabled:bg-slate-800 text-white disabled:text-slate-700 dark:disabled:text-slate-300 text-sm sm:text-xs font-black sm:font-bold transition-all shadow-md sm:shadow-sm flex items-center justify-center gap-2 active:scale-[0.98] disabled:cursor-not-allowed cursor-pointer"
               >
                 {submitting ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2 className="w-5 h-5 sm:w-4 sm:h-4 animate-spin" />
                 ) : (
-                  <ShoppingBag className="w-4 h-4" />
+                  <ShoppingBag className="w-5 h-5 sm:w-4 sm:h-4" />
                 )}
                 <span>
                   {submitting
@@ -2193,12 +2240,12 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
 
       {/* Mobile Sticky Quick-Checkout Trigger Bar */}
       {selectedProduct && selectedVariant && (
-        <div className="lg:hidden fixed bottom-16 left-0 right-0 z-30 p-3 px-4 bg-white/95 dark:bg-[#131926]/95 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800 shadow-xl flex items-center justify-between gap-3 animate-fade-in">
+        <div className="lg:hidden fixed bottom-16 left-0 right-0 z-30 p-3.5 px-4.5 bg-white/95 dark:bg-[#131926]/95 backdrop-blur-xl border-t border-slate-200/90 dark:border-slate-800 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] flex items-center justify-between gap-3 animate-fade-in">
           <div className="min-w-0">
-            <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 truncate">
+            <div className="text-xs font-black text-slate-500 dark:text-slate-400 truncate">
               {selectedProduct.name} · {quantity}x
             </div>
-            <div className="text-sm font-black text-slate-900 dark:text-white">
+            <div className="text-base font-black font-mono text-slate-900 dark:text-white">
               {unitPriceNum > 0
                 ? `${(tradeInAllowance > 0 ? netCashDue : totalAfterDiscount).toLocaleString()} ETB`
                 : 'Enter Unit Price'}
@@ -2209,10 +2256,10 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
             onClick={() => {
               document.getElementById('counter-order-summary')?.scrollIntoView({ behavior: 'smooth' });
             }}
-            className="h-9 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs flex items-center gap-1.5 active:scale-95 transition-all shrink-0 cursor-pointer"
+            className="h-11 px-4.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-md shadow-emerald-500/20 flex items-center gap-1.5 active:scale-95 transition-all shrink-0 cursor-pointer"
           >
             <span>Review & Pay</span>
-            <ChevronDown className="w-3.5 h-3.5" />
+            <ChevronDown className="w-4 h-4" />
           </button>
         </div>
       )}
