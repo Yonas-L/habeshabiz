@@ -1897,6 +1897,11 @@ export const api = {
       method: 'POST',
     }),
 
+  deleteStaff: (id: number) =>
+    request<{ success: boolean; message: string }>(`/staff/${id}`, {
+      method: 'DELETE',
+    }),
+
   getLeaderboard: (month?: string) =>
     request<{ leaderboard: LeaderboardItem[]; top_seller: LeaderboardItem | null }>(
       month ? `/staff/leaderboard?month=${month}` : '/staff/leaderboard'

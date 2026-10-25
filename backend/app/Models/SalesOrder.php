@@ -92,7 +92,7 @@ class SalesOrder extends Model
 
     public function salesperson(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'salesperson_id');
+        return $this->belongsTo(User::class, 'salesperson_id')->withTrashed();
     }
 
     public function financialAccount(): BelongsTo

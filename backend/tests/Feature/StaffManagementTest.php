@@ -70,7 +70,7 @@ test('salesperson cannot access staff management list', function () {
     $response->assertStatus(403);
 });
 
-test('owner can create a staff member with auto-generated temporary password and audit log', function () {
+test('owner can create a staff member with default password and email and audit log', function () {
     $response = $this->actingAs($this->owner)
         ->postJson('/api/v1/staff', [
             'name' => 'Abel Tesfaye',
@@ -82,20 +82,69 @@ test('owner can create a staff member with auto-generated temporary password and
         ->assertJsonPath('success', true);
 
     $tempPassword = $response->json('data.temporary_password');
-    expect($tempPassword)->not->toBeNull();
-    expect($tempPassword)->toStartWith('Bole-');
+    expect($tempPassword)->toBe('434344#Pass');
 
     $createdUser = User::where('phone', '+251911998877')->first();
     expect($createdUser)->not->toBeNull();
     expect($createdUser->role)->toBe('salesperson');
-    expect(Hash::check($tempPassword, $createdUser->password))->toBeTrue();
+    expect($createdUser->email)->toBe('abel@mail.com');
+    expect(Hash::check('434344#Pass', $createdUser->password))->toBeTrue();
 
     // Verify audit log
     $log = AuditLog::where('action', 'staff_created')->first();
     expect($log)->not->toBeNull();
 });
 
-test('owner can reset staff password generating new temporary password', function () {
+test('owner cannot create staff member with duplicate phone number', function () {
+    // First creation
+    $this->actingAs($this->owner)
+        ->postJson('/api/v1/staff', [
+            'name' => 'Sara First',
+            'phone' => '0911223344',
+        ])
+        ->assertStatus(201);
+
+    // Second creation with exact same phone
+    $dup1 = $this->actingAs($this->owner)
+        ->postJson('/api/v1/staff', [
+            'name' => 'Sara Duplicate',
+            'phone' => '0911223344',
+        ]);
+    $dup1->assertStatus(422)
+        ->assertJsonValidationErrors(['phone']);
+
+    // Third creation with normalized last 9 digits (+251911223344)
+    $dup2 = $this->actingAs($this->owner)
+        ->postJson('/api/v1/staff', [
+            'name' => 'Sara Normalized Dup',
+            'phone' => '+251911223344',
+        ]);
+    $dup2->assertStatus(422)
+        ->assertJsonValidationErrors(['phone']);
+});
+
+test('owner cannot update staff member phone to an existing phone number', function () {
+    $staffTwo = User::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Dagmawi Staff',
+        'phone' => '0922334455',
+        'email' => 'dagmawi@mail.com',
+        'password' => Hash::make('434344#Pass'),
+        'role' => 'salesperson',
+    ]);
+
+    // Updating this->staff to have staffTwo's phone
+    $response = $this->actingAs($this->owner)
+        ->putJson("/api/v1/staff/{$this->staff->id}", [
+            'name' => 'Husa Updated',
+            'phone' => '0922334455',
+        ]);
+
+    $response->assertStatus(422)
+        ->assertJsonValidationErrors(['phone']);
+});
+
+test('owner can reset staff password generating default password', function () {
     $response = $this->actingAs($this->owner)
         ->postJson("/api/v1/staff/{$this->staff->id}/reset-password");
 
@@ -103,8 +152,57 @@ test('owner can reset staff password generating new temporary password', functio
         ->assertJsonPath('success', true);
 
     $newPass = $response->json('data.temporary_password');
-    expect($newPass)->toStartWith('Bole-');
-    expect(Hash::check($newPass, $this->staff->fresh()->password))->toBeTrue();
+    expect($newPass)->toBe('434344#Pass');
+    expect(Hash::check('434344#Pass', $this->staff->fresh()->password))->toBeTrue();
+});
+
+test('owner can remove staff account while preserving historical sales and financial data', function () {
+    // Record a historical sale for this staff member
+    $order = SalesOrder::create([
+        'tenant_id' => $this->tenant->id,
+        'order_number' => 'ORD-HIST-001',
+        'salesperson_id' => $this->staff->id,
+        'total_amount' => 85000,
+        'paid_amount' => 85000,
+        'payment_status' => 'paid',
+        'payment_method' => 'cbe',
+        'order_date' => now(),
+    ]);
+
+    // Non-owner cannot delete
+    $this->actingAs($this->staff)
+        ->deleteJson("/api/v1/staff/{$this->staff->id}")
+        ->assertStatus(403);
+
+    // Owner cannot delete self
+    $this->actingAs($this->owner)
+        ->deleteJson("/api/v1/staff/{$this->owner->id}")
+        ->assertStatus(422);
+
+    // Owner removes staff
+    $response = $this->actingAs($this->owner)
+        ->deleteJson("/api/v1/staff/{$this->staff->id}");
+
+    $response->assertStatus(200)
+        ->assertJsonPath('success', true);
+
+    // Staff is soft deleted: not returned in active staff listing
+    $listResponse = $this->actingAs($this->owner)
+        ->getJson('/api/v1/staff');
+    $ids = collect($listResponse->json('data'))->pluck('id')->all();
+    expect($ids)->not->toContain($this->staff->id);
+
+    // Past sales order still exists and preserves salesperson details
+    $savedOrder = SalesOrder::where('order_number', 'ORD-HIST-001')->first();
+    expect($savedOrder)->not->toBeNull();
+    expect($savedOrder->salesperson_id)->toBe($this->staff->id);
+    expect($savedOrder->salesperson)->not->toBeNull();
+    expect($savedOrder->salesperson->name)->toBe('Husa Lead Sales');
+
+    // Audit log was recorded
+    $log = AuditLog::where('action', 'staff_removed')->first();
+    expect($log)->not->toBeNull();
+    expect($log->entity_id)->toBe((string) $this->staff->id);
 });
 
 test('staff member can change their password with current password confirmation', function () {

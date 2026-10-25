@@ -112,18 +112,48 @@ class StaffController extends Controller
         ]);
 
         $tenantId = $currentUser->tenant_id ?? TenantScope::getActiveTenantId();
-        $tenantSlug = $currentUser->tenant?->slug ?? 'shop';
 
-        // Generate email if omitted
-        $email = $validated['email'] ?? null;
-        if (! $email) {
-            $cleanName = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', explode(' ', $validated['name'])[0]));
-            $rand = rand(100, 999);
-            $email = "{$cleanName}{$rand}@{$tenantSlug}.et";
+        // Validate phone uniqueness for staff in this shop/system
+        $cleanPhone = preg_replace('/[^0-9]/', '', $validated['phone']);
+        $last9 = strlen($cleanPhone) >= 9 ? substr($cleanPhone, -9) : $cleanPhone;
+
+        $phoneExists = User::where('tenant_id', $tenantId)
+            ->where(function ($q) use ($validated, $last9) {
+                $q->where('phone', $validated['phone']);
+                if (! empty($last9)) {
+                    $q->orWhere('phone', 'like', "%{$last9}");
+                }
+            })
+            ->exists();
+
+        if ($phoneExists) {
+            return response()->json([
+                'message' => 'A staff member with this phone number already exists in your shop.',
+                'errors' => [
+                    'phone' => ['A staff member with this phone number already exists in your shop.'],
+                ],
+            ], 422);
         }
 
-        // Generate readable, secure temporary password e.g. Bole-4982
-        $tempPassword = 'Bole-'.rand(1000, 9999);
+        // Generate default email if omitted: name@mail.com
+        $email = $validated['email'] ?? null;
+        if (! $email) {
+            $firstName = explode(' ', trim($validated['name']))[0];
+            $cleanName = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $firstName));
+            if (empty($cleanName)) {
+                $cleanName = 'staff';
+            }
+            $baseEmail = "{$cleanName}@mail.com";
+            $email = $baseEmail;
+            $counter = 1;
+            while (User::where('email', $email)->exists()) {
+                $email = "{$cleanName}{$counter}@mail.com";
+                $counter++;
+            }
+        }
+
+        // Default password for salesperson staff registration
+        $tempPassword = '434344#Pass';
 
         $user = User::create([
             'tenant_id' => $tenantId,
@@ -242,6 +272,29 @@ class StaffController extends Controller
             'can_manage_inventory' => ['nullable', 'boolean'],
         ]);
 
+        // Validate phone uniqueness excluding current staff
+        $cleanPhone = preg_replace('/[^0-9]/', '', $validated['phone']);
+        $last9 = strlen($cleanPhone) >= 9 ? substr($cleanPhone, -9) : $cleanPhone;
+
+        $phoneExists = User::where('tenant_id', $currentUser->tenant_id)
+            ->where('id', '!=', $staff->id)
+            ->where(function ($q) use ($validated, $last9) {
+                $q->where('phone', $validated['phone']);
+                if (! empty($last9)) {
+                    $q->orWhere('phone', 'like', "%{$last9}");
+                }
+            })
+            ->exists();
+
+        if ($phoneExists) {
+            return response()->json([
+                'message' => 'A staff member with this phone number already exists in your shop.',
+                'errors' => [
+                    'phone' => ['A staff member with this phone number already exists in your shop.'],
+                ],
+            ], 422);
+        }
+
         $currentPermissions = is_array($staff->permissions) ? $staff->permissions : [];
         $newPermissions = array_merge($currentPermissions, [
             'can_discount' => $request->boolean('can_discount', false),
@@ -279,6 +332,57 @@ class StaffController extends Controller
             'success' => true,
             'message' => "Staff member {$staff->name} updated successfully.",
             'data' => $staff,
+        ]);
+    }
+
+    /**
+     * Remove a staff account from the system while preserving historical sales and financial data.
+     */
+    public function destroy(Request $request, int $id): JsonResponse
+    {
+        /** @var User $currentUser */
+        $currentUser = $request->user();
+        if (! $currentUser->isOwner()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only business owners can remove staff accounts.',
+            ], 403);
+        }
+
+        if ($currentUser->id === $id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot remove your own business owner account.',
+            ], 422);
+        }
+
+        $staff = User::where('tenant_id', $currentUser->tenant_id)->findOrFail($id);
+
+        $staffName = $staff->name;
+        $staffPhone = $staff->phone;
+        $staffEmail = $staff->email;
+
+        // Revoke active login tokens
+        $staff->tokens()->delete();
+
+        // Soft delete the user so historical records (sales, bonuses, debts, audits) remain intact
+        $staff->delete();
+
+        AuditLog::record(
+            action: 'staff_removed',
+            entityType: 'User',
+            entityId: (string) $staff->id,
+            oldValues: [
+                'name' => $staffName,
+                'phone' => $staffPhone,
+                'email' => $staffEmail,
+                'removed_by' => $currentUser->name,
+            ]
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => "Staff member {$staffName} has been removed from the system.",
         ]);
     }
 
@@ -322,7 +426,7 @@ class StaffController extends Controller
     }
 
     /**
-     * Reset password for staff member with a new temporary password.
+     * Reset password for staff member with default password.
      */
     public function resetPassword(Request $request, int $id): JsonResponse
     {
@@ -336,7 +440,7 @@ class StaffController extends Controller
         }
 
         $staff = User::where('tenant_id', $currentUser->tenant_id)->findOrFail($id);
-        $tempPassword = 'Bole-'.rand(1000, 9999);
+        $tempPassword = '434344#Pass';
         $staff->update(['password' => Hash::make($tempPassword)]);
 
         AuditLog::record(

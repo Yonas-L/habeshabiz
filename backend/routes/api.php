@@ -94,6 +94,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/staff', [StaffController::class, 'index']);
         Route::post('/staff', [StaffController::class, 'store']);
         Route::put('/staff/{id}', [StaffController::class, 'update']);
+        Route::delete('/staff/{id}', [StaffController::class, 'destroy']);
         Route::patch('/staff/{id}/toggle-status', [StaffController::class, 'toggleStatus']);
         Route::post('/staff/{id}/reset-password', [StaffController::class, 'resetPassword']);
         Route::get('/staff/leaderboard', [StaffController::class, 'leaderboard']);
