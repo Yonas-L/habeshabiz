@@ -91,6 +91,29 @@ class DashboardController extends Controller
             // net ≈ 0 → this contact contributes nothing to either side
         }
 
+        // Staff bonuses are distinct payables owed by the shop to staff
+        $uncollectedStaffBonuses = (float) Debt::where('created_at', '<=', $endOfMonth)
+            ->where('type', 'payable')
+            ->where('reference_type', 'salesperson_bonus')
+            ->whereIn('status', ['open', 'partially_paid'])
+            ->sum('remaining_amount');
+
+        $pendingBonusStaffContactIds = Debt::where('created_at', '<=', $endOfMonth)
+            ->where('type', 'payable')
+            ->where('reference_type', 'salesperson_bonus')
+            ->whereIn('status', ['open', 'partially_paid'])
+            ->pluck('contact_id')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $pendingBonusStaffCount = count($pendingBonusStaffContactIds);
+
+        // Include uncollected staff bonuses in total payables
+        $totalPayablesNetted += $uncollectedStaffBonuses;
+        $grossPayables += $uncollectedStaffBonuses;
+
         // 3. Treasury & Asset Balances (calculated as of end of selected month)
         $accounts = FinancialAccount::where('created_at', '<=', $endOfMonth)->get();
         (new AccountBalanceService)->calculateBalancesAsOf($accounts, $endOfMonth);
@@ -186,8 +209,8 @@ class DashboardController extends Controller
             ->take(60)
             ->get();
 
-        // 8. Top Payables (Parties whom the shop owes money net, excluding staff bonuses)
-        $topPayables = Debt::with(['contact', 'payments.financialAccount'])
+        // 8. Top Payables (Trade payables + Staff commission bonus payables)
+        $topTradePayables = Debt::with(['contact', 'payments.financialAccount'])
             ->where('type', 'payable')
             ->where('reference_type', '!=', 'salesperson_bonus')
             ->where('created_at', '<=', $endOfMonth)
@@ -203,6 +226,24 @@ class DashboardController extends Controller
             ->orderBy('created_at')
             ->take(60)
             ->get();
+
+        $topBonusPayables = Debt::with(['contact', 'payments.financialAccount'])
+            ->where('type', 'payable')
+            ->where('reference_type', 'salesperson_bonus')
+            ->where('created_at', '<=', $endOfMonth)
+            ->where(function ($q) {
+                $q->whereIn('status', ['open', 'partially_paid'])
+                    ->orWhere(function ($sq) {
+                        $sq->where('status', 'settled')
+                            ->where('updated_at', '>=', now()->subHours(12));
+                    });
+            })
+            ->orderByRaw("CASE WHEN status IN ('open', 'partially_paid') THEN 0 ELSE 1 END")
+            ->orderBy('created_at')
+            ->take(30)
+            ->get();
+
+        $topPayables = $topTradePayables->concat($topBonusPayables);
 
         // 9. Daily sales chart points for the selected month
         $monthOrders = SalesOrder::with('items')
@@ -367,14 +408,14 @@ class DashboardController extends Controller
                         ->count(),
                     'open_receivables' => $netReceivableParties,
                     'open_receivable_parties' => $netReceivableParties,
-                    'open_payables' => $netPayableParties,
-                    'open_payable_parties' => $netPayableParties,
+                    'open_payables' => $netPayableParties + $pendingBonusStaffCount,
+                    'open_payable_parties' => $netPayableParties + $pendingBonusStaffCount,
                     'gross_open_receivables' => Debt::where('created_at', '<=', $endOfMonth)->where('type', 'receivable')->whereIn('status', ['open', 'partially_paid'])->count(),
-                    'gross_open_payables' => Debt::where('created_at', '<=', $endOfMonth)->where('type', 'payable')->where('reference_type', '!=', 'salesperson_bonus')->whereIn('status', ['open', 'partially_paid'])->count(),
+                    'gross_open_payables' => Debt::where('created_at', '<=', $endOfMonth)->where('type', 'payable')->whereIn('status', ['open', 'partially_paid'])->count(),
                     'net_receivable_parties' => $netReceivableParties,
-                    'net_payable_parties' => $netPayableParties,
-                    'uncollected_staff_bonuses' => (float) Debt::where('created_at', '<=', $endOfMonth)->where('type', 'payable')->where('reference_type', 'salesperson_bonus')->whereIn('status', ['open', 'partially_paid'])->sum('remaining_amount'),
-                    'pending_bonus_staff_count' => Debt::where('created_at', '<=', $endOfMonth)->where('type', 'payable')->where('reference_type', 'salesperson_bonus')->whereIn('status', ['open', 'partially_paid'])->distinct('salesperson_id')->count('salesperson_id'),
+                    'net_payable_parties' => $netPayableParties + $pendingBonusStaffCount,
+                    'uncollected_staff_bonuses' => $uncollectedStaffBonuses,
+                    'pending_bonus_staff_count' => $pendingBonusStaffCount,
                 ],
                 'partner_settlements' => [
                     'partners_owing_us_count' => $partnersOwingUsCount,

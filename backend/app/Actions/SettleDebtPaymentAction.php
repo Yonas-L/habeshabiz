@@ -84,25 +84,55 @@ class SettleDebtPaymentAction
      */
     public function executeWaterfall(Contact $contact, string $type, array $data): array
     {
-        return DB::transaction(function () use ($contact, $type, $data) {
+        $amount = (float) $data['amount'];
+        if ($amount <= 0) {
+            throw new InvalidArgumentException('Payment amount must be greater than zero.');
+        }
+
+        $debtsQuery = Debt::where('contact_id', $contact->id)
+            ->where('type', $type)
+            ->whereIn('status', ['open', 'partially_paid'])
+            ->orderBy('created_at', 'asc');
+
+        $hasNonBonus = (clone $debtsQuery)->where('reference_type', '!=', 'salesperson_bonus')->exists();
+        if ($hasNonBonus) {
+            $debts = $debtsQuery->where('reference_type', '!=', 'salesperson_bonus')->get();
+        } else {
+            $debts = $debtsQuery->get();
+        }
+
+        if ($debts->isEmpty()) {
+            throw new InvalidArgumentException("This contact has no open {$type} obligations to settle.");
+        }
+
+        $totalRemaining = (float) $debts->sum('remaining_amount');
+        if ($amount > $totalRemaining + 0.01) {
+            throw new InvalidArgumentException('Payment amount ('.number_format($amount, 2).' ETB) exceeds total open balance ('.number_format($totalRemaining, 2).' ETB).');
+        }
+
+        return $this->executeWaterfallDebts($debts, $data);
+    }
+
+    /**
+     * Settle a collection of open debts using hierarchical (FIFO) waterfall allocation and split pool.
+     *
+     * @param \Illuminate\Support\Collection|Debt[] $debts
+     * @param array{
+     *     amount: float|int,
+     *     financial_account_id?: string|null,
+     *     payment_splits?: array|null,
+     *     payment_date?: string|null,
+     *     reference_number?: string|null,
+     *     notes?: string|null
+     * } $data
+     * @return array{debts: Debt[], payments: DebtPayment[]}
+     */
+    public function executeWaterfallDebts($debts, array $data): array
+    {
+        return DB::transaction(function () use ($debts, $data) {
             $amount = (float) $data['amount'];
             if ($amount <= 0) {
                 throw new InvalidArgumentException('Payment amount must be greater than zero.');
-            }
-
-            $debts = Debt::where('contact_id', $contact->id)
-                ->where('type', $type)
-                ->whereIn('status', ['open', 'partially_paid'])
-                ->orderBy('created_at', 'asc')
-                ->get();
-
-            if ($debts->isEmpty()) {
-                throw new InvalidArgumentException("This contact has no open {$type} obligations to settle.");
-            }
-
-            $totalRemaining = (float) $debts->sum('remaining_amount');
-            if ($amount > $totalRemaining + 0.01) {
-                throw new InvalidArgumentException('Payment amount ('.number_format($amount, 2).' ETB) exceeds total open balance ('.number_format($totalRemaining, 2).' ETB).');
             }
 
             // Normalise splits pool

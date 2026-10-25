@@ -628,3 +628,115 @@ test('staff listing API enriches active handovers and uncollected bonuses separa
     expect((int) $staffData['stats']['active_handovers_count'])->toEqual(1);
     expect((float) $staffData['stats']['active_handovers_value'])->toEqual(5000.00);
 });
+
+test('staff bonus can be disbursed using split payment module across multiple accounts', function () {
+    $boa = FinancialAccount::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Bank of Abyssinia',
+        'type' => 'bank',
+        'current_balance' => 500000.00,
+        'is_custom_asset' => false,
+    ]);
+
+    $contact = Contact::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => $this->staff->name,
+        'phone' => '0911002255',
+        'roles' => ['staff', 'salesperson'],
+    ]);
+
+    $bonusDebt = Debt::create([
+        'tenant_id' => $this->tenant->id,
+        'contact_id' => $contact->id,
+        'salesperson_id' => $this->staff->id,
+        'type' => 'payable',
+        'reference_type' => 'salesperson_bonus',
+        'original_amount' => 10000.00,
+        'paid_amount' => 0.00,
+        'remaining_amount' => 10000.00,
+        'status' => 'open',
+    ]);
+
+    $cbeInitial = (float) $this->cbe->current_balance;
+    $boaInitial = (float) $boa->current_balance;
+
+    // Disburse 10,000 ETB split: 6,000 from CBE and 4,000 from BOA
+    $response = $this->actingAs($this->owner)
+        ->postJson("/api/v1/staff/{$this->staff->id}/settle-bonus", [
+            'amount' => 10000.00,
+            'payment_splits' => [
+                [
+                    'financial_account_id' => $this->cbe->id,
+                    'amount' => 6000.00,
+                    'reference_number' => 'CBE-SPLIT-1',
+                ],
+                [
+                    'financial_account_id' => $boa->id,
+                    'amount' => 4000.00,
+                    'reference_number' => 'BOA-SPLIT-2',
+                ],
+            ],
+            'notes' => 'Split bonus payout',
+        ]);
+
+    $response->assertStatus(200)
+        ->assertJsonPath('success', true);
+
+    $bonusDebt->refresh();
+    expect((float) $bonusDebt->remaining_amount)->toEqual(0.00);
+    expect($bonusDebt->status)->toBe('settled');
+
+    $this->cbe->refresh();
+    $boa->refresh();
+
+    expect((float) $this->cbe->current_balance)->toEqual($cbeInitial - 6000.00);
+    expect((float) $boa->current_balance)->toEqual($boaInitial - 4000.00);
+
+    // Verify AuditLog was recorded
+    $log = AuditLog::where('action', 'staff_bonus_paid')->latest('id')->first();
+    expect($log)->not->toBeNull();
+    expect($log->new_values['amount'])->toEqual(10000.00);
+});
+
+test('dashboard API includes staff bonus in payables list, counts, and capital overview', function () {
+    $contact = Contact::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => $this->staff->name,
+        'phone' => '0911002255',
+        'roles' => ['staff', 'salesperson'],
+    ]);
+
+    Debt::create([
+        'tenant_id' => $this->tenant->id,
+        'contact_id' => $contact->id,
+        'salesperson_id' => $this->staff->id,
+        'type' => 'payable',
+        'reference_type' => 'salesperson_bonus',
+        'original_amount' => 8500.00,
+        'paid_amount' => 0.00,
+        'remaining_amount' => 8500.00,
+        'status' => 'open',
+    ]);
+
+    $response = $this->actingAs($this->owner)
+        ->getJson('/api/v1/dashboard/summary');
+
+    $response->assertStatus(200)
+        ->assertJsonPath('success', true);
+
+    $data = $response->json('data');
+
+    // Counts should show the bonus obligation
+    expect((float) $data['counts']['uncollected_staff_bonuses'])->toBeGreaterThanOrEqual(8500.00);
+    expect((int) $data['counts']['open_payables'])->toBeGreaterThanOrEqual(1);
+
+    // Capital overview payables must reflect the bonus
+    expect((float) $data['capital_overview']['payables'])->toBeGreaterThanOrEqual(8500.00);
+
+    // Top payables list must contain the bonus debt
+    $topPayables = collect($data['top_payables']);
+    $bonusPayable = $topPayables->firstWhere('reference_type', 'salesperson_bonus');
+    expect($bonusPayable)->not->toBeNull();
+    expect((float) $bonusPayable['remaining_amount'])->toEqual(8500.00);
+    expect($bonusPayable['contact']['name'])->toBe($this->staff->name);
+});

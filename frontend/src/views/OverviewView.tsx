@@ -147,11 +147,11 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       offsetAmount: number;
       debts: Debt[];
       openCount: number;
+      isStaffBonus?: boolean;
     }>();
 
-    (top_payables || [])
-      .filter((debt) => debt.reference_type !== 'salesperson_bonus')
-      .forEach((debt) => {
+    (top_payables || []).forEach((debt) => {
+      const isBonus = debt.reference_type === 'salesperson_bonus';
       const cid = debt.contact?.id || debt.contact?.name || 'unassigned';
       if (!map.has(cid)) {
         map.set(cid, {
@@ -163,6 +163,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           offsetAmount: 0,
           debts: [],
           openCount: 0,
+          isStaffBonus: isBonus,
         });
       }
       const g = map.get(cid)!;
@@ -172,13 +173,26 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       if (rem > 0.001) {
         g.openCount += 1;
       }
-      if (debt.contact && debt.contact.net_balance !== undefined) {
-        const netBal = Number(debt.contact.net_balance);
-        g.netRemaining = Math.max(0, -netBal);
-        g.offsetAmount = Math.max(0, g.totalRemaining - g.netRemaining);
-      } else {
-        g.netRemaining = g.totalRemaining;
+      if (isBonus) {
+        g.isStaffBonus = true;
+      }
+    });
+
+    map.forEach((g) => {
+      if (g.isStaffBonus) {
+        // Staff commission bonuses are NEVER offset against handovers or trade credit!
         g.offsetAmount = 0;
+        g.netRemaining = g.totalRemaining;
+      } else {
+        const firstDebt = g.debts[0];
+        if (firstDebt?.contact && firstDebt.contact.net_balance !== undefined) {
+          const netBal = Number(firstDebt.contact.net_balance);
+          g.netRemaining = Math.max(0, -netBal);
+          g.offsetAmount = Math.max(0, g.totalRemaining - g.netRemaining);
+        } else {
+          g.netRemaining = g.totalRemaining;
+          g.offsetAmount = 0;
+        }
       }
     });
 
@@ -597,9 +611,16 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                         {group.name.slice(0, 2).toUpperCase()}
                       </div>
                       <div className="truncate">
-                        <span className="font-semibold text-slate-900 dark:text-white truncate block">
-                          {group.name}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-semibold text-slate-900 dark:text-white truncate block">
+                            {group.name}
+                          </span>
+                          {group.isStaffBonus && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/60 shrink-0">
+                              Staff Bonus
+                            </span>
+                          )}
+                        </div>
                         <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
                           {group.openCount} {group.openCount === 1 ? 'obligation' : 'obligations'}
                           {group.offsetAmount > 0.01 && ` · Offset −${isBalancesHidden ? '••••••' : group.offsetAmount.toLocaleString()} ETB`}

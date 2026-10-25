@@ -28,6 +28,7 @@ interface GroupedDebtContact {
   debts: Debt[];
   hasHandover?: boolean;
   openCount: number;
+  isStaffBonus?: boolean;
 }
 
 interface MobileOverviewProps {
@@ -1044,9 +1045,16 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                       {group.name.slice(0, 2).toUpperCase()}
                     </div>
                     <div className="truncate">
-                      <span className="font-semibold text-slate-900 dark:text-white truncate block">
-                        {group.name}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-semibold text-slate-900 dark:text-white truncate block">
+                          {group.name}
+                        </span>
+                        {group.isStaffBonus && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/60 shrink-0">
+                            Staff Bonus
+                          </span>
+                        )}
+                      </div>
                       <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
                         {group.openCount} {group.openCount === 1 ? 'obligation' : 'obligations'}
                         {group.offsetAmount > 0.01 &&

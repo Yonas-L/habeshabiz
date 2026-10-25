@@ -809,7 +809,11 @@ class StaffController extends Controller
 
         $validated = $request->validate([
             'amount' => ['required', 'numeric', 'min:1'],
-            'financial_account_id' => ['required', 'exists:financial_accounts,id'],
+            'financial_account_id' => ['required_without:payment_splits', 'nullable', 'exists:financial_accounts,id'],
+            'payment_splits' => ['nullable', 'array', 'min:1'],
+            'payment_splits.*.financial_account_id' => ['required', 'exists:financial_accounts,id'],
+            'payment_splits.*.amount' => ['required', 'numeric', 'min:0.01'],
+            'payment_splits.*.reference_number' => ['nullable', 'string', 'max:100'],
             'payment_date' => ['nullable', 'date'],
             'reference_number' => ['nullable', 'string', 'max:100'],
             'notes' => ['nullable', 'string'],
@@ -839,31 +843,8 @@ class StaffController extends Controller
             ], 422);
         }
 
-        $remainingToPay = $paymentAmount;
-        $createdPayments = [];
-
-        DB::transaction(function () use ($openBonusDebts, $validated, &$remainingToPay, &$createdPayments, $settleAction) {
-            foreach ($openBonusDebts as $bonusDebt) {
-                if ($remainingToPay <= 0.001) {
-                    break;
-                }
-                $alloc = min($remainingToPay, (float) $bonusDebt->remaining_amount);
-                if ($alloc <= 0.001) {
-                    continue;
-                }
-
-                $payment = $settleAction->execute($bonusDebt, [
-                    'amount' => $alloc,
-                    'financial_account_id' => $validated['financial_account_id'],
-                    'payment_date' => $validated['payment_date'] ?? now()->toDateString(),
-                    'reference_number' => $validated['reference_number'] ?? 'BONUS-PAYOUT',
-                    'notes' => $validated['notes'] ?? 'Commission bonus payout',
-                ]);
-
-                $createdPayments[] = $payment;
-                $remainingToPay -= $alloc;
-            }
-        });
+        $result = $settleAction->executeWaterfallDebts($openBonusDebts, $validated);
+        $createdPayments = $result['payments'];
 
         AuditLog::record(
             action: 'staff_bonus_paid',
@@ -872,7 +853,8 @@ class StaffController extends Controller
             newValues: [
                 'staff_name' => $staff->name,
                 'amount' => $validated['amount'],
-                'account_id' => $validated['financial_account_id'],
+                'account_id' => $validated['financial_account_id'] ?? null,
+                'payment_splits' => $validated['payment_splits'] ?? null,
                 'paid_by' => $currentUser->name,
                 'payments_count' => count($createdPayments),
             ]

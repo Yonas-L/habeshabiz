@@ -2007,7 +2007,8 @@ export const api = {
     id: number,
     data: {
       amount: number;
-      financial_account_id: string;
+      financial_account_id?: string;
+      payment_splits?: { financial_account_id: string; amount: number; reference_number?: string }[];
       payment_date?: string;
       reference_number?: string;
       notes?: string;

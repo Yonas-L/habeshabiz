@@ -22,6 +22,7 @@ import {
 import { AnimatedNumber } from '../components/AnimatedNumber';
 import { CustomPageLoader } from '../components/loading/CustomPageLoader';
 import { formatLocalDate } from '../utils/dateUtils';
+import { SplitPaymentSelector, type PaymentSplitItem } from '../components/common/SplitPaymentSelector';
 
 interface StaffDetailViewProps {
   staffId: number;
@@ -74,6 +75,8 @@ export const StaffDetailView: React.FC<StaffDetailViewProps> = ({
   const [isSettleModalOpen, setIsSettleModalOpen] = useState(false);
   const [settleAmount, setSettleAmount] = useState<string>('');
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
+  const [isSplit, setIsSplit] = useState(false);
+  const [splits, setSplits] = useState<PaymentSplitItem[]>([]);
   const [paymentDate, setPaymentDate] = useState<string>(formatLocalDate(new Date()));
   const [referenceNumber, setReferenceNumber] = useState<string>('BONUS-PAYOUT');
   const [notes, setNotes] = useState<string>('');
@@ -146,6 +149,8 @@ export const StaffDetailView: React.FC<StaffDetailViewProps> = ({
       return;
     }
     setSettleAmount(String(uncollected));
+    setIsSplit(false);
+    setSplits([]);
     setPaymentDate(formatLocalDate(new Date()));
     setReferenceNumber(`BONUS-${Math.random().toString(36).substring(2, 7).toUpperCase()}`);
     setNotes(`Commission bonus payout to ${statementData.staff.name}`);
@@ -169,24 +174,37 @@ export const StaffDetailView: React.FC<StaffDetailViewProps> = ({
       return;
     }
 
-    if (!selectedAccountId) {
-      toast.error('Please select an account to disburse funds from.');
-      return;
-    }
+    if (isSplit) {
+      const sumSplits = splits.reduce((acc, s) => acc + (Number(s.amount) || 0), 0);
+      if (Math.abs(sumSplits - amountNum) > 0.01) {
+        toast.error(`Split allocation total (${sumSplits.toLocaleString()} ETB) must match payout (${amountNum.toLocaleString()} ETB).`);
+        return;
+      }
+      if (splits.some((s) => !s.financial_account_id || Number(s.amount) <= 0)) {
+        toast.error('Each split entry must have an account and amount greater than 0.');
+        return;
+      }
+    } else {
+      if (!selectedAccountId) {
+        toast.error('Please select an account to disburse funds from.');
+        return;
+      }
 
-    const chosenAccount = accounts.find((a) => a.id === selectedAccountId);
-    if (chosenAccount && Number(chosenAccount.current_balance) < amountNum) {
-      toast.error(
-        `Insufficient funds in ${chosenAccount.name}. Available balance: ${Number(chosenAccount.current_balance).toLocaleString()} ETB.`
-      );
-      return;
+      const chosenAccount = accounts.find((a) => a.id === selectedAccountId);
+      if (chosenAccount && Number(chosenAccount.current_balance) < amountNum) {
+        toast.error(
+          `Insufficient funds in ${chosenAccount.name}. Available balance: ${Number(chosenAccount.current_balance).toLocaleString()} ETB.`
+        );
+        return;
+      }
     }
 
     try {
       setIsSubmittingSettle(true);
       await api.settleStaffBonus(staffId, {
         amount: amountNum,
-        financial_account_id: selectedAccountId,
+        financial_account_id: isSplit ? undefined : selectedAccountId,
+        payment_splits: isSplit ? splits : undefined,
         payment_date: paymentDate,
         reference_number: referenceNumber,
         notes: notes,
@@ -1037,7 +1055,7 @@ export const StaffDetailView: React.FC<StaffDetailViewProps> = ({
           role="dialog"
           aria-modal="true"
         >
-          <div className="bg-white dark:bg-[#131926] border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-5 shadow-2xl space-y-4 animate-scale-up">
+          <div className="bg-white dark:bg-[#131926] border border-slate-200 dark:border-slate-800 rounded-2xl max-w-lg w-full p-5 shadow-2xl space-y-4 animate-scale-up">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <div>
                 <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
@@ -1087,21 +1105,18 @@ export const StaffDetailView: React.FC<StaffDetailViewProps> = ({
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                  Disburse From Account
-                </label>
-                <select
-                  value={selectedAccountId}
-                  onChange={(e) => setSelectedAccountId(e.target.value)}
-                  required
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
-                >
-                  {accounts.map((acc) => (
-                    <option key={acc.id} value={acc.id}>
-                      {acc.name} · ({Number(acc.current_balance).toLocaleString()} ETB)
-                    </option>
-                  ))}
-                </select>
+                <SplitPaymentSelector
+                  accounts={accounts}
+                  targetAmount={parseFloat(settleAmount) || 0}
+                  singleAccountId={selectedAccountId}
+                  onSingleAccountChange={setSelectedAccountId}
+                  isSplit={isSplit}
+                  onIsSplitChange={setIsSplit}
+                  splits={splits}
+                  onSplitsChange={setSplits}
+                  label="Disburse From Account"
+                  direction="outflow"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-2">

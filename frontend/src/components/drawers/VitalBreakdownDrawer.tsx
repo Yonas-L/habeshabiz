@@ -207,10 +207,20 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
   }, [top_receivables]);
 
   const groupedPayables = useMemo(() => {
-    const map = new Map<string, { contactId: string; name: string; phone: string | null; totalRemaining: number; netRemaining: number; offsetAmount: number; debts: Debt[]; openCount: number }>();
-    top_payables
-      .filter((debt) => debt.reference_type !== 'salesperson_bonus')
-      .forEach((debt) => {
+    const map = new Map<string, {
+      contactId: string;
+      name: string;
+      phone: string | null;
+      totalRemaining: number;
+      netRemaining: number;
+      offsetAmount: number;
+      debts: Debt[];
+      openCount: number;
+      isStaffBonus?: boolean;
+    }>();
+
+    (top_payables || []).forEach((debt) => {
+      const isBonus = debt.reference_type === 'salesperson_bonus';
       const cid = debt.contact?.id || debt.contact?.name || 'unassigned';
       if (!map.has(cid)) {
         map.set(cid, {
@@ -222,6 +232,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
           offsetAmount: 0,
           debts: [],
           openCount: 0,
+          isStaffBonus: isBonus,
         });
       }
       const g = map.get(cid)!;
@@ -231,43 +242,76 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
       if (rem > 0.001) {
         g.openCount += 1;
       }
-      if (debt.contact && debt.contact.net_balance !== undefined) {
-        const netBal = Number(debt.contact.net_balance);
-        g.netRemaining = Math.max(0, -netBal);
-        g.offsetAmount = Math.max(0, g.totalRemaining - g.netRemaining);
-      } else {
-        g.netRemaining = g.totalRemaining;
-        g.offsetAmount = 0;
+      if (isBonus) {
+        g.isStaffBonus = true;
       }
     });
+
     map.forEach((g) => {
-      const openDebts = g.debts.filter((d) => (Number(d.remaining_amount) || 0) > 0.001)
-        .sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
-      const settledDebts = g.debts.filter((d) => (Number(d.remaining_amount) || 0) <= 0.001)
-        .sort((a, b) => new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime())
-        .slice(0, 2);
+      if (g.isStaffBonus) {
+        // Staff commission bonuses are NEVER offset against handovers or trade credit!
+        g.offsetAmount = 0;
+        g.netRemaining = g.totalRemaining;
 
-      let remainingOffset = g.offsetAmount;
-      const enhancedOpenDebts = openDebts.map((d) => {
-        const rem = Number(d.remaining_amount) || 0;
-        const alloc = Math.min(rem, remainingOffset);
-        const netRem = Math.max(0, rem - alloc);
-        remainingOffset = Math.max(0, remainingOffset - alloc);
-        return {
+        const openDebts = g.debts.filter((d) => (Number(d.remaining_amount) || 0) > 0.001)
+          .sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
+        const settledDebts = g.debts.filter((d) => (Number(d.remaining_amount) || 0) <= 0.001)
+          .sort((a, b) => new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime())
+          .slice(0, 2);
+
+        const enhancedOpenDebts = openDebts.map((d) => ({
           ...d,
-          allocatedOffset: alloc,
-          effectiveRemaining: netRem,
-        } as Debt;
-      });
+          allocatedOffset: 0,
+          effectiveRemaining: Number(d.remaining_amount) || 0,
+        } as Debt));
 
-      const enhancedSettledDebts = settledDebts.map((d) => ({
-        ...d,
-        allocatedOffset: 0,
-        effectiveRemaining: 0,
-      } as Debt));
+        const enhancedSettledDebts = settledDebts.map((d) => ({
+          ...d,
+          allocatedOffset: 0,
+          effectiveRemaining: 0,
+        } as Debt));
 
-      g.debts = [...enhancedSettledDebts, ...enhancedOpenDebts];
+        g.debts = [...enhancedSettledDebts, ...enhancedOpenDebts];
+      } else {
+        const firstDebt = g.debts[0];
+        if (firstDebt?.contact && firstDebt.contact.net_balance !== undefined) {
+          const netBal = Number(firstDebt.contact.net_balance);
+          g.netRemaining = Math.max(0, -netBal);
+          g.offsetAmount = Math.max(0, g.totalRemaining - g.netRemaining);
+        } else {
+          g.netRemaining = g.totalRemaining;
+          g.offsetAmount = 0;
+        }
+
+        const openDebts = g.debts.filter((d) => (Number(d.remaining_amount) || 0) > 0.001)
+          .sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
+        const settledDebts = g.debts.filter((d) => (Number(d.remaining_amount) || 0) <= 0.001)
+          .sort((a, b) => new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime())
+          .slice(0, 2);
+
+        let remainingOffset = g.offsetAmount;
+        const enhancedOpenDebts = openDebts.map((d) => {
+          const rem = Number(d.remaining_amount) || 0;
+          const alloc = Math.min(rem, remainingOffset);
+          const netRem = Math.max(0, rem - alloc);
+          remainingOffset = Math.max(0, remainingOffset - alloc);
+          return {
+            ...d,
+            allocatedOffset: alloc,
+            effectiveRemaining: netRem,
+          } as Debt;
+        });
+
+        const enhancedSettledDebts = settledDebts.map((d) => ({
+          ...d,
+          allocatedOffset: 0,
+          effectiveRemaining: 0,
+        } as Debt));
+
+        g.debts = [...enhancedSettledDebts, ...enhancedOpenDebts];
+      }
     });
+
     return Array.from(map.values())
       .filter((g) => g.netRemaining > 0.001)
       .sort((a, b) => b.netRemaining - a.netRemaining);
@@ -303,7 +347,13 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
 
   const drawerTitle = focusedGroup ? focusedGroup.name : current.title;
   const drawerSubtitle = focusedGroup
-    ? `${focusedGroup.openCount} ${focusedGroup.openCount === 1 ? 'obligation' : 'obligations'} · ${vitalType === 'receivables' ? 'Customer / Partner Holdings' : 'Supplier Debt Ledger'}${focusedGroup.phone ? ` · ${focusedGroup.phone}` : ''}`
+    ? `${focusedGroup.openCount} ${focusedGroup.openCount === 1 ? 'obligation' : 'obligations'} · ${
+        vitalType === 'receivables'
+          ? 'Customer / Partner Holdings'
+          : (focusedGroup as any).isStaffBonus
+            ? 'Staff Commission Bonus Ledger'
+            : 'Supplier Debt Ledger'
+      }${focusedGroup.phone ? ` · ${focusedGroup.phone}` : ''}`
     : current.subtitle;
   const drawerAmount = focusedGroup ? focusedGroup.netRemaining : current.amount;
   const valuationLabel = focusedGroup
@@ -315,9 +365,15 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
       <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
         vitalType === 'receivables'
           ? 'bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/60'
-          : 'bg-rose-100 dark:bg-rose-900/60 text-rose-800 dark:text-rose-300 border border-rose-200/60 dark:border-rose-800/60'
+          : (focusedGroup as any).isStaffBonus
+            ? 'bg-purple-100 dark:bg-purple-900/60 text-purple-800 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/60'
+            : 'bg-rose-100 dark:bg-rose-900/60 text-rose-800 dark:text-rose-300 border border-rose-200/60 dark:border-rose-800/60'
       }`}>
-        {vitalType === 'receivables' ? 'Party Receivable' : 'Party Payable'}
+        {vitalType === 'receivables'
+          ? 'Party Receivable'
+          : (focusedGroup as any).isStaffBonus
+            ? 'Staff Bonus'
+            : 'Party Payable'}
       </span>
       {selectedMonth && (
         <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
@@ -812,6 +868,11 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                             <span className="font-bold text-slate-900 dark:text-white truncate">
                               {group.name}
                             </span>
+                            {(group as any).isStaffBonus && (
+                              <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/60 shrink-0">
+                                Staff Bonus
+                              </span>
+                            )}
                             {!focusedGroup && (
                               <button
                                 type="button"
