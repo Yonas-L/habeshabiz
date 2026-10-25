@@ -10,6 +10,7 @@ use App\Models\FinancialAccount;
 use App\Models\FinancialTransaction;
 use App\Models\InventoryStock;
 use App\Models\InventoryUnit;
+use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\SalesOrder;
 use App\Models\SalesOrderItem;
@@ -639,18 +640,65 @@ class RecordSaleAction
             // not a staff expense. Owner withdrawals are recorded separately as owner draws.
             if ($netOrderBonus > 0 && $salesperson) {
                 if (! $salesperson->isOwner()) {
-                    $staffContact = Contact::firstOrCreate(
-                        [
+                    // Resolve staff contact safely: match by phone first (including normalized), then by name
+                    $staffContact = null;
+                    $rawPhone = ! empty($salesperson->phone) ? trim((string) $salesperson->phone) : null;
+                    $cleanPhone = $rawPhone ? preg_replace('/[^0-9]/', '', $rawPhone) : '';
+                    $last9 = strlen($cleanPhone) >= 9 ? substr($cleanPhone, -9) : $cleanPhone;
+
+                    if ($rawPhone) {
+                        $staffContact = Contact::where('tenant_id', $tenantId)
+                            ->where(function ($q) use ($rawPhone, $last9) {
+                                $q->where('phone', $rawPhone);
+                                if (! empty($last9)) {
+                                    $q->orWhere('phone', 'like', "%{$last9}");
+                                }
+                            })
+                            ->first();
+                    }
+
+                    if (! $staffContact) {
+                        $staffContact = Contact::where('tenant_id', $tenantId)
+                            ->where('name', $salesperson->name)
+                            ->first();
+                    }
+
+                    if ($staffContact) {
+                        $existingRoles = is_array($staffContact->roles) ? $staffContact->roles : [];
+                        $newRoles = array_values(array_unique(array_merge($existingRoles, ['staff', 'salesperson'])));
+                        $needsSave = false;
+
+                        if ($newRoles !== $existingRoles) {
+                            $staffContact->roles = $newRoles;
+                            $needsSave = true;
+                        }
+                        if ($staffContact->name !== $salesperson->name) {
+                            $staffContact->name = $salesperson->name;
+                            $needsSave = true;
+                        }
+                        if ($salesperson->email && empty($staffContact->email)) {
+                            $staffContact->email = $salesperson->email;
+                            $needsSave = true;
+                        }
+                        if ($needsSave) {
+                            $staffContact->save();
+                        }
+                    } else {
+                        // Guard against phone collision
+                        $phoneToUse = $rawPhone;
+                        if ($phoneToUse && Contact::where('tenant_id', $tenantId)->where('phone', $phoneToUse)->exists()) {
+                            $phoneToUse = null;
+                        }
+
+                        $staffContact = Contact::create([
                             'tenant_id' => $tenantId,
                             'name' => $salesperson->name,
-                        ],
-                        [
-                            'phone' => $salesperson->phone ?? null,
+                            'phone' => $phoneToUse,
                             'email' => $salesperson->email ?? null,
                             'roles' => ['staff', 'salesperson'],
                             'is_active' => true,
-                        ]
-                    );
+                        ]);
+                    }
 
                     Debt::create([
                         'tenant_id' => $tenantId,
@@ -714,8 +762,20 @@ class RecordSaleAction
 
                 $order->loadMissing(['items.variant.product', 'items.inventoryUnit.variant.product']);
                 $deviceSummary = $order->items->map(function ($it) {
-                    $pName = $it->inventoryUnit?->variant?->product?->name ?? $it->variant?->product?->name ?? 'Device';
-                    $sn = $it->inventoryUnit?->imei_or_serial ? " (SN: {$it->inventoryUnit->imei_or_serial})" : '';
+                    /** @var SalesOrderItem $it */
+                    /** @var InventoryUnit|null $invUnit */
+                    $invUnit = $it->inventoryUnit;
+                    /** @var ProductVariant|null $invVariant */
+                    $invVariant = $invUnit?->variant;
+                    /** @var Product|null $invProduct */
+                    $invProduct = $invVariant?->product;
+                    /** @var ProductVariant|null $itemVariant */
+                    $itemVariant = $it->variant;
+                    /** @var Product|null $itemProduct */
+                    $itemProduct = $itemVariant?->product;
+
+                    $pName = $invProduct?->name ?? $itemProduct?->name ?? 'Device';
+                    $sn = $invUnit?->imei_or_serial ? " (SN: {$invUnit->imei_or_serial})" : '';
                     $uId = $it->inventory_unit_id ? " [unit_id:{$it->inventory_unit_id}]" : '';
 
                     return "{$pName}{$sn}{$uId}";

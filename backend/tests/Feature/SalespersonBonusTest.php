@@ -2,6 +2,7 @@
 
 use App\Actions\RecordSaleAction;
 use App\Actions\SettleDebtPaymentAction;
+use App\Models\Contact;
 use App\Models\Debt;
 use App\Models\FinancialAccount;
 use App\Models\InventoryUnit;
@@ -321,4 +322,49 @@ test('dashboard summary reports uncollected bonus alerts to owner', function () 
     $res->assertOk();
     expect((float) $res->json('data.counts.uncollected_staff_bonuses'))->toBe(10000.0);
     expect($res->json('data.counts.pending_bonus_staff_count'))->toBe(1);
+});
+
+test('safely resolves staff contact without duplicate key error when a contact with the same phone already exists under a different name', function () {
+    // Simulate an existing customer contact in the shop with the salesperson's phone number
+    Contact::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Boka (Customer)',
+        'phone' => '+251911223344', // Matches $this->salesperson->phone
+        'roles' => ['customer'],
+        'is_active' => true,
+    ]);
+
+    $action = app(RecordSaleAction::class);
+
+    // Salesperson makes a sale that generates a 10,000 ETB bonus
+    $order = $action->execute([
+        'salesperson_id' => $this->salesperson->id,
+        'paid_amount' => 160000.00,
+        'payment_method' => 'cash',
+        'financial_account_id' => $this->account->id,
+        'items' => [
+            [
+                'variant_id' => $this->variant->id,
+                'inventory_unit_id' => $this->unit->id,
+                'quantity' => 1,
+                'unit_price' => 160000.00,
+            ],
+        ],
+    ]);
+
+    expect($order)->toBeInstanceOf(SalesOrder::class);
+    $bonusDebt = Debt::where('reference_type', 'salesperson_bonus')
+        ->where('reference_id', $order->id)
+        ->first();
+
+    expect($bonusDebt)->not->toBeNull();
+    expect((float) $bonusDebt->original_amount)->toBe(10000.0);
+
+    // Verify contact was updated with staff/salesperson roles and renamed to salesperson's name
+    $contact = $bonusDebt->contact;
+    expect($contact)->not->toBeNull();
+    expect($contact->phone)->toBe('+251911223344');
+    expect($contact->name)->toBe('Dawit Sales');
+    expect($contact->roles)->toContain('staff');
+    expect($contact->roles)->toContain('salesperson');
 });

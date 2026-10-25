@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Models\Contact;
 use App\Models\Debt;
 use App\Models\SalesOrder;
 use App\Models\User;
@@ -140,6 +141,50 @@ class StaffController extends Controller
             ],
             'is_active' => true,
         ]);
+
+        // Safely sync staff contact in contacts table
+        $cleanPhone = preg_replace('/[^0-9]/', '', $validated['phone']);
+        $last9 = strlen($cleanPhone) >= 9 ? substr($cleanPhone, -9) : $cleanPhone;
+        $staffContact = Contact::where('tenant_id', $tenantId)
+            ->where(function ($q) use ($validated, $last9) {
+                $q->where('phone', $validated['phone']);
+                if (! empty($last9)) {
+                    $q->orWhere('phone', 'like', "%{$last9}");
+                }
+            })
+            ->first();
+
+        if (! $staffContact) {
+            $staffContact = Contact::where('tenant_id', $tenantId)
+                ->where('name', $validated['name'])
+                ->first();
+        }
+
+        if ($staffContact) {
+            $existingRoles = is_array($staffContact->roles) ? $staffContact->roles : [];
+            $newRoles = array_values(array_unique(array_merge($existingRoles, ['staff', 'salesperson'])));
+            $staffContact->roles = $newRoles;
+            if ($staffContact->name !== $validated['name']) {
+                $staffContact->name = $validated['name'];
+            }
+            if ($email && empty($staffContact->email)) {
+                $staffContact->email = $email;
+            }
+            $staffContact->save();
+        } else {
+            $phoneToUse = $validated['phone'];
+            if (Contact::where('tenant_id', $tenantId)->where('phone', $phoneToUse)->exists()) {
+                $phoneToUse = null;
+            }
+            Contact::create([
+                'tenant_id' => $tenantId,
+                'name' => $validated['name'],
+                'phone' => $phoneToUse,
+                'email' => $email,
+                'roles' => ['staff', 'salesperson'],
+                'is_active' => true,
+            ]);
+        }
 
         AuditLog::record(
             action: 'staff_created',
