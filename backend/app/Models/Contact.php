@@ -46,6 +46,7 @@ class Contact extends Model
         'net_balance',
         'open_receivable',
         'open_payable',
+        'open_bonus_payable',
     ];
 
     protected static function booted(): void
@@ -119,19 +120,22 @@ class Contact extends Model
 
     public function getOpenPayableAttribute(): float
     {
+        // Trade payables strictly exclude staff salesperson bonuses so commissions do not reduce custody handovers or trade offsets
         $open = $this->relationLoaded('debts')
             ? (float) $this->debts
                 ->where('type', 'payable')
+                ->where('reference_type', '!=', 'salesperson_bonus')
                 ->whereIn('status', ['open', 'partially_paid'])
                 ->sum('remaining_amount')
             : (float) $this->debts()
                 ->where('type', 'payable')
+                ->where('reference_type', '!=', 'salesperson_bonus')
                 ->whereIn('status', ['open', 'partially_paid'])
                 ->sum('remaining_amount');
 
         $surplus = 0.0;
         if ($this->relationLoaded('debts')) {
-            foreach ($this->debts->where('type', 'payable') as $d) {
+            foreach ($this->debts->where('type', 'payable')->where('reference_type', '!=', 'salesperson_bonus') as $d) {
                 if ($d->relationLoaded('payments')) {
                     $paid = (float) $d->payments->sum('amount');
                     if ($paid > (float) $d->original_amount) {
@@ -142,6 +146,21 @@ class Contact extends Model
         }
 
         return round(max(0.0, $open - $surplus), 2);
+    }
+
+    public function getOpenBonusPayableAttribute(): float
+    {
+        return $this->relationLoaded('debts')
+            ? (float) $this->debts
+                ->where('type', 'payable')
+                ->where('reference_type', 'salesperson_bonus')
+                ->whereIn('status', ['open', 'partially_paid'])
+                ->sum('remaining_amount')
+            : (float) $this->debts()
+                ->where('type', 'payable')
+                ->where('reference_type', 'salesperson_bonus')
+                ->whereIn('status', ['open', 'partially_paid'])
+                ->sum('remaining_amount');
     }
 
     public function getNetBalanceAttribute(): float

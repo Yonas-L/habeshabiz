@@ -208,7 +208,9 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
 
   const groupedPayables = useMemo(() => {
     const map = new Map<string, { contactId: string; name: string; phone: string | null; totalRemaining: number; netRemaining: number; offsetAmount: number; debts: Debt[]; openCount: number }>();
-    top_payables.forEach((debt) => {
+    top_payables
+      .filter((debt) => debt.reference_type !== 'salesperson_bonus')
+      .forEach((debt) => {
       const cid = debt.contact?.id || debt.contact?.name || 'unassigned';
       if (!map.has(cid)) {
         map.set(cid, {

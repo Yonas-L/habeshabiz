@@ -754,6 +754,9 @@ export interface StaffMember {
     uncollected_bonus?: number;
     collected_bonus?: number;
     total_bonus_earned?: number;
+    active_handovers_count?: number;
+    active_handovers_value?: number;
+    open_receivable?: number;
     last_sale_at: string | null;
   };
 }

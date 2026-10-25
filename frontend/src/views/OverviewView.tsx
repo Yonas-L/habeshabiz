@@ -149,7 +149,9 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       openCount: number;
     }>();
 
-    (top_payables || []).forEach((debt) => {
+    (top_payables || [])
+      .filter((debt) => debt.reference_type !== 'salesperson_bonus')
+      .forEach((debt) => {
       const cid = debt.contact?.id || debt.contact?.name || 'unassigned';
       if (!map.has(cid)) {
         map.set(cid, {

@@ -4,6 +4,7 @@ use App\Models\AuditLog;
 use App\Models\Contact;
 use App\Models\Debt;
 use App\Models\FinancialAccount;
+use App\Models\InventoryUnit;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\SalesOrder;
@@ -562,4 +563,68 @@ test('staff bonus is protected from mutual debt reconciliation and handovers', f
     // Bonus debt must remain untouched at 10,000 ETB, NOT reduced to 6,000 ETB!
     expect((float) $bonusDebt->remaining_amount)->toEqual(10000.00);
     expect((float) $handoverDebt->remaining_amount)->toEqual(4000.00);
+
+    // Contact open payable must exclude staff bonuses so trade netting does not touch commissions
+    $contact->refresh();
+    expect((float) $contact->open_payable)->toEqual(0.00);
+    expect((float) $contact->open_receivable)->toEqual(4000.00);
+    expect((float) $contact->net_balance)->toEqual(4000.00);
+    expect((float) $contact->open_bonus_payable)->toEqual(10000.00);
+});
+
+test('staff listing API enriches active handovers and uncollected bonuses separately', function () {
+    $contact = Contact::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => $this->staff->name,
+        'phone' => '0911002255',
+        'roles' => ['staff', 'salesperson'],
+    ]);
+
+    Debt::create([
+        'tenant_id' => $this->tenant->id,
+        'contact_id' => $contact->id,
+        'salesperson_id' => $this->staff->id,
+        'type' => 'payable',
+        'reference_type' => 'salesperson_bonus',
+        'original_amount' => 10000.00,
+        'paid_amount' => 0.00,
+        'remaining_amount' => 10000.00,
+        'status' => 'open',
+    ]);
+
+    $product = Product::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'iPhone 15 Pro',
+        'has_serials' => true,
+    ]);
+
+    $variant = ProductVariant::create([
+        'tenant_id' => $this->tenant->id,
+        'product_id' => $product->id,
+        'name' => '128GB Black',
+    ]);
+
+    $unit = InventoryUnit::create([
+        'tenant_id' => $this->tenant->id,
+        'variant_id' => $variant->id,
+        'imei_or_serial' => 'SN-HANDOVER-999',
+        'cost_basis' => 5000.00,
+        'status' => 'out',
+        'source_type' => 'purchase',
+        'handover_to' => $this->staff->name,
+        'handover_payout' => 5000.00,
+        'handed_out_at' => now(),
+    ]);
+
+    $response = $this->actingAs($this->owner)
+        ->getJson('/api/v1/staff');
+
+    $response->assertStatus(200)
+        ->assertJsonPath('success', true);
+
+    $staffData = collect($response->json('data'))->firstWhere('id', $this->staff->id);
+    expect($staffData)->not->toBeNull();
+    expect((float) $staffData['stats']['uncollected_bonus'])->toEqual(10000.00);
+    expect((int) $staffData['stats']['active_handovers_count'])->toEqual(1);
+    expect((float) $staffData['stats']['active_handovers_value'])->toEqual(5000.00);
 });

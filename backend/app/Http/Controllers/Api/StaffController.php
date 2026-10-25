@@ -43,7 +43,15 @@ class StaffController extends Controller
         $startOfWeek = Carbon::now()->startOfWeek();
         $startOfMonth = Carbon::now()->startOfMonth();
 
-        $enriched = $staffMembers->map(function ($staff) use ($startOfWeek, $startOfMonth) {
+        $activeHandovers = InventoryUnit::where('status', 'out')
+            ->whereNotNull('handover_to')
+            ->get();
+
+        $staffContacts = Contact::whereIn('name', $staffMembers->pluck('name'))
+            ->get()
+            ->keyBy('name');
+
+        $enriched = $staffMembers->map(function ($staff) use ($startOfWeek, $startOfMonth, $activeHandovers, $staffContacts) {
             $weekOrders = SalesOrder::where('salesperson_id', $staff->id)
                 ->where('created_at', '>=', $startOfWeek)
                 ->get();
@@ -55,6 +63,17 @@ class StaffController extends Controller
             $lastSale = SalesOrder::where('salesperson_id', $staff->id)
                 ->latest()
                 ->first();
+
+            $staffHandovers = $activeHandovers->filter(function ($u) use ($staff) {
+                return $u->handover_to === $staff->name;
+            });
+            $activeHandoversCount = $staffHandovers->count();
+            $activeHandoversValue = (float) $staffHandovers->sum(function ($u) {
+                return (float) ($u->handover_payout ?: ($u->selling_price ?: ($u->cost_basis ?: 0)));
+            });
+
+            $contact = $staffContacts->get($staff->name);
+            $openReceivable = $contact ? (float) $contact->open_receivable : $activeHandoversValue;
 
             return [
                 'id' => $staff->id,
@@ -80,6 +99,9 @@ class StaffController extends Controller
                     'total_bonus_earned' => (float) Debt::where('salesperson_id', $staff->id)
                         ->where('reference_type', 'salesperson_bonus')
                         ->sum('original_amount'),
+                    'active_handovers_count' => $activeHandoversCount,
+                    'active_handovers_value' => $activeHandoversValue,
+                    'open_receivable' => max($openReceivable, $activeHandoversValue),
                     'last_sale_at' => $lastSale?->order_date ?? $lastSale?->created_at,
                 ],
             ];

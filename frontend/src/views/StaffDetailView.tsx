@@ -450,7 +450,7 @@ export const StaffDetailView: React.FC<StaffDetailViewProps> = ({
             <button
               type="button"
               onClick={handleOpenSettleModal}
-              className="h-9 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-emerald-600/20"
+              className="h-9 px-3.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-rose-600/20"
               title="Disburse earned commission bonus"
             >
               <CreditCard className="w-3.5 h-3.5" />
@@ -553,7 +553,7 @@ export const StaffDetailView: React.FC<StaffDetailViewProps> = ({
       <div
         className={`rounded-2xl border p-5 sm:p-6 shadow-xs transition-all ${
           hasUncollected
-            ? 'bg-gradient-to-br from-emerald-50/70 via-white to-emerald-50/30 dark:from-emerald-950/30 dark:via-[#131926] dark:to-[#131926] border-emerald-200/90 dark:border-emerald-900/60'
+            ? 'bg-gradient-to-br from-rose-50/70 via-white to-rose-50/30 dark:from-rose-950/30 dark:via-[#131926] dark:to-[#131926] border-rose-200/90 dark:border-rose-900/60'
             : 'bg-white dark:bg-[#131926] border-slate-200/80 dark:border-slate-800'
         }`}
       >
@@ -567,13 +567,13 @@ export const StaffDetailView: React.FC<StaffDetailViewProps> = ({
               <span
                 className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1.5 ${
                   hasUncollected
-                    ? 'bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/60'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                    ? 'bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300 border border-rose-200/60 dark:border-rose-800/60'
+                    : 'bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/60'
                 }`}
               >
                 <span
                   className={`w-1.5 h-1.5 rounded-full ${
-                    hasUncollected ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'
+                    hasUncollected ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500'
                   }`}
                 />
                 {hasUncollected ? 'Store Owes Staff' : 'Settled In Full'}
@@ -583,19 +583,19 @@ export const StaffDetailView: React.FC<StaffDetailViewProps> = ({
             <div
               className={`text-3xl sm:text-4xl font-black font-mono tracking-tight tabular-nums flex items-baseline gap-1.5 ${
                 hasUncollected
-                  ? 'text-emerald-600 dark:text-emerald-400'
+                  ? 'text-rose-600 dark:text-rose-400'
                   : 'text-slate-900 dark:text-white'
               }`}
             >
-              <span>{hasUncollected ? '+' : ''}</span>
+              <span>{hasUncollected ? '−' : ''}</span>
               <AnimatedNumber value={uncollectedBonus} />
               <span className="text-xs font-semibold font-sans text-slate-400 dark:text-slate-500">
                 ETB
               </span>
             </div>
 
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500 dark:text-slate-400 font-medium">
-              <span>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium">
+              <span className={hasUncollected ? 'text-rose-600 dark:text-rose-400' : 'text-slate-500 dark:text-slate-400'}>
                 {hasUncollected
                   ? `Your shop owes this commission bonus to ${staff.name}.`
                   : `All earned bonuses with ${staff.name} are fully disbursed.`}
@@ -606,7 +606,7 @@ export const StaffDetailView: React.FC<StaffDetailViewProps> = ({
               </span>
             </div>
 
-            <div className="pt-1 flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
+            <div className="pt-1 flex items-center gap-1 text-[11px] font-bold text-slate-600 dark:text-slate-300">
               <ShieldCheck className="size-3.5 text-emerald-500" />
               <span>Autonomous Bonus Protection: Isolated from custody handovers & trade debts.</span>
             </div>
@@ -634,10 +634,13 @@ export const StaffDetailView: React.FC<StaffDetailViewProps> = ({
 
             <div className="px-3 py-2 rounded-xl bg-white/80 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800/60 text-center min-w-[95px] shadow-2xs">
               <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400 block">
-                On Handover
+                Held Handover
               </span>
-              <span className="text-sm font-mono font-bold text-slate-800 dark:text-slate-200 block mt-0.5">
-                {summary.active_handovers_count || 0} <span className="text-[10px] font-sans font-normal text-slate-400">units</span>
+              <span className="text-sm font-mono font-bold text-emerald-600 dark:text-emerald-400 block mt-0.5">
+                {(summary.active_handovers_value || 0).toLocaleString()} <span className="text-[10px] font-sans font-normal text-slate-400">ETB</span>
+              </span>
+              <span className="text-[9px] text-slate-400 block">
+                {summary.active_handovers_count || 0} {summary.active_handovers_count === 1 ? 'unit' : 'units'} in custody
               </span>
             </div>
           </div>
@@ -802,8 +805,8 @@ export const StaffDetailView: React.FC<StaffDetailViewProps> = ({
                             )}
                           </td>
                           <td className="py-2.5 px-3.5 text-right tabular-nums font-bold">
-                            <span className="text-emerald-600 dark:text-emerald-400">
-                              +{row.running_balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            <span className={row.running_balance > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-400'}>
+                              {row.running_balance > 0 ? '−' : ''}{row.running_balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                             </span>
                           </td>
                         </tr>
@@ -858,8 +861,8 @@ export const StaffDetailView: React.FC<StaffDetailViewProps> = ({
                           -{Math.abs(row.receivable).toLocaleString()} ETB
                         </span>
                       )}
-                      <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
-                        Bal: +{row.running_balance.toLocaleString()} ETB
+                      <div className={`text-[10px] font-semibold ${row.running_balance > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-400'}`}>
+                        Bal: {row.running_balance > 0 ? '−' : ''}{row.running_balance.toLocaleString()} ETB
                       </div>
                     </div>
                   </div>

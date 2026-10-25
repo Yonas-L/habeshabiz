@@ -56,8 +56,10 @@ class DashboardController extends Controller
         // 2. Debts: Receivables vs Payables
         // Gross totals reflect the actual outstanding legal debt obligations.
         // Bilateral net calculations reflect the merchant netted position per partner.
+        // Staff bonuses are kept completely distinct and never netted against vendor/custody debts.
         $openDebts = Debt::where('created_at', '<=', $endOfMonth)
             ->whereIn('status', ['open', 'partially_paid'])
+            ->where('reference_type', '!=', 'salesperson_bonus')
             ->get();
 
         $grossReceivables = (float) $openDebts->where('type', 'receivable')->sum('remaining_amount');
@@ -184,9 +186,10 @@ class DashboardController extends Controller
             ->take(60)
             ->get();
 
-        // 8. Top Payables (Parties whom the shop owes money net)
+        // 8. Top Payables (Parties whom the shop owes money net, excluding staff bonuses)
         $topPayables = Debt::with(['contact', 'payments.financialAccount'])
             ->where('type', 'payable')
+            ->where('reference_type', '!=', 'salesperson_bonus')
             ->where('created_at', '<=', $endOfMonth)
             ->whereIn('contact_id', $netPayableContactIds)
             ->where(function ($q) {
@@ -233,10 +236,12 @@ class DashboardController extends Controller
                 $q->whereJsonContains('roles', 'peer_vendor')
                     ->orWhereJsonContains('roles', 'supplier')
                     ->orWhereJsonContains('roles', 'partner')
-                    ->orWhereHas('debts')
+                    ->orWhereHas('debts', fn ($dq) => $dq->where('reference_type', '!=', 'salesperson_bonus'))
                     ->orWhereHas('suppliedUnits');
             })
-            ->with(['debts' => fn ($q) => $q->where('created_at', '<=', $endOfMonth)->whereIn('status', ['open', 'partially_paid'])])
+            ->with(['debts' => fn ($q) => $q->where('created_at', '<=', $endOfMonth)
+                ->where('reference_type', '!=', 'salesperson_bonus')
+                ->whereIn('status', ['open', 'partially_paid'])])
             ->get();
 
         $partnerSettlements = [];
@@ -365,7 +370,7 @@ class DashboardController extends Controller
                     'open_payables' => $netPayableParties,
                     'open_payable_parties' => $netPayableParties,
                     'gross_open_receivables' => Debt::where('created_at', '<=', $endOfMonth)->where('type', 'receivable')->whereIn('status', ['open', 'partially_paid'])->count(),
-                    'gross_open_payables' => Debt::where('created_at', '<=', $endOfMonth)->where('type', 'payable')->whereIn('status', ['open', 'partially_paid'])->count(),
+                    'gross_open_payables' => Debt::where('created_at', '<=', $endOfMonth)->where('type', 'payable')->where('reference_type', '!=', 'salesperson_bonus')->whereIn('status', ['open', 'partially_paid'])->count(),
                     'net_receivable_parties' => $netReceivableParties,
                     'net_payable_parties' => $netPayableParties,
                     'uncollected_staff_bonuses' => (float) Debt::where('created_at', '<=', $endOfMonth)->where('type', 'payable')->where('reference_type', 'salesperson_bonus')->whereIn('status', ['open', 'partially_paid'])->sum('remaining_amount'),

@@ -191,7 +191,7 @@
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            color: #047857;
+            color: #e11d48;
         }
 
         .balance-amount {
@@ -431,7 +431,7 @@
         </div>
         <div class="bento-cell" style="width: 20%;">
             <div class="bento-title">Net Unsettled Bonus</div>
-            <div class="bento-value font-mono" style="color: #b45309;">{{ number_format($summary['uncollected_bonus'] ?? 0, 2) }} ETB</div>
+            <div class="bento-value font-mono" style="color: #e11d48;">{{ number_format($summary['uncollected_bonus'] ?? 0, 2) }} ETB</div>
         </div>
         <div class="bento-cell" style="width: 20%;">
             <div class="bento-title">Sales Volume Closed</div>

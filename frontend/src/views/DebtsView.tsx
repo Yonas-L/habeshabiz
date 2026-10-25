@@ -582,7 +582,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
                         {/* Col 7: Chevron */}
                         <td className="py-2.5 px-2 text-right">
                           {isExpanded ? (
-                            <ChevronDown className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                            <ChevronDown className={`w-4 h-4 ${debtType === 'receivable' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`} />
                           ) : (
                             <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:text-slate-700 dark:group-hover:text-slate-300 group-hover:translate-x-0.5 transition-all" />
                           )}

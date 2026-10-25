@@ -227,7 +227,7 @@ export const StaffStatementDrawer: React.FC<StaffStatementDrawerProps> = ({
             <button
               onClick={handleOpenSettleModal}
               disabled={loading}
-              className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all shadow-emerald-500/20 active:scale-98"
+              className="px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all shadow-rose-500/20 active:scale-98"
             >
               <CreditCard className="size-3.5" />
               <span>Settle Bonus</span>
@@ -239,7 +239,7 @@ export const StaffStatementDrawer: React.FC<StaffStatementDrawerProps> = ({
       <div className="p-4 sm:p-6 space-y-6">
         {loading ? (
           <div className="py-24 flex flex-col items-center justify-center gap-3">
-            <Loader2 className="size-8 text-emerald-600 animate-spin" />
+            <Loader2 className="size-8 text-rose-600 animate-spin" />
             <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
               Generating staff performance & bonus ledger...
             </p>
@@ -253,23 +253,23 @@ export const StaffStatementDrawer: React.FC<StaffStatementDrawerProps> = ({
             {/* Financial & Performance Bento Strip */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               {/* Card 1: Uncollected Bonus (Net Owed) */}
-              <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent border border-emerald-500/20 dark:border-emerald-500/30 flex flex-col justify-between">
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-transparent border border-rose-500/20 dark:border-rose-500/30 flex flex-col justify-between">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-rose-700 dark:text-rose-400">
                     Bonus Owed
                   </span>
-                  <Sparkles className="size-4 text-emerald-500" />
+                  <Sparkles className="size-4 text-rose-500" />
                 </div>
                 <div className="my-2">
-                  <div className="text-xl sm:text-2xl font-black font-mono text-emerald-600 dark:text-emerald-400">
-                    {(data.summary.uncollected_bonus || 0).toLocaleString()}
-                    <span className="text-xs font-sans font-bold ml-1 text-emerald-700/70 dark:text-emerald-400/70">
+                  <div className="text-xl sm:text-2xl font-black font-mono text-rose-600 dark:text-rose-400">
+                    −{(data.summary.uncollected_bonus || 0).toLocaleString()}
+                    <span className="text-xs font-sans font-bold ml-1 text-rose-700/70 dark:text-rose-400/70">
                       ETB
                     </span>
                   </div>
-                  <div className="text-[10px] font-bold text-emerald-800 dark:text-emerald-300 uppercase mt-0.5 tracking-tight flex items-center gap-1">
-                    <ShieldCheck className="size-3 text-emerald-500" />
-                    <span>Protected Bonus</span>
+                  <div className="text-[10px] font-bold text-rose-800 dark:text-rose-300 uppercase mt-0.5 tracking-tight flex items-center gap-1">
+                    <ShieldCheck className="size-3 text-rose-500" />
+                    <span>Store Owes Staff</span>
                   </div>
                 </div>
                 <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
@@ -481,8 +481,8 @@ export const StaffStatementDrawer: React.FC<StaffStatementDrawerProps> = ({
                                       Fully Disbursed
                                     </span>
                                   ) : (
-                                    <span className="text-purple-600 dark:text-purple-400 font-bold">
-                                      {entry.remaining_amount.toLocaleString()} ETB uncollected
+                                    <span className="text-rose-600 dark:text-rose-400 font-bold">
+                                      −{entry.remaining_amount.toLocaleString()} ETB uncollected
                                     </span>
                                   )}
                                 </div>

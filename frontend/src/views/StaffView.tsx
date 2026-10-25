@@ -421,6 +421,7 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
                   <th className="py-3 px-4 whitespace-nowrap">Week</th>
                   <th className="py-3 px-4 whitespace-nowrap">Month</th>
                   <th className="py-3 px-4 whitespace-nowrap">Bonus</th>
+                  <th className="py-3 px-4 whitespace-nowrap">Handovers</th>
                   <th className="py-3 px-4 whitespace-nowrap">Status</th>
                   <th className="py-3 px-4 text-right whitespace-nowrap">Actions</th>
                 </tr>
@@ -518,11 +519,11 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
                         <td className="py-3 px-4 font-mono whitespace-nowrap">
                           {(member.stats?.uncollected_bonus ?? 0) > 0 ? (
                             <div>
-                              <span className="font-bold text-purple-700 dark:text-purple-300 text-xs">
-                                {(member.stats.uncollected_bonus ?? 0).toLocaleString()}
+                              <span className="font-bold text-rose-600 dark:text-rose-400 text-xs">
+                                −{(member.stats.uncollected_bonus ?? 0).toLocaleString()}
                               </span>
-                              <span className="text-[10px] text-purple-600 dark:text-purple-400 ml-1">ETB</span>
-                              <span className="text-[9px] block text-purple-600 dark:text-purple-400 font-sans font-semibold">uncollected</span>
+                              <span className="text-[10px] text-rose-500 dark:text-rose-400 ml-1">ETB</span>
+                              <span className="text-[9px] block text-rose-600 dark:text-rose-400 font-sans font-semibold">uncollected bonus</span>
                             </div>
                           ) : (member.stats?.total_bonus_earned ?? 0) > 0 ? (
                             <div>
@@ -531,6 +532,23 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
                               </span>
                               <span className="text-[10px] text-slate-400 ml-1">ETB</span>
                               <span className="text-[9px] block text-emerald-600 dark:text-emerald-400 font-sans">settled</span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 text-xs">—</span>
+                          )}
+                        </td>
+
+                        {/* Handovers Out */}
+                        <td className="py-3 px-4 font-mono whitespace-nowrap">
+                          {(member.stats?.active_handovers_count ?? 0) > 0 ? (
+                            <div>
+                              <span className="font-bold text-slate-900 dark:text-white text-xs">
+                                {(member.stats?.active_handovers_value || 0).toLocaleString()}
+                              </span>
+                              <span className="text-[10px] text-slate-400 ml-1">ETB</span>
+                              <span className="text-[9px] block text-emerald-600 dark:text-emerald-400 font-sans font-semibold">
+                                {member.stats?.active_handovers_count} {member.stats?.active_handovers_count === 1 ? 'unit held' : 'units held'}
+                              </span>
                             </div>
                           ) : (
                             <span className="text-slate-400 text-xs">—</span>
@@ -719,10 +737,10 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
                       <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Bonus</div>
                       {(member.stats?.uncollected_bonus ?? 0) > 0 ? (
                         <div>
-                          <div className="font-mono font-bold text-xs text-purple-600 dark:text-purple-400 mt-0.5">
-                            {(member.stats.uncollected_bonus ?? 0).toLocaleString()}
+                          <div className="font-mono font-bold text-xs text-rose-600 dark:text-rose-400 mt-0.5">
+                            −{(member.stats.uncollected_bonus ?? 0).toLocaleString()}
                           </div>
-                          <div className="text-[9px] text-purple-600 dark:text-purple-400 font-semibold mt-0.5">uncollected</div>
+                          <div className="text-[9px] text-rose-600 dark:text-rose-400 font-semibold mt-0.5">uncollected</div>
                         </div>
                       ) : (member.stats?.total_bonus_earned ?? 0) > 0 ? (
                         <div>
@@ -736,6 +754,16 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
                       )}
                     </div>
                   </div>
+
+                  {/* Handover Held Notice on Mobile */}
+                  {(member.stats?.active_handovers_count ?? 0) > 0 && (
+                    <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/50 dark:border-emerald-900/40 text-[11px]">
+                      <span className="text-slate-600 dark:text-slate-300 font-medium">Devices Held on Handover:</span>
+                      <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                        {member.stats?.active_handovers_count} units ({(member.stats?.active_handovers_value || 0).toLocaleString()} ETB)
+                      </span>
+                    </div>
+                  )}
 
                   {/* Actions row on mobile */}
                   <div
