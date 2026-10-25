@@ -89,17 +89,11 @@ class SettleDebtPaymentAction
             throw new InvalidArgumentException('Payment amount must be greater than zero.');
         }
 
-        $debtsQuery = Debt::where('contact_id', $contact->id)
+        $debts = Debt::where('contact_id', $contact->id)
             ->where('type', $type)
             ->whereIn('status', ['open', 'partially_paid'])
-            ->orderBy('created_at', 'asc');
-
-        $hasNonBonus = (clone $debtsQuery)->where('reference_type', '!=', 'salesperson_bonus')->exists();
-        if ($hasNonBonus) {
-            $debts = $debtsQuery->where('reference_type', '!=', 'salesperson_bonus')->get();
-        } else {
-            $debts = $debtsQuery->get();
-        }
+            ->orderBy('created_at', 'asc')
+            ->get();
 
         if ($debts->isEmpty()) {
             throw new InvalidArgumentException("This contact has no open {$type} obligations to settle.");

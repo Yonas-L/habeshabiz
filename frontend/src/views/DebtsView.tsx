@@ -37,6 +37,7 @@ interface PartyDebtGroup {
   openCount: number;
   settledCount: number;
   percentSettled: number;
+  isStaffBonus?: boolean;
 }
 
 const getOriginLabel = (refType?: string) => {
@@ -95,7 +96,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
   const loadDebts = async () => {
     try {
       setLoading(true);
-      const res = await api.getDebts({ type: debtType, status: 'all', search, exclude_staff_bonus: true });
+      const res = await api.getDebts({ type: debtType, status: 'all', search });
       setDebts(res);
     } catch (err: any) {
       toast.error('Failed to load obligations', { description: err.message });
@@ -173,10 +174,8 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
   const partyGroups = useMemo(() => {
     const map = new Map<string, PartyDebtGroup>();
 
-    // Staff bonuses are managed strictly in Staff Management, not mixed into trade vendor payables
-    const tradeDebts = debts.filter((d) => d.reference_type !== 'salesperson_bonus');
-
-    tradeDebts.forEach((debt) => {
+    debts.forEach((debt) => {
+      const isBonus = debt.reference_type === 'salesperson_bonus';
       const cid = debt.contact?.id || 'unassigned';
       if (!map.has(cid)) {
         map.set(cid, {
@@ -191,6 +190,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
           openCount: 0,
           settledCount: 0,
           percentSettled: 0,
+          isStaffBonus: isBonus,
         });
       }
       const group = map.get(cid)!;
@@ -205,6 +205,9 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
         group.openCount += 1;
       } else {
         group.settledCount += 1;
+      }
+      if (isBonus) {
+        group.isStaffBonus = true;
       }
     });
 
@@ -225,7 +228,11 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
       }
 
       g.percentSettled = g.totalOriginal > 0 ? Math.min(100, Math.round((g.totalPaid / g.totalOriginal) * 100)) : 0;
-      if (g.contact && g.contact.net_balance !== undefined) {
+      if (g.isStaffBonus) {
+        // Staff commission bonuses are NEVER offset against handovers or trade credit!
+        g.offsetAmount = 0;
+        g.netRemaining = g.totalRemaining;
+      } else if (g.contact && g.contact.net_balance !== undefined) {
         const netBal = Number(g.contact.net_balance);
         if (debtType === 'receivable') {
           g.netRemaining = Math.max(0, netBal);
@@ -244,6 +251,9 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
         const rem = Number(d.remaining_amount) || 0;
         if (rem <= 0.001) {
           return { ...d, allocatedOffset: 0, effectiveRemaining: 0 } as Debt;
+        }
+        if (d.reference_type === 'salesperson_bonus') {
+          return { ...d, allocatedOffset: 0, effectiveRemaining: rem } as Debt;
         }
         const alloc = Math.min(rem, remainingOffset);
         const netRem = Math.max(0, rem - alloc);
@@ -277,19 +287,23 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
   // Overall Totals
   const grossTotal = debts.reduce((sum, d) => sum + parseFloat(String(d.remaining_amount)), 0);
 
-  const contactsMap = new Map<string, { net_balance: number }>();
+  const contactsMap = new Map<string, { net_balance: number; hasBonus?: boolean }>();
   debts.forEach((d) => {
     if (d.contact && !contactsMap.has(d.contact.id)) {
       contactsMap.set(d.contact.id, {
         net_balance: Number(d.contact.net_balance ?? 0),
+        hasBonus: d.reference_type === 'salesperson_bonus',
       });
+    } else if (d.contact && d.reference_type === 'salesperson_bonus') {
+      contactsMap.get(d.contact.id)!.hasBonus = true;
     }
   });
 
   const distinctContacts = Array.from(contactsMap.values());
   const netPosition = debtType === 'receivable'
     ? distinctContacts.reduce((sum, c) => sum + Math.max(0, c.net_balance), 0)
-    : distinctContacts.reduce((sum, c) => sum + Math.max(0, -c.net_balance), 0);
+    : distinctContacts.reduce((sum, c) => sum + (c.hasBonus ? 0 : Math.max(0, -c.net_balance)), 0) +
+      debts.filter((d) => d.reference_type === 'salesperson_bonus').reduce((sum, d) => sum + parseFloat(String(d.remaining_amount)), 0);
 
   const totalOffsets = Math.max(0, grossTotal - netPosition);
   const hasOffsets = totalOffsets > 0.01;
@@ -497,6 +511,11 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
                             <div className="min-w-0">
                               <div className="font-bold text-slate-900 dark:text-white text-xs leading-tight group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors flex items-center gap-1.5 min-w-0">
                                 <span className="truncate">{group.name}</span>
+                                {group.isStaffBonus && (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/60 shrink-0">
+                                    Staff Bonus
+                                  </span>
+                                )}
                                 {isSettled ? (
                                   <span className="text-[10px] font-medium text-slate-400 shrink-0">
                                     Complete
@@ -622,7 +641,13 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
                             <td className="py-2.5 px-3.5 pl-8">
                               <div className="flex items-center gap-2 min-w-0">
                                 <span className="text-slate-400 dark:text-slate-600 font-mono text-xs select-none">↳</span>
-                                <span className={`font-semibold text-xs shrink-0 ${isDebtSettled ? 'text-slate-500 dark:text-slate-400' : 'text-slate-800 dark:text-slate-200'}`}>
+                                <span className={`font-semibold text-xs shrink-0 ${
+                                  isDebtSettled
+                                    ? 'text-slate-500 dark:text-slate-400'
+                                    : debt.reference_type === 'salesperson_bonus'
+                                      ? 'text-purple-600 dark:text-purple-400 font-bold'
+                                      : 'text-slate-800 dark:text-slate-200'
+                                }`}>
                                   {originLabel}
                                 </span>
                                 <span className="text-slate-300 dark:text-slate-600 text-xs">•</span>
@@ -797,8 +822,13 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
                         {group.name.slice(0, 2).toUpperCase()}
                       </div>
                       <div className="min-w-0">
-                        <div className="font-bold text-slate-900 dark:text-white text-sm truncate">
-                          {group.name}
+                        <div className="font-bold text-slate-900 dark:text-white text-sm truncate flex items-center gap-1.5">
+                          <span className="truncate">{group.name}</span>
+                          {group.isStaffBonus && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/60 shrink-0">
+                              Staff Bonus
+                            </span>
+                          )}
                         </div>
                         <div className="text-[11px] text-slate-400 mt-0.5">
                           <span className={isSettled ? 'text-slate-400' : debtType === 'receivable' ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-rose-600 dark:text-rose-400 font-semibold'}>
@@ -899,7 +929,13 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
                             >
                               <div className="min-w-0 pr-2">
                                 <div className="flex items-center gap-1.5 font-medium flex-wrap">
-                                  <span className={`font-semibold text-xs ${isDebtSettled ? 'text-slate-500 dark:text-slate-400' : 'text-slate-800 dark:text-slate-200'}`}>
+                                  <span className={`font-semibold text-xs ${
+                                    isDebtSettled
+                                      ? 'text-slate-500 dark:text-slate-400'
+                                      : debt.reference_type === 'salesperson_bonus'
+                                        ? 'text-purple-600 dark:text-purple-400 font-bold'
+                                        : 'text-slate-800 dark:text-slate-200'
+                                  }`}>
                                     {originLabel}
                                   </span>
                                   <span className="text-slate-300 dark:text-slate-600 text-xs">•</span>
