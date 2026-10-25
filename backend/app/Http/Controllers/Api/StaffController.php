@@ -636,9 +636,9 @@ class StaffController extends Controller
 
         $salesOrders = $salesQuery->orderByDesc('created_at')->get();
 
-        // Query handovers (devices out with staff)
+        // Query handovers (devices out with this specific staff member, strict case-sensitive name match)
         $handoversQuery = InventoryUnit::where('tenant_id', $currentUser->tenant_id)
-            ->where('handover_to', 'ilike', $staff->name)
+            ->where('handover_to', '=', $staff->name)
             ->with(['variant.product']);
 
         if ($startDate) {

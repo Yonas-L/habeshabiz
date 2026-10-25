@@ -328,7 +328,7 @@ class SettleDebtPaymentAction
                     $customerContact = $debt->contact;
                     if (! $customerContact && ! empty($unit->handover_to)) {
                         $customerContact = Contact::where('tenant_id', $tenantId)
-                            ->where('name', 'ilike', $unit->handover_to)
+                            ->where('name', '=', $unit->handover_to)
                             ->first();
                     }
 

@@ -23,7 +23,7 @@ import {
 import { AnimatedNumber } from '../components/AnimatedNumber';
 import { Pagination } from '../components/Pagination';
 import { CustomPageLoader } from '../components/loading/CustomPageLoader';
-import { StaffStatementDrawer } from '../components/drawers/StaffStatementDrawer';
+import { StaffDetailView } from './StaffDetailView';
 
 interface StaffViewProps {
   currentUser: User | null;
@@ -75,8 +75,8 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
   const [removeConfirmStaff, setRemoveConfirmStaff] = useState<StaffMember | null>(null);
   const [isRemovingStaff, setIsRemovingStaff] = useState(false);
 
-  // Staff Statement & Activity Drawer State
-  const [statementStaff, setStatementStaff] = useState<StaffMember | null>(null);
+  // Staff Statement & Detail View State
+  const [selectedStaffId, setSelectedStaffId] = useState<number | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -271,6 +271,23 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
     return <CustomPageLoader mode="app" fullScreen={false} />;
   }
 
+  if (selectedStaffId) {
+    return (
+      <StaffDetailView
+        staffId={selectedStaffId}
+        user={currentUser}
+        onBack={() => {
+          setSelectedStaffId(null);
+          loadData();
+        }}
+        onEditStaff={(member) => {
+          handleOpenEdit(member);
+        }}
+        onStaffUpdated={loadData}
+      />
+    );
+  }
+
   return (
     <div className="space-y-5 animate-page-enter">
       {/* Header */}
@@ -420,7 +437,7 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
                     return (
                       <tr
                         key={member.id}
-                        onClick={() => setStatementStaff(member)}
+                        onClick={() => setSelectedStaffId(member.id)}
                         className="hover:bg-slate-50/70 dark:hover:bg-slate-800/30 transition-colors cursor-pointer group"
                       >
                         {/* Name */}
@@ -536,7 +553,7 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
                         <td className="py-3 px-4 text-right">
                           <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                             <button
-                              onClick={() => setStatementStaff(member)}
+                              onClick={() => setSelectedStaffId(member.id)}
                               title="View performance statement, bonus ledger, and handovers"
                               className="px-2.5 py-1.5 rounded-lg bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 dark:hover:bg-purple-900/60 text-purple-700 dark:text-purple-300 font-semibold text-[11px] flex items-center gap-1 transition-colors cursor-pointer"
                             >
@@ -600,7 +617,7 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
               return (
                 <div
                   key={member.id}
-                  onClick={() => setStatementStaff(member)}
+                  onClick={() => setSelectedStaffId(member.id)}
                   className="p-3.5 space-y-3 cursor-pointer hover:bg-slate-50/60 dark:hover:bg-slate-800/20 transition-colors"
                 >
                   {/* Top row: Avatar, name, role badge, status */}
@@ -726,7 +743,7 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
                     onClick={(e) => e.stopPropagation()}
                   >
                     <button
-                      onClick={() => setStatementStaff(member)}
+                      onClick={() => setSelectedStaffId(member.id)}
                       className="px-3 py-1.5 rounded-lg bg-purple-50 dark:bg-purple-950/50 hover:bg-purple-100 dark:hover:bg-purple-900/60 text-purple-700 dark:text-purple-300 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
                     >
                       <FileText className="size-3 text-purple-600 dark:text-purple-400" />
@@ -1369,14 +1386,6 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
         </div>,
         document.body
       )}
-
-      {/* ── Staff Statement & Activity Drawer ── */}
-      <StaffStatementDrawer
-        isOpen={!!statementStaff}
-        onClose={() => setStatementStaff(null)}
-        staffMember={statementStaff}
-        onBonusSettled={loadData}
-      />
     </div>
   );
 };

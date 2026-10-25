@@ -112,7 +112,7 @@ class DebtController extends Controller
                 }
                 if (! $existingContact && $contactName) {
                     $existingContact = Contact::where('tenant_id', $tenantId)
-                        ->where('name', 'ilike', $contactName)
+                        ->where('name', '=', $contactName)
                         ->first();
                 }
 

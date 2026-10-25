@@ -723,7 +723,7 @@ class InventoryController extends Controller
                     }
                     if (! $partnerContact && ! empty($validated['handover_to'])) {
                         $partnerContact = Contact::where('tenant_id', $tenantId)
-                            ->where('name', 'ilike', $validated['handover_to'])
+                            ->where('name', '=', $validated['handover_to'])
                             ->first();
                     }
                     if (! $partnerContact && ! empty($validated['handover_to'])) {
@@ -878,7 +878,7 @@ class InventoryController extends Controller
                         }
                         if (! $contact) {
                             $contact = Contact::where('tenant_id', $tenantId)
-                                ->where('name', 'ilike', $recipientName)
+                                ->where('name', '=', $recipientName)
                                 ->first();
                         }
                         if (! $contact) {
@@ -1732,7 +1732,7 @@ class InventoryController extends Controller
                 : (float) ($unit->selling_price ?? $unit->cost_basis ?? 0);
 
             $partnerContact = Contact::where('tenant_id', $user->tenant_id)
-                ->where('name', 'ilike', $validated['handover_to'])
+                ->where('name', '=', $validated['handover_to'])
                 ->first();
 
             if (! $partnerContact) {
@@ -1901,8 +1901,8 @@ class InventoryController extends Controller
         if (! empty($validated['handover_payout']) && (float) $validated['handover_payout'] > 0) {
             $payoutAmount = (float) $validated['handover_payout'];
 
-            // Try to find a matching contact for the handover person
-            $contact = Contact::where('name', 'ilike', $validated['handover_to'])->first();
+            // Try to find a matching contact for the handover person (exact case-sensitive match to isolate different individuals)
+            $contact = Contact::where('tenant_id', $unit->tenant_id)->where('name', '=', $validated['handover_to'])->first();
 
             if (! $contact) {
                 $contact = Contact::create([
@@ -2231,7 +2231,7 @@ class InventoryController extends Controller
                         'notes' => ($holdingDebt->notes ? $holdingDebt->notes.' | ' : '')."Device confirmed SOLD by {$vendorName}. Awaiting payment collection.",
                     ]);
                 } else {
-                    $contact = Contact::where('name', 'ilike', $vendorName)->first();
+                    $contact = Contact::where('tenant_id', $user->tenant_id)->where('name', '=', $vendorName)->first();
                     if ($contact && $finalPrice > 0) {
                         Debt::create([
                             'tenant_id' => $user->tenant_id,
@@ -2252,12 +2252,12 @@ class InventoryController extends Controller
 
             // Record SalesOrder & SalesOrderItem to register sales revenue, facts, and gross profit margin (+5,000 ETB etc.)
             $saleContact = Contact::where('tenant_id', $user->tenant_id)
-                ->where('name', 'ilike', $vendorName)
+                ->where('name', '=', $vendorName)
                 ->first();
 
             if (! $saleContact && ! empty($unit->handover_to)) {
                 $saleContact = Contact::where('tenant_id', $user->tenant_id)
-                    ->where('name', 'ilike', $unit->handover_to)
+                    ->where('name', '=', $unit->handover_to)
                     ->first();
             }
 

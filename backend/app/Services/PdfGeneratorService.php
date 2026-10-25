@@ -364,9 +364,9 @@ class PdfGeneratorService
 
         $salesOrders = $salesQuery->orderBy('created_at', 'asc')->get();
 
-        // Query handovers
+        // Query handovers (strict case-sensitive name match to avoid conflating different persons like Halle vs halle)
         $handoversQuery = InventoryUnit::where('tenant_id', $staff->tenant_id)
-            ->where('handover_to', 'ilike', $staff->name)
+            ->where('handover_to', '=', $staff->name)
             ->with(['variant.product']);
 
         if ($startDate) {
