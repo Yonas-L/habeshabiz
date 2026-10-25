@@ -5,9 +5,12 @@ namespace App\Services;
 use App\Actions\GenerateBusinessReportAction;
 use App\Actions\GeneratePartnerStatementAction;
 use App\Models\Contact;
+use App\Models\Debt;
+use App\Models\InventoryUnit;
 use App\Models\ProformaInvoice;
 use App\Models\SalesOrder;
 use App\Models\Tenant;
+use App\Models\User;
 use Carbon\Carbon;
 use Dompdf\Dompdf;
 use Dompdf\Options;
@@ -316,6 +319,128 @@ class PdfGeneratorService
             .'</div>';
 
         return $this->renderToPdfResponse('pdf.vendor-statement', $data, $filename, $forceDownload);
+    }
+
+    /**
+     * Generate a professional Staff Performance & Commission Statement PDF.
+     */
+    public function generateStaffStatement(
+        User $staff,
+        ?string $startDate = null,
+        ?string $endDate = null,
+        bool $forceDownload = true
+    ): \Symfony\Component\HttpFoundation\Response {
+        $tenant = $staff->tenant;
+        if (! $tenant && ! empty($staff->tenant_id)) {
+            $tenant = Tenant::find($staff->tenant_id);
+        }
+
+        // Query bonus debts
+        $bonusQuery = Debt::where('tenant_id', $staff->tenant_id)
+            ->where('salesperson_id', $staff->id)
+            ->where('reference_type', 'salesperson_bonus')
+            ->with(['payments.financialAccount', 'salesOrder.items.variant.product']);
+
+        if ($startDate) {
+            $bonusQuery->where('created_at', '>=', Carbon::parse($startDate)->startOfDay());
+        }
+        if ($endDate) {
+            $bonusQuery->where('created_at', '<=', Carbon::parse($endDate)->endOfDay());
+        }
+
+        $bonusDebts = $bonusQuery->orderBy('created_at', 'asc')->get();
+
+        // Query sales orders
+        $salesQuery = SalesOrder::where('tenant_id', $staff->tenant_id)
+            ->where('salesperson_id', $staff->id)
+            ->with(['customer', 'items.variant.product']);
+
+        if ($startDate) {
+            $salesQuery->where('created_at', '>=', Carbon::parse($startDate)->startOfDay());
+        }
+        if ($endDate) {
+            $salesQuery->where('created_at', '<=', Carbon::parse($endDate)->endOfDay());
+        }
+
+        $salesOrders = $salesQuery->orderBy('created_at', 'asc')->get();
+
+        // Query handovers
+        $handoversQuery = InventoryUnit::where('tenant_id', $staff->tenant_id)
+            ->where('handover_to', 'ilike', $staff->name)
+            ->with(['variant.product']);
+
+        if ($startDate) {
+            $handoversQuery->where('handed_out_at', '>=', Carbon::parse($startDate)->startOfDay());
+        }
+        if ($endDate) {
+            $handoversQuery->where('handed_out_at', '<=', Carbon::parse($endDate)->endOfDay());
+        }
+
+        $handovers = $handoversQuery->orderBy('handed_out_at', 'desc')->get();
+
+        // All-time totals
+        $allBonusDebts = Debt::where('tenant_id', $staff->tenant_id)
+            ->where('salesperson_id', $staff->id)
+            ->where('reference_type', 'salesperson_bonus')
+            ->get();
+
+        $uncollectedBonus = (float) $allBonusDebts->whereIn('status', ['open', 'partially_paid'])->sum('remaining_amount');
+        $collectedBonus = (float) $allBonusDebts->sum('paid_amount');
+        $totalBonusEarned = (float) $allBonusDebts->sum('original_amount');
+
+        $activeHandovers = $handovers->where('status', 'out');
+
+        // Logo & signatures
+        $tenantSettings = $tenant?->settings ?? [];
+        $logoUrl = $tenantSettings['logo_url'] ?? null;
+        $logoBase64 = self::resolveImageBase64($logoUrl);
+
+        $prefs = $tenantSettings['signature_stamp_preferences'] ?? [];
+        $autoEmbed = $prefs['auto_embed_vendor_statement'] ?? true;
+        $sigUrl = $autoEmbed ? ($tenantSettings['default_signature_url'] ?? null) : null;
+        $stmpUrl = $autoEmbed ? ($tenantSettings['default_stamp_url'] ?? null) : null;
+
+        $rangeText = 'All Time';
+        if ($startDate && $endDate) {
+            $rangeText = Carbon::parse($startDate)->format('M d, Y').' – '.Carbon::parse($endDate)->format('M d, Y');
+        } elseif ($startDate) {
+            $rangeText = 'Since '.Carbon::parse($startDate)->format('M d, Y');
+        } elseif ($endDate) {
+            $rangeText = 'Until '.Carbon::parse($endDate)->format('M d, Y');
+        }
+
+        $sanitizedStaff = Str::slug($staff->name ?: 'Staff', '_');
+        $filename = "Staff_Statement_{$sanitizedStaff}.pdf";
+
+        $data = [
+            'staff' => $staff,
+            'business' => [
+                'name' => $tenant?->name ?? 'Bole Tech Hub',
+                'phone' => $tenant?->phone ?? '',
+                'email' => $tenant?->email ?? '',
+                'address' => $tenant?->address ?? 'Bole, Addis Ababa, Ethiopia',
+                'logo_base64' => $logoBase64,
+            ],
+            'range' => $rangeText,
+            'generated_at' => now()->format('M d, Y h:i A'),
+            'summary' => [
+                'uncollected_bonus' => $uncollectedBonus,
+                'collected_bonus' => $collectedBonus,
+                'total_bonus_earned' => $totalBonusEarned,
+                'total_sales_count' => $salesOrders->count(),
+                'total_sales_volume' => (float) $salesOrders->sum('total_amount'),
+                'active_handovers_count' => $activeHandovers->count(),
+                'active_handovers_value' => (float) $activeHandovers->sum(fn ($u) => (float) ($u->handover_payout ?: ($u->selling_price ?: ($u->cost_basis ?: 0)))),
+            ],
+            'bonus_debts' => $bonusDebts,
+            'sales_orders' => $salesOrders,
+            'handovers' => $handovers,
+            'signatureBase64' => self::resolveImageBase64($sigUrl),
+            'stampBase64' => self::resolveImageBase64($stmpUrl),
+            'filename' => $filename,
+        ];
+
+        return $this->renderToPdfResponse('pdf.staff-statement', $data, $filename, $forceDownload);
     }
 
     /**

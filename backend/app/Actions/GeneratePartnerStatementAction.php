@@ -170,13 +170,15 @@ class GeneratePartnerStatementAction
                         $itemDesc = $this->sanitizeContext($debt->notes);
                     }
 
-                    $cleanContext = str_starts_with(strtolower($itemDesc), 'sold') ? $itemDesc : "Sold: {$itemDesc}";
+                    $cleanContext = str_starts_with(strtolower($itemDesc), 'sold')
+                        ? $itemDesc
+                        : "Sold: {$itemDesc}";
 
                     $rawEntries[] = [
                         'id' => "debt-{$debt->id}",
                         'date' => $debtCreatedDate,
                         'type' => 'salesperson_bonus',
-                        'type_label' => 'Payable',
+                        'type_label' => 'Bonus',
                         'context' => $cleanContext,
                         'payable' => (float) $debt->original_amount,
                         'receivable' => 0.0,

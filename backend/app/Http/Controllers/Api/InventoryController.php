@@ -1744,10 +1744,11 @@ class InventoryController extends Controller
                 ]);
             }
 
-            // Strict validation: Verify partner actually has open payables to offset against
+            // Strict validation: Verify partner actually has open trade payables to offset against (staff bonuses protected)
             $openPayables = Debt::where('tenant_id', $user->tenant_id)
                 ->where('contact_id', $partnerContact->id)
                 ->where('type', 'payable')
+                ->where('reference_type', '!=', 'salesperson_bonus')
                 ->whereIn('status', ['open', 'partially_paid'])
                 ->with('payments')
                 ->orderBy('due_date', 'asc')

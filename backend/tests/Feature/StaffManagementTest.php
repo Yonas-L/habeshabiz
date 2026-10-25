@@ -1,6 +1,8 @@
 <?php
 
 use App\Models\AuditLog;
+use App\Models\Contact;
+use App\Models\Debt;
 use App\Models\FinancialAccount;
 use App\Models\Product;
 use App\Models\ProductVariant;
@@ -441,4 +443,123 @@ test('staff permission enforcement for stock intake and handover', function () {
             'handover_to' => 'Brokers Hub',
         ]);
     $handoverSuccess->assertStatus(200);
+});
+
+test('owner can view comprehensive staff statement including bonus ledger strictly labeled Bonus', function () {
+    $contact = Contact::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => $this->staff->name,
+        'phone' => '0911002233',
+        'roles' => ['staff', 'salesperson'],
+    ]);
+
+    // Create a bonus debt
+    $bonusDebt = Debt::create([
+        'tenant_id' => $this->tenant->id,
+        'contact_id' => $contact->id,
+        'salesperson_id' => $this->staff->id,
+        'type' => 'payable',
+        'reference_type' => 'salesperson_bonus',
+        'original_amount' => 8500.00,
+        'paid_amount' => 0.00,
+        'remaining_amount' => 8500.00,
+        'status' => 'open',
+    ]);
+
+    $response = $this->actingAs($this->owner)
+        ->getJson("/api/v1/staff/{$this->staff->id}/statement");
+
+    $response->assertStatus(200)
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.summary.uncollected_bonus', 8500)
+        ->assertJsonPath('data.bonus_ledger.0.type_label', 'Bonus');
+
+    expect($response->json('data.bonus_ledger.0.remaining_amount'))->toEqual(8500);
+});
+
+test('owner can settle staff bonus and balance is deducted from account', function () {
+    $contact = Contact::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => $this->staff->name,
+        'phone' => '0911002244',
+        'roles' => ['staff', 'salesperson'],
+    ]);
+
+    $bonusDebt = Debt::create([
+        'tenant_id' => $this->tenant->id,
+        'contact_id' => $contact->id,
+        'salesperson_id' => $this->staff->id,
+        'type' => 'payable',
+        'reference_type' => 'salesperson_bonus',
+        'original_amount' => 5000.00,
+        'paid_amount' => 0.00,
+        'remaining_amount' => 5000.00,
+        'status' => 'open',
+    ]);
+
+    $initialBalance = (float) $this->cbe->current_balance;
+
+    $response = $this->actingAs($this->owner)
+        ->postJson("/api/v1/staff/{$this->staff->id}/settle-bonus", [
+            'amount' => 3000.00,
+            'financial_account_id' => $this->cbe->id,
+            'reference_number' => 'TEST-BONUS-01',
+            'notes' => 'Partial bonus payout',
+        ]);
+
+    $response->assertStatus(200)
+        ->assertJsonPath('success', true);
+
+    $bonusDebt->refresh();
+    expect((float) $bonusDebt->paid_amount)->toEqual(3000.00);
+    expect((float) $bonusDebt->remaining_amount)->toEqual(2000.00);
+    expect($bonusDebt->status)->toBe('partially_paid');
+
+    $this->cbe->refresh();
+    expect((float) $this->cbe->current_balance)->toBeLessThan($initialBalance);
+});
+
+test('staff bonus is protected from mutual debt reconciliation and handovers', function () {
+    $contact = Contact::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => $this->staff->name,
+        'phone' => '0911002255',
+        'roles' => ['staff', 'salesperson'],
+    ]);
+
+    // Staff has a 10,000 ETB bonus payable
+    $bonusDebt = Debt::create([
+        'tenant_id' => $this->tenant->id,
+        'contact_id' => $contact->id,
+        'salesperson_id' => $this->staff->id,
+        'type' => 'payable',
+        'reference_type' => 'salesperson_bonus',
+        'original_amount' => 10000.00,
+        'paid_amount' => 0.00,
+        'remaining_amount' => 10000.00,
+        'status' => 'open',
+    ]);
+
+    // Staff also receives a device worth 4,000 ETB (receivable debt)
+    $handoverDebt = Debt::create([
+        'tenant_id' => $this->tenant->id,
+        'contact_id' => $contact->id,
+        'salesperson_id' => $this->staff->id,
+        'type' => 'receivable',
+        'reference_type' => 'handover_holding',
+        'original_amount' => 4000.00,
+        'paid_amount' => 0.00,
+        'remaining_amount' => 4000.00,
+        'status' => 'open',
+    ]);
+
+    // Trigger reconciliation
+    Debt::reconcileContactMutualDebts($contact->id, $this->tenant->id);
+
+    $bonusDebt->refresh();
+    $handoverDebt->refresh();
+
+    // Bonus debt must remain untouched at 10,000 ETB, NOT reduced to 6,000 ETB!
+    expect((float) $bonusDebt->remaining_amount)->toEqual(10000.00);
+    expect((float) $handoverDebt->remaining_amount)->toEqual(4000.00);
 });

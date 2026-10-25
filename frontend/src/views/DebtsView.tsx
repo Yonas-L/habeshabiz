@@ -95,7 +95,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
   const loadDebts = async () => {
     try {
       setLoading(true);
-      const res = await api.getDebts({ type: debtType, status: 'all', search });
+      const res = await api.getDebts({ type: debtType, status: 'all', search, exclude_staff_bonus: true });
       setDebts(res);
     } catch (err: any) {
       toast.error('Failed to load obligations', { description: err.message });
@@ -173,7 +173,10 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
   const partyGroups = useMemo(() => {
     const map = new Map<string, PartyDebtGroup>();
 
-    debts.forEach((debt) => {
+    // Staff bonuses are managed strictly in Staff Management, not mixed into trade vendor payables
+    const tradeDebts = debts.filter((d) => d.reference_type !== 'salesperson_bonus');
+
+    tradeDebts.forEach((debt) => {
       const cid = debt.contact?.id || 'unassigned';
       if (!map.has(cid)) {
         map.set(cid, {

@@ -18,10 +18,12 @@ import {
   AlertTriangle,
   Edit2,
   Trash2,
+  FileText,
 } from 'lucide-react';
 import { AnimatedNumber } from '../components/AnimatedNumber';
 import { Pagination } from '../components/Pagination';
 import { CustomPageLoader } from '../components/loading/CustomPageLoader';
+import { StaffStatementDrawer } from '../components/drawers/StaffStatementDrawer';
 
 interface StaffViewProps {
   currentUser: User | null;
@@ -72,6 +74,9 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
   // Remove Staff Confirmation Modal State
   const [removeConfirmStaff, setRemoveConfirmStaff] = useState<StaffMember | null>(null);
   const [isRemovingStaff, setIsRemovingStaff] = useState(false);
+
+  // Staff Statement & Activity Drawer State
+  const [statementStaff, setStatementStaff] = useState<StaffMember | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -413,7 +418,11 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
                     const isSelf = member.id === currentUser?.id;
 
                     return (
-                      <tr key={member.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/30 transition-colors">
+                      <tr
+                        key={member.id}
+                        onClick={() => setStatementStaff(member)}
+                        className="hover:bg-slate-50/70 dark:hover:bg-slate-800/30 transition-colors cursor-pointer group"
+                      >
                         {/* Name */}
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-2.5">
@@ -525,45 +534,53 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
 
                         {/* Actions */}
                         <td className="py-3 px-4 text-right">
-                          {member.role !== 'owner' && !isSelf ? (
-                            <div className="flex items-center justify-end gap-1.5">
-                              <button
-                                onClick={() => handleOpenEdit(member)}
-                                title="Edit staff details and privileges"
-                                className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-[11px] flex items-center gap-1 transition-colors"
-                              >
-                                <Edit2 className="w-3 h-3 text-slate-500 dark:text-slate-400" />
-                                Edit
-                              </button>
-                              <button
-                                onClick={() => setResetConfirmStaff(member)}
-                                title="Reset password"
-                                className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-semibold text-[11px] flex items-center gap-1 transition-colors"
-                              >
-                                <KeyRound className="w-3 h-3" />
-                                Reset
-                              </button>
-                              <button
-                                onClick={() => handleToggleStatus(member)}
-                                className={`px-2.5 py-1.5 rounded-lg font-semibold text-[11px] transition-colors ${
-                                  member.is_active
-                                    ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-950/60'
-                                    : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-950/60'
-                                }`}
-                              >
-                                {member.is_active ? 'Suspend' : 'Activate'}
-                              </button>
-                              <button
-                                onClick={() => setRemoveConfirmStaff(member)}
-                                title="Remove staff account from system"
-                                className="px-2 py-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          ) : (
-                            <span className="text-[11px] text-slate-400">{isSelf ? 'You' : 'Admin'}</span>
-                          )}
+                          <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              onClick={() => setStatementStaff(member)}
+                              title="View performance statement, bonus ledger, and handovers"
+                              className="px-2.5 py-1.5 rounded-lg bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 dark:hover:bg-purple-900/60 text-purple-700 dark:text-purple-300 font-semibold text-[11px] flex items-center gap-1 transition-colors cursor-pointer"
+                            >
+                              <FileText className="w-3 h-3 text-purple-600 dark:text-purple-400" />
+                              Statement
+                            </button>
+                            {member.role !== 'owner' && !isSelf ? (
+                              <>
+                                <button
+                                  onClick={() => handleOpenEdit(member)}
+                                  title="Edit staff details and privileges"
+                                  className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-[11px] flex items-center gap-1 transition-colors cursor-pointer"
+                                >
+                                  <Edit2 className="w-3 h-3 text-slate-500 dark:text-slate-400" />
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => setResetConfirmStaff(member)}
+                                  title="Reset password"
+                                  className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-semibold text-[11px] flex items-center gap-1 transition-colors cursor-pointer"
+                                >
+                                  <KeyRound className="w-3 h-3" />
+                                  Reset
+                                </button>
+                                <button
+                                  onClick={() => handleToggleStatus(member)}
+                                  className={`px-2.5 py-1.5 rounded-lg font-semibold text-[11px] transition-colors cursor-pointer ${
+                                    member.is_active
+                                      ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-950/60'
+                                      : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-950/60'
+                                  }`}
+                                >
+                                  {member.is_active ? 'Suspend' : 'Activate'}
+                                </button>
+                                <button
+                                  onClick={() => setRemoveConfirmStaff(member)}
+                                  title="Remove staff account from system"
+                                  className="px-2 py-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </>
+                            ) : null}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -581,7 +598,11 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
             pagedStaff.map((member) => {
               const isSelf = member.id === currentUser?.id;
               return (
-                <div key={member.id} className="p-3.5 space-y-3">
+                <div
+                  key={member.id}
+                  onClick={() => setStatementStaff(member)}
+                  className="p-3.5 space-y-3 cursor-pointer hover:bg-slate-50/60 dark:hover:bg-slate-800/20 transition-colors"
+                >
                   {/* Top row: Avatar, name, role badge, status */}
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2.5 min-w-0">
@@ -700,41 +721,54 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
                   </div>
 
                   {/* Actions row on mobile */}
-                  {member.role !== 'owner' && !isSelf && (
-                    <div className="flex items-center justify-end gap-2 pt-1 border-t border-slate-100 dark:border-slate-800/60">
-                      <button
-                        onClick={() => handleOpenEdit(member)}
-                        className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs flex items-center gap-1.5 transition-colors"
-                      >
-                        <Edit2 className="size-3 text-slate-500" />
-                        <span>Edit</span>
-                      </button>
-                      <button
-                        onClick={() => setResetConfirmStaff(member)}
-                        className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-semibold text-xs flex items-center gap-1.5 transition-colors"
-                      >
-                        <KeyRound className="size-3" />
-                        <span>Reset Password</span>
-                      </button>
-                      <button
-                        onClick={() => handleToggleStatus(member)}
-                        className={`px-3 py-1.5 rounded-lg font-semibold text-xs transition-colors ${
-                          member.is_active
-                            ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-100'
-                            : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100'
-                        }`}
-                      >
-                        {member.is_active ? 'Suspend' : 'Activate'}
-                      </button>
-                      <button
-                        onClick={() => setRemoveConfirmStaff(member)}
-                        title="Remove staff member"
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
-                      >
-                        <Trash2 className="size-3.5" />
-                      </button>
-                    </div>
-                  )}
+                  <div
+                    className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100 dark:border-slate-800/60"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      onClick={() => setStatementStaff(member)}
+                      className="px-3 py-1.5 rounded-lg bg-purple-50 dark:bg-purple-950/50 hover:bg-purple-100 dark:hover:bg-purple-900/60 text-purple-700 dark:text-purple-300 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <FileText className="size-3 text-purple-600 dark:text-purple-400" />
+                      <span>Statement</span>
+                    </button>
+
+                    {member.role !== 'owner' && !isSelf && (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => handleOpenEdit(member)}
+                          className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs flex items-center gap-1 transition-colors cursor-pointer"
+                        >
+                          <Edit2 className="size-3 text-slate-500" />
+                          <span>Edit</span>
+                        </button>
+                        <button
+                          onClick={() => setResetConfirmStaff(member)}
+                          className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors cursor-pointer"
+                          title="Reset Password"
+                        >
+                          <KeyRound className="size-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleToggleStatus(member)}
+                          className={`px-2.5 py-1.5 rounded-lg font-semibold text-xs transition-colors cursor-pointer ${
+                            member.is_active
+                              ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-100'
+                              : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100'
+                          }`}
+                        >
+                          {member.is_active ? 'Suspend' : 'Activate'}
+                        </button>
+                        <button
+                          onClick={() => setRemoveConfirmStaff(member)}
+                          title="Remove staff member"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               );
             })
@@ -1335,6 +1369,14 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
         </div>,
         document.body
       )}
+
+      {/* ── Staff Statement & Activity Drawer ── */}
+      <StaffStatementDrawer
+        isOpen={!!statementStaff}
+        onClose={() => setStatementStaff(null)}
+        staffMember={statementStaff}
+        onBonusSettled={loadData}
+      />
     </div>
   );
 };

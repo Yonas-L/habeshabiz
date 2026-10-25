@@ -33,6 +33,10 @@ class DebtController extends Controller
             $query->where('type', $request->type);
         }
 
+        if ($request->boolean('exclude_staff_bonus') || $request->query('exclude_staff_bonus') === '1') {
+            $query->where('reference_type', '!=', 'salesperson_bonus');
+        }
+
         if ($request->filled('status') && $request->status !== 'all') {
             $query->where('status', $request->status);
         } elseif (! $request->filled('status')) {

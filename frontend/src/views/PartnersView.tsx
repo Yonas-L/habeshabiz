@@ -137,6 +137,10 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
   // Filter and search
   const filteredContacts = useMemo(() => {
     return contacts.filter((c) => {
+      // Exclude purely internal staff contacts from the external vendor/partner directory
+      const isPureStaff = Array.isArray(c.roles) && c.roles.length > 0 && c.roles.every((r) => r === 'staff' || r === 'salesperson');
+      if (isPureStaff) return false;
+
       if (selectedRole !== 'all' && !c.roles.includes(selectedRole)) return false;
       if (onlyActive && c.is_active === false) return false;
       if (search.trim()) {
@@ -154,11 +158,12 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
 
   // Statistics calculation
   const stats = useMemo(() => {
-    const total = contacts.length;
-    const brokers = contacts.filter((c) => c.roles.includes('peer_vendor')).length;
-    const suppliers = contacts.filter((c) => c.roles.includes('supplier')).length;
-    const partners = contacts.filter((c) => c.roles.includes('partner')).length;
-    const customers = contacts.filter((c) => c.roles.includes('customer')).length;
+    const tradeContacts = contacts.filter((c) => !(Array.isArray(c.roles) && c.roles.length > 0 && c.roles.every((r) => r === 'staff' || r === 'salesperson')));
+    const total = tradeContacts.length;
+    const brokers = tradeContacts.filter((c) => c.roles.includes('peer_vendor')).length;
+    const suppliers = tradeContacts.filter((c) => c.roles.includes('supplier')).length;
+    const partners = tradeContacts.filter((c) => c.roles.includes('partner')).length;
+    const customers = tradeContacts.filter((c) => c.roles.includes('customer')).length;
     return { total, brokers, suppliers, partners, customers };
   }, [contacts]);
 

@@ -774,6 +774,90 @@ export interface LeaderboardItem {
   total_bonus_earned?: number;
 }
 
+export interface StaffBonusLedgerPayment {
+  id: string;
+  amount: number;
+  payment_date: string | null;
+  account_name?: string | null;
+  reference_number?: string | null;
+  notes?: string | null;
+}
+
+export interface StaffBonusLedgerEntry {
+  id: string;
+  date: string | null;
+  order_id?: string | null;
+  order_number?: string | null;
+  description: string;
+  type: string;
+  type_label: string;
+  bonus_amount: number;
+  paid_amount: number;
+  remaining_amount: number;
+  status: 'open' | 'partially_paid' | 'settled';
+  due_date?: string | null;
+  notes?: string | null;
+  payments: StaffBonusLedgerPayment[];
+}
+
+export interface StaffSalesOrderEntryItem {
+  name: string;
+  imei?: string | null;
+  unit_price: number;
+}
+
+export interface StaffSalesOrderEntry {
+  id: string;
+  order_number: string;
+  order_date: string | null;
+  customer_name: string;
+  total_amount: number;
+  paid_amount: number;
+  payment_status: string;
+  bonus_amount: number;
+  items_count: number;
+  items: StaffSalesOrderEntryItem[];
+}
+
+export interface StaffHandoverEntry {
+  id: string;
+  device_name: string;
+  imei_or_serial?: string | null;
+  status: string;
+  handed_out_at?: string | null;
+  sold_at?: string | null;
+  location?: string | null;
+  handover_payout: number;
+  return_deadline?: string | null;
+  notes?: string | null;
+}
+
+export interface StaffStatementSummary {
+  uncollected_bonus: number;
+  collected_bonus: number;
+  total_bonus_earned: number;
+  total_sales_count: number;
+  total_sales_volume: number;
+  active_handovers_count: number;
+  active_handovers_value: number;
+}
+
+export interface StaffStatementData {
+  staff: {
+    id: number;
+    name: string;
+    email: string;
+    phone: string | null;
+    role: string;
+    is_active: boolean;
+    created_at?: string | null;
+  };
+  summary: StaffStatementSummary;
+  bonus_ledger: StaffBonusLedgerEntry[];
+  sales_orders: StaffSalesOrderEntry[];
+  handovers: StaffHandoverEntry[];
+}
+
 export interface AuditLogItem {
   id: string;
   user_id: number | null;
@@ -1562,11 +1646,12 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
-  getDebts: (params?: { type?: 'receivable' | 'payable'; status?: string; search?: string }) => {
+  getDebts: (params?: { type?: 'receivable' | 'payable'; status?: string; search?: string; exclude_staff_bonus?: boolean }) => {
     const query = new URLSearchParams();
     if (params?.type) query.set('type', params.type);
     if (params?.status) query.set('status', params.status);
     if (params?.search) query.set('search', params.search);
+    if (params?.exclude_staff_bonus) query.set('exclude_staff_bonus', '1');
     return request<Debt[]>(`/debts?${query.toString()}`);
   },
 
@@ -1906,6 +1991,57 @@ export const api = {
     request<{ leaderboard: LeaderboardItem[]; top_seller: LeaderboardItem | null }>(
       month ? `/staff/leaderboard?month=${month}` : '/staff/leaderboard'
     ),
+
+  getStaffStatement: (id: number, params?: { start_date?: string; end_date?: string }) => {
+    const query = new URLSearchParams();
+    if (params?.start_date) query.set('start_date', params.start_date);
+    if (params?.end_date) query.set('end_date', params.end_date);
+    const qs = query.toString();
+    return request<StaffStatementData>(`/staff/${id}/statement${qs ? `?${qs}` : ''}`);
+  },
+
+  settleStaffBonus: (
+    id: number,
+    data: {
+      amount: number;
+      financial_account_id: string;
+      payment_date?: string;
+      reference_number?: string;
+      notes?: string;
+    }
+  ) =>
+    request<{ success: boolean; message: string; data?: any }>(`/staff/${id}/settle-bonus`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  downloadStaffStatementPdf: async (
+    id: number,
+    params?: { start_date?: string; end_date?: string; download?: boolean }
+  ): Promise<Blob> => {
+    const query = new URLSearchParams();
+    if (params?.start_date) query.set('start_date', params.start_date);
+    if (params?.end_date) query.set('end_date', params.end_date);
+    if (params?.download !== undefined) query.set('download', params.download ? '1' : '0');
+    const qs = query.toString();
+    const token = getAuthToken();
+    const res = await fetch(`${API_BASE}/staff/${id}/statement-pdf${qs ? `?${qs}` : ''}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new Error('Failed to download staff statement PDF');
+    return res.blob();
+  },
+
+  getStaffStatementPdfUrl: (id: number, params?: { start_date?: string; end_date?: string; download?: boolean }) => {
+    const query = new URLSearchParams();
+    if (params?.start_date) query.set('start_date', params.start_date);
+    if (params?.end_date) query.set('end_date', params.end_date);
+    if (params?.download !== undefined) query.set('download', params.download ? '1' : '0');
+    const token = getAuthToken();
+    if (token) query.set('token', token);
+    const qs = query.toString();
+    return `${API_BASE}/staff/${id}/statement-pdf${qs ? `?${qs}` : ''}`;
+  },
 
   getAuditLogs: (params?: {
     page?: number;

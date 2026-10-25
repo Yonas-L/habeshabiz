@@ -55,6 +55,11 @@ class Debt extends Model
         return $this->hasMany(DebtPayment::class);
     }
 
+    public function salesOrder(): BelongsTo
+    {
+        return $this->belongsTo(SalesOrder::class, 'reference_id');
+    }
+
     public function isReceivable(): bool
     {
         return $this->type === 'receivable';
@@ -203,6 +208,7 @@ class Debt extends Model
         $openPayables = self::where('tenant_id', $tenantId)
             ->where('contact_id', $contactId)
             ->where('type', 'payable')
+            ->where('reference_type', '!=', 'salesperson_bonus') // Never auto-offset staff commission bonuses
             ->whereIn('status', ['open', 'partially_paid'])
             ->orderBy('created_at')
             ->get();
@@ -282,6 +288,7 @@ class Debt extends Model
         $contactIds = self::where('tenant_id', $tenantId)
             ->whereIn('status', ['open', 'partially_paid'])
             ->where('reference_type', '!=', 'handover_holding')
+            ->where('reference_type', '!=', 'salesperson_bonus')
             ->whereNotNull('contact_id')
             ->select('contact_id')
             ->groupBy('contact_id')
