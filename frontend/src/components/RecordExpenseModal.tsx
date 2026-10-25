@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import type { Contact, FinancialAccount, InventoryUnit } from '../api/client';
+import type { Contact, FinancialAccount, InventoryUnit, StaffMember } from '../api/client';
 import { api } from '../api/client';
 import { toast } from 'sonner';
 import {
@@ -10,6 +10,8 @@ import {
   ChevronDown,
   Loader2,
   Handshake,
+  Users,
+  AlertCircle,
 } from 'lucide-react';
 import { SplitPaymentSelector, type PaymentSplitItem } from './common/SplitPaymentSelector';
 
@@ -44,6 +46,11 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
   // Vendor Payout state
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [selectedVendorContactId, setSelectedVendorContactId] = useState('');
+
+  // Staff Daily Pay / Commission state
+  const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
+  const [selectedStaffId, setSelectedStaffId] = useState<string>('');
+  const [loadingStaff, setLoadingStaff] = useState(false);
 
   // Device Maintenance state
   const [maintenanceUnits, setMaintenanceUnits] = useState<InventoryUnit[]>([]);
@@ -87,6 +94,17 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
       api.getContacts()
         .then((res) => setContacts(res.filter((c) => c.is_active !== false)))
         .catch(() => {});
+    }
+  }, [isOpen]);
+
+  // Load staff members for staff daily pay / commission
+  useEffect(() => {
+    if (isOpen) {
+      setLoadingStaff(true);
+      api.getStaff()
+        .then((res) => setStaffMembers(res.filter((s) => s.is_active !== false)))
+        .catch(() => {})
+        .finally(() => setLoadingStaff(false));
     }
   }, [isOpen]);
 
@@ -134,6 +152,7 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
 
   const selectedUnit = maintenanceUnits.find((u) => u.id === selectedUnitId);
   const hasVendor = Boolean(selectedUnit?.supplier_contact_id || selectedUnit?.source_type === 'consignment');
+  const selectedStaff = staffMembers.find((s) => String(s.id) === String(selectedStaffId));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -169,10 +188,21 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
     try {
       setSubmitting(true);
       const isDraw = isOwnerDraw || category === 'personal_owner_draw';
+      const staffContact = selectedStaff
+        ? contacts.find(
+            (c) =>
+              (selectedStaff.contact_id && c.id === selectedStaff.contact_id) ||
+              (selectedStaff.phone && c.phone === selectedStaff.phone) ||
+              c.name.toLowerCase() === selectedStaff.name.toLowerCase()
+          )
+        : null;
+
       const finalVendorContactId = category === 'vendor_payout'
         ? selectedVendorContactId
         : category === 'maintenance' && selectedUnit?.supplier_contact_id
         ? selectedUnit.supplier_contact_id
+        : category === 'salary' && staffContact
+        ? staffContact.id
         : selectedVendorContactId || undefined;
 
       await api.recordExpense({
@@ -192,6 +222,8 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
           ? 'Owner Personal Draw Recorded'
           : category === 'vendor_payout'
           ? 'Vendor Transfer Recorded (Debts Auto-Settled)'
+          : category === 'salary' && selectedStaff
+          ? `Staff Pay Recorded for ${selectedStaff.name}`
           : vendorBilling === 'vendor_deduct' && hasVendor
           ? 'Vendor-Deductible Repair Logged (Offset on Debt)'
           : vendorBilling === 'vendor_reimburse' && hasVendor
@@ -206,6 +238,7 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
       setDescription('');
       setSelectedUnitId('');
       setSelectedVendorContactId('');
+      setSelectedStaffId('');
       setIsOwnerDraw(false);
       setIsSplit(false);
       setPaymentSplits([]);
@@ -271,6 +304,8 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
                 setIsOwnerDraw(cat === 'personal_owner_draw');
                 if (cat === 'vendor_payout' && !description) {
                   setDescription('Transfer to vendor');
+                } else if (cat === 'salary' && !description) {
+                  setDescription('Staff daily pay / commission');
                 }
               }}
               className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 focus:border-slate-900 dark:focus:border-slate-600 cursor-pointer"
@@ -320,6 +355,64 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
 
               <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
                 This transfer directly decreases what you owe this partner on their ledger statement. If it exceeds your open payables, the remainder is logged as an advance credit.
+              </p>
+            </div>
+          )}
+
+          {/* Staff Member Selection (Visible when category is salary) */}
+          {category === 'salary' && (
+            <div className="p-3.5 rounded-xl bg-violet-50/70 dark:bg-violet-950/20 border border-violet-200/70 dark:border-violet-900/50 space-y-2.5 animate-page-enter">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400" />
+                  <span>Select Staff Member</span>
+                </label>
+                <span className="text-[10px] text-violet-600 dark:text-violet-400 font-bold">Operating Expense</span>
+              </div>
+
+              <div className="relative">
+                <select
+                  value={selectedStaffId}
+                  onChange={(e) => {
+                    const sid = e.target.value;
+                    setSelectedStaffId(sid);
+                    const staff = staffMembers.find((item) => String(item.id) === String(sid));
+                    if (staff) {
+                      if (!description || description.startsWith('Staff daily pay / commission')) {
+                        setDescription(`Staff daily pay / commission: ${staff.name}`);
+                      }
+                    }
+                  }}
+                  disabled={loadingStaff}
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 cursor-pointer"
+                >
+                  <option value="">-- Choose Staff Member (Optional) --</option>
+                  {staffMembers.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} {s.phone ? `(${s.phone})` : ''} • {s.role.toUpperCase()}
+                    </option>
+                  ))}
+                </select>
+                {loadingStaff && (
+                  <Loader2 className="w-4 h-4 animate-spin text-violet-500 absolute right-3 top-3 pointer-events-none" />
+                )}
+              </div>
+
+              {/* Notice if staff has uncollected bonuses from sales orders */}
+              {selectedStaff && (selectedStaff.stats?.uncollected_bonus || 0) > 0 && (
+                <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-800 dark:text-amber-300 flex items-start gap-2">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                  <div className="leading-tight">
+                    <span className="font-semibold">{selectedStaff.name} has {Number(selectedStaff.stats?.uncollected_bonus || 0).toLocaleString()} ETB</span> in uncollected sales bonuses.
+                    <div className="text-[10px] text-slate-600 dark:text-slate-400 mt-1">
+                      Sales order bonuses already reduced profit when the sale was made. To pay sales bonuses, disburse from the <strong className="font-semibold text-slate-800 dark:text-slate-200">Payables Page</strong> or <strong className="font-semibold text-slate-800 dark:text-slate-200">Staff Statement</strong> so profit is not deducted twice.
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                Daily allowances, stipends, and fixed daily pay recorded here count directly as operating expenses on your monthly Income Statement (P&amp;L).
               </p>
             </div>
           )}

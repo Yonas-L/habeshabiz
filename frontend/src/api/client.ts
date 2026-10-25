@@ -737,6 +737,7 @@ export interface StaffMember {
   phone: string | null;
   role: string;
   is_active: boolean;
+  contact_id?: string;
   permissions?: {
     can_discount?: boolean;
     can_handover?: boolean;

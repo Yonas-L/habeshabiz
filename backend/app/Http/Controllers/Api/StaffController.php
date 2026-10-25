@@ -47,9 +47,12 @@ class StaffController extends Controller
             ->whereNotNull('handover_to')
             ->get();
 
-        $staffContacts = Contact::whereIn('name', $staffMembers->pluck('name'))
-            ->get()
-            ->keyBy('name');
+        $staffContacts = Contact::where('tenant_id', $currentUser->tenant_id)
+            ->where(function ($q) use ($staffMembers) {
+                $q->whereIn('name', $staffMembers->pluck('name'))
+                    ->orWhereIn('phone', $staffMembers->pluck('phone')->filter());
+            })
+            ->get();
 
         $enriched = $staffMembers->map(function ($staff) use ($startOfWeek, $startOfMonth, $activeHandovers, $staffContacts) {
             $weekOrders = SalesOrder::where('salesperson_id', $staff->id)
@@ -72,7 +75,7 @@ class StaffController extends Controller
                 return (float) ($u->handover_payout ?: ($u->selling_price ?: ($u->cost_basis ?: 0)));
             });
 
-            $contact = $staffContacts->get($staff->name);
+            $contact = $staffContacts->first(fn ($c) => ($staff->phone && $c->phone === $staff->phone) || strcasecmp($c->name, $staff->name) === 0);
             $openReceivable = $contact ? (float) $contact->open_receivable : $activeHandoversValue;
 
             return [
@@ -82,6 +85,7 @@ class StaffController extends Controller
                 'phone' => $staff->phone,
                 'role' => $staff->role,
                 'is_active' => $staff->is_active,
+                'contact_id' => $contact?->id,
                 'permissions' => $staff->permissions,
                 'created_at' => $staff->created_at,
                 'stats' => [

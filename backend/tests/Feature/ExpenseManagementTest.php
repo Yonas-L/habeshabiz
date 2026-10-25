@@ -144,3 +144,52 @@ test('non-owner cannot delete an expense', function () {
 
     expect(Expense::find($expenseId))->not->toBeNull();
 });
+
+test('recording staff daily pay expense associates staff contact and does not trigger debt settlement', function () {
+    $staffContact = Contact::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Abebe Staff',
+        'roles' => ['staff', 'salesperson'],
+        'phone' => '0912345678',
+        'is_active' => true,
+    ]);
+
+    // Create an open bonus debt
+    $bonusDebt = Debt::create([
+        'tenant_id' => $this->tenant->id,
+        'contact_id' => $staffContact->id,
+        'salesperson_id' => $this->seller->id,
+        'type' => 'payable',
+        'reference_type' => 'salesperson_bonus',
+        'original_amount' => 5000.00,
+        'paid_amount' => 0.00,
+        'remaining_amount' => 5000.00,
+        'due_date' => now()->addDays(7),
+        'status' => 'open',
+    ]);
+
+    // Record staff daily pay expense of 500 ETB
+    $res = $this->actingAs($this->owner)->postJson('/api/v1/expenses', [
+        'financial_account_id' => $this->cbe->id,
+        'category' => 'salary',
+        'vendor_contact_id' => $staffContact->id,
+        'amount' => 500.00,
+        'description' => 'Staff daily pay / commission: Abebe Staff',
+    ]);
+    $res->assertStatus(201);
+    $expenseId = $res->json('data.id');
+
+    // Account reduced by 500
+    expect((float) $this->cbe->fresh()->current_balance)->toBe(49500.00);
+
+    // Bonus debt remains completely untouched (not auto-settled)
+    $bonusDebt->refresh();
+    expect((float) $bonusDebt->remaining_amount)->toBe(5000.00);
+    expect($bonusDebt->status)->toBe('open');
+
+    // Expense list loads vendorContact
+    $listRes = $this->actingAs($this->owner)->getJson('/api/v1/expenses');
+    $listRes->assertOk();
+    $found = collect($listRes->json('data.expenses'))->firstWhere('id', $expenseId);
+    expect($found['vendor_contact']['name'])->toBe('Abebe Staff');
+});

@@ -139,6 +139,15 @@ export const ExpenseDrawer: React.FC<ExpenseDrawerProps> = ({
             </span>
           </div>
 
+          {expense.vendor_contact && (
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400">Recipient / Staff</span>
+              <span className="font-semibold text-slate-800 dark:text-slate-200">
+                {expense.vendor_contact.name} {expense.vendor_contact.phone ? `(${expense.vendor_contact.phone})` : ''}
+              </span>
+            </div>
+          )}
+
           {expense.payment_splits && expense.payment_splits.length > 1 ? (
             <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
               <div className="flex items-center justify-between">

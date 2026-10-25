@@ -449,6 +449,14 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
                       <div className="text-slate-900 dark:text-white font-bold text-xs group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
                         {item.description}
                       </div>
+                      {item.rawExpense?.vendor_contact && (
+                        <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-violet-600 dark:text-violet-400 font-medium">
+                          <span>• {item.rawExpense.vendor_contact.name}</span>
+                          {item.rawExpense.vendor_contact.phone && (
+                            <span className="text-slate-400 font-mono text-[10px]">({item.rawExpense.vendor_contact.phone})</span>
+                          )}
+                        </div>
+                      )}
                       {item.rawExpense?.inventory_unit && (
                         <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-slate-500 dark:text-slate-400 font-mono">
                           <span>{item.rawExpense.inventory_unit.variant?.product?.name || 'Device'}</span>
@@ -556,6 +564,14 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
                   <div className="text-slate-900 dark:text-white font-bold text-xs">
                     {item.description}
                   </div>
+                  {item.rawExpense?.vendor_contact && (
+                    <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-violet-600 dark:text-violet-400 font-medium">
+                      <span>• {item.rawExpense.vendor_contact.name}</span>
+                      {item.rawExpense.vendor_contact.phone && (
+                        <span className="text-slate-400 font-mono text-[9px]">({item.rawExpense.vendor_contact.phone})</span>
+                      )}
+                    </div>
+                  )}
                   {item.rawExpense?.inventory_unit && (
                     <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-slate-500 dark:text-slate-400 font-mono">
                       <span>{item.rawExpense.inventory_unit.variant?.product?.name || 'Device'}</span>

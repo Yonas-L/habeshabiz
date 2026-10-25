@@ -25,7 +25,7 @@ class ExpenseController extends Controller
     public function index(Request $request): JsonResponse
     {
         $tenantId = $request->user()->tenant_id;
-        $query = Expense::with(['financialAccount', 'inventoryUnit.variant.product']);
+        $query = Expense::with(['financialAccount', 'inventoryUnit.variant.product', 'vendorContact']);
 
         if ($request->has('is_owner_draw')) {
             $query->where('is_owner_draw', filter_var($request->is_owner_draw, FILTER_VALIDATE_BOOLEAN));
@@ -162,7 +162,7 @@ class ExpenseController extends Controller
             ]);
 
             // Handle direct vendor wire transfer / cash payout
-            if ($vendorContactId && empty($validated['inventory_unit_id'])) {
+            if ($vendorContactId && empty($validated['inventory_unit_id']) && $validated['category'] !== 'salary') {
                 $openPayables = Debt::where('tenant_id', $tenantId)
                     ->where('contact_id', $vendorContactId)
                     ->where('type', 'payable')
