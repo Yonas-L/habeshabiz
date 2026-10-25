@@ -3,6 +3,7 @@ import type { User, AuditLogItem, AuditLogsResponse } from '../api/client';
 import { api } from '../api/client';
 import { CustomPageLoader } from '../components/loading/CustomPageLoader';
 import { SlideOverDrawer } from '../components/drawers/SlideOverDrawer';
+import { UndoActionModal } from '../components/UndoActionModal';
 import {
   ScrollText,
   Search,
@@ -26,6 +27,8 @@ import {
   Clock,
   Globe,
   FileCode,
+  RotateCcw,
+  Undo2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -175,6 +178,10 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
   // Inspector Drawer State
   const [inspectItem, setInspectItem] = useState<AuditLogItem | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  // Undo Action Modal State
+  const [selectedUndoLog, setSelectedUndoLog] = useState<AuditLogItem | null>(null);
+  const [isUndoModalOpen, setIsUndoModalOpen] = useState(false);
 
   // Debounce search input
   useEffect(() => {
@@ -553,7 +560,7 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
                 <th className="py-3.5 px-4 whitespace-nowrap">Entity Target</th>
                 <th className="py-3.5 px-4 whitespace-nowrap">IP Address</th>
                 <th className="py-3.5 px-4 whitespace-nowrap">Change Overview</th>
-                <th className="py-3.5 px-4 text-right whitespace-nowrap">Inspect</th>
+                <th className="py-3.5 px-4 text-right whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
@@ -638,12 +645,22 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
 
                       {/* Action Event Badge */}
                       <td className="py-3 px-4 whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold border ${badgeStyle.bg} ${badgeStyle.text}`}
-                        >
-                          <span className={`size-1.5 rounded-full ${badgeStyle.dot}`} />
-                          {formatActionLabel(log.action)}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold border ${badgeStyle.bg} ${badgeStyle.text} ${log.is_reverted ? 'opacity-70 line-through' : ''}`}
+                          >
+                            <span className={`size-1.5 rounded-full ${badgeStyle.dot}`} />
+                            {formatActionLabel(log.action)}
+                          </span>
+                          {log.is_reverted && (
+                            <span
+                              title={log.reverted_by_name && log.reverted_at ? `Reverted by ${log.reverted_by_name} at ${formatExactTime(log.reverted_at)}` : 'Action was reverted'}
+                              className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200/60 dark:border-rose-900/40"
+                            >
+                              Reverted
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Entity Target */}
@@ -694,19 +711,44 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
                         )}
                       </td>
 
-                      {/* Inspect Button */}
+                      {/* Actions Column */}
                       <td className="py-3 px-4 text-right whitespace-nowrap">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setInspectItem(log);
-                          }}
-                          className="px-2.5 py-1.5 rounded-lg border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#131926] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white group-hover:border-slate-300 dark:group-hover:border-slate-700 text-[11px] font-semibold inline-flex items-center gap-1 transition-colors"
-                        >
-                          <Eye className="size-3" />
-                          <span>Inspect</span>
-                        </button>
+                        <div className="flex items-center justify-end gap-1.5">
+                          {log.is_reverted ? (
+                            <span
+                              title={log.reverted_by_name && log.reverted_at ? `Reverted by ${log.reverted_by_name} at ${formatExactTime(log.reverted_at)}` : 'This action has been reverted'}
+                              className="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200/60 dark:border-slate-700/60 line-through tracking-tight"
+                            >
+                              Reverted
+                            </span>
+                          ) : log.can_undo && isOwner ? (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedUndoLog(log);
+                                setIsUndoModalOpen(true);
+                              }}
+                              className="px-2.5 py-1.5 rounded-lg border border-amber-300/80 dark:border-amber-800/80 bg-amber-50/80 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/60 text-[11px] font-semibold inline-flex items-center gap-1 transition-colors shadow-xs"
+                              title="Undo this business action within 24 hours"
+                            >
+                              <RotateCcw className="size-3" />
+                              <span>Undo</span>
+                            </button>
+                          ) : null}
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setInspectItem(log);
+                            }}
+                            className="px-2.5 py-1.5 rounded-lg border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#131926] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white group-hover:border-slate-300 dark:group-hover:border-slate-700 text-[11px] font-semibold inline-flex items-center gap-1 transition-colors"
+                          >
+                            <Eye className="size-3" />
+                            <span>Inspect</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -768,12 +810,19 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
                       </div>
                     </div>
 
-                    <span
-                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border shrink-0 ${badgeStyle.bg} ${badgeStyle.text}`}
-                    >
-                      <span className={`size-1.5 rounded-full ${badgeStyle.dot}`} />
-                      {formatActionLabel(log.action)}
-                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${badgeStyle.bg} ${badgeStyle.text} ${log.is_reverted ? 'opacity-70 line-through' : ''}`}
+                      >
+                        <span className={`size-1.5 rounded-full ${badgeStyle.dot}`} />
+                        {formatActionLabel(log.action)}
+                      </span>
+                      {log.is_reverted && (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200/60 dark:border-rose-900/40">
+                          Reverted
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {/* Entity and change summary */}
@@ -824,17 +873,38 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
                       <Globe className="size-2.5" />
                       {log.ip_address || '127.0.0.1'}
                     </span>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setInspectItem(log);
-                      }}
-                      className="px-2.5 py-1 rounded-lg border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#131926] text-slate-600 dark:text-slate-400 text-[11px] font-semibold inline-flex items-center gap-1"
-                    >
-                      <Eye className="size-3" />
-                      <span>Inspect</span>
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      {log.is_reverted ? (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200/60 dark:border-slate-700/60 line-through">
+                          Reverted
+                        </span>
+                      ) : log.can_undo && isOwner ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedUndoLog(log);
+                            setIsUndoModalOpen(true);
+                          }}
+                          className="px-2.5 py-1 rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 text-[11px] font-bold inline-flex items-center gap-1 shadow-xs"
+                        >
+                          <RotateCcw className="size-3" />
+                          <span>Undo</span>
+                        </button>
+                      ) : null}
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setInspectItem(log);
+                        }}
+                        className="px-2.5 py-1 rounded-lg border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#131926] text-slate-600 dark:text-slate-400 text-[11px] font-semibold inline-flex items-center gap-1"
+                      >
+                        <Eye className="size-3" />
+                        <span>Inspect</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -988,6 +1058,59 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
       >
         {inspectItem && (
           <div className="space-y-4">
+            {/* Reverted or Undo Action Banner */}
+            {inspectItem.is_reverted ? (
+              <div className="p-3.5 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 flex items-center justify-between gap-3 shadow-xs">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="size-8 rounded-lg bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500 shrink-0">
+                    <RotateCcw className="size-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                      <span>This action has been reverted</span>
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200/60 dark:border-rose-900/40">
+                        Reverted
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+                      {inspectItem.reverted_by_name ? `Reverted by ${inspectItem.reverted_by_name}` : 'Reverted by Owner'}
+                      {inspectItem.reverted_at ? ` · ${formatExactTime(inspectItem.reverted_at)}` : ''}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : inspectItem.can_undo && isOwner ? (
+              <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/80 flex items-center justify-between gap-3 shadow-xs">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="size-8 rounded-lg bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 flex items-center justify-center shrink-0">
+                    <Undo2 className="size-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+                      <span>Eligible for Undo Reversal</span>
+                      <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300">
+                        24h Window
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-amber-700 dark:text-amber-400 mt-0.5">
+                      Restores inventory &amp; relative cash balance deltas safely
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedUndoLog(inspectItem);
+                    setIsUndoModalOpen(true);
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center gap-1.5 transition-colors shadow-xs shrink-0 cursor-pointer"
+                >
+                  <RotateCcw className="size-3.5" />
+                  <span>Undo Action</span>
+                </button>
+              </div>
+            ) : null}
+
             {/* Actor Profile Section */}
             <div className="p-3.5 sm:p-4 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
@@ -1134,6 +1257,32 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
           </div>
         )}
       </SlideOverDrawer>
+
+      {/* Undo Action Reversal Modal */}
+      <UndoActionModal
+        isOpen={isUndoModalOpen}
+        onClose={() => {
+          setIsUndoModalOpen(false);
+          setSelectedUndoLog(null);
+        }}
+        log={selectedUndoLog}
+        onSuccess={() => {
+          fetchLogs();
+          if (inspectItem && selectedUndoLog && inspectItem.id === selectedUndoLog.id) {
+            setInspectItem((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    is_reverted: true,
+                    can_undo: false,
+                    reverted_at: new Date().toISOString(),
+                    reverted_by_name: currentUser?.name || 'Owner',
+                  }
+                : null
+            );
+          }
+        }}
+      />
     </div>
   );
 };

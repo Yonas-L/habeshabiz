@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Undo\UndoActionFactory;
+use App\Exceptions\UndoBlockedException;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Throwable;
 
 class AuditLogController extends Controller
 {
@@ -26,7 +29,7 @@ class AuditLogController extends Controller
             ], 403);
         }
 
-        $query = AuditLog::with('user:id,name,email,role');
+        $query = AuditLog::with(['user:id,name,email,role', 'revertedByUser:id,name,email']);
 
         // Search filter (action, entity_type, entity_id, user name, ip_address, description in new_values)
         if ($request->filled('search')) {
@@ -112,5 +115,127 @@ class AuditLogController extends Controller
                 ],
             ],
         ]);
+    }
+
+    /**
+     * Preview the consequences and blockers of undoing an audit action.
+     */
+    public function undoPreview(Request $request, string $id): JsonResponse
+    {
+        /** @var User|null $currentUser */
+        $currentUser = $request->user();
+
+        if (! $currentUser || ! $currentUser->isOwner()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. Reversing business actions is strictly restricted to store owners.',
+            ], 403);
+        }
+
+        $log = AuditLog::with(['user', 'revertedByUser'])->findOrFail($id);
+
+        if ($log->isReverted()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This action has already been undone.',
+                'is_reverted' => true,
+                'reverted_at' => $log->reverted_at?->toIso8601String(),
+                'reverted_by' => $log->revertedByUser?->name,
+            ], 422);
+        }
+
+        if (! $log->isWithinUndoWindow()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Action cannot be undone: the 24-hour undo window has expired.',
+                'expired' => true,
+            ], 422);
+        }
+
+        if (! UndoActionFactory::isUndoable($log->action)) {
+            return response()->json([
+                'success' => false,
+                'message' => "Action '{$log->action}' does not support automatic undo.",
+            ], 422);
+        }
+
+        $action = UndoActionFactory::make($log->action);
+        $preview = $action->preview($log);
+
+        return response()->json([
+            'success' => true,
+            'data' => $preview,
+        ]);
+    }
+
+    /**
+     * Execute the atomic undo of an audit action.
+     */
+    public function undo(Request $request, string $id): JsonResponse
+    {
+        /** @var User|null $currentUser */
+        $currentUser = $request->user();
+
+        if (! $currentUser || ! $currentUser->isOwner()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. Reversing business actions is strictly restricted to store owners.',
+            ], 403);
+        }
+
+        $log = AuditLog::with(['user', 'revertedByUser'])->findOrFail($id);
+
+        if ($log->isReverted()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This action has already been undone.',
+                'is_reverted' => true,
+                'reverted_at' => $log->reverted_at?->toIso8601String(),
+                'reverted_by' => $log->revertedByUser?->name,
+            ], 422);
+        }
+
+        if (! $log->isWithinUndoWindow()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Action cannot be undone: the 24-hour undo window has expired.',
+                'expired' => true,
+            ], 422);
+        }
+
+        if (! UndoActionFactory::isUndoable($log->action)) {
+            return response()->json([
+                'success' => false,
+                'message' => "Action '{$log->action}' does not support automatic undo.",
+            ], 422);
+        }
+
+        try {
+            $action = UndoActionFactory::make($log->action);
+            $message = $action->execute($log);
+
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'data' => [
+                    'id' => $log->id,
+                    'is_reverted' => true,
+                    'reverted_at' => now()->toIso8601String(),
+                    'reverted_by' => $currentUser->name,
+                ],
+            ]);
+        } catch (UndoBlockedException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'blocked' => true,
+                'blocked_reasons' => $e->getBlockedReasons(),
+            ], 422);
+        } catch (Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Undo failed: '.$e->getMessage(),
+            ], 500);
+        }
     }
 }

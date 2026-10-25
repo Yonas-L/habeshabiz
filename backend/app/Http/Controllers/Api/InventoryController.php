@@ -517,6 +517,7 @@ class InventoryController extends Controller
         }
 
         $createdUnits = [];
+        $revertGroupId = (string) Str::uuid();
 
         DB::transaction(function () use (
             $validated,
@@ -530,6 +531,7 @@ class InventoryController extends Controller
             $preparedBankSplits,
             $totalCost,
             $user,
+            $revertGroupId,
             &$createdUnits
         ) {
             $tenantId = $user->tenant_id;
@@ -705,6 +707,11 @@ class InventoryController extends Controller
                 $unit = $createdUnits[0];
                 $handoverMode = $validated['handover_mode'] ?? 'offset';
 
+                $oldStatus = $unit->status;
+                $oldLocation = $unit->location;
+                $oldHandoverTo = $unit->handover_to;
+                $revertGroupId = (string) Str::uuid();
+
                 if ($handoverMode === 'offset') {
                     $finalPrice = ! empty($validated['handover_payout'])
                         ? (float) $validated['handover_payout']
@@ -842,7 +849,8 @@ class InventoryController extends Controller
                             'selling_price' => $finalPrice,
                             'offset_debt' => true,
                             'immediate' => true,
-                        ]
+                        ],
+                        revertGroupId: $revertGroupId
                     );
                 } else {
                     // Temporary Handout to Staff / Broker
@@ -914,23 +922,34 @@ class InventoryController extends Controller
                             'handover_payout' => $validated['handover_payout'] ?? null,
                             'debt_created' => $debtCreated,
                             'immediate' => true,
-                        ]
+                        ],
+                        revertGroupId: $revertGroupId
                     );
                 }
             }
+
+            $createdUnitIds = collect($createdUnits)->pluck('id')->map(fn ($id) => (string) $id)->all();
 
             AuditLog::record(
                 action: 'stock_intake',
                 entityType: 'InventoryUnit',
                 entityId: (string) ($createdUnits[0]->id ?? $user->id),
                 newValues: [
+                    'unit_ids' => $createdUnitIds,
                     'units_count' => count($createdUnits),
                     'total_cost' => $totalCost,
                     'funding_source' => $fundingSource,
+                    'paid_amount' => $bankAmount,
                     'bank_amount' => $bankAmount,
+                    'financial_account_id' => $primaryPaymentAccountId,
+                    'payment_splits' => count($preparedBankSplits) > 0 ? array_map(fn ($p) => [
+                        'financial_account_id' => $p['financial_account_id'],
+                        'amount' => $p['total'],
+                    ], $preparedBankSplits) : null,
                     'offset_amount' => $offsetAmount,
                     'immediate_handover' => ! empty($validated['immediate_handover']),
-                ]
+                ],
+                revertGroupId: $revertGroupId
             );
         });
 
@@ -1702,6 +1721,11 @@ class InventoryController extends Controller
             'instant_offset' => ['nullable', 'boolean'],
         ]);
 
+        $oldStatus = $unit->status;
+        $oldLocation = $unit->location;
+        $oldHandoverTo = $unit->handover_to;
+        $revertGroupId = (string) Str::uuid();
+
         if ($validated['instant_offset'] ?? false) {
             $finalPrice = ! empty($validated['handover_payout'])
                 ? (float) $validated['handover_payout']
@@ -1744,7 +1768,18 @@ class InventoryController extends Controller
                 ]);
             }
 
-            DB::transaction(function () use ($unit, $partnerContact, $finalPrice, $validated, $user, $openPayables) {
+            DB::transaction(function () use (
+                $unit,
+                $partnerContact,
+                $finalPrice,
+                $validated,
+                $user,
+                $openPayables,
+                $oldStatus,
+                $oldLocation,
+                $oldHandoverTo,
+                $revertGroupId
+            ) {
                 $now = now();
 
                 // 1. Mark unit sold directly (never intermediate holding)
@@ -1825,12 +1860,18 @@ class InventoryController extends Controller
                     action: 'unit_instant_offset',
                     entityType: 'InventoryUnit',
                     entityId: (string) $unit->id,
+                    oldValues: [
+                        'status' => $oldStatus,
+                        'location' => $oldLocation,
+                        'handover_to' => $oldHandoverTo,
+                    ],
                     newValues: [
                         'imei_or_serial' => $unit->imei_or_serial,
                         'handover_to' => $partnerContact->name,
                         'selling_price' => $finalPrice,
                         'offset_debt' => true,
-                    ]
+                    ],
+                    revertGroupId: $revertGroupId
                 );
             });
 
@@ -1893,6 +1934,11 @@ class InventoryController extends Controller
             action: 'unit_handover',
             entityType: 'InventoryUnit',
             entityId: (string) $unit->id,
+            oldValues: [
+                'status' => $oldStatus,
+                'location' => $oldLocation,
+                'handover_to' => $oldHandoverTo,
+            ],
             newValues: [
                 'imei_or_serial' => $unit->imei_or_serial,
                 'handover_to' => $validated['handover_to'],
@@ -1900,7 +1946,8 @@ class InventoryController extends Controller
                 'return_deadline' => $validated['return_deadline'] ?? null,
                 'handover_payout' => $validated['handover_payout'] ?? null,
                 'debt_created' => $debtCreated,
-            ]
+            ],
+            revertGroupId: $revertGroupId
         );
 
         $message = "Item handed out to {$validated['handover_to']} for sale.";
@@ -2049,7 +2096,22 @@ class InventoryController extends Controller
             ? (float) $validated['selling_price']
             : (float) ($unit->handover_payout ?? $unit->selling_price ?? 0);
 
-        DB::transaction(function () use ($unit, $validated, $settlementType, $finalPrice, $user) {
+        $oldStatus = $unit->status;
+        $oldLocation = $unit->location;
+        $oldHandoverTo = $unit->handover_to;
+        $revertGroupId = (string) Str::uuid();
+
+        DB::transaction(function () use (
+            $unit,
+            $validated,
+            $settlementType,
+            $finalPrice,
+            $user,
+            $oldStatus,
+            $oldLocation,
+            $oldHandoverTo,
+            $revertGroupId
+        ) {
             $now = now();
             $vendorName = $unit->handover_to ?? 'Vendor/Broker';
 
@@ -2300,12 +2362,19 @@ class InventoryController extends Controller
                 action: 'handover_marked_sold',
                 entityType: 'InventoryUnit',
                 entityId: (string) $unit->id,
+                oldValues: [
+                    'status' => $oldStatus,
+                    'location' => $oldLocation,
+                    'handover_to' => $oldHandoverTo,
+                ],
                 newValues: [
                     'imei_or_serial' => $unit->imei_or_serial,
                     'handover_to' => $vendorName,
                     'settlement_type' => $settlementType,
                     'selling_price' => $finalPrice,
-                ]
+                    'sales_order_id' => $order->id ?? null,
+                ],
+                revertGroupId: $revertGroupId
             );
         });
 

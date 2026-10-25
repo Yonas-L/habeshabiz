@@ -49,6 +49,7 @@ class RecordSaleAction
     {
         return DB::transaction(function () use ($data) {
             $tenantId = TenantScope::getActiveTenantId();
+            $revertGroupId = (string) Str::uuid();
             $orderNumber = $data['order_number'] ?? 'ORD-'.strtoupper(Str::random(8));
             $discount = (float) ($data['discount_amount'] ?? 0);
             $paidAmount = (float) $data['paid_amount'];
@@ -332,7 +333,8 @@ class RecordSaleAction
                         'imei_or_serial' => $exchangeUnit->imei_or_serial,
                         'trade_in_value' => $exchangeAllowance,
                     ],
-                    userId: $data['salesperson_id'] ?? auth()->id()
+                    userId: $data['salesperson_id'] ?? auth()->id(),
+                    revertGroupId: $revertGroupId
                 );
             }
 
@@ -787,6 +789,13 @@ class RecordSaleAction
                 }
             }
 
+            $soldUnitIds = [];
+            foreach ($data['items'] as $it) {
+                if (! empty($it['inventory_unit_id'])) {
+                    $soldUnitIds[] = $it['inventory_unit_id'];
+                }
+            }
+
             AuditLog::record(
                 action: 'sale_created',
                 entityType: 'SalesOrder',
@@ -797,8 +806,14 @@ class RecordSaleAction
                     'paid_amount' => $order->paid_amount,
                     'payment_method' => $order->payment_method,
                     'items_count' => count($data['items']),
+                    'sold_unit_ids' => $soldUnitIds,
+                    'exchange_unit_id' => $order->exchange_unit_id,
                 ],
-                userId: $data['salesperson_id'] ?? auth()->id()
+                oldValues: [
+                    'sold_units_count' => count($soldUnitIds),
+                ],
+                userId: $data['salesperson_id'] ?? auth()->id(),
+                revertGroupId: $revertGroupId
             );
 
             return $order->load([

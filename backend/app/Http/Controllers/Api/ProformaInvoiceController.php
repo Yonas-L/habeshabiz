@@ -12,6 +12,7 @@ use App\Services\ProformaCalculationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class ProformaInvoiceController extends Controller
@@ -194,7 +195,8 @@ class ProformaInvoiceController extends Controller
                 'customer_name' => $proforma->customer_name,
                 'total_amount' => $proforma->total_amount,
                 'net_payable' => $proforma->net_payable,
-            ]
+            ],
+            revertGroupId: (string) Str::uuid()
         );
 
         $proforma->load(['customer', 'creator', 'bankAccount', 'items']);

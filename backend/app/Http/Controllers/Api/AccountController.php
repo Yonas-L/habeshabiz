@@ -116,6 +116,8 @@ class AccountController extends Controller
             $source->decrement('current_balance', $totalDeduction);
             $destination->increment('current_balance', $amount);
 
+            $revertGroupId = (string) Str::uuid();
+
             $txn = FinancialTransaction::create([
                 'tenant_id' => TenantScope::getActiveTenantId(),
                 'transaction_number' => 'TRF-'.strtoupper(Str::random(8)),
@@ -129,6 +131,30 @@ class AccountController extends Controller
                 'date' => now(),
                 'created_by' => auth()->id(),
             ]);
+
+            AuditLog::record(
+                action: 'account_transfer',
+                entityType: 'FinancialTransaction',
+                entityId: (string) $txn->id,
+                oldValues: [
+                    'source_account_id' => $source->id,
+                    'destination_account_id' => $destination->id,
+                    'source_account_name' => $source->name,
+                    'destination_account_name' => $destination->name,
+                ],
+                newValues: [
+                    'source_account_id' => $source->id,
+                    'destination_account_id' => $destination->id,
+                    'source_account_name' => $source->name,
+                    'destination_account_name' => $destination->name,
+                    'amount' => $amount,
+                    'fee' => $fee,
+                    'total_deducted' => $totalDeduction,
+                    'transaction_number' => $txn->transaction_number,
+                ],
+                userId: auth()->id(),
+                revertGroupId: $revertGroupId
+            );
 
             return [
                 'transaction' => $txn,

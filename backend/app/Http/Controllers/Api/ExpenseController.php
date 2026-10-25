@@ -83,6 +83,7 @@ class ExpenseController extends Controller
         $expense = DB::transaction(function () use ($validated) {
             $tenantId = TenantScope::getActiveTenantId();
             $amount = (float) $validated['amount'];
+            $revertGroupId = (string) Str::uuid();
 
             $rawSplits = $validated['payment_splits'] ?? null;
             if (is_array($rawSplits) && count($rawSplits) > 0) {
@@ -335,7 +336,8 @@ class ExpenseController extends Controller
                             'repair_expense_id' => $expense->id,
                             'repair_cost' => $amount,
                             'vendor_billing' => $vendorBilling,
-                        ]
+                        ],
+                        revertGroupId: $revertGroupId
                     );
                 }
 
@@ -380,6 +382,23 @@ class ExpenseController extends Controller
                     'created_by' => auth()->id(),
                 ]);
             }
+
+            AuditLog::record(
+                action: 'expense_created',
+                entityType: 'Expense',
+                entityId: (string) $expense->id,
+                newValues: [
+                    'amount' => (float) $expense->amount,
+                    'category' => $expense->category,
+                    'description' => $expense->description,
+                    'financial_account_id' => $primaryAccount->id,
+                    'payment_splits' => $paymentSplitsData,
+                    'is_owner_draw' => (bool) $expense->is_owner_draw,
+                    'inventory_unit_id' => $expense->inventory_unit_id,
+                ],
+                userId: auth()->id(),
+                revertGroupId: $revertGroupId
+            );
 
             return $expense->load(['financialAccount', 'inventoryUnit.variant.product', 'vendorContact']);
         });

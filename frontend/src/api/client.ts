@@ -781,10 +781,54 @@ export interface AuditLogItem {
   action: string;
   entity_type: string;
   entity_id: string | null;
+  revert_group_id?: string | null;
   old_values?: any;
   new_values?: any;
   ip_address?: string | null;
   created_at: string;
+  reverted_at?: string | null;
+  reverted_by?: number | null;
+  reverted_by_name?: string | null;
+  is_reverted?: boolean;
+  can_undo?: boolean;
+}
+
+export interface UndoPreviewNode {
+  id: string;
+  category: 'inventory' | 'financial' | 'debt' | 'bonus' | 'document';
+  title: string;
+  reversal: string;
+  detail: string;
+  direction: 'in' | 'out' | 'neutral';
+}
+
+export interface UndoHierarchyTree {
+  current_state: {
+    title: string;
+    badge: string;
+    subtitle: string;
+    timestamp: string;
+    actor: string;
+  };
+  impact_nodes: UndoPreviewNode[];
+  resulting_state: {
+    title: string;
+    summary: string;
+  };
+}
+
+export interface UndoPreviewData {
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  performed_by: string;
+  performed_at: string;
+  can_undo: boolean;
+  blocked: boolean;
+  blocked_reasons: string[];
+  warning: string;
+  impact_summary: string[];
+  hierarchy_tree: UndoHierarchyTree | null;
 }
 
 export interface AuditLogsResponse {
@@ -1880,6 +1924,25 @@ export const api = {
     const qs = query.toString();
     return request<AuditLogsResponse>(qs ? `/staff/audit-logs?${qs}` : '/staff/audit-logs');
   },
+
+  getAuditLogUndoPreview: (id: string) =>
+    request<{ success: boolean; data: UndoPreviewData }>(`/staff/audit-logs/${id}/undo-preview`),
+
+  executeAuditLogUndo: (id: string) =>
+    request<{
+      success: boolean;
+      message: string;
+      data?: {
+        id: string;
+        is_reverted: boolean;
+        reverted_at: string;
+        reverted_by: string;
+      };
+      blocked?: boolean;
+      blocked_reasons?: string[];
+    }>(`/staff/audit-logs/${id}/undo`, {
+      method: 'POST',
+    }),
 
   // Staff Tasks & Targets Checklist
   getTasks: () => request<StaffTask[]>('/tasks'),

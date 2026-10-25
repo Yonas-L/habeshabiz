@@ -3,12 +3,35 @@
 namespace App\Models;
 
 use App\Traits\BelongsToTenant;
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property string $id
+ * @property string $tenant_id
+ * @property string $order_number
+ * @property string|null $customer_id
+ * @property int|null $salesperson_id
+ * @property string|float $total_amount
+ * @property string|float $paid_amount
+ * @property string|null $payment_status
+ * @property string|null $financial_account_id
+ * @property array<int, array<string, mixed>>|null $payment_splits
+ * @property string|null $exchange_unit_id
+ * @property string|float $exchange_allowance
+ * @property Carbon|string|null $order_date
+ * @property Carbon|string|null $created_at
+ * @property-read Contact|null $customer
+ * @property-read User|null $salesperson
+ * @property-read FinancialAccount|null $financialAccount
+ * @property-read InventoryUnit|null $exchangeUnit
+ * @property-read Collection<int, SalesOrderItem> $items
+ */
 class SalesOrder extends Model
 {
     use BelongsToTenant, HasFactory, HasUuids;

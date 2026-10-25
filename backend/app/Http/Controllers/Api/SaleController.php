@@ -289,6 +289,10 @@ class SaleController extends Controller
         $tenantId = $order->tenant_id;
 
         $updatedOrder = DB::transaction(function () use ($order, $amount, $netPayable, $splits, $validated, $user, $tenantId) {
+            $revertGroupId = (string) Str::uuid();
+            $orderPaidBefore = (float) $order->paid_amount;
+            $orderStatusBefore = $order->payment_status;
+
             $newPaid = (float) $order->paid_amount + $amount;
             $newRemaining = max(0, $netPayable - $newPaid);
             $newStatus = $newRemaining <= 0 ? 'paid' : 'partially_paid';
@@ -305,6 +309,10 @@ class SaleController extends Controller
             $debt = Debt::where('reference_type', 'sales_order')
                 ->where('reference_id', $order->id)
                 ->first();
+
+            $debtRemainingBefore = $debt ? (float) $debt->remaining_amount : null;
+            $debtPaidBefore = $debt ? (float) $debt->paid_amount : null;
+            $debtStatusBefore = $debt ? $debt->status : null;
 
             if (! $debt) {
                 $unitIds = $order->items()->pluck('inventory_unit_id')->filter()->all();
@@ -375,7 +383,18 @@ class SaleController extends Controller
                     'new_paid_amount' => $newPaid,
                     'payment_status' => $newStatus,
                     'financial_account' => $account->name,
-                ]
+                    'financial_account_id' => $account->id,
+                    'order_number' => $order->order_number,
+                ],
+                oldValues: [
+                    'order_paid_amount_before' => $orderPaidBefore,
+                    'order_payment_status_before' => $orderStatusBefore,
+                    'debt_remaining_before' => $debtRemainingBefore,
+                    'debt_paid_before' => $debtPaidBefore,
+                    'debt_status_before' => $debtStatusBefore,
+                ],
+                userId: $user?->id,
+                revertGroupId: $revertGroupId
             );
 
             return $order->fresh([

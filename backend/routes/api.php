@@ -98,7 +98,11 @@ Route::prefix('v1')->group(function () {
         Route::post('/staff/{id}/reset-password', [StaffController::class, 'resetPassword']);
         Route::get('/staff/leaderboard', [StaffController::class, 'leaderboard']);
         Route::get('/audit-logs', [AuditLogController::class, 'index']);
+        Route::get('/audit-logs/{id}/undo-preview', [AuditLogController::class, 'undoPreview']);
+        Route::post('/audit-logs/{id}/undo', [AuditLogController::class, 'undo']);
         Route::get('/staff/audit-logs', [AuditLogController::class, 'index']);
+        Route::get('/staff/audit-logs/{id}/undo-preview', [AuditLogController::class, 'undoPreview']);
+        Route::post('/staff/audit-logs/{id}/undo', [AuditLogController::class, 'undo']);
 
         // Personal Staff Tasks & Targets Checklist
         Route::get('/tasks', [TaskController::class, 'index']);
