@@ -104,10 +104,15 @@ export const UndoActionModal: React.FC<UndoActionModalProps> = ({
 
     api
       .getAuditLogUndoPreview(log.id)
-      .then((res) => {
+      .then((res: any) => {
         if (!isMounted) return;
-        if (res.success && res.data) {
-          setPreview(res.data);
+        // Handle both raw unwrapped UndoPreviewData and { success, data } envelopes
+        const previewData: UndoPreviewData = (res && (res.hierarchy_tree !== undefined || res.action !== undefined))
+          ? res
+          : (res?.data ?? res);
+
+        if (previewData && (previewData.hierarchy_tree !== undefined || previewData.action !== undefined)) {
+          setPreview(previewData);
         } else {
           setFetchError('Unable to generate undo preview');
         }
@@ -132,13 +137,13 @@ export const UndoActionModal: React.FC<UndoActionModalProps> = ({
 
     try {
       setSubmitting(true);
-      const res = await api.executeAuditLogUndo(log.id);
-      if (res.success) {
-        toast.success(res.message || 'Action reverted successfully');
+      const res: any = await api.executeAuditLogUndo(log.id);
+      if (res?.success || res?.is_reverted) {
+        toast.success(res?.message || 'Action reverted successfully');
         onSuccess();
         onClose();
       } else {
-        toast.error('Could not revert action', { description: res.message });
+        toast.error('Could not revert action', { description: res?.message });
       }
     } catch (err: any) {
       toast.error('Reversal failed', { description: err.message || 'An error occurred during rollback.' });

@@ -1931,7 +1931,7 @@ export const api = {
   },
 
   getAuditLogUndoPreview: (id: string) =>
-    request<{ success: boolean; data: UndoPreviewData }>(`/staff/audit-logs/${id}/undo-preview`),
+    request<UndoPreviewData>(`/staff/audit-logs/${id}/undo-preview`),
 
   executeAuditLogUndo: (id: string) =>
     request<{
@@ -1943,6 +1943,10 @@ export const api = {
         reverted_at: string;
         reverted_by: string;
       };
+      id?: string;
+      is_reverted?: boolean;
+      reverted_at?: string;
+      reverted_by?: string;
       blocked?: boolean;
       blocked_reasons?: string[];
     }>(`/staff/audit-logs/${id}/undo`, {

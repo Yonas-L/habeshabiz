@@ -218,6 +218,8 @@ class AuditLogController extends Controller
                 'success' => true,
                 'message' => $message,
                 'data' => [
+                    'success' => true,
+                    'message' => $message,
                     'id' => $log->id,
                     'is_reverted' => true,
                     'reverted_at' => now()->toIso8601String(),
