@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import type { User, AuditLogItem, AuditLogsResponse } from '../api/client';
 import { api } from '../api/client';
 import { CustomPageLoader } from '../components/loading/CustomPageLoader';
 import { SlideOverDrawer } from '../components/drawers/SlideOverDrawer';
 import { UndoActionModal } from '../components/UndoActionModal';
+import { humanizeAuditLog, getAuditQuickSummary } from '../utils/auditHumanizer';
 import {
   ScrollText,
   Search,
@@ -13,22 +14,20 @@ import {
   Calendar,
   Filter,
   Eye,
-  Copy,
   Check,
   X,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
   ShieldAlert,
   ShieldCheck,
   Activity,
   Layers,
   Clock,
-  Globe,
   FileCode,
   RotateCcw,
   Undo2,
+  Loader2,
+  ChevronDown,
+  ArrowRight,
+  Copy,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -68,7 +67,6 @@ function formatExactTime(dateString: string): string {
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
-    second: '2-digit',
     hour12: true,
   });
 }
@@ -162,11 +160,13 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
 
   // Server state
   const [data, setData] = useState<AuditLogsResponse | null>(null);
+  const [items, setItems] = useState<AuditLogItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
 
   // Filter states
   const [page, setPage] = useState(1);
-  const [perPage, setPerPage] = useState(20);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedAction, setSelectedAction] = useState('all');
@@ -187,20 +187,20 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchTerm);
-      setPage(1); // Reset to page 1 on new search
+      setPage(1);
     }, 280);
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Fetch paginated logs from backend
-  const fetchLogs = useCallback(async () => {
+  // Fetch initial logs (page 1)
+  const fetchInitialLogs = useCallback(async () => {
     if (!isOwner) return;
 
     try {
       setLoading(true);
       const res = await api.getAuditLogs({
-        page,
-        per_page: perPage,
+        page: 1,
+        per_page: 50,
         search: debouncedSearch.trim() || undefined,
         action: selectedAction,
         entity_type: selectedEntity,
@@ -209,16 +209,67 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
         end_date: endDate || undefined,
       });
       setData(res);
+      setItems(res.items || []);
+      setPage(1);
+      setHasMore(res.pagination ? res.pagination.current_page < res.pagination.last_page : false);
     } catch (err: any) {
       toast.error('Failed to load audit logs', { description: err.message });
     } finally {
       setLoading(false);
     }
-  }, [isOwner, page, perPage, debouncedSearch, selectedAction, selectedEntity, selectedUser, startDate, endDate]);
+  }, [isOwner, debouncedSearch, selectedAction, selectedEntity, selectedUser, startDate, endDate]);
 
   useEffect(() => {
-    fetchLogs();
-  }, [fetchLogs]);
+    fetchInitialLogs();
+  }, [fetchInitialLogs]);
+
+  // Load more items as user scrolls down inside the fixed-height container
+  const loadMoreLogs = async () => {
+    if (loading || loadingMore || !hasMore) return;
+
+    try {
+      setLoadingMore(true);
+      const nextPage = page + 1;
+      const res = await api.getAuditLogs({
+        page: nextPage,
+        per_page: 50,
+        search: debouncedSearch.trim() || undefined,
+        action: selectedAction,
+        entity_type: selectedEntity,
+        user_id: selectedUser,
+        start_date: startDate || undefined,
+        end_date: endDate || undefined,
+      });
+
+      setItems((prev) => [...prev, ...(res.items || [])]);
+      setPage(nextPage);
+      setData((prev) =>
+        prev
+          ? {
+              ...prev,
+              items: [...(prev.items || []), ...(res.items || [])],
+              pagination: res.pagination,
+            }
+          : res
+      );
+      setHasMore(res.pagination ? res.pagination.current_page < res.pagination.last_page : false);
+    } catch (err: any) {
+      toast.error('Failed to load older audit logs', { description: err.message });
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  // Scroll listener for fixed-height internal scrolling
+  const handleContainerScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    const bottomThreshold = 180;
+    if (target.scrollHeight - target.scrollTop - target.clientHeight < bottomThreshold) {
+      if (hasMore && !loading && !loadingMore) {
+        loadMoreLogs();
+      }
+    }
+  };
 
   // Reset all filters
   const handleResetFilters = () => {
@@ -249,26 +300,25 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
     setTimeout(() => setCopiedKey(null), 1800);
   };
 
-  // Export current filtered view to CSV
+  // Export current loaded view to CSV
   const handleExportCSV = () => {
-    if (!data?.items || data.items.length === 0) {
+    if (!items || items.length === 0) {
       toast.error('No logs available to export');
       return;
     }
 
-    const headers = ['Timestamp', 'Actor Name', 'Actor Email', 'Action', 'Entity Type', 'Entity ID', 'IP Address', 'New Values'];
-    const rows = data.items.map((log) => [
+    const headers = ['Timestamp', 'Actor Name', 'Actor Email', 'Action', 'Entity Type', 'Summary'];
+    const rows = items.map((log) => [
       `"${formatExactTime(log.created_at)}"`,
       `"${log.user?.name || 'System'}"`,
       `"${log.user?.email || '—'}"`,
       `"${log.action}"`,
       `"${log.entity_type}"`,
-      `"${log.entity_id || '—'}"`,
-      `"${log.ip_address || '—'}"`,
-      `"${JSON.stringify(log.new_values || {}).replace(/"/g, '""')}"`,
+      `"${getAuditQuickSummary(log).replace(/"/g, '""')}"`,
     ]);
 
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const csvContent =
+      'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
@@ -294,31 +344,14 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
     );
   }
 
-  const pagination = data?.pagination;
   const summary = data?.summary;
   const filterOptions = data?.filter_options;
-
-  // Pagination navigation helpers
-  const totalPages = pagination?.last_page || 1;
-  const currentPage = pagination?.current_page || 1;
-
-  const visiblePageNumbers = useMemo(() => {
-    const delta = 2;
-    const range: number[] = [];
-    for (let i = Math.max(2, currentPage - delta); i <= Math.min(totalPages - 1, currentPage + delta); i++) {
-      range.push(i);
-    }
-    return range;
-  }, [currentPage, totalPages]);
-
-  if (loading && (!data?.items || data.items.length === 0)) {
-    return <CustomPageLoader mode="app" fullScreen={false} />;
-  }
+  const humanizedInspect = inspectItem ? humanizeAuditLog(inspectItem) : null;
 
   return (
-    <div className="flex flex-col gap-6 animate-page-enter">
+    <div className="flex flex-col gap-4 animate-page-enter">
       {/* Top Header & Actions Strip */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <div className="flex items-center gap-2.5">
             <div className="size-9 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 flex items-center justify-center shadow-xs">
@@ -333,7 +366,7 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
                 </span>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Tamper-evident record of all system events, inventory intakes, user actions & data changes
+                Tamper-evident record of all system events, inventory intakes, user actions &amp; data changes
               </p>
             </div>
           </div>
@@ -341,7 +374,7 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={fetchLogs}
+            onClick={fetchInitialLogs}
             disabled={loading}
             title="Refresh logs"
             className="size-9 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60 disabled:opacity-50"
@@ -361,7 +394,7 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
 
       {/* KPI Summary Strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="p-4 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/80 shadow-xs flex flex-col justify-between">
+        <div className="p-3.5 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/80 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between text-slate-400 mb-1">
             <span className="text-[10px] font-bold uppercase tracking-wider">Total Recorded</span>
             <ScrollText className="size-3.5 text-slate-400" />
@@ -372,7 +405,7 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
           <div className="text-[11px] text-slate-400 mt-0.5">Immutable system events</div>
         </div>
 
-        <div className="p-4 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/80 shadow-xs flex flex-col justify-between">
+        <div className="p-3.5 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/80 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between text-slate-400 mb-1">
             <span className="text-[10px] font-bold uppercase tracking-wider">Today's Activity</span>
             <Activity className="size-3.5 text-emerald-500" />
@@ -383,7 +416,7 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
           <div className="text-[11px] text-emerald-600/80 dark:text-emerald-400/80 mt-0.5">Logged since midnight</div>
         </div>
 
-        <div className="p-4 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/80 shadow-xs flex flex-col justify-between">
+        <div className="p-3.5 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/80 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between text-slate-400 mb-1">
             <span className="text-[10px] font-bold uppercase tracking-wider">Action Types</span>
             <Layers className="size-3.5 text-sky-500" />
@@ -394,7 +427,7 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
           <div className="text-[11px] text-slate-400 mt-0.5">Distinct event categories</div>
         </div>
 
-        <div className="p-4 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/80 shadow-xs flex flex-col justify-between">
+        <div className="p-3.5 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/80 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between text-slate-400 mb-1">
             <span className="text-[10px] font-bold uppercase tracking-wider">Filtered Matches</span>
             <Filter className="size-3.5 text-purple-500" />
@@ -408,15 +441,15 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
         </div>
       </div>
 
-      {/* Filter and Control Surface */}
-      <div className="p-4 rounded-2xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/80 shadow-xs flex flex-col gap-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-center">
+      {/* Filter Surface */}
+      <div className="p-3.5 rounded-2xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/80 shadow-xs flex flex-col gap-2.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2.5 items-center">
           {/* Search Input */}
-          <div className="lg:col-span-4 relative">
+          <div className="lg:col-span-5 relative">
             <Search className="size-4 absolute left-3 top-2.5 text-slate-400" />
             <input
               type="text"
-              placeholder="Search action, entity, user, IP, or payload..."
+              placeholder="Search actions, items, staff, or notes..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full h-9 pl-9 pr-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900 dark:focus:ring-white transition-colors"
@@ -432,7 +465,7 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
           </div>
 
           {/* Action Filter */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-3">
             <select
               value={selectedAction}
               onChange={(e) => {
@@ -460,7 +493,7 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
               }}
               className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 text-xs font-medium text-slate-900 dark:text-white focus:outline-none transition-colors"
             >
-              <option value="all">All Entities</option>
+              <option value="all">All Modules</option>
               {filterOptions?.entity_types?.map((entity) => (
                 <option key={entity} value={entity}>
                   {entity}
@@ -487,24 +520,6 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
               ))}
             </select>
           </div>
-
-          {/* Rows Per Page */}
-          <div className="lg:col-span-2 flex items-center justify-end gap-2">
-            <span className="text-[11px] text-slate-400 font-medium whitespace-nowrap">Show:</span>
-            <select
-              value={perPage}
-              onChange={(e) => {
-                setPerPage(Number(e.target.value));
-                setPage(1);
-              }}
-              className="h-9 px-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none"
-            >
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-            </select>
-          </div>
         </div>
 
         {/* Date Filter Strip & Reset Action */}
@@ -512,7 +527,7 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <div className="flex items-center gap-1.5 text-slate-400">
               <Calendar className="size-3.5" />
-              <span className="text-[11px] font-medium">Date Range:</span>
+              <span className="text-[11px] font-medium">Date:</span>
             </div>
             <input
               type="date"
@@ -547,32 +562,33 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
         </div>
       </div>
 
-      {/* Main Paginated Table Card */}
-      <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-xs overflow-hidden flex flex-col">
-        {/* Desktop Table View */}
-        <div className="hidden md:block overflow-x-auto min-h-[300px]">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="border-b border-slate-100 dark:border-slate-800/80 bg-slate-50/60 dark:bg-slate-900/30 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                <th className="py-3.5 px-4 whitespace-nowrap">Timestamp</th>
-                <th className="py-3.5 px-4 whitespace-nowrap">Actor</th>
-                <th className="py-3.5 px-4 whitespace-nowrap">Action Event</th>
-                <th className="py-3.5 px-4 whitespace-nowrap">Entity Target</th>
-                <th className="py-3.5 px-4 whitespace-nowrap">IP Address</th>
-                <th className="py-3.5 px-4 whitespace-nowrap">Change Overview</th>
-                <th className="py-3.5 px-4 text-right whitespace-nowrap">Actions</th>
+      {/* Fixed Height Container with Internal Scrolling (No Horizontal Scroll) */}
+      <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-xs overflow-hidden flex flex-col h-[calc(100vh-290px)] min-h-[500px]">
+        {/* Desktop View: Sticky Header + Internal Scrollable Table */}
+        <div
+          onScroll={handleContainerScroll}
+          className="hidden md:flex flex-col flex-1 overflow-y-auto overscroll-contain"
+        >
+          <table className="w-full text-left text-xs border-collapse table-fixed">
+            <thead className="sticky top-0 z-10 bg-slate-50/95 dark:bg-[#161d2d]/95 backdrop-blur-xs border-b border-slate-100 dark:border-slate-800/80 shadow-xs">
+              <tr className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                <th className="py-3 px-4 w-[36%]">Event &amp; Description</th>
+                <th className="py-3 px-4 w-[22%]">Actor / Staff</th>
+                <th className="py-3 px-4 w-[16%]">Time</th>
+                <th className="py-3 px-4 w-[14%]">Target Module</th>
+                <th className="py-3 px-4 w-[12%] text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-              {loading && (!data?.items || data.items.length === 0) ? (
+              {loading && items.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center">
+                  <td colSpan={5} className="py-16 text-center">
                     <CustomPageLoader mode="app" fullScreen={false} />
                   </td>
                 </tr>
-              ) : !data?.items || data.items.length === 0 ? (
+              ) : items.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-16 text-center">
+                  <td colSpan={5} className="py-16 text-center">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <div className="size-12 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400">
                         <ScrollText className="size-6" />
@@ -597,11 +613,10 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
                   </td>
                 </tr>
               ) : (
-                data.items.map((log) => {
+                items.map((log) => {
                   const badgeStyle = getActionBadgeStyle(log.action);
                   const isSystem = !log.user;
-                  const newValsCount = log.new_values ? Object.keys(log.new_values).length : 0;
-                  const oldValsCount = log.old_values ? Object.keys(log.old_values).length : 0;
+                  const quickSummary = getAuditQuickSummary(log);
 
                   return (
                     <tr
@@ -609,114 +624,86 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
                       onClick={() => setInspectItem(log)}
                       className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors cursor-pointer group"
                     >
-                      {/* Timestamp */}
-                      <td className="py-3 px-4 whitespace-nowrap">
-                        <div className="flex flex-col leading-tight">
-                          <span className="font-semibold text-slate-900 dark:text-white">
-                            {formatRelativeTime(log.created_at)}
-                          </span>
-                          <span className="text-[10px] text-slate-400 font-mono mt-0.5">
-                            {formatExactTime(log.created_at)}
+                      {/* Event & Description */}
+                      <td className="py-3 px-4">
+                        <div className="flex flex-col gap-1 min-w-0 pr-2">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span
+                              className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-bold border shrink-0 ${badgeStyle.bg} ${badgeStyle.text} ${log.is_reverted ? 'opacity-70 line-through' : ''}`}
+                            >
+                              <span className={`size-1.5 rounded-full ${badgeStyle.dot}`} />
+                              {formatActionLabel(log.action)}
+                            </span>
+                            {log.is_reverted && (
+                              <span
+                                title={
+                                  log.reverted_by_name && log.reverted_at
+                                    ? `Reverted by ${log.reverted_by_name} at ${formatExactTime(log.reverted_at)}`
+                                    : 'Action was reverted'
+                                }
+                                className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200/60 dark:border-rose-900/40 shrink-0"
+                              >
+                                Reverted
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300 truncate">
+                            {quickSummary}
                           </span>
                         </div>
                       </td>
 
                       {/* Actor */}
-                      <td className="py-3 px-4 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <div className="size-7 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[11px] font-bold text-slate-700 dark:text-slate-200 uppercase shrink-0">
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="size-7 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[10px] font-bold text-slate-700 dark:text-slate-200 uppercase shrink-0">
                             {isSystem ? 'SY' : log.user?.name.slice(0, 2) || 'US'}
                           </div>
                           <div className="flex flex-col min-w-0">
                             <div className="flex items-center gap-1.5 font-semibold text-slate-900 dark:text-white truncate">
-                              <span>{isSystem ? 'System Automatic' : log.user?.name}</span>
+                              <span className="truncate">{isSystem ? 'System Engine' : log.user?.name}</span>
                               {log.user?.role === 'owner' && (
-                                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-400 border border-purple-200/50 dark:border-purple-800/50">
+                                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-400 border border-purple-200/50 dark:border-purple-800/50 shrink-0">
                                   Owner
                                 </span>
                               )}
                             </div>
                             <span className="text-[10px] text-slate-400 truncate">
-                              {isSystem ? 'Cron / Engine' : log.user?.email}
+                              {isSystem ? 'Automated' : log.user?.email}
                             </span>
                           </div>
                         </div>
                       </td>
 
-                      {/* Action Event Badge */}
-                      <td className="py-3 px-4 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
-                          <span
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold border ${badgeStyle.bg} ${badgeStyle.text} ${log.is_reverted ? 'opacity-70 line-through' : ''}`}
-                          >
-                            <span className={`size-1.5 rounded-full ${badgeStyle.dot}`} />
-                            {formatActionLabel(log.action)}
+                      {/* Time */}
+                      <td className="py-3 px-4">
+                        <div className="flex flex-col leading-tight">
+                          <span className="font-semibold text-slate-900 dark:text-white">
+                            {formatRelativeTime(log.created_at)}
                           </span>
-                          {log.is_reverted && (
-                            <span
-                              title={log.reverted_by_name && log.reverted_at ? `Reverted by ${log.reverted_by_name} at ${formatExactTime(log.reverted_at)}` : 'Action was reverted'}
-                              className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200/60 dark:border-rose-900/40"
-                            >
-                              Reverted
-                            </span>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* Entity Target */}
-                      <td className="py-3 px-4 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-semibold text-slate-800 dark:text-slate-200 capitalize">
-                            {log.entity_type}
+                          <span className="text-[10px] text-slate-400 mt-0.5">
+                            {formatExactTime(log.created_at)}
                           </span>
-                          {log.entity_id && (
-                            <span className="font-mono text-[10px] text-slate-400 bg-slate-100 dark:bg-slate-800/80 px-1.5 py-0.5 rounded">
-                              #{log.entity_id.length > 12 ? `${log.entity_id.slice(0, 10)}...` : log.entity_id}
-                            </span>
-                          )}
                         </div>
                       </td>
 
-                      {/* IP Address */}
-                      <td className="py-3 px-4 whitespace-nowrap">
-                        <div className="flex items-center gap-1 text-slate-400 font-mono text-[11px]">
-                          <Globe className="size-3 text-slate-400" />
-                          <span>{log.ip_address || '127.0.0.1'}</span>
-                        </div>
+                      {/* Target Module */}
+                      <td className="py-3 px-4">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60">
+                          {log.entity_type}
+                        </span>
                       </td>
 
-                      {/* Change Overview */}
-                      <td className="py-3 px-4 max-w-xs truncate">
-                        {newValsCount > 0 || oldValsCount > 0 ? (
-                          <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
-                            {oldValsCount > 0 && (
-                              <span className="px-1.5 py-0.5 rounded bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 text-[10px] font-mono">
-                                -{oldValsCount} fields
-                              </span>
-                            )}
-                            {newValsCount > 0 && (
-                              <span className="px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 text-[10px] font-mono">
-                                +{newValsCount} fields
-                              </span>
-                            )}
-                            <span className="text-[10px] text-slate-400 truncate">
-                              {log.new_values?.notes ||
-                                log.new_values?.model ||
-                                log.new_values?.name ||
-                                (log.new_values ? Object.keys(log.new_values).slice(0, 3).join(', ') : '')}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-slate-400 text-[11px]">—</span>
-                        )}
-                      </td>
-
-                      {/* Actions Column */}
-                      <td className="py-3 px-4 text-right whitespace-nowrap">
+                      {/* Actions */}
+                      <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           {log.is_reverted ? (
                             <span
-                              title={log.reverted_by_name && log.reverted_at ? `Reverted by ${log.reverted_by_name} at ${formatExactTime(log.reverted_at)}` : 'This action has been reverted'}
+                              title={
+                                log.reverted_by_name && log.reverted_at
+                                  ? `Reverted by ${log.reverted_by_name} at ${formatExactTime(log.reverted_at)}`
+                                  : 'This action has been reverted'
+                              }
                               className="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200/60 dark:border-slate-700/60 line-through tracking-tight"
                             >
                               Reverted
@@ -756,20 +743,50 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
               )}
             </tbody>
           </table>
+
+          {/* Bottom Infinite Scroll Sentinel & Loader */}
+          {items.length > 0 && (
+            <div className="p-4 text-center border-t border-slate-100 dark:border-slate-800/60 text-xs text-slate-400">
+              {loadingMore ? (
+                <div className="flex items-center justify-center gap-2 font-medium text-slate-600 dark:text-slate-300">
+                  <Loader2 className="size-4 animate-spin text-emerald-500" />
+                  <span>Loading older records...</span>
+                </div>
+              ) : hasMore ? (
+                <button
+                  onClick={loadMoreLogs}
+                  className="px-4 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors"
+                >
+                  Load older records
+                </button>
+              ) : (
+                <span className="text-[11px] text-slate-400">
+                  ✓ All {summary?.filtered_count || items.length} audit records loaded
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Mobile Cards View */}
-        <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800/60 min-h-[250px]">
-          {loading && (!data?.items || data.items.length === 0) ? (
+        {/* Mobile View: Fixed Height Scrollable Card Stream */}
+        <div
+          onScroll={handleContainerScroll}
+          className="md:hidden flex-1 overflow-y-auto overscroll-contain p-3.5 space-y-3"
+        >
+          {loading && items.length === 0 ? (
             <div className="py-12 text-center">
               <CustomPageLoader mode="app" fullScreen={false} />
             </div>
-          ) : !data?.items || data.items.length === 0 ? (
+          ) : items.length === 0 ? (
             <div className="py-16 text-center px-4">
               <div className="flex flex-col items-center justify-center gap-2">
                 <SearchX className="size-8 text-slate-300 dark:text-slate-600" />
-                <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">No audit events match your filters</span>
-                <p className="text-[11px] text-slate-400 max-w-xs mt-0.5">Try widening the date range, changing selected modules, or clearing text search.</p>
+                <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                  No audit events match your filters
+                </span>
+                <p className="text-[11px] text-slate-400 max-w-xs mt-0.5">
+                  Try changing selected filters or clearing text search.
+                </p>
                 <button
                   onClick={handleResetFilters}
                   className="mt-3 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
@@ -779,33 +796,33 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
               </div>
             </div>
           ) : (
-            data.items.map((log: AuditLogItem) => {
+            items.map((log: AuditLogItem) => {
               const badgeStyle = getActionBadgeStyle(log.action);
+              const isSystem = !log.user;
+              const quickSummary = getAuditQuickSummary(log);
+
               return (
                 <div
                   key={log.id}
                   onClick={() => setInspectItem(log)}
-                  className="p-3.5 space-y-2.5 active:bg-slate-50 dark:active:bg-slate-900/40 transition-colors cursor-pointer"
+                  className="p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-slate-50/40 dark:bg-slate-900/40 hover:bg-slate-50 dark:hover:bg-slate-900/70 transition-all cursor-pointer space-y-2.5 active:scale-[0.99]"
                 >
-                  <div className="flex items-start justify-between gap-2">
+                  {/* Card Header: Actor Profile + Action Badge */}
+                  <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
-                      <div className="size-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center font-bold text-xs uppercase shrink-0">
-                        {log.user?.name ? log.user.name.slice(0, 2) : 'SY'}
+                      <div className="size-7 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 flex items-center justify-center font-bold text-[11px] uppercase shrink-0">
+                        {isSystem ? 'SY' : log.user?.name.slice(0, 2) || 'US'}
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="text-xs font-bold text-slate-900 dark:text-white truncate">
-                            {log.user?.name || 'System Worker'}
+                            {isSystem ? 'System Engine' : log.user?.name}
                           </span>
                           {log.user?.role === 'owner' && (
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-400 border border-purple-200/60 dark:border-purple-800/60">
+                            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-400 border border-purple-200/50 dark:border-purple-800/50 shrink-0">
                               Owner
                             </span>
                           )}
-                        </div>
-                        <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
-                          <Clock className="size-2.5" />
-                          <span>{formatRelativeTime(log.created_at)}</span>
                         </div>
                       </div>
                     </div>
@@ -818,61 +835,30 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
                         {formatActionLabel(log.action)}
                       </span>
                       {log.is_reverted && (
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200/60 dark:border-rose-900/40">
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200/60 dark:border-rose-900/40 shrink-0">
                           Reverted
                         </span>
                       )}
                     </div>
                   </div>
 
-                  {/* Entity and change summary */}
-                  <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-900/30 border border-slate-100 dark:border-slate-800/60 space-y-1.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-mono text-[11px] font-semibold text-slate-900 dark:text-white flex items-center gap-1">
-                        <span className="text-slate-400">Target:</span>
-                        <span className="px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80">
-                          {log.entity_type} {log.entity_id ? `#${log.entity_id}` : ''}
-                        </span>
-                      </span>
+                  {/* Card Body: Clean Business Summary */}
+                  <div className="p-2.5 rounded-lg bg-white dark:bg-[#131926] border border-slate-100 dark:border-slate-800/70 text-xs">
+                    <div className="font-semibold text-slate-800 dark:text-slate-200">
+                      {quickSummary}
                     </div>
-
-                    {/* Change payload preview */}
-                    <div className="text-[11px]">
-                      {log.action.includes('created') ? (
-                        <span className="text-emerald-600 dark:text-emerald-400 font-medium">Initial state created</span>
-                      ) : log.action.includes('deleted') ? (
-                        <span className="text-rose-600 dark:text-rose-400 font-medium">Record deleted</span>
-                      ) : log.old_values && log.new_values ? (
-                        <div className="flex items-center gap-1 flex-wrap">
-                          <span className="text-slate-400 text-[10px]">Modified:</span>
-                          {Object.keys(log.new_values)
-                            .slice(0, 3)
-                            .map((k) => (
-                              <span
-                                key={k}
-                                className="font-mono text-[9px] px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800/60"
-                              >
-                                {k}
-                              </span>
-                            ))}
-                          {Object.keys(log.new_values).length > 3 && (
-                            <span className="text-[9px] text-slate-400 font-medium">
-                              +{Object.keys(log.new_values).length - 3} more
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-slate-400 italic">No details recorded</span>
-                      )}
+                    <div className="text-[10px] text-slate-400 mt-0.5">
+                      Module: <span className="font-medium text-slate-600 dark:text-slate-300">{log.entity_type}</span>
                     </div>
                   </div>
 
-                  {/* Footer row */}
+                  {/* Card Footer: Relative Time + Actions */}
                   <div className="flex items-center justify-between pt-0.5">
-                    <span className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
-                      <Globe className="size-2.5" />
-                      {log.ip_address || '127.0.0.1'}
+                    <span className="text-[10px] text-slate-400 flex items-center gap-1 font-medium">
+                      <Clock className="size-3 text-slate-400" />
+                      <span>{formatRelativeTime(log.created_at)}</span>
                     </span>
+
                     <div className="flex items-center gap-1.5">
                       {log.is_reverted ? (
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200/60 dark:border-slate-700/60 line-through">
@@ -910,121 +896,39 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
               );
             })
           )}
+
+          {/* Bottom Infinite Scroll Sentinel & Loader on Mobile */}
+          {items.length > 0 && (
+            <div className="p-3 text-center text-xs text-slate-400">
+              {loadingMore ? (
+                <div className="flex items-center justify-center gap-2 font-medium text-slate-600 dark:text-slate-300">
+                  <Loader2 className="size-4 animate-spin text-emerald-500" />
+                  <span>Loading older records...</span>
+                </div>
+              ) : hasMore ? (
+                <button
+                  onClick={loadMoreLogs}
+                  className="px-4 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors"
+                >
+                  Load older records
+                </button>
+              ) : (
+                <span className="text-[11px] text-slate-400">
+                  ✓ All {summary?.filtered_count || items.length} audit records loaded
+                </span>
+              )}
+            </div>
+          )}
         </div>
-
-        {/* Pagination Footer */}
-        {pagination && pagination.total > 0 && (
-          <div className="px-4 py-3.5 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/40 dark:bg-slate-900/20 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs">
-            <div className="text-slate-500 dark:text-slate-400">
-              Showing <span className="font-semibold text-slate-900 dark:text-white">{pagination.from || 0}</span> to{' '}
-              <span className="font-semibold text-slate-900 dark:text-white">{pagination.to || 0}</span> of{' '}
-              <span className="font-semibold text-slate-900 dark:text-white">{pagination.total.toLocaleString()}</span> entries
-            </div>
-
-            <div className="flex items-center gap-1.5 self-center sm:self-auto">
-              {/* First Page */}
-              <button
-                onClick={() => setPage(1)}
-                disabled={currentPage === 1 || loading}
-                title="First Page"
-                className="size-8 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none transition-colors"
-              >
-                <ChevronsLeft className="size-4" />
-              </button>
-
-              {/* Prev Page */}
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1 || loading}
-                title="Previous Page"
-                className="size-8 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none transition-colors"
-              >
-                <ChevronLeft className="size-4" />
-              </button>
-
-              {/* Page 1 */}
-              <button
-                onClick={() => setPage(1)}
-                className={`size-8 rounded-lg text-xs font-semibold transition-all ${
-                  currentPage === 1
-                    ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
-                    : 'border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                1
-              </button>
-
-              {/* Leading Ellipsis */}
-              {visiblePageNumbers.length > 0 && visiblePageNumbers[0] > 2 && (
-                <span className="px-1 text-slate-400 text-xs">...</span>
-              )}
-
-              {/* Visible Mid-range Pages */}
-              {visiblePageNumbers.map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setPage(p)}
-                  className={`size-8 rounded-lg text-xs font-semibold transition-all ${
-                    currentPage === p
-                      ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
-                      : 'border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                >
-                  {p}
-                </button>
-              ))}
-
-              {/* Trailing Ellipsis */}
-              {visiblePageNumbers.length > 0 &&
-                visiblePageNumbers[visiblePageNumbers.length - 1] < totalPages - 1 && (
-                  <span className="px-1 text-slate-400 text-xs">...</span>
-                )}
-
-              {/* Last Page */}
-              {totalPages > 1 && (
-                <button
-                  onClick={() => setPage(totalPages)}
-                  className={`size-8 rounded-lg text-xs font-semibold transition-all ${
-                    currentPage === totalPages
-                      ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
-                      : 'border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                >
-                  {totalPages}
-                </button>
-              )}
-
-              {/* Next Page */}
-              <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages || loading}
-                title="Next Page"
-                className="size-8 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none transition-colors"
-              >
-                <ChevronRight className="size-4" />
-              </button>
-
-              {/* Last Page */}
-              <button
-                onClick={() => setPage(totalPages)}
-                disabled={currentPage === totalPages || loading}
-                title="Last Page"
-                className="size-8 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none transition-colors"
-              >
-                <ChevronsRight className="size-4" />
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Inspect Item SlideOver Drawer */}
+      {/* Human-Readable Inspect Item SlideOver Drawer */}
       <SlideOverDrawer
         isOpen={Boolean(inspectItem)}
         onClose={() => setInspectItem(null)}
-        title="Audit Event Inspector"
-        subtitle={inspectItem ? `Event #${inspectItem.id} · ${formatExactTime(inspectItem.created_at)}` : ''}
-        widthClass="sm:max-w-2xl"
+        title={humanizedInspect?.eventTitle || 'Audit Event Inspector'}
+        subtitle={humanizedInspect ? `${humanizedInspect.eventSubtitle} · ${formatExactTime(inspectItem?.created_at || '')}` : ''}
+        widthClass="sm:max-w-xl"
         badge={
           inspectItem ? (
             <span
@@ -1035,29 +939,9 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
             </span>
           ) : undefined
         }
-        headerActions={
-          inspectItem ? (
-            <button
-              onClick={() => handleCopy(JSON.stringify(inspectItem, null, 2), 'raw-log')}
-              className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-colors"
-            >
-              {copiedKey === 'raw-log' ? (
-                <>
-                  <Check className="size-3.5 text-emerald-500" />
-                  <span className="hidden sm:inline">Copied</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="size-3.5" />
-                  <span className="hidden sm:inline">Copy JSON</span>
-                </>
-              )}
-            </button>
-          ) : undefined
-        }
       >
-        {inspectItem && (
-          <div className="space-y-4">
+        {inspectItem && humanizedInspect && (
+          <div className="space-y-4 text-xs">
             {/* Reverted or Undo Action Banner */}
             {inspectItem.is_reverted ? (
               <div className="p-3.5 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 flex items-center justify-between gap-3 shadow-xs">
@@ -1114,13 +998,13 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
             {/* Actor Profile Section */}
             <div className="p-3.5 sm:p-4 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="size-10 sm:size-11 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 flex items-center justify-center font-bold text-xs sm:text-sm shadow-xs uppercase shrink-0">
+                <div className="size-10 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 flex items-center justify-center font-bold text-xs uppercase shadow-xs shrink-0">
                   {inspectItem.user?.name ? inspectItem.user.name.slice(0, 2) : 'SY'}
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-bold text-slate-900 dark:text-white text-sm truncate">
-                      {inspectItem.user?.name || 'System Worker / Automated'}
+                      {inspectItem.user?.name || 'System Automatic'}
                     </span>
                     {inspectItem.user?.role === 'owner' && (
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-400 border border-purple-200/60 dark:border-purple-800/60 shrink-0">
@@ -1128,132 +1012,150 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
                       </span>
                     )}
                   </div>
-                  <div className="text-xs text-slate-400 mt-0.5 truncate">{inspectItem.user?.email || 'automated-task@system.local'}</div>
+                  <div className="text-xs text-slate-400 mt-0.5 truncate">
+                    {inspectItem.user?.email || 'Automated business task'}
+                  </div>
                 </div>
               </div>
 
-              <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center border-t sm:border-t-0 border-slate-200/60 dark:border-slate-800/60 pt-2.5 sm:pt-0">
-                <div className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400 font-mono">
-                  <Globe className="size-3 text-slate-400 shrink-0" />
-                  <span>{inspectItem.ip_address || '127.0.0.1'}</span>
-                </div>
-                <div className="text-[10px] text-slate-400 sm:mt-0.5">IP Address</div>
-              </div>
-            </div>
-
-            {/* Event Metadata Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
-              <div className="p-3 sm:p-3.5 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Action Identifier</div>
-                <div className="font-mono text-xs font-semibold text-slate-900 dark:text-white break-all">
-                  {inspectItem.action}
-                </div>
-              </div>
-
-              <div className="p-3 sm:p-3.5 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Entity Model & ID</div>
-                <div className="font-mono text-xs font-semibold text-slate-900 dark:text-white break-all">
-                  {inspectItem.entity_type} {inspectItem.entity_id ? `(#${inspectItem.entity_id})` : ''}
-                </div>
-              </div>
-
-              <div className="p-3 sm:p-3.5 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Relative Time</div>
-                <div className="text-xs font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
-                  <Clock className="size-3.5 text-slate-400 shrink-0" />
+              <div className="text-left sm:text-right border-t sm:border-t-0 border-slate-200/60 dark:border-slate-800/60 pt-2 sm:pt-0">
+                <div className="text-xs font-semibold text-slate-900 dark:text-white flex items-center sm:justify-end gap-1">
+                  <Clock className="size-3 text-slate-400" />
                   <span>{formatRelativeTime(inspectItem.created_at)}</span>
                 </div>
-              </div>
-
-              <div className="p-3 sm:p-3.5 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Full ISO Timestamp</div>
-                <div className="font-mono text-[11px] text-slate-600 dark:text-slate-300 break-all">
-                  {inspectItem.created_at}
+                <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                  {formatExactTime(inspectItem.created_at)}
                 </div>
               </div>
             </div>
 
-            {/* Changes / Payload Diff Viewer */}
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900 dark:text-white">
-                  <FileCode className="size-4 text-emerald-500" />
-                  <span>Payload & Audit Diff</span>
-                </div>
-                <span className="text-[10px] text-slate-400 font-mono">JSON Snapshot</span>
-              </div>
-
-              {/* If both old and new exist, show comparison */}
-              {inspectItem.old_values && inspectItem.new_values ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {/* Previous State */}
-                  <div className="rounded-xl border border-rose-200/80 dark:border-rose-900/60 bg-rose-50/20 dark:bg-rose-950/20 overflow-hidden">
-                    <div className="px-3.5 py-2 border-b border-rose-200/60 dark:border-rose-900/40 bg-rose-100/50 dark:bg-rose-950/40 flex items-center justify-between text-xs font-bold text-rose-700 dark:text-rose-300">
-                      <span>Previous State (Before)</span>
-                      <button
-                        onClick={() => handleCopy(JSON.stringify(inspectItem.old_values, null, 2), 'old-val')}
-                        className="text-[10px] text-rose-600 dark:text-rose-400 hover:underline"
-                      >
-                        {copiedKey === 'old-val' ? 'Copied' : 'Copy'}
-                      </button>
-                    </div>
-                    <pre className="p-3.5 text-[11px] font-mono text-slate-800 dark:text-slate-200 overflow-x-auto max-h-72">
-                      {JSON.stringify(inspectItem.old_values, null, 2)}
-                    </pre>
+            {/* Key Event Highlights / Big Metrics */}
+            {humanizedInspect.highlights.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                {humanizedInspect.highlights.map((h, idx) => (
+                  <div
+                    key={idx}
+                    className="p-3 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/80 shadow-xs flex flex-col justify-between"
+                  >
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      {h.label}
+                    </span>
+                    <span
+                      className={`text-base font-bold font-mono mt-1 ${
+                        h.isHighlight
+                          ? 'text-emerald-600 dark:text-emerald-400'
+                          : 'text-slate-900 dark:text-white'
+                      }`}
+                    >
+                      {h.value}
+                    </span>
                   </div>
+                ))}
+              </div>
+            )}
 
-                  {/* New State */}
-                  <div className="rounded-xl border border-emerald-200/80 dark:border-emerald-900/60 bg-emerald-50/20 dark:bg-emerald-950/20 overflow-hidden">
-                    <div className="px-3.5 py-2 border-b border-emerald-200/60 dark:border-emerald-900/40 bg-emerald-100/50 dark:bg-emerald-950/40 flex items-center justify-between text-xs font-bold text-emerald-700 dark:text-emerald-300">
-                      <span>Result State (After)</span>
+            {/* Business Details Grid (Filtered Clean Fields) */}
+            {humanizedInspect.details.length > 0 && (
+              <div className="p-3.5 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-2.5">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Business &amp; Transaction Details
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  {humanizedInspect.details.map((d, idx) => (
+                    <div
+                      key={idx}
+                      className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800/60 flex flex-col"
+                    >
+                      <span className="text-[10px] text-slate-400 font-medium">{d.label}</span>
+                      <span className="font-semibold text-slate-900 dark:text-white mt-0.5 break-words">
+                        {d.value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Recorded Differences (Before vs After) */}
+            {humanizedInspect.diffs.length > 0 && (
+              <div className="p-3.5 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-2.5">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Field Modifications (Before ➔ After)
+                </div>
+                <div className="space-y-2">
+                  {humanizedInspect.diffs.map((diff, idx) => (
+                    <div
+                      key={idx}
+                      className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800/60 flex items-center justify-between gap-3 text-xs"
+                    >
+                      <span className="font-bold text-slate-700 dark:text-slate-300 shrink-0">
+                        {diff.label}
+                      </span>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="px-2 py-0.5 rounded bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 font-mono text-[11px] truncate">
+                          {diff.from}
+                        </span>
+                        <ArrowRight className="size-3 text-slate-400 shrink-0" />
+                        <span className="px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 font-mono text-[11px] truncate">
+                          {diff.to}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Technical & Developer Data (Collapsed by default) */}
+            <details className="group border border-slate-200/80 dark:border-slate-800 rounded-xl overflow-hidden bg-slate-50/50 dark:bg-slate-900/30">
+              <summary className="px-3.5 py-2.5 flex items-center justify-between cursor-pointer text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
+                <div className="flex items-center gap-2">
+                  <FileCode className="size-3.5 text-slate-400" />
+                  <span>Technical &amp; Developer Details (Raw JSON &amp; IP)</span>
+                </div>
+                <ChevronDown className="size-3.5 text-slate-400 group-open:rotate-180 transition-transform" />
+              </summary>
+
+              <div className="p-3.5 pt-1 space-y-3 border-t border-slate-200/60 dark:border-slate-800/60">
+                <div className="grid grid-cols-2 gap-2 text-[11px]">
+                  <div className="p-2 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 font-mono">
+                    <span className="text-[10px] text-slate-400 block font-sans">IP Address</span>
+                    {inspectItem.ip_address || '127.0.0.1'}
+                  </div>
+                  <div className="p-2 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 font-mono truncate">
+                    <span className="text-[10px] text-slate-400 block font-sans">Event UUID</span>
+                    #{inspectItem.id}
+                  </div>
+                </div>
+
+                {inspectItem.new_values && (
+                  <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-950 overflow-hidden">
+                    <div className="px-3 py-1.5 bg-slate-900 border-b border-slate-800 flex items-center justify-between text-[10px] font-mono text-slate-400">
+                      <span>raw_new_values.json</span>
                       <button
-                        onClick={() => handleCopy(JSON.stringify(inspectItem.new_values, null, 2), 'new-val')}
-                        className="text-[10px] text-emerald-600 dark:text-emerald-400 hover:underline"
+                        onClick={() => handleCopy(JSON.stringify(inspectItem.new_values, null, 2), 'raw-json')}
+                        className="hover:text-white flex items-center gap-1"
                       >
-                        {copiedKey === 'new-val' ? 'Copied' : 'Copy'}
+                        {copiedKey === 'raw-json' ? (
+                          <>
+                            <Check className="size-3 text-emerald-500" />
+                            <span>Copied</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="size-3" />
+                            <span>Copy JSON</span>
+                          </>
+                        )}
                       </button>
                     </div>
-                    <pre className="p-3.5 text-[11px] font-mono text-slate-800 dark:text-slate-200 overflow-x-auto max-h-72">
+                    <pre className="p-3 text-[10px] font-mono text-emerald-400 overflow-x-auto max-h-48 leading-relaxed">
                       {JSON.stringify(inspectItem.new_values, null, 2)}
                     </pre>
                   </div>
-                </div>
-              ) : inspectItem.new_values ? (
-                <div className="rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-slate-900 text-slate-100 overflow-hidden shadow-sm">
-                  <div className="px-3.5 py-2 border-b border-slate-800 bg-slate-950/80 flex items-center justify-between text-xs font-semibold text-slate-300">
-                    <span className="font-mono text-[11px] text-emerald-400">new_values.json</span>
-                    <button
-                      onClick={() => handleCopy(JSON.stringify(inspectItem.new_values, null, 2), 'new-json')}
-                      className="text-[10px] text-slate-400 hover:text-white transition-colors"
-                    >
-                      {copiedKey === 'new-json' ? 'Copied' : 'Copy JSON'}
-                    </button>
-                  </div>
-                  <pre className="p-4 text-[11px] font-mono leading-relaxed overflow-x-auto max-h-96 text-emerald-300/90 selection:bg-emerald-900">
-                    {JSON.stringify(inspectItem.new_values, null, 2)}
-                  </pre>
-                </div>
-              ) : inspectItem.old_values ? (
-                <div className="rounded-xl border border-rose-200/80 dark:border-rose-900/80 bg-rose-950/90 text-rose-100 overflow-hidden shadow-sm">
-                  <div className="px-3.5 py-2 border-b border-rose-900 bg-rose-950 flex items-center justify-between text-xs font-semibold text-rose-300">
-                    <span className="font-mono text-[11px] text-rose-400">deleted_values.json</span>
-                    <button
-                      onClick={() => handleCopy(JSON.stringify(inspectItem.old_values, null, 2), 'old-json')}
-                      className="text-[10px] text-rose-400 hover:text-white transition-colors"
-                    >
-                      {copiedKey === 'old-json' ? 'Copied' : 'Copy JSON'}
-                    </button>
-                  </div>
-                  <pre className="p-4 text-[11px] font-mono leading-relaxed overflow-x-auto max-h-96 text-rose-200/90">
-                    {JSON.stringify(inspectItem.old_values, null, 2)}
-                  </pre>
-                </div>
-              ) : (
-                <div className="p-6 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 text-center text-xs text-slate-400">
-                  No additional JSON attributes or payload recorded for this event.
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            </details>
           </div>
         )}
       </SlideOverDrawer>
@@ -1267,7 +1169,7 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
         }}
         log={selectedUndoLog}
         onSuccess={() => {
-          fetchLogs();
+          fetchInitialLogs();
           if (inspectItem && selectedUndoLog && inspectItem.id === selectedUndoLog.id) {
             setInspectItem((prev) =>
               prev
