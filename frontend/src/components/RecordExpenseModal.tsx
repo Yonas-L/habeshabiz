@@ -51,6 +51,11 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
   const [selectedStaffId, setSelectedStaffId] = useState<string>('');
   const [loadingStaff, setLoadingStaff] = useState(false);
 
+  const staffWithBonus = useMemo<StaffMember[]>(
+    () => staffMembers.filter((s: StaffMember) => (s.stats?.uncollected_bonus || 0) > 0),
+    [staffMembers]
+  );
+
   // Device Maintenance state
   const [maintenanceUnits, setMaintenanceUnits] = useState<InventoryUnit[]>([]);
   const [selectedUnitId, setSelectedUnitId] = useState(initialUnitId || initialUnit?.id || '');
@@ -147,15 +152,9 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
-
   const selectedUnit = maintenanceUnits.find((u) => u.id === selectedUnitId);
   const hasVendor = Boolean(selectedUnit?.supplier_contact_id || selectedUnit?.source_type === 'consignment');
   const selectedStaff = staffMembers.find((s) => String(s.id) === String(selectedStaffId));
-  const staffWithBonus = useMemo<StaffMember[]>(
-    () => staffMembers.filter((s: StaffMember) => (s.stats?.uncollected_bonus || 0) > 0),
-    [staffMembers]
-  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
