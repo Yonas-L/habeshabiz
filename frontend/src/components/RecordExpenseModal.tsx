@@ -11,7 +11,6 @@ import {
   Loader2,
   Handshake,
   Users,
-  AlertCircle,
 } from 'lucide-react';
 import { SplitPaymentSelector, type PaymentSplitItem } from './common/SplitPaymentSelector';
 
@@ -50,6 +49,7 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
   // Staff Daily Pay / Commission state
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
   const [selectedStaffId, setSelectedStaffId] = useState<string>('');
+  const [staffPayoutMode, setStaffPayoutMode] = useState<'bonus' | 'allowance'>('bonus');
   const [loadingStaff, setLoadingStaff] = useState(false);
 
   // Device Maintenance state
@@ -187,6 +187,35 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
 
     try {
       setSubmitting(true);
+
+      // Handle staff sales bonus payout (settles liability without double-deducting profit)
+      if (category === 'salary' && staffPayoutMode === 'bonus' && selectedStaff) {
+        await api.settleStaffBonus(Number(selectedStaff.id), {
+          amount: numAmount,
+          financial_account_id: isSplit ? undefined : accountId,
+          payment_splits: isSplit ? paymentSplits : undefined,
+          notes: description,
+        });
+
+        toast.success(`Sales Commission Disbursed to ${selectedStaff.name}`, {
+          description: `${numAmount.toLocaleString()} ETB • Commission liability cleared (profit neutral)`,
+        });
+
+        setAmount('');
+        setDescription('');
+        setSelectedUnitId('');
+        setSelectedVendorContactId('');
+        setSelectedStaffId('');
+        setIsOwnerDraw(false);
+        setIsSplit(false);
+        setPaymentSplits([]);
+        setCategory('ride');
+        setStaffPayoutMode('allowance');
+        onClose();
+        if (onSuccess) onSuccess();
+        return;
+      }
+
       const isDraw = isOwnerDraw || category === 'personal_owner_draw';
       const staffContact = selectedStaff
         ? contacts.find(
@@ -367,7 +396,17 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
                   <Users className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400" />
                   <span>Select Staff Member</span>
                 </label>
-                <span className="text-[10px] text-violet-600 dark:text-violet-400 font-bold">Operating Expense</span>
+                <span
+                  className={`text-[10px] font-bold ${
+                    selectedStaff && staffPayoutMode === 'bonus'
+                      ? 'text-emerald-600 dark:text-emerald-400'
+                      : 'text-violet-600 dark:text-violet-400'
+                  }`}
+                >
+                  {selectedStaff && staffPayoutMode === 'bonus'
+                    ? 'Settles Commission Debt (Profit Neutral)'
+                    : 'Operating Expense (P&L Overhead)'}
+                </span>
               </div>
 
               <div className="relative">
@@ -378,8 +417,14 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
                     setSelectedStaffId(sid);
                     const staff = staffMembers.find((item) => String(item.id) === String(sid));
                     if (staff) {
-                      if (!description || description.startsWith('Staff daily pay / commission')) {
-                        setDescription(`Staff daily pay / commission: ${staff.name}`);
+                      const uncollected = staff.stats?.uncollected_bonus || 0;
+                      if (uncollected > 0) {
+                        setStaffPayoutMode('bonus');
+                        setAmount(String(uncollected));
+                        setDescription(`Sales commission payout: ${staff.name}`);
+                      } else {
+                        setStaffPayoutMode('allowance');
+                        setDescription(`Staff daily pay / allowance: ${staff.name}`);
                       }
                     }
                   }}
@@ -398,22 +443,66 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
                 )}
               </div>
 
-              {/* Notice if staff has uncollected bonuses from sales orders */}
-              {selectedStaff && (selectedStaff.stats?.uncollected_bonus || 0) > 0 && (
-                <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-800 dark:text-amber-300 flex items-start gap-2">
-                  <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
-                  <div className="leading-tight">
-                    <span className="font-semibold">{selectedStaff.name} has {Number(selectedStaff.stats?.uncollected_bonus || 0).toLocaleString()} ETB</span> in uncollected sales bonuses.
-                    <div className="text-[10px] text-slate-600 dark:text-slate-400 mt-1">
-                      Sales order bonuses already reduced profit when the sale was made. To pay sales bonuses, disburse from the <strong className="font-semibold text-slate-800 dark:text-slate-200">Payables Page</strong> or <strong className="font-semibold text-slate-800 dark:text-slate-200">Staff Statement</strong> so profit is not deducted twice.
-                    </div>
+              {/* If staff has uncollected bonuses, allow choosing between paying bonus vs daily allowance */}
+              {selectedStaff && (selectedStaff.stats?.uncollected_bonus || 0) > 0 ? (
+                <div className="pt-1 space-y-2">
+                  <div className="flex items-center justify-between text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                    <span>Disbursement Purpose</span>
+                    <span className="text-[10px] text-slate-400 font-normal">Choose allocation type</span>
                   </div>
-                </div>
-              )}
 
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-                Daily allowances, stipends, and fixed daily pay recorded here count directly as operating expenses on your monthly Income Statement (P&amp;L).
-              </p>
+                  <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl text-xs font-semibold">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStaffPayoutMode('bonus');
+                        setAmount(String(selectedStaff.stats?.uncollected_bonus || ''));
+                        setDescription(`Sales commission payout: ${selectedStaff.name}`);
+                      }}
+                      className={`py-1.5 px-2 rounded-lg text-center transition-all ${
+                        staffPayoutMode === 'bonus'
+                          ? 'bg-violet-600 text-white shadow-xs'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                    >
+                      <span>Pay Sales Commission</span>
+                      <span className="block text-[9px] opacity-80">
+                        {Number(selectedStaff.stats?.uncollected_bonus || 0).toLocaleString()} ETB · Clears Debt
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStaffPayoutMode('allowance');
+                        setDescription(`Staff daily pay / allowance: ${selectedStaff.name}`);
+                      }}
+                      className={`py-1.5 px-2 rounded-lg text-center transition-all ${
+                        staffPayoutMode === 'allowance'
+                          ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                    >
+                      <span>Daily Pay / Allowance</span>
+                      <span className="block text-[9px] opacity-80">P&amp;L Operating Expense</span>
+                    </button>
+                  </div>
+
+                  {staffPayoutMode === 'bonus' ? (
+                    <p className="text-[11px] text-emerald-700/90 dark:text-emerald-400/90 leading-relaxed bg-emerald-50/70 dark:bg-emerald-950/30 p-2.5 rounded-xl border border-emerald-200/60 dark:border-emerald-900/40">
+                      ✓ <strong>Clears Earned Bonus Debt:</strong> Disburses {selectedStaff.name}&apos;s earned sales commission and settles their open bonus payable. Profit was already accounted for on the sale, so your P&amp;L is not double-deducted.
+                    </p>
+                  ) : (
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed bg-slate-50 dark:bg-slate-900/40 p-2.5 rounded-xl border border-slate-200/60 dark:border-slate-800">
+                      <strong>Operating Overhead:</strong> Discretionary daily allowances, lunch, transport, or fixed stipends recorded here count directly as operating expenses on your monthly Income Statement (P&amp;L).
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                  Daily allowances, stipends, and fixed daily pay recorded here count directly as operating expenses on your monthly Income Statement (P&amp;L).
+                </p>
+              )}
             </div>
           )}
 
