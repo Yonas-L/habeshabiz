@@ -43,12 +43,6 @@ parameters:
 			path: app/Actions/GenerateBusinessReportAction.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$role\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Actions/GenerateBusinessReportAction.php
-
-		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$total_amount\.$#'
 			identifier: property.notFound
 			count: 1
@@ -57,12 +51,6 @@ parameters:
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$write_off_amount\.$#'
 			identifier: property.notFound
-			count: 1
-			path: app/Actions/GenerateBusinessReportAction.php
-
-		-
-			message: '#^Cannot call method toDateString\(\) on string\.$#'
-			identifier: method.nonObject
 			count: 1
 			path: app/Actions/GenerateBusinessReportAction.php
 
@@ -82,12 +70,6 @@ parameters:
 			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\SalesOrderItem\>\:\:map\(\) contains unresolvable type\.$#'
 			identifier: argument.unresolvableType
 			count: 1
-			path: app/Actions/GenerateBusinessReportAction.php
-
-		-
-			message: '#^Parameter \#1 \$key of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:contains\(\) expects \(callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: bool\)\|Illuminate\\Database\\Eloquent\\Model\|int\|string, Closure\(App\\Models\\SalesOrderItem\)\: bool given\.$#'
-			identifier: argument.type
-			count: 2
 			path: app/Actions/GenerateBusinessReportAction.php
 
 		-
@@ -127,12 +109,6 @@ parameters:
 			path: app/Actions/GenerateBusinessReportAction.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$accessory_name\.$#'
-			identifier: property.notFound
-			count: 5
-			path: app/Actions/GeneratePartnerStatementAction.php
-
-		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$amount\.$#'
 			identifier: property.notFound
 			count: 24
@@ -165,19 +141,13 @@ parameters:
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$imei_or_serial\.$#'
 			identifier: property.notFound
-			count: 1
-			path: app/Actions/GeneratePartnerStatementAction.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$inventoryUnit\.$#'
-			identifier: property.notFound
 			count: 7
 			path: app/Actions/GeneratePartnerStatementAction.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
 			identifier: property.notFound
-			count: 5
+			count: 4
 			path: app/Actions/GeneratePartnerStatementAction.php
 
 		-
@@ -201,13 +171,7 @@ parameters:
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$product\.$#'
 			identifier: property.notFound
-			count: 9
-			path: app/Actions/GeneratePartnerStatementAction.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$quantity\.$#'
-			identifier: property.notFound
-			count: 5
+			count: 17
 			path: app/Actions/GeneratePartnerStatementAction.php
 
 		-
@@ -231,13 +195,7 @@ parameters:
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$variant\.$#'
 			identifier: property.notFound
-			count: 1
-			path: app/Actions/GeneratePartnerStatementAction.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$vendor_contact_id\.$#'
-			identifier: property.notFound
-			count: 2
+			count: 7
 			path: app/Actions/GeneratePartnerStatementAction.php
 
 		-
@@ -319,18 +277,6 @@ parameters:
 			path: app/Actions/RecordSaleAction.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$inventoryUnit\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Actions/RecordSaleAction.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$inventory_unit_id\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Actions/RecordSaleAction.php
-
-		-
 			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\FinancialAccount\>\:\:decrement\(\)\.$#'
 			identifier: method.notFound
 			count: 1
@@ -385,19 +331,19 @@ parameters:
 			path: app/Actions/RecordSaleAction.php
 
 		-
-			message: '#^Offset ''accessory_name'' does not exist on array\{variant_id\: string, inventory_unit_id\?\: string\|null, quantity\?\: int, unit_price\: float\|int, sourcing_type\?\: string, vendor_contact_id\?\: string\|null, vendor_cost\: float\|int\|null\}\.$#'
+			message: '#^Offset ''accessory_name'' does not exist on array\{variant_id\: string, inventory_unit_id\?\: string\|null, quantity\?\: int, unit_price\: float\|int, sourcing_type\?\: string, vendor_contact_id\?\: string\|null, vendor_cost\: float\|int\|null, setted_price\?\: float\}\.$#'
 			identifier: offsetAccess.notFound
 			count: 1
 			path: app/Actions/RecordSaleAction.php
 
 		-
-			message: '#^Offset ''accessory_name'' on array\{variant_id\: string, inventory_unit_id\?\: string\|null, quantity\?\: int, unit_price\: float\|int, sourcing_type\?\: string, vendor_contact_id\?\: string\|null, vendor_cost\: float\|int\|null\} in empty\(\) does not exist\.$#'
+			message: '#^Offset ''accessory_name'' on array\{variant_id\: string, inventory_unit_id\?\: string\|null, quantity\?\: int, unit_price\: float\|int, sourcing_type\?\: string, vendor_contact_id\?\: string\|null, vendor_cost\: float\|int\|null, setted_price\?\: float\} in empty\(\) does not exist\.$#'
 			identifier: empty.offset
 			count: 2
 			path: app/Actions/RecordSaleAction.php
 
 		-
-			message: '#^Offset ''accessory_name'' on array\{variant_id\: string, inventory_unit_id\?\: string\|null, quantity\?\: int, unit_price\: float\|int, sourcing_type\?\: string, vendor_contact_id\?\: string\|null, vendor_cost\?\: float\|int\|null\} on left side of \?\? does not exist\.$#'
+			message: '#^Offset ''accessory_name'' on array\{variant_id\: string, inventory_unit_id\?\: string\|null, quantity\?\: int, unit_price\: float\|int, sourcing_type\?\: string, vendor_contact_id\?\: string\|null, vendor_cost\?\: float\|int\|null, setted_price\?\: float\} on left side of \?\? does not exist\.$#'
 			identifier: nullCoalesce.offset
 			count: 1
 			path: app/Actions/RecordSaleAction.php
@@ -481,13 +427,13 @@ parameters:
 			path: app/Actions/RecordSaleAction.php
 
 		-
-			message: '#^Offset ''is_accessory'' on array\{variant_id\: string, inventory_unit_id\?\: string\|null, quantity\?\: int, unit_price\: float\|int, sourcing_type\?\: string, vendor_contact_id\?\: string\|null, vendor_cost\: float\|int\|null\} in empty\(\) does not exist\.$#'
+			message: '#^Offset ''is_accessory'' on array\{variant_id\: string, inventory_unit_id\?\: string\|null, quantity\?\: int, unit_price\: float\|int, sourcing_type\?\: string, vendor_contact_id\?\: string\|null, vendor_cost\: float\|int\|null, setted_price\?\: float\} in empty\(\) does not exist\.$#'
 			identifier: empty.offset
 			count: 1
 			path: app/Actions/RecordSaleAction.php
 
 		-
-			message: '#^Offset ''is_accessory'' on array\{variant_id\: string, inventory_unit_id\?\: string\|null, quantity\?\: int, unit_price\: float\|int, sourcing_type\?\: string, vendor_contact_id\?\: string\|null, vendor_cost\?\: float\|int\|null\} in empty\(\) does not exist\.$#'
+			message: '#^Offset ''is_accessory'' on array\{variant_id\: string, inventory_unit_id\?\: string\|null, quantity\?\: int, unit_price\: float\|int, sourcing_type\?\: string, vendor_contact_id\?\: string\|null, vendor_cost\?\: float\|int\|null, setted_price\?\: float\} in empty\(\) does not exist\.$#'
 			identifier: empty.offset
 			count: 1
 			path: app/Actions/RecordSaleAction.php
@@ -499,7 +445,7 @@ parameters:
 			path: app/Actions/RecordSaleAction.php
 
 		-
-			message: '#^Offset ''parent_item_id'' on array\{variant_id\: string, inventory_unit_id\?\: string\|null, quantity\?\: int, unit_price\: float\|int, sourcing_type\?\: string, vendor_contact_id\?\: string\|null, vendor_cost\?\: float\|int\|null\} on left side of \?\? does not exist\.$#'
+			message: '#^Offset ''parent_item_id'' on array\{variant_id\: string, inventory_unit_id\?\: string\|null, quantity\?\: int, unit_price\: float\|int, sourcing_type\?\: string, vendor_contact_id\?\: string\|null, vendor_cost\?\: float\|int\|null, setted_price\?\: float\} on left side of \?\? does not exist\.$#'
 			identifier: nullCoalesce.offset
 			count: 1
 			path: app/Actions/RecordSaleAction.php
@@ -511,7 +457,7 @@ parameters:
 			path: app/Actions/RecordSaleAction.php
 
 		-
-			message: '#^Offset ''payout_already…'' on array\{variant_id\: string, inventory_unit_id\?\: string\|null, quantity\?\: int, unit_price\: float\|int, sourcing_type\?\: string, vendor_contact_id\?\: string\|null, vendor_cost\: float\|int\|null\} in empty\(\) does not exist\.$#'
+			message: '#^Offset ''payout_already…'' on array\{variant_id\: string, inventory_unit_id\?\: string\|null, quantity\?\: int, unit_price\: float\|int, sourcing_type\?\: string, vendor_contact_id\?\: string\|null, vendor_cost\: float\|int\|null, setted_price\?\: float\} in empty\(\) does not exist\.$#'
 			identifier: empty.offset
 			count: 1
 			path: app/Actions/RecordSaleAction.php
@@ -529,8 +475,8 @@ parameters:
 			path: app/Actions/RecordSaleAction.php
 
 		-
-			message: '#^Offset ''setted_price'' on array\{variant_id\: string, inventory_unit_id\?\: string\|null, quantity\?\: int, unit_price\: float\|int, sourcing_type\?\: string, vendor_contact_id\?\: string\|null, vendor_cost\?\: float\|int\|null\} in isset\(\) does not exist\.$#'
-			identifier: isset.offset
+			message: '#^Offset ''setted_price'' on array\{variant_id\: string, inventory_unit_id\?\: string\|null, quantity\?\: int, unit_price\: float\|int, sourcing_type\?\: string, vendor_contact_id\?\: string\|null, vendor_cost\?\: float\|int\|null\} in empty\(\) does not exist\.$#'
+			identifier: empty.offset
 			count: 1
 			path: app/Actions/RecordSaleAction.php
 
@@ -541,25 +487,25 @@ parameters:
 			path: app/Actions/RecordSaleAction.php
 
 		-
-			message: '#^Offset ''variant_id'' on array\{variant_id\: string, inventory_unit_id\?\: string\|null, quantity\?\: int, unit_price\: float\|int, sourcing_type\?\: string, vendor_contact_id\?\: string\|null, vendor_cost\?\: float\|int\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			message: '#^Offset ''variant_id'' on array\{variant_id\: string, inventory_unit_id\?\: string\|null, quantity\?\: int, unit_price\: float\|int, sourcing_type\?\: string, vendor_contact_id\?\: string\|null, vendor_cost\?\: float\|int\|null, setted_price\?\: float\} on left side of \?\? always exists and is not nullable\.$#'
 			identifier: nullCoalesce.offset
 			count: 1
 			path: app/Actions/RecordSaleAction.php
 
 		-
-			message: '#^Offset ''vendor_paid_amount'' on array\{variant_id\: string, inventory_unit_id\?\: string\|null, quantity\?\: int, unit_price\: float\|int, sourcing_type\?\: string, vendor_contact_id\?\: string\|null, vendor_cost\: float\|int\|null\} in isset\(\) does not exist\.$#'
+			message: '#^Offset ''vendor_paid_amount'' on array\{variant_id\: string, inventory_unit_id\?\: string\|null, quantity\?\: int, unit_price\: float\|int, sourcing_type\?\: string, vendor_contact_id\?\: string\|null, vendor_cost\: float\|int\|null, setted_price\?\: float\} in isset\(\) does not exist\.$#'
 			identifier: isset.offset
 			count: 1
 			path: app/Actions/RecordSaleAction.php
 
 		-
-			message: '#^Offset ''vendor_paid_now'' on array\{variant_id\: string, inventory_unit_id\?\: string\|null, quantity\?\: int, unit_price\: float\|int, sourcing_type\?\: string, vendor_contact_id\?\: string\|null, vendor_cost\: float\|int\|null\} in empty\(\) does not exist\.$#'
+			message: '#^Offset ''vendor_paid_now'' on array\{variant_id\: string, inventory_unit_id\?\: string\|null, quantity\?\: int, unit_price\: float\|int, sourcing_type\?\: string, vendor_contact_id\?\: string\|null, vendor_cost\: float\|int\|null, setted_price\?\: float\} in empty\(\) does not exist\.$#'
 			identifier: empty.offset
 			count: 1
 			path: app/Actions/RecordSaleAction.php
 
 		-
-			message: '#^Offset ''vendor_payment…'' on array\{variant_id\: string, inventory_unit_id\?\: string\|null, quantity\?\: int, unit_price\: float\|int, sourcing_type\?\: string, vendor_contact_id\?\: string\|null, vendor_cost\: float\|int\|null\} on left side of \?\? does not exist\.$#'
+			message: '#^Offset ''vendor_payment…'' on array\{variant_id\: string, inventory_unit_id\?\: string\|null, quantity\?\: int, unit_price\: float\|int, sourcing_type\?\: string, vendor_contact_id\?\: string\|null, vendor_cost\: float\|int\|null, setted_price\?\: float\} on left side of \?\? does not exist\.$#'
 			identifier: nullCoalesce.offset
 			count: 2
 			path: app/Actions/RecordSaleAction.php
@@ -571,15 +517,9 @@ parameters:
 			path: app/Actions/RecordSaleAction.php
 
 		-
-			message: '#^Property App\\Models\\Contact\:\:\$roles \(string\) does not accept array\<int, string\>\.$#'
-			identifier: assign.propertyType
-			count: 1
-			path: app/Actions/RecordSaleAction.php
-
-		-
 			message: '#^Result of && is always false\.$#'
 			identifier: booleanAnd.alwaysFalse
-			count: 6
+			count: 5
 			path: app/Actions/RecordSaleAction.php
 
 		-
@@ -675,7 +615,7 @@ parameters:
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
 			identifier: property.notFound
-			count: 1
+			count: 4
 			path: app/Actions/SettleDebtPaymentAction.php
 
 		-
@@ -693,7 +633,7 @@ parameters:
 		-
 			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
 			identifier: nullsafe.neverNull
-			count: 1
+			count: 5
 			path: app/Actions/SettleDebtPaymentAction.php
 
 		-
@@ -719,6 +659,30 @@ parameters:
 			identifier: property.notFound
 			count: 6
 			path: app/Actions/SynchronizeInventoryStockAction.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Actions/Undo/UndoBlockedChecker.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Actions/Undo/UndoBlockedChecker.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Actions/Undo/UndoDebtPaymentAction.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 3
+			path: app/Actions/Undo/UndoDebtPaymentAction.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
@@ -843,12 +807,6 @@ parameters:
 		-
 			message: '#^Comparison operation "\>" between int\<1, max\> and 0 is always true\.$#'
 			identifier: greater.alwaysTrue
-			count: 1
-			path: app/Http/Controllers/Api/DebtController.php
-
-		-
-			message: '#^Property App\\Models\\Contact\:\:\$roles \(string\) does not accept array\<int, string\>\.$#'
-			identifier: assign.propertyType
 			count: 1
 			path: app/Http/Controllers/Api/DebtController.php
 
@@ -1219,12 +1177,6 @@ parameters:
 			path: app/Http/Controllers/Api/ReportController.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/SaleController.php
-
-		-
 			message: '#^Call to an undefined method Symfony\\Component\\HttpFoundation\\Response\:\:toResponse\(\)\.$#'
 			identifier: method.notFound
 			count: 1
@@ -1237,16 +1189,124 @@ parameters:
 			path: app/Http/Controllers/Api/SaleController.php
 
 		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$amount\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/StaffController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$financialAccount\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/StaffController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/StaffController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$imei_or_serial\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/StaffController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$items\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/StaffController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$notes\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/StaffController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$order_number\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/StaffController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$payment_date\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/StaffController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$product\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/StaffController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$reference_number\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/StaffController.php
+
+		-
+			message: '#^Cannot call method toDateString\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 2
+			path: app/Http/Controllers/Api/StaffController.php
+
+		-
+			message: '#^Cannot call method toIso8601String\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 2
+			path: app/Http/Controllers/Api/StaffController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\Debt\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/Api/StaffController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\InventoryUnit\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/Api/StaffController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\SalesOrder\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/Api/StaffController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\SalesOrderItem\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/Api/StaffController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/Api/StaffController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 4
+			path: app/Http/Controllers/Api/StaffController.php
+
+		-
 			message: '#^Using nullsafe property access "\?\-\>order_date" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
 			identifier: nullsafe.neverNull
 			count: 1
 			path: app/Http/Controllers/Api/StaffController.php
 
 		-
-			message: '#^Using nullsafe property access "\?\-\>slug" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
-			identifier: nullsafe.neverNull
+			message: '#^Property ''is_reverted'' does not exist in model\.$#'
+			identifier: rules.modelAppends
 			count: 1
-			path: app/Http/Controllers/Api/StaffController.php
+			path: app/Models/AuditLog.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$original_amount\.$#'
@@ -1315,6 +1375,18 @@ parameters:
 			path: app/Services/AccountBalanceService.php
 
 		-
+			message: '#^Access to an undefined property App\\Models\\Tenant\:\:\$address\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/PdfGeneratorService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Tenant\:\:\$email\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/PdfGeneratorService.php
+
+		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$business_type\.$#'
 			identifier: property.notFound
 			count: 2
@@ -1322,12 +1394,6 @@ parameters:
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$email\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/PdfGeneratorService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$inventoryUnit\.$#'
 			identifier: property.notFound
 			count: 1
 			path: app/Services/PdfGeneratorService.php
@@ -1345,15 +1411,15 @@ parameters:
 			path: app/Services/PdfGeneratorService.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$roles\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/PdfGeneratorService.php
-
-		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$settings\.$#'
 			identifier: property.notFound
 			count: 3
+			path: app/Services/PdfGeneratorService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 1
 			path: app/Services/PdfGeneratorService.php
 
 		-
@@ -1387,9 +1453,21 @@ parameters:
 			path: app/Services/PdfGeneratorService.php
 
 		-
+			message: '#^Using nullsafe property access "\?\-\>address" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Services/PdfGeneratorService.php
+
+		-
 			message: '#^Using nullsafe property access "\?\-\>email" in empty\(\) is unnecessary\. Use \-\> instead\.$#'
 			identifier: nullsafe.neverNull
 			count: 3
+			path: app/Services/PdfGeneratorService.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>email" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
 			path: app/Services/PdfGeneratorService.php
 
 		-
@@ -1399,9 +1477,21 @@ parameters:
 			path: app/Services/PdfGeneratorService.php
 
 		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Services/PdfGeneratorService.php
+
+		-
 			message: '#^Using nullsafe property access "\?\-\>phone" in empty\(\) is unnecessary\. Use \-\> instead\.$#'
 			identifier: nullsafe.neverNull
 			count: 2
+			path: app/Services/PdfGeneratorService.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>phone" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
 			path: app/Services/PdfGeneratorService.php
 
 		-
@@ -1413,7 +1503,7 @@ parameters:
 		-
 			message: '#^Using nullsafe property access "\?\-\>settings" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
 			identifier: nullsafe.neverNull
-			count: 3
+			count: 4
 			path: app/Services/PdfGeneratorService.php
 
 		-
