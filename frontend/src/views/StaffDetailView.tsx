@@ -83,6 +83,8 @@ export const StaffDetailView: React.FC<StaffDetailViewProps> = ({
   const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
   const [isSubmittingSettle, setIsSubmittingSettle] = useState(false);
 
+  const isOwner = _user?.role === 'owner';
+
   const loadStatement = useCallback(async () => {
     try {
       setLoading(true);
@@ -464,7 +466,7 @@ export const StaffDetailView: React.FC<StaffDetailViewProps> = ({
             </button>
           )}
 
-          {hasUncollected && (
+          {hasUncollected && isOwner && (
             <button
               type="button"
               onClick={handleOpenSettleModal}
@@ -567,9 +569,9 @@ export const StaffDetailView: React.FC<StaffDetailViewProps> = ({
         )}
       </div>
 
-      {/* ── Financial Position: Matching Bilateral Net Balance Hero Card ── */}
+      {/* ── Financial Position: Matching Bilateral Net Balance Hero Card (Desktop >= sm) ── */}
       <div
-        className={`rounded-2xl border p-5 sm:p-6 shadow-xs transition-all ${
+        className={`hidden sm:block rounded-2xl border p-5 sm:p-6 shadow-xs transition-all ${
           hasUncollected
             ? 'bg-gradient-to-br from-rose-50/70 via-white to-rose-50/30 dark:from-rose-950/30 dark:via-[#131926] dark:to-[#131926] border-rose-200/90 dark:border-rose-900/60'
             : 'bg-white dark:bg-[#131926] border-slate-200/80 dark:border-slate-800'
@@ -665,6 +667,48 @@ export const StaffDetailView: React.FC<StaffDetailViewProps> = ({
         </div>
       </div>
 
+      {/* ── Mobile Minimal Amount on Top Strip (< sm) ── */}
+      <div className="sm:hidden flex items-center justify-between p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#131926] shadow-2xs">
+        <div>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+            Bonus Payable
+          </span>
+          <div className="flex items-baseline gap-1 mt-0.5">
+            <span
+              className={`text-2xl font-black font-mono tracking-tight tabular-nums ${
+                hasUncollected
+                  ? 'text-rose-600 dark:text-rose-400'
+                  : 'text-slate-900 dark:text-white'
+              }`}
+            >
+              {hasUncollected ? '−' : ''}
+              <AnimatedNumber value={uncollectedBonus} />
+            </span>
+            <span className="text-[10px] font-semibold text-slate-400">ETB</span>
+          </div>
+        </div>
+
+        <div className="text-right flex flex-col items-end gap-1">
+          <span
+            className={`text-[10px] font-bold px-2 py-0.5 rounded-md inline-flex items-center gap-1.5 ${
+              hasUncollected
+                ? 'bg-black text-white border border-rose-500/40'
+                : 'bg-black text-white border border-emerald-500/40'
+            }`}
+          >
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                hasUncollected ? 'bg-rose-500 animate-pulse' : 'bg-emerald-400'
+              }`}
+            />
+            <span>{hasUncollected ? 'Store Owes Staff' : 'Settled In Full'}</span>
+          </span>
+          <span className="text-[10px] font-mono text-slate-400">
+            Paid: {(summary.collected_bonus || 0).toLocaleString()} ETB
+          </span>
+        </div>
+      </div>
+
       {/* ── Sub-Tabs Navigation Strip ── */}
       <div className="flex items-center gap-1 border-b border-slate-200 dark:border-slate-800 overflow-x-auto text-xs font-semibold">
         <button
@@ -752,18 +796,31 @@ export const StaffDetailView: React.FC<StaffDetailViewProps> = ({
             </span>
           </div>
 
-          {/* Desktop Table View (Exact layout of screenshot) */}
-          <div className="hidden sm:block bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-slate-50/80 dark:bg-slate-900/60 border-b border-slate-200/80 dark:border-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+          {/* Table View matching ReportsView (Desktop & Mobile) */}
+          <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-[#131926] shadow-2xs">
+            <div className="flex items-center justify-between px-3.5 py-2.5 sm:px-4 sm:py-3 bg-slate-50 dark:bg-slate-900/70 border-b border-slate-200 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <Receipt className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+                  Statement & Ledger Breakdown
+                </h2>
+              </div>
+              <span className="text-[11px] font-mono text-slate-400">
+                Showing {filteredLedger.length} of {chronologicalLedger.length} entries
+              </span>
+            </div>
+
+            <div className="h-[420px] overflow-y-auto overflow-x-hidden sm:overflow-x-auto">
+              {/* Desktop Table View (>= sm) */}
+              <table className="hidden sm:table w-full text-left text-xs border-collapse">
+                <thead className="sticky top-0 z-10 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-xs border-b border-slate-200 dark:border-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  <tr>
                     <th className="py-2.5 px-3.5 whitespace-nowrap">Date</th>
                     <th className="py-2.5 px-3.5 whitespace-nowrap">Type</th>
-                    <th className="py-2.5 px-3.5 min-w-[220px]">Description</th>
+                    <th className="py-2.5 px-3.5 min-w-[200px]">Description</th>
                     <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Payable</th>
                     <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Receivable</th>
-                    <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Running Balance</th>
+                    <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Running Bal</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 font-mono text-xs">
@@ -774,119 +831,124 @@ export const StaffDetailView: React.FC<StaffDetailViewProps> = ({
                       </td>
                     </tr>
                   ) : (
-                    filteredLedger.map((row) => {
-                      return (
-                        <tr
-                          key={row.id}
-                          className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors"
-                        >
-                          <td className="py-2.5 px-3.5 whitespace-nowrap text-slate-600 dark:text-slate-300">
-                            {row.formatted_date}
-                          </td>
-                          <td className="py-2.5 px-3.5 whitespace-nowrap font-sans">
-                            <span
-                              className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                                row.type === 'bonus'
-                                  ? 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/60'
-                                  : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60'
-                              }`}
-                            >
-                              {row.type_label}
-                            </span>
-                          </td>
-                          <td className="py-2.5 px-3.5 font-sans text-xs font-semibold text-slate-900 dark:text-white">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span>{row.context}</span>
-                              {row.order_number && (
-                                <span className="text-[10px] font-mono text-slate-400 font-bold">
-                                  #{row.order_number}
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="py-2.5 px-3.5 text-right tabular-nums text-slate-700 dark:text-slate-300">
-                            {row.payable !== 0 ? (
-                              <span className="font-semibold text-slate-900 dark:text-white">
-                                {row.payable.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    filteredLedger.map((row) => (
+                      <tr
+                        key={row.id}
+                        className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors"
+                      >
+                        <td className="py-2.5 px-3.5 whitespace-nowrap text-slate-600 dark:text-slate-300">
+                          {row.formatted_date}
+                        </td>
+                        <td className="py-2.5 px-3.5 whitespace-nowrap font-sans">
+                          <span
+                            className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                              row.type === 'bonus'
+                                ? 'bg-black dark:bg-black text-white border border-emerald-500/40'
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60'
+                            }`}
+                          >
+                            {row.type_label}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3.5 font-sans text-xs font-semibold text-slate-900 dark:text-white">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span>{row.context}</span>
+                            {row.order_number && (
+                              <span className="text-[10px] font-mono text-slate-400 font-bold">
+                                #{row.order_number}
                               </span>
-                            ) : (
-                              <span className="text-slate-400 font-normal">—</span>
                             )}
-                          </td>
-                          <td className="py-2.5 px-3.5 text-right tabular-nums text-slate-700 dark:text-slate-300">
-                            {row.receivable !== 0 ? (
-                              <span className="text-emerald-600 dark:text-emerald-400 font-bold">
-                                -{Math.abs(row.receivable).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                              </span>
-                            ) : (
-                              <span className="text-slate-400 font-normal">—</span>
-                            )}
-                          </td>
-                          <td className="py-2.5 px-3.5 text-right tabular-nums font-bold">
-                            <span className={row.running_balance > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-400'}>
-                              {row.running_balance > 0 ? '−' : ''}{row.running_balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-3.5 text-right tabular-nums text-slate-700 dark:text-slate-300">
+                          {row.payable !== 0 ? (
+                            <span className="font-semibold text-slate-900 dark:text-white">
+                              {row.payable.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                             </span>
-                          </td>
-                        </tr>
-                      );
-                    })
+                          ) : (
+                            <span className="text-slate-400 font-normal">—</span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3.5 text-right tabular-nums text-slate-700 dark:text-slate-300">
+                          {row.receivable !== 0 ? (
+                            <span className="text-emerald-500 dark:text-emerald-400 font-bold">
+                              -{Math.abs(row.receivable).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 font-normal">—</span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3.5 text-right tabular-nums font-bold">
+                          <span className={row.running_balance > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-400'}>
+                            {row.running_balance > 0 ? '−' : ''}{row.running_balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
                   )}
                 </tbody>
               </table>
-            </div>
-          </div>
 
-          {/* Mobile Card View (< sm) */}
-          <div className="sm:hidden space-y-2">
-            {filteredLedger.length === 0 ? (
-              <div className="py-12 text-center text-slate-400 text-xs italic">
-                No transactions found.
-              </div>
-            ) : (
-              filteredLedger.map((row) => (
-                <div
-                  key={row.id}
-                  className="p-3 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800 space-y-1.5 shadow-2xs"
-                >
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-slate-400 font-mono">{row.formatted_date}</span>
-                    <span
-                      className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                        row.type === 'bonus'
-                          ? 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300'
-                          : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400'
-                      }`}
+              {/* Mobile List-Like Table View (< sm): 100% Width, Zero Horizontal Scroll */}
+              <div className="sm:hidden divide-y divide-slate-100 dark:divide-slate-800/80 text-xs">
+                {filteredLedger.length === 0 ? (
+                  <div className="py-12 text-center text-slate-400 italic">
+                    No transactions found matching your criteria.
+                  </div>
+                ) : (
+                  filteredLedger.map((row) => (
+                    <div
+                      key={row.id}
+                      className="py-2.5 px-3 flex items-start justify-between gap-2 hover:bg-slate-50/60 dark:hover:bg-slate-800/30"
                     >
-                      {row.type_label}
-                    </span>
-                  </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[10px] text-slate-400 font-mono">{row.formatted_date}</span>
+                          <span
+                            className={`px-1.5 py-0.2 rounded-md text-[9px] font-bold ${
+                              row.type === 'bonus'
+                                ? 'bg-black dark:bg-black text-white border border-emerald-500/40'
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                            }`}
+                          >
+                            {row.type_label}
+                          </span>
+                        </div>
+                        <div className="text-xs font-semibold text-slate-900 dark:text-white mt-1 break-words">
+                          {row.context}
+                          {row.order_number && (
+                            <span className="text-[10px] font-mono text-slate-400 font-bold ml-1">
+                              #{row.order_number}
+                            </span>
+                          )}
+                        </div>
+                      </div>
 
-                  <div className="text-xs font-semibold text-slate-900 dark:text-white">
-                    {row.context}
-                  </div>
-
-                  <div className="flex items-center justify-between text-xs font-mono pt-1 border-t border-slate-100 dark:border-slate-800">
-                    <span className="text-slate-400 text-[10px]">
-                      {row.payable > 0 ? 'Bonus Earned' : 'Payout Disbursed'}
-                    </span>
-                    <div className="text-right">
-                      {row.payable > 0 ? (
-                        <span className="font-bold text-slate-900 dark:text-white">
-                          +{row.payable.toLocaleString()} ETB
-                        </span>
-                      ) : (
-                        <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                          -{Math.abs(row.receivable).toLocaleString()} ETB
-                        </span>
-                      )}
-                      <div className={`text-[10px] font-semibold ${row.running_balance > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-400'}`}>
-                        Bal: {row.running_balance > 0 ? '−' : ''}{row.running_balance.toLocaleString()} ETB
+                      <div className="text-right shrink-0 font-mono">
+                        {row.payable !== 0 ? (
+                          <div className="font-bold text-slate-900 dark:text-white">
+                            +{row.payable.toLocaleString()} ETB
+                          </div>
+                        ) : row.receivable !== 0 ? (
+                          <div className="font-bold text-emerald-500 dark:text-emerald-400">
+                            -{Math.abs(row.receivable).toLocaleString()} ETB
+                          </div>
+                        ) : (
+                          <div className="text-slate-400">—</div>
+                        )}
+                        <div
+                          className={`text-[10px] font-semibold mt-0.5 ${
+                            row.running_balance > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-400'
+                          }`}
+                        >
+                          Bal: {row.running_balance > 0 ? '−' : ''}{row.running_balance.toLocaleString()} ETB
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
-              ))
-            )}
+                  ))
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -894,11 +956,24 @@ export const StaffDetailView: React.FC<StaffDetailViewProps> = ({
       {/* ── TAB 2: CLOSED SALES ORDERS ── */}
       {activeTab === 'sales' && (
         <div className="space-y-3">
-          <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-slate-50/80 dark:bg-slate-900/60 border-b border-slate-200/80 dark:border-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+          <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-[#131926] shadow-2xs">
+            <div className="flex items-center justify-between px-3.5 py-2.5 sm:px-4 sm:py-3 bg-slate-50 dark:bg-slate-900/70 border-b border-slate-200 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <Package className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+                  Sales Orders Closed
+                </h2>
+              </div>
+              <span className="text-[11px] font-mono text-slate-400">
+                {sales_orders.length} orders
+              </span>
+            </div>
+
+            <div className="h-[420px] overflow-y-auto overflow-x-hidden sm:overflow-x-auto">
+              {/* Desktop Table View (>= sm) */}
+              <table className="hidden sm:table w-full text-left text-xs border-collapse">
+                <thead className="sticky top-0 z-10 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-xs border-b border-slate-200 dark:border-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  <tr>
                     <th className="py-2.5 px-3.5 whitespace-nowrap">Date</th>
                     <th className="py-2.5 px-3.5 whitespace-nowrap">Order #</th>
                     <th className="py-2.5 px-3.5 whitespace-nowrap">Customer</th>
@@ -942,20 +1017,20 @@ export const StaffDetailView: React.FC<StaffDetailViewProps> = ({
                         </td>
                         <td className="py-2.5 px-3.5 text-right whitespace-nowrap font-sans">
                           <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
                               order.payment_status === 'paid'
-                                ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400'
-                                : 'bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400'
+                                ? 'bg-black dark:bg-black text-white border border-emerald-500/40'
+                                : 'bg-black dark:bg-black text-amber-400 border border-amber-500/40'
                             }`}
                           >
                             {order.payment_status === 'paid' ? 'Paid' : 'Credit / Partial'}
                           </span>
                         </td>
-                        <td className="py-2.5 px-3.5 text-right font-bold text-purple-600 dark:text-purple-400 whitespace-nowrap">
+                        <td className="py-2.5 px-3.5 text-right font-bold text-emerald-500 dark:text-emerald-400 whitespace-nowrap">
                           {order.bonus_amount > 0 ? (
-                            <span className="flex items-center justify-end gap-1">
-                              <Sparkles className="size-3" />
-                              +{order.bonus_amount.toLocaleString()} ETB
+                            <span className="inline-flex items-center justify-end gap-1 px-2 py-0.5 rounded-md bg-black dark:bg-black text-white border border-emerald-500/40">
+                              <Sparkles className="size-2.5 text-emerald-400" />
+                              <span>+{order.bonus_amount.toLocaleString()} ETB</span>
                             </span>
                           ) : (
                             '—'
@@ -966,6 +1041,60 @@ export const StaffDetailView: React.FC<StaffDetailViewProps> = ({
                   )}
                 </tbody>
               </table>
+
+              {/* Mobile View (< sm): 100% Width, Zero Horizontal Scroll */}
+              <div className="sm:hidden divide-y divide-slate-100 dark:divide-slate-800/80 text-xs">
+                {sales_orders.length === 0 ? (
+                  <div className="py-12 text-center text-slate-400 italic">
+                    No sales orders closed by this staff member yet.
+                  </div>
+                ) : (
+                  sales_orders.map((order) => (
+                    <div
+                      key={order.id}
+                      className="py-2.5 px-3 flex items-start justify-between gap-2 hover:bg-slate-50/60 dark:hover:bg-slate-800/30"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-slate-900 dark:text-white">#{order.order_number}</span>
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            {order.order_date ? new Date(order.order_date).toLocaleDateString() : '—'}
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-700 dark:text-slate-300 font-medium truncate mt-0.5">
+                          {order.customer_name}
+                        </div>
+                        <div className="text-[10px] text-slate-400 truncate mt-0.5">
+                          {order.items.map((it) => it.name).join(', ')}
+                        </div>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <div className="font-bold font-mono text-slate-900 dark:text-white">
+                          {order.total_amount.toLocaleString()} ETB
+                        </div>
+                        <div className="mt-1 flex items-center justify-end gap-1">
+                          <span
+                            className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
+                              order.payment_status === 'paid'
+                                ? 'bg-black text-white border border-emerald-500/40'
+                                : 'bg-black text-amber-400 border border-amber-500/40'
+                            }`}
+                          >
+                            {order.payment_status === 'paid' ? 'Paid' : 'Credit'}
+                          </span>
+                          {order.bonus_amount > 0 && (
+                            <span className="px-1.5 py-0.2 rounded text-[9px] font-bold font-mono bg-black text-white border border-emerald-500/40 inline-flex items-center gap-0.5">
+                              <Sparkles className="size-2 text-emerald-400" />
+                              <span>+{order.bonus_amount.toLocaleString()}</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -974,8 +1103,8 @@ export const StaffDetailView: React.FC<StaffDetailViewProps> = ({
       {/* ── TAB 3: HANDOVERS OUT ── */}
       {activeTab === 'handovers' && (
         <div className="space-y-3">
-          <div className="p-3.5 rounded-xl bg-purple-500/5 dark:bg-purple-950/20 border border-purple-500/20 dark:border-purple-800/30 flex items-start gap-3 text-xs text-purple-900 dark:text-purple-200">
-            <ShieldCheck className="size-4 text-purple-600 dark:text-purple-400 shrink-0 mt-0.5" />
+          <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 flex items-start gap-3 text-xs text-slate-700 dark:text-slate-300">
+            <ShieldCheck className="size-4 text-emerald-500 dark:text-emerald-400 shrink-0 mt-0.5" />
             <div>
               <span className="font-bold">Custody Separation: </span>
               Devices handed out to {staff.name} for outside demonstration or sales are tracked here.
@@ -983,11 +1112,24 @@ export const StaffDetailView: React.FC<StaffDetailViewProps> = ({
             </div>
           </div>
 
-          <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-slate-50/80 dark:bg-slate-900/60 border-b border-slate-200/80 dark:border-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+          <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-[#131926] shadow-2xs">
+            <div className="flex items-center justify-between px-3.5 py-2.5 sm:px-4 sm:py-3 bg-slate-50 dark:bg-slate-900/70 border-b border-slate-200 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <ArrowRightLeft className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+                  Custody Handovers Out
+                </h2>
+              </div>
+              <span className="text-[11px] font-mono text-slate-400">
+                {handovers.length} units
+              </span>
+            </div>
+
+            <div className="h-[420px] overflow-y-auto overflow-x-hidden sm:overflow-x-auto">
+              {/* Desktop Table View (>= sm) */}
+              <table className="hidden sm:table w-full text-left text-xs border-collapse">
+                <thead className="sticky top-0 z-10 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-xs border-b border-slate-200 dark:border-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  <tr>
                     <th className="py-2.5 px-3.5 whitespace-nowrap">Handout Date</th>
                     <th className="py-2.5 px-3.5 min-w-[200px]">Device & Model</th>
                     <th className="py-2.5 px-3.5 whitespace-nowrap">Serial / IMEI</th>
@@ -1017,11 +1159,11 @@ export const StaffDetailView: React.FC<StaffDetailViewProps> = ({
                         </td>
                         <td className="py-2.5 px-3.5 whitespace-nowrap font-sans">
                           <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
                               unit.status === 'out'
-                                ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400'
+                                ? 'bg-black dark:bg-black text-amber-400 border border-amber-500/40'
                                 : unit.status === 'sold'
-                                ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400'
+                                ? 'bg-black dark:bg-black text-white border border-emerald-500/40'
                                 : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
                             }`}
                           >
@@ -1043,6 +1185,52 @@ export const StaffDetailView: React.FC<StaffDetailViewProps> = ({
                   )}
                 </tbody>
               </table>
+
+              {/* Mobile View (< sm): 100% Width, Zero Horizontal Scroll */}
+              <div className="sm:hidden divide-y divide-slate-100 dark:divide-slate-800/80 text-xs">
+                {handovers.length === 0 ? (
+                  <div className="py-12 text-center text-slate-400 italic">
+                    No devices currently handed out to {staff.name}.
+                  </div>
+                ) : (
+                  handovers.map((unit) => (
+                    <div
+                      key={unit.id}
+                      className="py-2.5 px-3 flex items-start justify-between gap-2 hover:bg-slate-50/60 dark:hover:bg-slate-800/30"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="font-bold text-slate-900 dark:text-white truncate">
+                          {unit.device_name}
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-mono mt-0.5 flex items-center gap-1.5 flex-wrap">
+                          <span>SN: {unit.imei_or_serial || '—'}</span>
+                          <span>•</span>
+                          <span>{unit.handed_out_at ? new Date(unit.handed_out_at).toLocaleDateString() : '—'}</span>
+                        </div>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <div className="font-bold font-mono text-slate-900 dark:text-white">
+                          {unit.handover_payout > 0 ? `${unit.handover_payout.toLocaleString()} ETB` : '—'}
+                        </div>
+                        <div className="mt-1">
+                          <span
+                            className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
+                              unit.status === 'out'
+                                ? 'bg-black text-amber-400 border border-amber-500/40'
+                                : unit.status === 'sold'
+                                ? 'bg-black text-white border border-emerald-500/40'
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
+                            }`}
+                          >
+                            {unit.status === 'out' ? 'In Custody' : unit.status === 'sold' ? 'Sold' : unit.status}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -1094,7 +1282,7 @@ export const StaffDetailView: React.FC<StaffDetailViewProps> = ({
                   <button
                     type="button"
                     onClick={() => setSettleAmount(String(summary.uncollected_bonus || 0))}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold text-[10px] cursor-pointer"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded-md bg-black dark:bg-black text-white border border-emerald-500/40 font-bold text-[10px] cursor-pointer"
                   >
                     Max
                   </button>
@@ -1169,12 +1357,12 @@ export const StaffDetailView: React.FC<StaffDetailViewProps> = ({
                 <button
                   type="submit"
                   disabled={isSubmittingSettle}
-                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all shadow-emerald-500/20 disabled:opacity-50 cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-black dark:bg-black text-white border border-emerald-500/40 hover:bg-slate-950 font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all disabled:opacity-50 cursor-pointer"
                 >
                   {isSubmittingSettle ? (
                     <Loader2 className="size-3.5 animate-spin" />
                   ) : (
-                    <Send className="size-3.5" />
+                    <Send className="size-3.5 text-emerald-400" />
                   )}
                   <span>Confirm Payout</span>
                 </button>

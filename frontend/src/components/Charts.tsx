@@ -18,12 +18,14 @@ export const InteractiveSalesWaveChart: React.FC<{
   canViewCost?: boolean;
   totalRevenue?: number;
   totalProfit?: number;
+  heightClass?: string;
 }> = ({
   data = [],
   currency = 'ETB',
   canViewCost = true,
   totalRevenue,
   totalProfit,
+  heightClass = 'h-[170px] sm:h-[180px]',
 }) => {
   const { isBalancesHidden } = useBalancePrivacy();
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
@@ -215,7 +217,7 @@ export const InteractiveSalesWaveChart: React.FC<{
         onTouchEnd={handleTouchEnd}
         onMouseMove={(e) => handlePointerInteraction(e.clientX)}
         onMouseLeave={() => setHoverIndex(null)}
-        className="relative w-full h-[170px] sm:h-[180px] bg-gradient-to-b from-slate-50/50 to-transparent dark:from-slate-800/20 dark:to-transparent rounded-xl border border-slate-100/90 dark:border-slate-800/80 touch-none select-none cursor-crosshair"
+        className={`relative w-full ${heightClass} bg-gradient-to-b from-slate-50/50 to-transparent dark:from-slate-800/20 dark:to-transparent rounded-xl border border-slate-100/90 dark:border-slate-800/80 touch-none select-none cursor-crosshair`}
       >
         {points.length === 0 && (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-xs text-slate-400 font-medium z-10">
