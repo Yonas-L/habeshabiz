@@ -51,7 +51,7 @@ class UndoBlockedChecker
         foreach ($bonusDebts as $bDebt) {
             if ((float) $bDebt->paid_amount > 0) {
                 $staffName = $bDebt->salesperson?->name ?? $bDebt->contact?->name ?? 'staff';
-                $reasons[] = "The salesperson commission bonus of ".number_format((float) $bDebt->paid_amount, 2)." ETB was already paid out to {$staffName}. Reverse the 'Staff Bonus Paid' action on the Activity Logs first.";
+                $reasons[] = 'The salesperson commission bonus of '.number_format((float) $bDebt->paid_amount, 2)." ETB was already paid out to {$staffName}. Reverse the 'Staff Bonus Paid' action on the Activity Logs first.";
             }
         }
 

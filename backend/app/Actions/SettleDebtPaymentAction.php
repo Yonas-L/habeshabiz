@@ -15,6 +15,7 @@ use App\Models\SalesOrderItem;
 use App\Models\User;
 use App\Scopes\TenantScope;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -110,7 +111,7 @@ class SettleDebtPaymentAction
     /**
      * Settle a collection of open debts using hierarchical (FIFO) waterfall allocation and split pool.
      *
-     * @param \Illuminate\Support\Collection|Debt[] $debts
+     * @param  Collection|Debt[]  $debts
      * @param array{
      *     amount: float|int,
      *     financial_account_id?: string|null,

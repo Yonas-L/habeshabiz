@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\SettleDebtPaymentAction;
 use App\Models\AuditLog;
 use App\Models\Contact;
 use App\Models\Debt;
@@ -415,7 +416,7 @@ test('successfully previews and undoes a staff bonus payout, then unblocks sale 
     ]);
 
     // 3. Settle bonus via SettleDebtPaymentAction
-    $action = app(\App\Actions\SettleDebtPaymentAction::class);
+    $action = app(SettleDebtPaymentAction::class);
     $createdPayments = $action->execute($bonusDebt, [
         'amount' => 4000.0,
         'financial_account_id' => $this->account->id,
