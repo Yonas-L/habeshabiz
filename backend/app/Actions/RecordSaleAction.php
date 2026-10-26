@@ -117,6 +117,9 @@ class RecordSaleAction
             if ($paidAmount + $discount > $preliminaryTotal && count($data['items']) === 1) {
                 $firstKey = array_key_first($data['items']);
                 $itemQty = max(1, (int) ($data['items'][$firstKey]['quantity'] ?? 1));
+                if (empty($data['items'][$firstKey]['setted_price'])) {
+                    $data['items'][$firstKey]['setted_price'] = (float) $data['items'][$firstKey]['unit_price'];
+                }
                 $data['items'][$firstKey]['unit_price'] = ($paidAmount + $discount) / $itemQty;
             }
 

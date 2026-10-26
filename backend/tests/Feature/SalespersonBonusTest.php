@@ -368,3 +368,119 @@ test('safely resolves staff contact without duplicate key error when a contact w
     expect($contact->roles)->toContain('staff');
     expect($contact->roles)->toContain('salesperson');
 });
+
+test('selling a device with no pre-set price calculates bonus from floor price to customer paid amount', function () {
+    // Device with NO pre-set selling price
+    $customVariant = ProductVariant::create([
+        'tenant_id' => $this->tenant->id,
+        'product_id' => $this->product->id,
+        'storage' => '128GB',
+        'color' => 'Black',
+        'default_selling_price' => null, // Unset
+    ]);
+
+    $customUnit = InventoryUnit::create([
+        'tenant_id' => $this->tenant->id,
+        'variant_id' => $customVariant->id,
+        'status' => 'in_stock',
+        'cost_basis' => 70000.00,
+        'selling_price' => null, // Unset
+        'imei_or_serial' => 'IMEI-NO-PRICE-100',
+    ]);
+
+    $action = app(RecordSaleAction::class);
+
+    // Salesperson enters 100,000 ETB floor price in unit_price, customer pays 120,000 ETB in paid_amount
+    $order = $action->execute([
+        'salesperson_id' => $this->salesperson->id,
+        'paid_amount' => 120000.00,
+        'payment_method' => 'cash',
+        'financial_account_id' => $this->account->id,
+        'items' => [
+            [
+                'variant_id' => $customVariant->id,
+                'inventory_unit_id' => $customUnit->id,
+                'quantity' => 1,
+                'unit_price' => 100000.00, // Floor price
+            ],
+        ],
+    ]);
+
+    expect((float) $order->total_amount)->toBe(120000.0);
+    expect((float) $order->paid_amount)->toBe(120000.0);
+    expect((float) $order->total_bonus_amount)->toBe(20000.0);
+
+    $item = $order->items->first();
+    expect((float) $item->unit_price)->toBe(120000.0);
+    expect((float) $item->setted_price)->toBe(100000.0);
+    expect((float) $item->bonus_amount)->toBe(20000.0);
+    // Shop profit is (120,000 - 70,000) - 20,000 = 30,000 (which equals 100,000 floor - 70,000 cost)
+    expect((float) $item->profit)->toBe(30000.0);
+
+    // Verify payable debt was created for the sales agent
+    $bonusDebt = Debt::where('salesperson_id', $this->salesperson->id)
+        ->where('reference_type', 'salesperson_bonus')
+        ->where('reference_id', $order->id)
+        ->first();
+
+    expect($bonusDebt)->not->toBeNull();
+    expect($bonusDebt->type)->toBe('payable');
+    expect((float) $bonusDebt->original_amount)->toBe(20000.0);
+    expect((float) $bonusDebt->remaining_amount)->toBe(20000.0);
+    expect($bonusDebt->status)->toBe('open');
+});
+
+test('selling a device with explicit setted_price and higher unit_price calculates bonus correctly', function () {
+    $customVariant = ProductVariant::create([
+        'tenant_id' => $this->tenant->id,
+        'product_id' => $this->product->id,
+        'storage' => '512GB',
+        'color' => 'Silver',
+        'default_selling_price' => null,
+    ]);
+
+    $customUnit = InventoryUnit::create([
+        'tenant_id' => $this->tenant->id,
+        'variant_id' => $customVariant->id,
+        'status' => 'in_stock',
+        'cost_basis' => 80000.00,
+        'selling_price' => null,
+        'imei_or_serial' => 'IMEI-NO-PRICE-200',
+    ]);
+
+    $action = app(RecordSaleAction::class);
+
+    // Frontend passes both setted_price (100,000 floor) and unit_price (120,000 customer price)
+    $order = $action->execute([
+        'salesperson_id' => $this->salesperson->id,
+        'paid_amount' => 120000.00,
+        'payment_method' => 'cash',
+        'financial_account_id' => $this->account->id,
+        'items' => [
+            [
+                'variant_id' => $customVariant->id,
+                'inventory_unit_id' => $customUnit->id,
+                'quantity' => 1,
+                'unit_price' => 120000.00,
+                'setted_price' => 100000.00,
+            ],
+        ],
+    ]);
+
+    expect((float) $order->total_amount)->toBe(120000.0);
+    expect((float) $order->total_bonus_amount)->toBe(20000.0);
+
+    $item = $order->items->first();
+    expect((float) $item->unit_price)->toBe(120000.0);
+    expect((float) $item->setted_price)->toBe(100000.0);
+    expect((float) $item->bonus_amount)->toBe(20000.0);
+    expect((float) $item->profit)->toBe(20000.0); // (120,000 - 80,000) - 20,000 = 20,000
+
+    $bonusDebt = Debt::where('salesperson_id', $this->salesperson->id)
+        ->where('reference_type', 'salesperson_bonus')
+        ->where('reference_id', $order->id)
+        ->first();
+
+    expect($bonusDebt)->not->toBeNull();
+    expect((float) $bonusDebt->original_amount)->toBe(20000.0);
+});

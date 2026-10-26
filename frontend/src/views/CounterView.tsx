@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import type { Product, ProductVariant, InventoryUnit, Contact, FinancialAccount, User, SalesOrder } from '../api/client';
+import type { Product, ProductVariant, InventoryUnit, Contact, FinancialAccount, User, SalesOrder, StaffMember } from '../api/client';
 import { api } from '../api/client';
 import { CustomPageLoader } from '../components/loading/CustomPageLoader';
 import { toast } from 'sonner';
@@ -18,6 +18,7 @@ import {
   Banknote,
   Receipt,
   User as UserIcon,
+  UserCheck,
   Tag,
   AlertTriangle,
   Plus,
@@ -83,6 +84,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
 
   // Pricing & Discount
   const [unitSellingPrice, setUnitSellingPrice] = useState<string>('');
+  const [customBasePrice, setCustomBasePrice] = useState<string>('');
   const [discountType, setDiscountType] = useState<'percent' | 'fixed'>('percent');
   const [discountValue, setDiscountValue] = useState<string>('');
   const [paidAmount, setPaidAmount] = useState<string>('');
@@ -99,6 +101,22 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
   const [notes, setNotes] = useState<string>('');
   const [debtOffsetAmount, setDebtOffsetAmount] = useState<string>('');
   const [cashTransferAmount, setCashTransferAmount] = useState<string>('');
+
+  // Staff / Salesperson Selection for Commissions
+  const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
+  const [selectedSalespersonId, setSelectedSalespersonId] = useState<string>('');
+
+  useEffect(() => {
+    api.getStaff()
+      .then((res) => {
+        const active = (res || []).filter((s) => s.is_active !== false);
+        setStaffMembers(active);
+        if (user && user.role !== 'owner') {
+          setSelectedSalespersonId(String(user.id));
+        }
+      })
+      .catch(() => {});
+  }, [user]);
 
   // Exchange / Trade-In State
   const [exchangeDevice, setExchangeDevice] = useState<ExchangeDevicePayload | null>(null);
@@ -392,8 +410,9 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
     return selectedUnitIds.length === 1 ? availableUnits.find((u) => u.id === selectedUnitIds[0]) || null : null;
   }, [selectedUnitIds, availableUnits]);
   const settedPrice = Number(selectedSingleUnit?.selling_price || currentVariant?.default_selling_price || 0);
-  const isUpsell = settedPrice > 0 && unitPriceNum > settedPrice;
-  const upsellBonusPerUnit = isUpsell ? unitPriceNum - settedPrice : 0;
+  const effectiveBasePrice = settedPrice > 0 ? settedPrice : (parseFloat(customBasePrice) || 0);
+  const isUpsell = effectiveBasePrice > 0 && unitPriceNum > effectiveBasePrice;
+  const upsellBonusPerUnit = isUpsell ? unitPriceNum - effectiveBasePrice : 0;
   const rawTotalBonus = upsellBonusPerUnit * quantity;
   const netEstimatedBonus = Math.max(0, rawTotalBonus - calculatedDiscountAmount);
 
@@ -449,6 +468,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
       setSelectedUnitIds([]);
       setQuantity(1);
       setUnitSellingPrice('');
+      setCustomBasePrice('');
       setDiscountValue('');
       setPaidAmount('');
     }
@@ -474,8 +494,13 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
     if (initialPrice) {
       const priceStr = String(initialPrice);
       setUnitSellingPrice(priceStr);
+      setCustomBasePrice(priceStr);
       const remCash = exchangeDevice ? Math.max(0, Number(priceStr) - exchangeDevice.trade_in_value) : Number(priceStr);
       setPaidAmount(String(remCash));
+    } else {
+      setUnitSellingPrice('');
+      setCustomBasePrice('');
+      setPaidAmount('');
     }
   };
 
@@ -575,6 +600,9 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
 
   const handleUnitPriceChange = (val: string) => {
     setUnitSellingPrice(val);
+    if (settedPrice <= 0) {
+      setCustomBasePrice(val);
+    }
     const p = parseFloat(val) || 0;
     const newGross = p * quantity;
     const discountAmt = discountType === 'percent'
@@ -613,12 +641,13 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
     const totalCustomerValue = paidVal + tradeInAllowance + calculatedDiscountAmount;
     const perUnitReceived = quantity > 0 ? totalCustomerValue / quantity : totalCustomerValue;
 
-    // Dynamic upsell: if customer pays above the baseline set selling price, raise unitSellingPrice so upsell bonus triggers
-    if (settedPrice > 0) {
-      if (perUnitReceived > settedPrice) {
+    // Dynamic upsell: if customer pays above the baseline set selling price (or entered floor price), raise unitSellingPrice so upsell bonus triggers
+    const baseTarget = effectiveBasePrice;
+    if (baseTarget > 0) {
+      if (perUnitReceived > baseTarget) {
         setUnitSellingPrice(String(perUnitReceived));
-      } else if (unitPriceNum > settedPrice && perUnitReceived <= settedPrice) {
-        setUnitSellingPrice(String(settedPrice));
+      } else if (unitPriceNum > baseTarget && perUnitReceived <= baseTarget) {
+        setUnitSellingPrice(String(baseTarget));
       }
     }
   };
@@ -630,6 +659,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
     setAttachedAccessories([]);
     setQuantity(1);
     setUnitSellingPrice('');
+    setCustomBasePrice('');
     setDiscountValue('');
     setPaidAmount('');
     setIsCreditSale(false);
@@ -647,6 +677,11 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
     setDebtOffsetAmount('');
     setCashTransferAmount('');
     setExchangeDevice(null);
+    if (user && user.role !== 'owner') {
+      setSelectedSalespersonId(String(user.id));
+    } else {
+      setSelectedSalespersonId('');
+    }
   };
 
   const handleBackToProducts = () => {
@@ -753,7 +788,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
           is_accessory: false,
           quantity: 1,
           unit_price: unitPriceNum,
-          setted_price: settedPrice > 0 ? settedPrice : undefined,
+          setted_price: effectiveBasePrice > 0 ? effectiveBasePrice : undefined,
           sourcing_type: 'internal_stock',
           vendor_contact_id: null,
           vendor_cost: null,
@@ -766,7 +801,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
             is_accessory: false,
             quantity: quantity,
             unit_price: unitPriceNum,
-            setted_price: settedPrice > 0 ? settedPrice : undefined,
+            setted_price: effectiveBasePrice > 0 ? effectiveBasePrice : undefined,
             sourcing_type: 'internal_stock',
             vendor_contact_id: null,
             vendor_cost: null,
@@ -811,6 +846,7 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
         customer_id: customerMode === 'existing' ? (customerId || null) : null,
         customer_name: customerMode === 'new' && customerName.trim() ? customerName.trim() : null,
         customer_phone: customerMode === 'new' && customerPhone.trim() ? customerPhone.trim() : null,
+        salesperson_id: selectedSalespersonId ? Number(selectedSalespersonId) : undefined,
         discount_amount: calculatedDiscountAmount,
         paid_amount: totalCustomerPaid,
         debt_offset_amount: isDebtOffset ? debtOffsetNum : undefined,
@@ -1499,9 +1535,10 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                       <Tag className="w-3.5 h-3.5 sm:w-3 sm:h-3 inline mr-1" />
                       Unit Price (ETB) *
                     </label>
-                    {settedPrice > 0 && (
+                    {effectiveBasePrice > 0 && (
                       <span className="text-xs sm:text-[10px] font-mono text-slate-400">
-                        Base: <strong className="text-slate-700 dark:text-slate-300 font-bold">{settedPrice.toLocaleString()} ETB</strong>
+                        Base: <strong className="text-slate-700 dark:text-slate-300 font-bold">{effectiveBasePrice.toLocaleString()} ETB</strong>
+                        {settedPrice <= 0 && <span className="ml-1 text-[10px] text-purple-600 dark:text-purple-400 font-semibold">(Floor)</span>}
                       </span>
                     )}
                   </div>
@@ -1870,6 +1907,37 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                 />
               )}
 
+              {/* Sold By / Salesperson Selection */}
+              <div className="space-y-1.5 pt-1 border-t border-slate-100 dark:border-slate-800/80">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs sm:text-[10px] font-black sm:font-bold uppercase tracking-wider text-slate-400">
+                    <UserCheck className="w-3.5 h-3.5 sm:w-3 sm:h-3 inline mr-1 text-slate-400" />
+                    Sold By (Staff Member)
+                  </label>
+                  {selectedSalespersonId ? (
+                    <span className="text-xs sm:text-[10px] text-purple-600 dark:text-purple-400 font-bold">
+                      Eligible for sales commission
+                    </span>
+                  ) : (
+                    <span className="text-xs sm:text-[10px] text-slate-400 font-medium">
+                      Store Direct (No staff bonus)
+                    </span>
+                  )}
+                </div>
+                <select
+                  value={selectedSalespersonId}
+                  onChange={(e) => setSelectedSalespersonId(e.target.value)}
+                  className="w-full h-11 sm:h-9 px-3.5 sm:px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs font-bold sm:font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+                >
+                  <option value="">Store / Direct (No staff bonus)</option>
+                  {staffMembers.map((s) => (
+                    <option key={s.id} value={String(s.id)}>
+                      {s.name} {s.phone ? `(${s.phone})` : ''} • {s.role.toUpperCase()}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               {/* Customer Selection / New Customer */}
               <div className="space-y-2 pt-1 border-t border-slate-100 dark:border-slate-800/80">
                 <div className="flex items-center justify-between">
@@ -2171,16 +2239,28 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
                           </div>
                         )}
 
+                        {isUpsell && netEstimatedBonus > 0 && (
+                          <div className="flex justify-between items-center text-xs sm:text-[11px] pt-1.5 border-t border-purple-100 dark:border-purple-900/40 text-purple-700 dark:text-purple-300 font-bold">
+                            <span className="flex items-center gap-1">
+                              <TrendingUp className="w-3.5 h-3.5" />
+                              Salesperson Commission
+                            </span>
+                            <span className="font-mono font-black">
+                              +{netEstimatedBonus.toLocaleString()} ETB
+                            </span>
+                          </div>
+                        )}
+
                         {(user?.role === 'owner' || !!user?.permissions?.can_view_costs) && (outgoingUnitCost > 0 || accessoriesCostTotal > 0) && (
                           <div className="flex justify-between items-center text-xs sm:text-[11px] pt-1.5 border-t border-slate-100 dark:border-slate-800 text-slate-500 font-bold sm:font-normal">
                             <span>Estimated Net Profit</span>
                             <span className={`font-mono font-black sm:font-bold ${
-                              (totalAfterDiscount - ((outgoingUnitCost * quantity) + accessoriesCostTotal)) >= 0
+                              (totalAfterDiscount - ((outgoingUnitCost * quantity) + accessoriesCostTotal) - netEstimatedBonus) >= 0
                                 ? 'text-emerald-600 dark:text-emerald-400'
                                 : 'text-rose-600 dark:text-rose-400'
                             }`}>
-                              {(totalAfterDiscount - ((outgoingUnitCost * quantity) + accessoriesCostTotal)) >= 0 ? '+' : ''}
-                              {(totalAfterDiscount - ((outgoingUnitCost * quantity) + accessoriesCostTotal)).toLocaleString()} ETB
+                              {(totalAfterDiscount - ((outgoingUnitCost * quantity) + accessoriesCostTotal) - netEstimatedBonus) >= 0 ? '+' : ''}
+                              {(totalAfterDiscount - ((outgoingUnitCost * quantity) + accessoriesCostTotal) - netEstimatedBonus).toLocaleString()} ETB
                             </span>
                           </div>
                         )}

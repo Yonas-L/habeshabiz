@@ -285,7 +285,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <div className="flex items-center gap-2.5">
                 <ScrollText className={`size-4 ${activeTab === 'logs' ? 'text-emerald-400 dark:text-emerald-600' : 'text-slate-400 dark:text-slate-500'}`} />
-                <span>Audit Logs</span>
+                <span>User Activities</span>
               </div>
               <span className={`text-[10px] font-mono ${activeTab === 'logs' ? 'text-slate-400 dark:text-slate-600' : 'text-slate-300 dark:text-slate-600'}`}>
                 ⌘0
@@ -583,7 +583,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   >
                     <ScrollText className={`w-4 h-4 ${activeTab === 'logs' ? 'text-emerald-400 dark:text-emerald-600' : ''}`} />
                   </div>
-                  <span className="text-xs">Audit Logs</span>
+                  <span className="text-xs">User Activities</span>
                 </div>
                 {activeTab === 'logs' ? (
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 dark:bg-emerald-600 shrink-0" />
