@@ -850,20 +850,6 @@ class StaffController extends Controller
         $result = $settleAction->executeWaterfallDebts($openBonusDebts, $validated);
         $createdPayments = $result['payments'];
 
-        AuditLog::record(
-            action: 'staff_bonus_paid',
-            entityType: 'DebtPayment',
-            entityId: (string) ($createdPayments[0]->id ?? ''),
-            newValues: [
-                'staff_name' => $staff->name,
-                'amount' => $validated['amount'],
-                'account_id' => $validated['financial_account_id'] ?? null,
-                'payment_splits' => $validated['payment_splits'] ?? null,
-                'paid_by' => $currentUser->name,
-                'payments_count' => count($createdPayments),
-            ]
-        );
-
         return response()->json([
             'success' => true,
             'message' => 'Successfully disbursed '.number_format($validated['amount'], 2)." ETB bonus to {$staff->name}.",

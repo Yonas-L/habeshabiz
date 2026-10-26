@@ -43,14 +43,15 @@ class UndoBlockedChecker
         }
 
         // 2. Check if salesperson bonus was already settled/paid out to staff
-        $bonusDebts = Debt::where('tenant_id', $order->tenant_id)
+        $bonusDebts = Debt::with(['contact', 'salesperson'])->where('tenant_id', $order->tenant_id)
             ->where('reference_type', 'salesperson_bonus')
             ->where('reference_id', $order->id)
             ->get();
 
         foreach ($bonusDebts as $bDebt) {
             if ((float) $bDebt->paid_amount > 0) {
-                $reasons[] = "The salesperson commission bonus of {$bDebt->paid_amount} ETB was already paid out to staff. Reverse that staff payment first.";
+                $staffName = $bDebt->salesperson?->name ?? $bDebt->contact?->name ?? 'staff';
+                $reasons[] = "The salesperson commission bonus of ".number_format((float) $bDebt->paid_amount, 2)." ETB was already paid out to {$staffName}. Reverse the 'Staff Bonus Paid' action on the Activity Logs first.";
             }
         }
 

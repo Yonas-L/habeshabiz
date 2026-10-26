@@ -389,3 +389,73 @@ test('successfully previews and undoes an account transfer', function () {
     // Transaction deleted
     expect(FinancialTransaction::find($txn->id))->toBeNull();
 });
+
+test('successfully previews and undoes a staff bonus payout, then unblocks sale undo', function () {
+    // 1. Initial balance
+    $this->account->update(['current_balance' => 50000.0]);
+
+    // 2. Create staff contact & bonus debt
+    $staffContact = Contact::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Kidus Staff',
+        'roles' => ['staff', 'salesperson'],
+        'is_active' => true,
+    ]);
+
+    $bonusDebt = Debt::create([
+        'tenant_id' => $this->tenant->id,
+        'contact_id' => $staffContact->id,
+        'salesperson_id' => $this->salesperson->id,
+        'type' => 'payable',
+        'reference_type' => 'salesperson_bonus',
+        'original_amount' => 4000.0,
+        'paid_amount' => 0.0,
+        'remaining_amount' => 4000.0,
+        'status' => 'open',
+    ]);
+
+    // 3. Settle bonus via SettleDebtPaymentAction
+    $action = app(\App\Actions\SettleDebtPaymentAction::class);
+    $createdPayments = $action->execute($bonusDebt, [
+        'amount' => 4000.0,
+        'financial_account_id' => $this->account->id,
+    ]);
+
+    // Account decreased by 4,000 ETB
+    expect((float) $this->account->fresh()->current_balance)->toBe(46000.0);
+    expect($bonusDebt->fresh()->status)->toBe('settled');
+
+    // AuditLog should exist
+    $log = AuditLog::where('action', 'staff_bonus_paid')
+        ->where('entity_id', $createdPayments->id)
+        ->first();
+    expect($log)->not->toBeNull();
+    expect($log->can_undo)->toBeTrue();
+
+    // 4. Preview undo
+    $previewRes = $this->actingAs($this->owner)
+        ->getJson("/api/v1/audit-logs/{$log->id}/undo-preview")
+        ->assertStatus(200);
+
+    expect($previewRes->json('data.can_undo'))->toBeTrue()
+        ->and($previewRes->json('data.blocked'))->toBeFalse();
+
+    // 5. Execute undo
+    $undoRes = $this->actingAs($this->owner)
+        ->postJson("/api/v1/audit-logs/{$log->id}/undo")
+        ->assertStatus(200);
+
+    expect($undoRes->json('success'))->toBeTrue();
+
+    // Account restored back to 50,000 ETB
+    expect((float) $this->account->fresh()->current_balance)->toBe(50000.0);
+
+    // Debt reopened back to 4,000 ETB remaining
+    $bonusDebt->refresh();
+    expect((float) $bonusDebt->paid_amount)->toBe(0.0)
+        ->and((float) $bonusDebt->remaining_amount)->toBe(4000.0)
+        ->and($bonusDebt->status)->toBe('open');
+
+    // Payment deleted
+    expect(DebtPayment::find($createdPayments->id))->toBeNull();
+});

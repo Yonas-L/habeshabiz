@@ -434,6 +434,33 @@ class SettleDebtPaymentAction
             $debt->syncLinkedSalesOrder();
         }
 
+        if (! empty($createdPayments)) {
+            $isBonus = $debt->reference_type === 'salesperson_bonus';
+            $firstPayment = $createdPayments[0];
+            $actionName = $isBonus ? 'staff_bonus_paid' : 'debt_payment_settled';
+            $staffOrContactName = $isBonus
+                ? ($debt->salesperson?->name ?? $debt->contact?->name ?? 'Staff')
+                : ($debt->contact?->name ?? 'Partner/Supplier');
+
+            AuditLog::record(
+                action: $actionName,
+                entityType: 'DebtPayment',
+                entityId: (string) $firstPayment->id,
+                newValues: [
+                    'debt_id' => $debt->id,
+                    'reference_type' => $debt->reference_type,
+                    'reference_id' => $debt->reference_id,
+                    'contact_name' => $staffOrContactName,
+                    'staff_name' => $isBonus ? $staffOrContactName : null,
+                    'amount' => $amount,
+                    'type' => $debt->type,
+                    'split_group_id' => $splitGroupId,
+                    'payments_count' => count($createdPayments),
+                    'paid_by' => auth()->user()?->name ?? 'Owner',
+                ]
+            );
+        }
+
         return $createdPayments;
     }
 }

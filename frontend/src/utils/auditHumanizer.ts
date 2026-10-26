@@ -215,6 +215,12 @@ export function humanizeAuditLog(log: AuditLogItem): HumanizedAuditData {
   } else if (action === 'sale_created' || action === 'sales_order_create') {
     eventTitle = 'Sales Order Completed';
     eventSubtitle = newVals?.order_number ? `Order #${newVals.order_number}` : 'Customer device sale';
+  } else if (action === 'staff_bonus_paid' || action.includes('bonus')) {
+    eventTitle = 'Staff Commission Bonus Paid';
+    eventSubtitle = newVals?.staff_name || newVals?.contact_name ? `Disbursed to ${newVals.staff_name || newVals.contact_name}` : 'Sales commission bonus payout';
+  } else if (action === 'debt_payment_settled') {
+    eventTitle = 'Debt Settlement Payment';
+    eventSubtitle = newVals?.contact_name ? `Settled with ${newVals.contact_name}` : 'Obligation settlement';
   } else if (action.includes('payment_collected') || action.includes('collect_payment')) {
     eventTitle = 'Customer Payment Collected';
     eventSubtitle = newVals?.order_number ? `Against Order #${newVals.order_number}` : 'Credit debt repayment';
@@ -390,6 +396,20 @@ export function getAuditQuickSummary(log: AuditLogItem): string {
     if (src.total_amount) parts.push(`${Number(src.total_amount).toLocaleString()} ETB`);
     if (src.order_number) parts.push(`Order #${src.order_number}`);
     return parts.join(' · ') || 'Sale transaction recorded';
+  }
+
+  // Staff bonus paid summary
+  if (log.action === 'staff_bonus_paid' || log.action.includes('bonus')) {
+    if (src.amount) parts.push(`Disbursed ${Number(src.amount).toLocaleString()} ETB`);
+    if (src.staff_name || src.contact_name) parts.push(`To ${src.staff_name || src.contact_name}`);
+    return parts.join(' · ') || 'Staff commission bonus disbursed';
+  }
+
+  // Debt payment settled summary
+  if (log.action === 'debt_payment_settled') {
+    if (src.amount) parts.push(`${src.type === 'payable' ? 'Paid' : 'Settled'} ${Number(src.amount).toLocaleString()} ETB`);
+    if (src.contact_name) parts.push(src.type === 'payable' ? `To ${src.contact_name}` : `From ${src.contact_name}`);
+    return parts.join(' · ') || 'Debt payment settled';
   }
 
   // Payment summary

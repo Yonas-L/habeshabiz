@@ -83,6 +83,14 @@ function formatActionLabel(action: string): string {
 function getActionBadgeStyle(action: string): { bg: string; text: string; dot: string } {
   const lower = action.toLowerCase();
 
+  if (lower.includes('bonus')) {
+    return {
+      bg: 'bg-orange-50 dark:bg-orange-950/50 border-orange-200/60 dark:border-orange-800/60',
+      text: 'text-orange-700 dark:text-orange-400',
+      dot: 'bg-orange-500',
+    };
+  }
+
   if (
     lower.includes('create') ||
     lower.includes('intake') ||
