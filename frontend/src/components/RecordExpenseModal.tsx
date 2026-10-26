@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import type { Contact, FinancialAccount, InventoryUnit, StaffMember } from '../api/client';
 import { api } from '../api/client';
@@ -46,10 +46,9 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [selectedVendorContactId, setSelectedVendorContactId] = useState('');
 
-  // Staff Daily Pay / Commission state
+  // Staff Bonus Payout state
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
   const [selectedStaffId, setSelectedStaffId] = useState<string>('');
-  const [staffPayoutMode, setStaffPayoutMode] = useState<'bonus' | 'allowance'>('bonus');
   const [loadingStaff, setLoadingStaff] = useState(false);
 
   // Device Maintenance state
@@ -153,6 +152,10 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
   const selectedUnit = maintenanceUnits.find((u) => u.id === selectedUnitId);
   const hasVendor = Boolean(selectedUnit?.supplier_contact_id || selectedUnit?.source_type === 'consignment');
   const selectedStaff = staffMembers.find((s) => String(s.id) === String(selectedStaffId));
+  const staffWithBonus = useMemo<StaffMember[]>(
+    () => staffMembers.filter((s: StaffMember) => (s.stats?.uncollected_bonus || 0) > 0),
+    [staffMembers]
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -185,11 +188,16 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
       return;
     }
 
+    if (category === 'salary' && !selectedStaffId) {
+      toast.error('Please select the staff member receiving this bonus payout');
+      return;
+    }
+
     try {
       setSubmitting(true);
 
       // Handle staff sales bonus payout (settles liability without double-deducting profit)
-      if (category === 'salary' && staffPayoutMode === 'bonus' && selectedStaff) {
+      if (category === 'salary' && selectedStaff) {
         await api.settleStaffBonus(Number(selectedStaff.id), {
           amount: numAmount,
           financial_account_id: isSplit ? undefined : accountId,
@@ -197,8 +205,8 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
           notes: description,
         });
 
-        toast.success(`Sales Commission Disbursed to ${selectedStaff.name}`, {
-          description: `${numAmount.toLocaleString()} ETB • Commission liability cleared (profit neutral)`,
+        toast.success(`Bonus paid to ${selectedStaff.name}`, {
+          description: `${numAmount.toLocaleString()} ETB paid out successfully.`,
         });
 
         setAmount('');
@@ -210,7 +218,6 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
         setIsSplit(false);
         setPaymentSplits([]);
         setCategory('ride');
-        setStaffPayoutMode('allowance');
         onClose();
         if (onSuccess) onSuccess();
         return;
@@ -334,7 +341,7 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
                 if (cat === 'vendor_payout' && !description) {
                   setDescription('Transfer to vendor');
                 } else if (cat === 'salary' && !description) {
-                  setDescription('Staff daily pay / commission');
+                  setDescription('Staff bonus payout');
                 }
               }}
               className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 focus:border-slate-900 dark:focus:border-slate-600 cursor-pointer"
@@ -344,7 +351,7 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
               <option value="food">Food & Hospitality</option>
               <option value="rent">Shop Rent & Utilities</option>
               <option value="maintenance">Device Maintenance & Tooling</option>
-              <option value="salary">Staff Daily Pay / Commission</option>
+              <option value="salary">Staff Bonus / Commission Payout</option>
               <option value="personal_owner_draw">Personal Owner Draw</option>
               <option value="other">Other Operational Expense</option>
             </select>
@@ -396,112 +403,61 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
                   <Users className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400" />
                   <span>Select Staff Member</span>
                 </label>
-                <span
-                  className={`text-[10px] font-bold ${
-                    selectedStaff && staffPayoutMode === 'bonus'
-                      ? 'text-emerald-600 dark:text-emerald-400'
-                      : 'text-violet-600 dark:text-violet-400'
-                  }`}
-                >
-                  {selectedStaff && staffPayoutMode === 'bonus'
-                    ? 'Settles Commission Debt (Profit Neutral)'
-                    : 'Operating Expense (P&L Overhead)'}
-                </span>
-              </div>
-
-              <div className="relative">
-                <select
-                  value={selectedStaffId}
-                  onChange={(e) => {
-                    const sid = e.target.value;
-                    setSelectedStaffId(sid);
-                    const staff = staffMembers.find((item) => String(item.id) === String(sid));
-                    if (staff) {
-                      const uncollected = staff.stats?.uncollected_bonus || 0;
-                      if (uncollected > 0) {
-                        setStaffPayoutMode('bonus');
-                        setAmount(String(uncollected));
-                        setDescription(`Sales commission payout: ${staff.name}`);
-                      } else {
-                        setStaffPayoutMode('allowance');
-                        setDescription(`Staff daily pay / allowance: ${staff.name}`);
-                      }
-                    }
-                  }}
-                  disabled={loadingStaff}
-                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 cursor-pointer"
-                >
-                  <option value="">-- Choose Staff Member (Optional) --</option>
-                  {staffMembers.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} {s.phone ? `(${s.phone})` : ''} • {s.role.toUpperCase()}
-                    </option>
-                  ))}
-                </select>
-                {loadingStaff && (
-                  <Loader2 className="w-4 h-4 animate-spin text-violet-500 absolute right-3 top-3 pointer-events-none" />
+                {selectedStaff && (selectedStaff.stats?.uncollected_bonus || 0) > 0 && (
+                  <span className="text-[11px] font-bold text-violet-700 dark:text-violet-300 font-mono">
+                    Open Bonus: {Number(selectedStaff.stats?.uncollected_bonus || 0).toLocaleString()} ETB
+                  </span>
                 )}
               </div>
 
-              {/* If staff has uncollected bonuses, allow choosing between paying bonus vs daily allowance */}
-              {selectedStaff && (selectedStaff.stats?.uncollected_bonus || 0) > 0 ? (
-                <div className="pt-1 space-y-2">
-                  <div className="flex items-center justify-between text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                    <span>Disbursement Purpose</span>
-                    <span className="text-[10px] text-slate-400 font-normal">Choose allocation type</span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl text-xs font-semibold">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setStaffPayoutMode('bonus');
-                        setAmount(String(selectedStaff.stats?.uncollected_bonus || ''));
-                        setDescription(`Sales commission payout: ${selectedStaff.name}`);
-                      }}
-                      className={`py-1.5 px-2 rounded-lg text-center transition-all ${
-                        staffPayoutMode === 'bonus'
-                          ? 'bg-violet-600 text-white shadow-xs'
-                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                      }`}
-                    >
-                      <span>Pay Sales Commission</span>
-                      <span className="block text-[9px] opacity-80">
-                        {Number(selectedStaff.stats?.uncollected_bonus || 0).toLocaleString()} ETB · Clears Debt
-                      </span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setStaffPayoutMode('allowance');
-                        setDescription(`Staff daily pay / allowance: ${selectedStaff.name}`);
-                      }}
-                      className={`py-1.5 px-2 rounded-lg text-center transition-all ${
-                        staffPayoutMode === 'allowance'
-                          ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                      }`}
-                    >
-                      <span>Daily Pay / Allowance</span>
-                      <span className="block text-[9px] opacity-80">P&amp;L Operating Expense</span>
-                    </button>
-                  </div>
-
-                  {staffPayoutMode === 'bonus' ? (
-                    <p className="text-[11px] text-emerald-700/90 dark:text-emerald-400/90 leading-relaxed bg-emerald-50/70 dark:bg-emerald-950/30 p-2.5 rounded-xl border border-emerald-200/60 dark:border-emerald-900/40">
-                      ✓ <strong>Clears Earned Bonus Debt:</strong> Disburses {selectedStaff.name}&apos;s earned sales commission and settles their open bonus payable. Profit was already accounted for on the sale, so your P&amp;L is not double-deducted.
-                    </p>
-                  ) : (
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed bg-slate-50 dark:bg-slate-900/40 p-2.5 rounded-xl border border-slate-200/60 dark:border-slate-800">
-                      <strong>Operating Overhead:</strong> Discretionary daily allowances, lunch, transport, or fixed stipends recorded here count directly as operating expenses on your monthly Income Statement (P&amp;L).
-                    </p>
-                  )}
+              {staffWithBonus.length === 0 ? (
+                <div className="p-3 rounded-lg bg-white/70 dark:bg-slate-900/60 border border-violet-100 dark:border-violet-900/40 text-center py-3">
+                  <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    No uncollected staff bonuses
+                  </p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    All staff bonuses are currently paid up.
+                  </p>
                 </div>
               ) : (
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-                  Daily allowances, stipends, and fixed daily pay recorded here count directly as operating expenses on your monthly Income Statement (P&amp;L).
-                </p>
+                <>
+                  <div className="relative">
+                    <select
+                      value={selectedStaffId}
+                      onChange={(e) => {
+                        const sid = e.target.value;
+                        setSelectedStaffId(sid);
+                        const staff = staffWithBonus.find((item: StaffMember) => String(item.id) === String(sid));
+                        if (staff) {
+                          const uncollected = staff.stats?.uncollected_bonus || 0;
+                          setAmount(String(uncollected));
+                          setDescription(`Bonus payout: ${staff.name}`);
+                        } else {
+                          setAmount('');
+                          setDescription('');
+                        }
+                      }}
+                      disabled={loadingStaff}
+                      className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 cursor-pointer"
+                    >
+                      <option value="">-- Choose Staff Member ({staffWithBonus.length} with open bonus) --</option>
+                      {staffWithBonus.map((s: StaffMember) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name} {s.phone ? `(${s.phone})` : ''} • {Number(s.stats?.uncollected_bonus || 0).toLocaleString()} ETB
+                        </option>
+                      ))}
+                    </select>
+                    {loadingStaff && (
+                      <Loader2 className="w-4 h-4 animate-spin text-violet-500 absolute right-3 top-3 pointer-events-none" />
+                    )}
+                  </div>
+
+                  {selectedStaff && (
+                    <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
+                      Disburses {selectedStaff.name}&apos;s sales bonus and marks it as paid.
+                    </p>
+                  )}
+                </>
               )}
             </div>
           )}
