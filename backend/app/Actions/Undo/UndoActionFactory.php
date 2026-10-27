@@ -25,6 +25,7 @@ class UndoActionFactory
         'proforma_invoice_created' => UndoProformaInvoiceAction::class,
         'staff_bonus_paid' => UndoDebtPaymentAction::class,
         'debt_payment_settled' => UndoDebtPaymentAction::class,
+        'bonus_used_for_debt' => UndoBonusDebtOffsetAction::class,
     ];
 
     /**

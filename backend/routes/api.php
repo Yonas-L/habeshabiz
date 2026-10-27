@@ -98,6 +98,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/staff/{id}/statement', [StaffController::class, 'statement']);
         Route::get('/staff/{id}/statement-pdf', [StaffController::class, 'statementPdf']);
         Route::post('/staff/{id}/settle-bonus', [StaffController::class, 'settleBonus']);
+        Route::post('/staff/{id}/offset-bonus-debt', [StaffController::class, 'offsetBonusDebt']);
         Route::patch('/staff/{id}/toggle-status', [StaffController::class, 'toggleStatus']);
         Route::post('/staff/{id}/reset-password', [StaffController::class, 'resetPassword']);
         Route::get('/staff/leaderboard', [StaffController::class, 'leaderboard']);

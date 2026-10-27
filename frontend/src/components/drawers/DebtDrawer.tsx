@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import type { Debt, FinancialAccount } from '../../api/client';
+import React, { useState, useEffect, useCallback } from 'react';
+import type { Debt, FinancialAccount, StaffMember } from '../../api/client';
 import { api } from '../../api/client';
 import { SlideOverDrawer } from './SlideOverDrawer';
 import { ProgressiveSection } from './ProgressiveSection';
@@ -15,6 +15,7 @@ import {
   Send,
   History,
   Trash2,
+  Sparkles,
 } from 'lucide-react';
 import { AccountLogo } from '../../utils/bankLogos';
 import { SplitPaymentSelector, type PaymentSplitItem } from '../common/SplitPaymentSelector';
@@ -46,6 +47,34 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
   const [settling, setSettling] = useState(false);
   const [deletingDrawer, setDeletingDrawer] = useState(false);
 
+  // Bonus Offset for Receivables
+  const [settleMethod, setSettleMethod] = useState<'account' | 'staff_bonus'>('account');
+  const [staffList, setStaffList] = useState<StaffMember[]>([]);
+  const [selectedStaffId, setSelectedStaffId] = useState<string>('');
+  const [loadingStaff, setLoadingStaff] = useState(false);
+
+  const loadStaffWithBonus = useCallback(async () => {
+    try {
+      setLoadingStaff(true);
+      const list = await api.getStaff();
+      const withBonus = (list || []).filter((s) => (s.stats?.uncollected_bonus || 0) > 0);
+      setStaffList(withBonus);
+      if (withBonus.length > 0 && !selectedStaffId) {
+        setSelectedStaffId(String(withBonus[0].id));
+      }
+    } catch (err: any) {
+      console.error('Failed to load staff for bonus offset', err);
+    } finally {
+      setLoadingStaff(false);
+    }
+  }, [selectedStaffId]);
+
+  useEffect(() => {
+    if (showPayForm && settleMethod === 'staff_bonus') {
+      loadStaffWithBonus();
+    }
+  }, [showPayForm, settleMethod, loadStaffWithBonus]);
+
   const handleDrawerDelete = async () => {
     if (!debt) return;
     try {
@@ -72,6 +101,7 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
       setPaymentSplits([]);
       setReferenceNumber('');
       setNotes('');
+      setSettleMethod('account');
       setShowPayForm(false);
     }
   }, [debt, accounts]);
@@ -92,6 +122,36 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
     const numAmount = parseFloat(paymentAmount);
     if (isNaN(numAmount) || numAmount <= 0) {
       toast.error('Please enter a valid payment amount');
+      return;
+    }
+
+    if (isReceivable && settleMethod === 'staff_bonus') {
+      if (!selectedStaffId) {
+        toast.error('Please select a staff member whose bonus to apply');
+        return;
+      }
+      try {
+        setSettling(true);
+        await api.settleDebtPayment(debt.id, {
+          amount: numAmount,
+          payment_method: 'staff_bonus',
+          staff_id: Number(selectedStaffId),
+          reference_number: referenceNumber || undefined,
+          notes: notes || undefined,
+        });
+
+        toast.success('Receivable payment offset against staff bonus', {
+          description: `${numAmount.toLocaleString()} ETB applied from staff bonus for ${debt.contact?.name}`,
+        });
+
+        setShowPayForm(false);
+        if (onPaymentSettled) onPaymentSettled();
+        onClose();
+      } catch (err: any) {
+        toast.error('Failed to record bonus offset', { description: err.message });
+      } finally {
+        setSettling(false);
+      }
       return;
     }
 
@@ -347,14 +407,122 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
             </button>
           </div>
 
+          {isReceivable && (
+            <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-900 rounded-xl text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setSettleMethod('account')}
+                className={`flex-1 py-1.5 rounded-lg text-center transition-all cursor-pointer ${
+                  settleMethod === 'account'
+                    ? 'bg-white dark:bg-[#151b26] text-slate-900 dark:text-white shadow-xs font-bold'
+                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                }`}
+              >
+                Treasury Account
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSettleMethod('staff_bonus');
+                  loadStaffWithBonus();
+                }}
+                className={`flex-1 py-1.5 rounded-lg text-center transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                  settleMethod === 'staff_bonus'
+                    ? 'bg-white dark:bg-[#151b26] text-slate-900 dark:text-white shadow-xs font-bold'
+                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                }`}
+              >
+                <Sparkles className="size-3 text-emerald-500" />
+                <span>Staff Bonus Offset</span>
+              </button>
+            </div>
+          )}
+
+          {isReceivable && settleMethod === 'staff_bonus' ? (
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Select Staff Member (with Uncollected Bonus)
+              </label>
+              {loadingStaff ? (
+                <div className="py-2.5 text-center text-xs text-slate-400 flex items-center justify-center gap-1.5">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Loading staff members...</span>
+                </div>
+              ) : staffList.length === 0 ? (
+                <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 text-amber-700 dark:text-amber-400 text-xs">
+                  No staff members currently have uncollected bonuses to offset against.
+                </div>
+              ) : (
+                <select
+                  value={selectedStaffId}
+                  onChange={(e) => {
+                    setSelectedStaffId(e.target.value);
+                    const staff = staffList.find((s) => String(s.id) === e.target.value);
+                    if (staff) {
+                      const maxVal = Math.min(
+                        effectiveRemaining,
+                        Number(staff.stats?.uncollected_bonus || 0)
+                      );
+                      setPaymentAmount(String(maxVal));
+                    }
+                  }}
+                  className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs text-slate-900 dark:text-white"
+                >
+                  {staffList.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} — {(s.stats?.uncollected_bonus || 0).toLocaleString()} ETB available bonus
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          ) : (
+            <SplitPaymentSelector
+              accounts={accounts}
+              targetAmount={parseFloat(paymentAmount) || 0}
+              singleAccountId={paymentAccountId}
+              onSingleAccountChange={setPaymentAccountId}
+              isSplit={isSplit}
+              onIsSplitChange={setIsSplit}
+              splits={paymentSplits}
+              onSplitsChange={setPaymentSplits}
+              direction={isReceivable ? 'inflow' : 'outflow'}
+            />
+          )}
+
           <div>
-            <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              Payment Amount (ETB)
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                Payment Amount (ETB)
+              </label>
+              {isReceivable && settleMethod === 'staff_bonus' && selectedStaffId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const staff = staffList.find((s) => String(s.id) === selectedStaffId);
+                    const maxVal = Math.min(
+                      effectiveRemaining,
+                      Number(staff?.stats?.uncollected_bonus || 0)
+                    );
+                    setPaymentAmount(String(maxVal));
+                  }}
+                  className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
+                >
+                  Use Max Available
+                </button>
+              )}
+            </div>
             <input
               type="number"
               step="0.01"
-              max={effectiveRemaining}
+              max={
+                isReceivable && settleMethod === 'staff_bonus' && selectedStaffId
+                  ? Math.min(
+                      effectiveRemaining,
+                      Number(staffList.find((s) => String(s.id) === selectedStaffId)?.stats?.uncollected_bonus || 9999999)
+                    )
+                  : effectiveRemaining
+              }
               value={paymentAmount}
               onChange={(e) => setPaymentAmount(e.target.value)}
               className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs font-mono font-bold text-slate-900 dark:text-white"
@@ -362,28 +530,29 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
             />
           </div>
 
-          <SplitPaymentSelector
-            accounts={accounts}
-            targetAmount={parseFloat(paymentAmount) || 0}
-            singleAccountId={paymentAccountId}
-            onSingleAccountChange={setPaymentAccountId}
-            isSplit={isSplit}
-            onIsSplitChange={setIsSplit}
-            splits={paymentSplits}
-            onSplitsChange={setPaymentSplits}
-            direction={isReceivable ? 'inflow' : 'outflow'}
-          />
-
           <div>
             <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
               Transaction Reference
             </label>
             <input
               type="text"
-              placeholder="e.g. CBE-FT-82914 or TeleBirr TxID"
+              placeholder={isReceivable && settleMethod === 'staff_bonus' ? 'e.g. BONUS-OFFSET or memo' : 'e.g. CBE-FT-82914 or TeleBirr TxID'}
               value={referenceNumber}
               onChange={(e) => setReferenceNumber(e.target.value)}
               className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs font-mono text-slate-900 dark:text-white"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Notes
+            </label>
+            <input
+              type="text"
+              placeholder="Optional memo..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs text-slate-900 dark:text-white"
             />
           </div>
 
@@ -401,7 +570,13 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
               className="h-8 px-4 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 disabled:opacity-50 flex items-center gap-1.5"
             >
               {settling ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-              <span>{settling ? 'Processing...' : 'Confirm Payment'}</span>
+              <span>
+                {settling
+                  ? 'Processing...'
+                  : isReceivable && settleMethod === 'staff_bonus'
+                  ? 'Confirm Bonus Offset'
+                  : 'Confirm Payment'}
+              </span>
             </button>
           </div>
         </form>
@@ -568,9 +743,16 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
                       Split
                     </span>
                   )}
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold">
-                    Cleared
-                  </span>
+                  {p.reference_number?.includes('OFFSET-STAFF-BONUS') || p.reference_number?.includes('BONUS-OFFSET') ? (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-semibold border border-emerald-200/50 dark:border-emerald-800/50 inline-flex items-center gap-1">
+                      <Sparkles className="size-2.5 text-emerald-500" />
+                      Bonus Offset
+                    </span>
+                  ) : (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold">
+                      Cleared
+                    </span>
+                  )}
                 </div>
               </div>
             ))}

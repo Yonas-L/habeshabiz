@@ -201,6 +201,7 @@ class Debt extends Model
             ->where('contact_id', $contactId)
             ->where('type', 'receivable')
             ->where('reference_type', '!=', 'handover_holding')
+            ->where('reference_type', '!=', 'salesperson_bonus')
             ->whereIn('status', ['open', 'partially_paid'])
             ->orderBy('created_at')
             ->get();

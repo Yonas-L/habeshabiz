@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\OffsetStaffBonusDebtAction;
 use App\Actions\SettleDebtPaymentAction;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
@@ -650,7 +651,7 @@ class StaffController extends Controller
         // Query sales orders
         $salesQuery = SalesOrder::where('tenant_id', $currentUser->tenant_id)
             ->where('salesperson_id', $staff->id)
-            ->with(['customer', 'items.variant.product']);
+            ->with(['customer', 'items.variant.product', 'bonusDebts.payments']);
 
         if ($startDate) {
             $salesQuery->where('created_at', '>=', Carbon::parse($startDate)->startOfDay());
@@ -704,6 +705,13 @@ class StaffController extends Controller
                 })->join(', ');
             }
 
+            $hasDebtOffset = $debt->payments->contains(function ($p) {
+                return str_contains($p->reference_number ?? '', 'BONUS-OFFSET') || str_contains($p->notes ?? '', 'Used for debt');
+            });
+            $offsetPayment = $hasDebtOffset ? $debt->payments->first(function ($p) {
+                return str_contains($p->reference_number ?? '', 'BONUS-OFFSET') || str_contains($p->notes ?? '', 'Used for debt');
+            }) : null;
+
             return [
                 'id' => $debt->id,
                 'date' => $debt->created_at?->toIso8601String(),
@@ -716,21 +724,27 @@ class StaffController extends Controller
                 'paid_amount' => (float) $debt->paid_amount,
                 'remaining_amount' => (float) $debt->remaining_amount,
                 'status' => $debt->status,
+                'has_debt_offset' => $hasDebtOffset,
+                'debt_offset_notes' => $offsetPayment?->notes,
                 'due_date' => $debt->due_date?->toDateString(),
                 'notes' => $debt->notes,
                 'payments' => $debt->payments->map(fn ($p) => [
                     'id' => $p->id,
                     'amount' => (float) $p->amount,
                     'payment_date' => $p->payment_date?->toIso8601String(),
+                    'created_at' => $p->created_at?->toIso8601String(),
                     'account_name' => $p->financialAccount?->name,
                     'reference_number' => $p->reference_number,
                     'notes' => $p->notes,
+                    'is_debt_offset' => str_contains($p->reference_number ?? '', 'BONUS-OFFSET') || str_contains($p->notes ?? '', 'Used for debt'),
                 ]),
             ];
         });
 
         // Format sales orders
         $formattedSales = $salesOrders->map(function ($order) {
+            $bonusInfo = $order->bonus_info;
+
             return [
                 'id' => $order->id,
                 'order_number' => $order->order_number,
@@ -740,6 +754,9 @@ class StaffController extends Controller
                 'paid_amount' => (float) $order->paid_amount,
                 'payment_status' => $order->payment_status,
                 'bonus_amount' => (float) ($order->total_bonus_amount ?? 0),
+                'bonus_status' => $bonusInfo['status'] ?? null,
+                'bonus_used_for_debt' => $bonusInfo['used_for_debt'] ?? false,
+                'bonus_offset_notes' => $bonusInfo['offset_notes'] ?? null,
                 'items_count' => $order->items->count(),
                 'items' => $order->items->map(fn ($it) => [
                     'name' => $it->variant?->product?->name ?? 'Device',
@@ -794,7 +811,8 @@ class StaffController extends Controller
     }
 
     /**
-     * Settle / Payout a staff member's commission bonus from a chosen treasury account.
+     * Settle / Payout a staff member's commission bonus from a chosen treasury account,
+     * or offset against an open receivable debt.
      */
     public function settleBonus(Request $request, int $id, SettleDebtPaymentAction $settleAction): JsonResponse
     {
@@ -809,6 +827,30 @@ class StaffController extends Controller
         }
 
         $staff = User::where('tenant_id', $currentUser->tenant_id)->findOrFail($id);
+
+        if ($request->input('settlement_type') === 'debt_offset' || $request->filled('receivable_debt_id')) {
+            $offsetAction = app(OffsetStaffBonusDebtAction::class);
+            $validated = $request->validate([
+                'amount' => ['required', 'numeric', 'min:0.01'],
+                'receivable_debt_id' => ['required', 'string', 'exists:debts,id'],
+                'payment_date' => ['nullable', 'date'],
+                'reference_number' => ['nullable', 'string', 'max:100'],
+                'notes' => ['nullable', 'string', 'max:500'],
+            ]);
+
+            $result = $offsetAction->execute($staff, $validated);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Successfully offset '.number_format($result['amount_offset'], 2)." ETB of {$staff->name}'s bonus against receivable debt.",
+                'data' => [
+                    'amount_offset' => $result['amount_offset'],
+                    'receivable_debt' => $result['receivable_debt'],
+                    'receivable_payment' => $result['receivable_payment'],
+                    'bonus_payments' => $result['bonus_payments'],
+                ],
+            ]);
+        }
 
         $validated = $request->validate([
             'amount' => ['required', 'numeric', 'min:1'],
@@ -854,6 +896,45 @@ class StaffController extends Controller
             'message' => 'Successfully disbursed '.number_format($validated['amount'], 2)." ETB bonus to {$staff->name}.",
             'data' => [
                 'payments' => $createdPayments,
+            ],
+        ]);
+    }
+
+    /**
+     * Use a staff member's open commission bonus to settle an open receivable debt.
+     */
+    public function offsetBonusDebt(Request $request, int $id, OffsetStaffBonusDebtAction $action): JsonResponse
+    {
+        /** @var User $currentUser */
+        $currentUser = $request->user();
+
+        if (! $currentUser->isOwner()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only business owners can offset staff bonuses against debts.',
+            ], 403);
+        }
+
+        $staff = User::where('tenant_id', $currentUser->tenant_id)->findOrFail($id);
+
+        $validated = $request->validate([
+            'amount' => ['required', 'numeric', 'min:0.01'],
+            'receivable_debt_id' => ['required', 'string', 'exists:debts,id'],
+            'payment_date' => ['nullable', 'date'],
+            'reference_number' => ['nullable', 'string', 'max:100'],
+            'notes' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $result = $action->execute($staff, $validated);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Successfully offset '.number_format($result['amount_offset'], 2)." ETB of {$staff->name}'s bonus against receivable debt.",
+            'data' => [
+                'amount_offset' => $result['amount_offset'],
+                'receivable_debt' => $result['receivable_debt'],
+                'receivable_payment' => $result['receivable_payment'],
+                'bonus_payments' => $result['bonus_payments'],
             ],
         ]);
     }

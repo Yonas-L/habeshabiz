@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\OffsetStaffBonusDebtAction;
 use App\Actions\SettleDebtPaymentAction;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
@@ -38,7 +39,11 @@ class DebtController extends Controller
         }
 
         if ($request->filled('status') && $request->status !== 'all') {
-            $query->where('status', $request->status);
+            if ($request->status === 'open' || $request->status === 'unsettled' || $request->status === 'active') {
+                $query->whereIn('status', ['open', 'partially_paid']);
+            } else {
+                $query->where('status', $request->status);
+            }
         } elseif (! $request->filled('status')) {
             // Default show open and partially paid debts
             $query->whereIn('status', ['open', 'partially_paid']);
@@ -333,11 +338,13 @@ class DebtController extends Controller
             // Mutual debt cancellation / offset:
             // If we record a receivable for someone we already owe, or a payable for someone who owes us,
             // automatically cancel out against existing open obligations so balances remain strictly synchronized.
-            if (! $isImmediateSettlement) {
+            // EXCEPTION: Staff bonuses are strictly isolated and must NEVER be automatically offset!
+            if (! $isImmediateSettlement && $debt->reference_type !== 'salesperson_bonus') {
                 if ($type === 'receivable') {
                     $openPayables = Debt::where('tenant_id', $tenantId)
                         ->where('contact_id', $contactId)
                         ->where('type', 'payable')
+                        ->where('reference_type', '!=', 'salesperson_bonus')
                         ->whereIn('status', ['open', 'partially_paid'])
                         ->orderBy('created_at')
                         ->get();
@@ -412,9 +419,10 @@ class DebtController extends Controller
                         $openReceivables = Debt::where('tenant_id', $tenantId)
                             ->where('contact_id', $contactId)
                             ->where('type', 'receivable')
+                            ->where('reference_type', '!=', 'salesperson_bonus')
+                            ->where('reference_type', '!=', 'vendor_advance_payout')
                             ->whereIn('status', ['open', 'partially_paid'])
                             ->where('id', '!=', $debt->id)
-                            ->where('reference_type', '!=', 'vendor_advance_payout')
                             ->orderBy('created_at')
                             ->get();
 
@@ -609,6 +617,31 @@ class DebtController extends Controller
     public function settlePayment(Request $request, string $id, SettleDebtPaymentAction $action): JsonResponse
     {
         $debt = Debt::with('contact')->findOrFail($id);
+
+        if ($request->input('payment_method') === 'staff_bonus' || $request->filled('staff_id')) {
+            $validated = $request->validate([
+                'amount' => ['required', 'numeric', 'min:0.01'],
+                'staff_id' => ['required', 'integer', 'exists:users,id'],
+                'notes' => ['nullable', 'string', 'max:500'],
+            ]);
+
+            $staff = User::where('tenant_id', $debt->tenant_id)->findOrFail($validated['staff_id']);
+            $offsetAction = app(OffsetStaffBonusDebtAction::class);
+            $result = $offsetAction->execute($staff, [
+                'amount' => $validated['amount'],
+                'receivable_debt_id' => $debt->id,
+                'notes' => $validated['notes'] ?? null,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => "Receivable settled using {$staff->name}'s commission bonus.",
+                'data' => [
+                    'debt' => $result['receivable_debt'],
+                    'payment' => $result['receivable_payment'],
+                ],
+            ]);
+        }
 
         $validated = $request->validate([
             'amount' => ['required', 'numeric', 'min:0.01'],

@@ -215,6 +215,12 @@ export function humanizeAuditLog(log: AuditLogItem): HumanizedAuditData {
   } else if (action === 'sale_created' || action === 'sales_order_create') {
     eventTitle = 'Sales Order Completed';
     eventSubtitle = newVals?.order_number ? `Order #${newVals.order_number}` : 'Customer device sale';
+  } else if (action === 'bonus_used_for_debt') {
+    eventTitle = 'Staff Bonus Used for Debt Settlement';
+    eventSubtitle =
+      newVals?.staff_name && newVals?.receivable_contact_name
+        ? `${newVals.staff_name}'s bonus applied to ${newVals.receivable_contact_name}'s debt`
+        : 'Sales commission used to settle receivable';
   } else if (action === 'staff_bonus_paid' || action.includes('bonus')) {
     eventTitle = 'Staff Commission Bonus Paid';
     eventSubtitle = newVals?.staff_name || newVals?.contact_name ? `Disbursed to ${newVals.staff_name || newVals.contact_name}` : 'Sales commission bonus payout';
@@ -396,6 +402,14 @@ export function getAuditQuickSummary(log: AuditLogItem): string {
     if (src.total_amount) parts.push(`${Number(src.total_amount).toLocaleString()} ETB`);
     if (src.order_number) parts.push(`Order #${src.order_number}`);
     return parts.join(' · ') || 'Sale transaction recorded';
+  }
+
+  // Staff bonus offset debt summary
+  if (log.action === 'bonus_used_for_debt') {
+    if (src.amount) parts.push(`Offset ${Number(src.amount).toLocaleString()} ETB`);
+    if (src.staff_name) parts.push(`From ${src.staff_name}`);
+    if (src.receivable_contact_name) parts.push(`For ${src.receivable_contact_name}`);
+    return parts.join(' · ') || 'Staff bonus used for debt settlement';
   }
 
   // Staff bonus paid summary

@@ -441,6 +441,14 @@ export interface SalesOrder {
   order_date: string;
   notes?: string | null;
   items: SalesOrderItem[];
+  bonus_info?: {
+    bonus_amount: number;
+    paid_amount: number;
+    remaining_amount: number;
+    status: 'uncollected' | 'disbursed' | 'used_for_debt';
+    used_for_debt: boolean;
+    offset_notes?: string | null;
+  } | null;
 }
 
 export interface DebtPayment {
@@ -782,9 +790,11 @@ export interface StaffBonusLedgerPayment {
   id: string;
   amount: number;
   payment_date: string | null;
+  created_at?: string | null;
   account_name?: string | null;
   reference_number?: string | null;
   notes?: string | null;
+  is_debt_offset?: boolean;
 }
 
 export interface StaffBonusLedgerEntry {
@@ -799,6 +809,8 @@ export interface StaffBonusLedgerEntry {
   paid_amount: number;
   remaining_amount: number;
   status: 'open' | 'partially_paid' | 'settled';
+  has_debt_offset?: boolean;
+  debt_offset_notes?: string | null;
   due_date?: string | null;
   notes?: string | null;
   payments: StaffBonusLedgerPayment[];
@@ -819,6 +831,9 @@ export interface StaffSalesOrderEntry {
   paid_amount: number;
   payment_status: string;
   bonus_amount: number;
+  bonus_status?: string | null;
+  bonus_used_for_debt?: boolean;
+  bonus_offset_notes?: string | null;
   items_count: number;
   items: StaffSalesOrderEntryItem[];
 }
@@ -1665,6 +1680,8 @@ export const api = {
       amount: number;
       financial_account_id?: string;
       payment_splits?: PaymentSplit[];
+      payment_method?: string;
+      staff_id?: number;
       reference_number?: string;
       notes?: string;
     }
@@ -2016,6 +2033,21 @@ export const api = {
     }
   ) =>
     request<{ success: boolean; message: string; data?: any }>(`/staff/${id}/settle-bonus`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  offsetStaffBonusDebt: (
+    id: number,
+    data: {
+      amount: number;
+      receivable_debt_id: string | number;
+      payment_date?: string;
+      reference_number?: string;
+      notes?: string;
+    }
+  ) =>
+    request<{ success: boolean; message: string; data?: any }>(`/staff/${id}/offset-bonus-debt`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),

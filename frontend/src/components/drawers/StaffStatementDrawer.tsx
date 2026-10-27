@@ -11,6 +11,8 @@ import {
   Loader2,
   ShieldCheck,
   Sparkles,
+  CheckCircle2,
+  ArrowLeftRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { SlideOverDrawer } from './SlideOverDrawer';
@@ -19,6 +21,7 @@ import type {
   StaffMember,
   StaffStatementData,
   FinancialAccount,
+  Debt,
 } from '../../api/client';
 import { SplitPaymentSelector, type PaymentSplitItem } from '../common/SplitPaymentSelector';
 
@@ -42,6 +45,10 @@ export const StaffStatementDrawer: React.FC<StaffStatementDrawerProps> = ({
 
   // Settle Bonus Modal State
   const [isSettleModalOpen, setIsSettleModalOpen] = useState(false);
+  const [settleMode, setSettleMode] = useState<'payout' | 'debt_offset'>('payout');
+  const [receivables, setReceivables] = useState<Debt[]>([]);
+  const [selectedReceivableId, setSelectedReceivableId] = useState<string>('');
+  const [loadingReceivables, setLoadingReceivables] = useState(false);
   const [settleAmount, setSettleAmount] = useState<string>('');
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
   const [isSplit, setIsSplit] = useState(false);
@@ -91,6 +98,51 @@ export const StaffStatementDrawer: React.FC<StaffStatementDrawerProps> = ({
     }
   };
 
+  const loadReceivables = async () => {
+    try {
+      setLoadingReceivables(true);
+      const res = await api.getDebts({ type: 'receivable', status: 'open' });
+      const openDebts = (res || []).filter((d: Debt) => Number(d.remaining_amount) > 0);
+
+      // Prioritize debts belonging to this staff member first!
+      const staffName = staffMember?.name?.trim().toLowerCase();
+      const staffPhone = staffMember?.phone?.trim();
+
+      openDebts.sort((a, b) => {
+        const aName = (a.contact?.name || '').toLowerCase();
+        const bName = (b.contact?.name || '').toLowerCase();
+        const aPhone = (a.contact?.phone || '').trim();
+        const bPhone = (b.contact?.phone || '').trim();
+
+        const aMatches = (staffName && aName.includes(staffName)) || (staffPhone && aPhone === staffPhone);
+        const bMatches = (staffName && bName.includes(staffName)) || (staffPhone && bPhone === staffPhone);
+
+        if (aMatches && !bMatches) return -1;
+        if (!aMatches && bMatches) return 1;
+        return Number(b.remaining_amount) - Number(a.remaining_amount);
+      });
+
+      setReceivables(openDebts);
+      if (openDebts.length > 0) {
+        const targetDebt = (!selectedReceivableId || !openDebts.some((d) => String(d.id) === selectedReceivableId))
+          ? openDebts[0]
+          : openDebts.find((d) => String(d.id) === selectedReceivableId) || openDebts[0];
+
+        setSelectedReceivableId(String(targetDebt.id));
+        const maxVal = Math.min(
+          data?.summary?.uncollected_bonus || 0,
+          Number(targetDebt.remaining_amount || 0)
+        );
+        setSettleAmount(String(maxVal));
+        setNotes('');
+      }
+    } catch (err: any) {
+      console.error('Failed to load receivables for bonus offset', err);
+    } finally {
+      setLoadingReceivables(false);
+    }
+  };
+
   const handleOpenSettleModal = () => {
     if (!data) return;
     const uncollected = data.summary.uncollected_bonus || 0;
@@ -98,6 +150,7 @@ export const StaffStatementDrawer: React.FC<StaffStatementDrawerProps> = ({
       toast.info('This staff member has no uncollected bonuses to disburse.');
       return;
     }
+    setSettleMode('payout');
     setSettleAmount(String(uncollected));
     setIsSplit(false);
     setSplits([]);
@@ -114,7 +167,7 @@ export const StaffStatementDrawer: React.FC<StaffStatementDrawerProps> = ({
 
     const amountNum = parseFloat(settleAmount);
     if (isNaN(amountNum) || amountNum <= 0) {
-      toast.error('Please enter a valid payout amount.');
+      toast.error('Please enter a valid amount.');
       return;
     }
 
@@ -123,6 +176,44 @@ export const StaffStatementDrawer: React.FC<StaffStatementDrawerProps> = ({
       toast.error(
         `Amount cannot exceed total uncollected bonus (${uncollected.toLocaleString()} ETB).`
       );
+      return;
+    }
+
+    if (settleMode === 'debt_offset') {
+      if (!selectedReceivableId) {
+        toast.error('Please select an open receivable debt to settle.');
+        return;
+      }
+
+      const targetDebt = receivables.find((d) => d.id === selectedReceivableId);
+      if (targetDebt && amountNum > Number(targetDebt.remaining_amount) + 0.01) {
+        toast.error(
+          `Amount cannot exceed remaining receivable balance (${Number(targetDebt.remaining_amount).toLocaleString()} ETB).`
+        );
+        return;
+      }
+
+      try {
+        setIsSubmittingSettle(true);
+        await api.offsetStaffBonusDebt(staffMember.id, {
+          amount: amountNum,
+          receivable_debt_id: selectedReceivableId,
+          payment_date: paymentDate,
+          reference_number: referenceNumber,
+          notes: notes || undefined,
+        });
+
+        toast.success(
+          `Successfully offset ${amountNum.toLocaleString()} ETB of bonus against ${targetDebt?.contact?.name || 'debtor'}'s receivable!`
+        );
+        setIsSettleModalOpen(false);
+        loadStatement();
+        onBonusSettled?.();
+      } catch (err: any) {
+        toast.error(err.message || 'Failed to offset bonus against debt.');
+      } finally {
+        setIsSubmittingSettle(false);
+      }
       return;
     }
 
@@ -494,7 +585,12 @@ export const StaffStatementDrawer: React.FC<StaffStatementDrawerProps> = ({
                                   {entry.bonus_amount.toLocaleString()} ETB
                                 </div>
                                 <div className="text-[11px] font-mono text-slate-400">
-                                  {isSettled ? (
+                                  {entry.has_debt_offset ? (
+                                    <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 sm:justify-end">
+                                      <CheckCircle2 className="size-3" />
+                                      <span>Used for Debt</span>
+                                    </span>
+                                  ) : isSettled ? (
                                     <span className="text-emerald-600 dark:text-emerald-400 font-bold">
                                       Fully Disbursed
                                     </span>
@@ -540,11 +636,16 @@ export const StaffStatementDrawer: React.FC<StaffStatementDrawerProps> = ({
                                         -{p.amount.toLocaleString()} ETB
                                       </span>
                                       <span className="text-slate-500 dark:text-slate-400 ml-2">
-                                        via {p.account_name || 'Treasury'}
+                                        {p.is_debt_offset ? 'Used for Debt Offset' : `via ${p.account_name || 'Treasury'}`}
                                       </span>
-                                      {p.reference_number && (
+                                      {p.reference_number && !p.is_debt_offset && (
                                         <span className="text-slate-400 ml-1.5">
                                           ({p.reference_number})
+                                        </span>
+                                      )}
+                                      {p.notes && (
+                                        <span className="text-slate-400 ml-1.5 truncate max-w-[200px] block sm:inline">
+                                          ({p.notes.replace(/^Used for debt:\s*/i, '').replace(/\s*\(#[^)]+\)/g, '').replace(/Commission bonus payout to [^|]+/i, '').replace(/\|\s*$/g, '').trim() || p.notes})
                                         </span>
                                       )}
                                     </div>
@@ -630,9 +731,16 @@ export const StaffStatementDrawer: React.FC<StaffStatementDrawerProps> = ({
                               {sale.total_amount.toLocaleString()} ETB
                             </div>
                             {sale.bonus_amount > 0 && (
-                              <div className="text-[11px] font-mono text-purple-600 dark:text-purple-400 font-bold mt-0.5 flex items-center gap-1 sm:justify-end">
-                                <Sparkles className="size-3" />
-                                <span>+{sale.bonus_amount.toLocaleString()} ETB Bonus</span>
+                              <div className="text-[11px] font-mono text-purple-600 dark:text-purple-400 font-bold mt-0.5 flex items-center gap-1.5 sm:justify-end flex-wrap">
+                                <span className="flex items-center gap-1">
+                                  <Sparkles className="size-3" />
+                                  <span>+{sale.bonus_amount.toLocaleString()} ETB Bonus</span>
+                                </span>
+                                {sale.bonus_used_for_debt && (
+                                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/80">
+                                    Used for Debt
+                                  </span>
+                                )}
                               </div>
                             )}
                           </div>
@@ -735,28 +843,132 @@ export const StaffStatementDrawer: React.FC<StaffStatementDrawerProps> = ({
                   <span>Settle Commission Bonus</span>
                 </h3>
                 <p className="text-[11px] text-slate-400 mt-0.5">
-                  Disburse bonus payment to {data?.staff.name}
+                  Disburse payout or offset against debt for {data?.staff.name}
                 </p>
               </div>
               <button
+                type="button"
                 onClick={() => setIsSettleModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
+            {/* Settle Mode Segmented Control */}
+            <div className="grid grid-cols-2 gap-1 p-1 bg-slate-100 dark:bg-slate-900 rounded-xl">
+              <button
+                type="button"
+                onClick={() => {
+                  setSettleMode('payout');
+                  setSettleAmount(String(data?.summary.uncollected_bonus || 0));
+                  setNotes(`Commission bonus payout to ${data?.staff.name}`);
+                }}
+                className={`py-1.5 px-2.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  settleMode === 'payout'
+                    ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-2xs font-bold'
+                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <CreditCard className="size-3.5" />
+                <span>Payout Cash</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSettleMode('debt_offset');
+                  loadReceivables();
+                }}
+                className={`py-1.5 px-2.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  settleMode === 'debt_offset'
+                    ? 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-2xs font-bold'
+                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <ArrowLeftRight className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                <span>Settle Receivable</span>
+              </button>
+            </div>
+
             <form onSubmit={handleSubmitSettle} className="space-y-3.5">
+              {settleMode === 'debt_offset' ? (
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                    Select Open Receivable Debt to Settle
+                  </label>
+                  {loadingReceivables ? (
+                    <div className="flex items-center justify-center py-4 text-xs text-slate-400">
+                      <Loader2 className="size-4 animate-spin mr-1.5 text-emerald-600" />
+                      <span>Loading open receivables...</span>
+                    </div>
+                  ) : receivables.length === 0 ? (
+                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-500 text-center">
+                      No open receivable debts found to settle.
+                    </div>
+                  ) : (
+                    <select
+                      value={selectedReceivableId}
+                      onChange={(e) => {
+                        const recId = e.target.value;
+                        setSelectedReceivableId(recId);
+                        const found = receivables.find((d) => d.id === recId);
+                        if (found) {
+                          const maxVal = Math.min(
+                            data?.summary?.uncollected_bonus || 0,
+                            Number(found.remaining_amount)
+                          );
+                          setSettleAmount(String(maxVal));
+                          setNotes(`Used for debt: Settled receivable for ${found.contact?.name || 'Customer'}`);
+                        }
+                      }}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+                    >
+                      {receivables.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.contact?.name || 'Customer'} · {Number(r.remaining_amount).toLocaleString()} ETB remaining {r.due_date ? `(Due ${r.due_date})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  {receivables.length > 0 && selectedReceivableId && (
+                    <div className="mt-1.5 text-[10px] text-slate-400 flex items-center justify-between">
+                      <span>
+                        Receivable Balance:{' '}
+                        <strong className="text-slate-700 dark:text-slate-300 font-mono">
+                          {Number(
+                            receivables.find((d) => d.id === selectedReceivableId)?.remaining_amount || 0
+                          ).toLocaleString()}{' '}
+                          ETB
+                        </strong>
+                      </span>
+                      <span>
+                        Available Bonus:{' '}
+                        <strong className="text-emerald-600 dark:text-emerald-400 font-mono">
+                          {(data?.summary.uncollected_bonus || 0).toLocaleString()} ETB
+                        </strong>
+                      </span>
+                    </div>
+                  )}
+                </div>
+              ) : null}
+
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                  Payout Amount (ETB)
+                  {settleMode === 'debt_offset' ? 'Offset Amount (ETB)' : 'Payout Amount (ETB)'}
                 </label>
                 <div className="relative">
                   <input
                     type="number"
                     step="0.01"
                     min="1"
-                    max={data?.summary?.uncollected_bonus || 9999999}
+                    max={
+                      settleMode === 'debt_offset' && selectedReceivableId
+                        ? Math.min(
+                            data?.summary?.uncollected_bonus || 9999999,
+                            Number(receivables.find((d) => d.id === selectedReceivableId)?.remaining_amount || 9999999)
+                          )
+                        : data?.summary?.uncollected_bonus || 9999999
+                    }
                     value={settleAmount}
                     onChange={(e) => setSettleAmount(e.target.value)}
                     required
@@ -765,31 +977,46 @@ export const StaffStatementDrawer: React.FC<StaffStatementDrawerProps> = ({
                   />
                   <button
                     type="button"
-                    onClick={() => setSettleAmount(String(data?.summary.uncollected_bonus || 0))}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold text-[10px]"
+                    onClick={() => {
+                      if (settleMode === 'debt_offset' && selectedReceivableId) {
+                        const recDebt = receivables.find((d) => d.id === selectedReceivableId);
+                        const maxVal = Math.min(
+                          data?.summary?.uncollected_bonus || 0,
+                          Number(recDebt?.remaining_amount || 0)
+                        );
+                        setSettleAmount(String(maxVal));
+                      } else {
+                        setSettleAmount(String(data?.summary.uncollected_bonus || 0));
+                      }
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold text-[10px] cursor-pointer"
                   >
                     Max
                   </button>
                 </div>
                 <p className="text-[10px] text-slate-400 mt-1">
-                  Total uncollected balance: {(data?.summary.uncollected_bonus || 0).toLocaleString()} ETB
+                  {settleMode === 'debt_offset'
+                    ? 'Amount will directly pay down the chosen receivable debt without affecting cash accounts.'
+                    : `Total uncollected balance: ${(data?.summary.uncollected_bonus || 0).toLocaleString()} ETB`}
                 </p>
               </div>
 
-              <div>
-                <SplitPaymentSelector
-                  accounts={accounts}
-                  targetAmount={parseFloat(settleAmount) || 0}
-                  singleAccountId={selectedAccountId}
-                  onSingleAccountChange={setSelectedAccountId}
-                  isSplit={isSplit}
-                  onIsSplitChange={setIsSplit}
-                  splits={splits}
-                  onSplitsChange={setSplits}
-                  label="Disburse From Account"
-                  direction="outflow"
-                />
-              </div>
+              {settleMode === 'payout' && (
+                <div>
+                  <SplitPaymentSelector
+                    accounts={accounts}
+                    targetAmount={parseFloat(settleAmount) || 0}
+                    singleAccountId={selectedAccountId}
+                    onSingleAccountChange={setSelectedAccountId}
+                    isSplit={isSplit}
+                    onIsSplitChange={setIsSplit}
+                    splits={splits}
+                    onSplitsChange={setSplits}
+                    label="Disburse From Account"
+                    direction="outflow"
+                  />
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
@@ -812,7 +1039,7 @@ export const StaffStatementDrawer: React.FC<StaffStatementDrawerProps> = ({
                     value={referenceNumber}
                     onChange={(e) => setReferenceNumber(e.target.value)}
                     className="w-full px-2.5 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-mono text-slate-900 dark:text-white"
-                    placeholder="e.g. CBE-TXN-123"
+                    placeholder={settleMode === 'debt_offset' ? 'Auto-generated or custom ref' : 'e.g. CBE-TXN-123'}
                   />
                 </div>
               </div>
@@ -826,7 +1053,7 @@ export const StaffStatementDrawer: React.FC<StaffStatementDrawerProps> = ({
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   className="w-full px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white"
-                  placeholder="Optional memo..."
+                  placeholder={settleMode === 'debt_offset' ? 'e.g. Offsetting customer credit balance...' : 'Optional memo...'}
                 />
               </div>
 
@@ -848,7 +1075,7 @@ export const StaffStatementDrawer: React.FC<StaffStatementDrawerProps> = ({
                   ) : (
                     <Send className="size-3.5" />
                   )}
-                  <span>Confirm Payout</span>
+                  <span>{settleMode === 'debt_offset' ? 'Confirm Debt Offset' : 'Confirm Payout'}</span>
                 </button>
               </div>
             </form>

@@ -166,6 +166,7 @@ class ExpenseController extends Controller
                 $openPayables = Debt::where('tenant_id', $tenantId)
                     ->where('contact_id', $vendorContactId)
                     ->where('type', 'payable')
+                    ->whereNotIn('reference_type', ['salesperson_bonus', 'handover_holding'])
                     ->whereIn('status', ['open', 'partially_paid'])
                     ->orderBy('created_at')
                     ->get();
@@ -254,6 +255,7 @@ class ExpenseController extends Controller
                         $openPayable = Debt::where('tenant_id', $tenantId)
                             ->where('contact_id', $vendorContactId)
                             ->where('type', 'payable')
+                            ->whereNotIn('reference_type', ['salesperson_bonus', 'handover_holding'])
                             ->whereIn('status', ['open', 'partially_paid'])
                             ->orderBy('created_at')
                             ->first();

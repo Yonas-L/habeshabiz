@@ -41,6 +41,7 @@ class SaleController extends Controller
             'items.inventoryUnit.swappedReplacementUnit.variant.product',
             'items.inventoryUnit.swappedSalesOrder',
             'items.vendorContact',
+            'bonusDebts.payments',
         ]);
 
         /** @var User|null $user */

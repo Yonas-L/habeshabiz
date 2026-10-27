@@ -36,6 +36,8 @@ class SalesOrder extends Model
 {
     use BelongsToTenant, HasFactory, HasUuids;
 
+    protected $appends = ['bonus_info'];
+
     protected $fillable = [
         'tenant_id',
         'order_number',
@@ -113,5 +115,51 @@ class SalesOrder extends Model
     public function debts(): HasMany
     {
         return $this->hasMany(Debt::class, 'reference_id')->where('reference_type', 'sales_order');
+    }
+
+    public function bonusDebts(): HasMany
+    {
+        return $this->hasMany(Debt::class, 'reference_id')->where('reference_type', 'salesperson_bonus');
+    }
+
+    public function getBonusInfoAttribute(): ?array
+    {
+        if (! $this->relationLoaded('bonusDebts')) {
+            $this->load('bonusDebts.payments');
+        }
+
+        $bDebt = $this->bonusDebts->first();
+        if (! $bDebt && (float) $this->total_bonus_amount <= 0) {
+            return null;
+        }
+
+        $usedForDebt = false;
+        $offsetNotes = null;
+
+        if ($bDebt) {
+            foreach ($bDebt->payments as $p) {
+                if (str_contains($p->reference_number ?? '', 'BONUS-OFFSET') || str_contains($p->notes ?? '', 'Used for debt')) {
+                    $usedForDebt = true;
+                    $offsetNotes = $p->notes;
+                    break;
+                }
+            }
+        }
+
+        $bonusAmount = $bDebt ? (float) $bDebt->original_amount : (float) ($this->total_bonus_amount ?? 0);
+        $paidAmount = $bDebt ? (float) $bDebt->paid_amount : 0.0;
+        $remainingAmount = $bDebt ? (float) $bDebt->remaining_amount : $bonusAmount;
+        $status = $usedForDebt
+            ? 'used_for_debt'
+            : ($bDebt ? ($bDebt->status === 'settled' ? 'disbursed' : 'uncollected') : 'uncollected');
+
+        return [
+            'bonus_amount' => $bonusAmount,
+            'paid_amount' => $paidAmount,
+            'remaining_amount' => $remainingAmount,
+            'status' => $status,
+            'used_for_debt' => $usedForDebt,
+            'offset_notes' => $offsetNotes,
+        ];
     }
 }

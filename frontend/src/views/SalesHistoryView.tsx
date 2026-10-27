@@ -14,6 +14,7 @@ import {
   X,
   ChevronRight,
   Handshake,
+  Sparkles,
 } from 'lucide-react';
 import { AnimatedNumber } from '../components/AnimatedNumber';
 import { Pagination } from '../components/Pagination';
@@ -589,6 +590,14 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
                             Credit
                           </span>
                         )}
+                        {order.bonus_info?.used_for_debt && (
+                          <div className="mt-1">
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-800/50" title={order.bonus_info.offset_notes || 'Bonus used for debt settlement'}>
+                              <Sparkles className="w-2.5 h-2.5 text-emerald-500" />
+                              Used for Debt
+                            </span>
+                          </div>
+                        )}
                       </td>
 
                       {/* Col 7: Action */}
@@ -735,6 +744,14 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
                             <Clock className="w-3.5 h-3.5" />
                             Credit
                           </span>
+                        )}
+                        {order.bonus_info?.used_for_debt && (
+                          <div className="mt-1">
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-800/50" title={order.bonus_info.offset_notes || 'Bonus used for debt settlement'}>
+                              <Sparkles className="w-2.5 h-2.5 text-emerald-500" />
+                              Used for Debt
+                            </span>
+                          </div>
                         )}
                       </div>
                     </div>
