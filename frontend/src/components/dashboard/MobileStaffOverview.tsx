@@ -353,15 +353,13 @@ export const MobileStaffOverview: React.FC<MobileStaffOverviewProps> = ({
         </button>
       </div>
 
-      {/* ── 3. QUICK 4-CARD METRIC SQUIRCLES (Matching Owner Benchmark) ── */}
-      <div className="w-full rounded-[24px] bg-white dark:bg-[#111C2D] border border-slate-200/80 dark:border-slate-800/80 shadow-[0_4px_24px_-4px_rgba(0,0,0,0.06)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] p-2.5 min-[390px]:p-3 select-none animate-stagger-2">
+      {/* ── 3. QUICK 4-CARD METRIC SQUIRCLES (Clean Neutral & Emerald Theme) ── */}
+      <div className="w-full rounded-2xl bg-white dark:bg-[#111C2D] border border-slate-200/80 dark:border-slate-800/80 shadow-2xs p-2.5 min-[390px]:p-3 select-none animate-stagger-2">
         <div className="grid grid-cols-4 gap-1.5">
           {/* Week Volume */}
           <div className="flex flex-col items-center text-center">
-            <div className="size-11 rounded-[16px] p-0.5 bg-slate-100/80 dark:bg-slate-800/50 border border-slate-200/60 dark:border-white/5 flex items-center justify-center shrink-0 shadow-xs">
-              <div className="w-full h-full rounded-[13px] bg-gradient-to-b from-[#eef9f2] to-[#ddf4e6] dark:from-[#0b2b1d] dark:to-[#071f15] flex items-center justify-center">
-                <TrendingUp className="w-5 h-5 text-emerald-600 dark:text-emerald-400 stroke-[2.2]" />
-              </div>
+            <div className="size-10 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60 flex items-center justify-center shrink-0 shadow-2xs">
+              <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400 stroke-[2.2]" />
             </div>
             <span className="text-[10.5px] font-semibold text-slate-700 dark:text-slate-300 mt-1 truncate">
               Week
@@ -373,15 +371,13 @@ export const MobileStaffOverview: React.FC<MobileStaffOverviewProps> = ({
 
           {/* Month Volume */}
           <div className="flex flex-col items-center text-center">
-            <div className="size-11 rounded-[16px] p-0.5 bg-slate-100/80 dark:bg-slate-800/50 border border-slate-200/60 dark:border-white/5 flex items-center justify-center shrink-0 shadow-xs">
-              <div className="w-full h-full rounded-[13px] bg-gradient-to-b from-[#eaf4ff] to-[#d6ebff] dark:from-[#0d273a] dark:to-[#091b29] flex items-center justify-center">
-                <DollarSign className="w-5 h-5 text-sky-600 dark:text-sky-400 stroke-[2.2]" />
-              </div>
+            <div className="size-10 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60 flex items-center justify-center shrink-0 shadow-2xs">
+              <DollarSign className="w-4 h-4 text-slate-700 dark:text-slate-300 stroke-[2.2]" />
             </div>
             <span className="text-[10.5px] font-semibold text-slate-700 dark:text-slate-300 mt-1 truncate">
               Month
             </span>
-            <span className="text-[10px] font-bold font-mono text-sky-600 dark:text-sky-400 truncate">
+            <span className="text-[10px] font-bold font-mono text-slate-900 dark:text-white truncate">
               <AnimatedNumber value={userStats.month_volume} compact />
             </span>
           </div>
@@ -391,12 +387,10 @@ export const MobileStaffOverview: React.FC<MobileStaffOverviewProps> = ({
             onClick={onOpenStatement}
             className="flex flex-col items-center text-center cursor-pointer active:scale-95 transition-transform"
           >
-            <div className="size-11 rounded-[16px] p-0.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/80 dark:border-emerald-800/60 flex items-center justify-center shrink-0 shadow-xs">
-              <div className="w-full h-full rounded-[13px] bg-gradient-to-b from-[#eef9f2] to-[#ddf4e6] dark:from-[#0b2b1d] dark:to-[#071f15] flex items-center justify-center">
-                <DollarSign className="w-5 h-5 text-emerald-600 dark:text-emerald-400 stroke-[2.4]" />
-              </div>
+            <div className="size-10 rounded-xl bg-black dark:bg-black border border-emerald-500/40 flex items-center justify-center shrink-0 shadow-2xs">
+              <DollarSign className="w-4 h-4 text-emerald-400 stroke-[2.2]" />
             </div>
-            <span className="text-[10.5px] font-semibold text-emerald-700 dark:text-emerald-300 mt-1 truncate">
+            <span className="text-[10.5px] font-semibold text-emerald-600 dark:text-emerald-400 mt-1 truncate">
               Bonus
             </span>
             <span className="text-[10px] font-bold font-mono text-emerald-600 dark:text-emerald-400 truncate">
@@ -406,15 +400,13 @@ export const MobileStaffOverview: React.FC<MobileStaffOverviewProps> = ({
 
           {/* Custody */}
           <div className="flex flex-col items-center text-center">
-            <div className="size-11 rounded-[16px] p-0.5 bg-slate-100/80 dark:bg-slate-800/50 border border-slate-200/60 dark:border-white/5 flex items-center justify-center shrink-0 shadow-xs">
-              <div className="w-full h-full rounded-[13px] bg-gradient-to-b from-[#f8fafc] to-[#f1f5f9] dark:from-[#182338] dark:to-[#0f172a] flex items-center justify-center">
-                <Smartphone className="w-5 h-5 text-slate-600 dark:text-slate-300 stroke-[2.2]" />
-              </div>
+            <div className="size-10 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60 flex items-center justify-center shrink-0 shadow-2xs">
+              <Smartphone className="w-4 h-4 text-slate-600 dark:text-slate-400 stroke-[2]" />
             </div>
             <span className="text-[10.5px] font-semibold text-slate-700 dark:text-slate-300 mt-1 truncate">
               Custody
             </span>
-            <span className="text-[10px] font-bold font-mono text-slate-600 dark:text-slate-300 truncate">
+            <span className="text-[10px] font-bold font-mono text-slate-600 dark:text-slate-400 truncate">
               {activeHandoversCount > 0 ? `${activeHandoversCount}u · ${(activeHandoversValue / 1000).toFixed(0)}k` : '0 units'}
             </span>
           </div>
