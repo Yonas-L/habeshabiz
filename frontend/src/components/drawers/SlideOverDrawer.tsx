@@ -5,25 +5,29 @@ import { X } from 'lucide-react';
 interface SlideOverDrawerProps {
   isOpen: boolean;
   onClose: () => void;
-  title: string;
+  title?: string;
   subtitle?: string;
   badge?: React.ReactNode;
   headerActions?: React.ReactNode;
   children: React.ReactNode;
   footerActions?: React.ReactNode;
   widthClass?: string; // Default: 'sm:max-w-xl'
+  customHeader?: React.ReactNode;
+  contentClassName?: string;
 }
 
 export const SlideOverDrawer: React.FC<SlideOverDrawerProps> = ({
   isOpen,
   onClose,
-  title,
+  title = '',
   subtitle,
   badge,
   headerActions,
   children,
   footerActions,
   widthClass = 'sm:max-w-xl',
+  customHeader,
+  contentClassName,
 }) => {
   const [rendered, setRendered] = useState(isOpen);
   const [isClosing, setIsClosing] = useState(false);
@@ -78,36 +82,40 @@ export const SlideOverDrawer: React.FC<SlideOverDrawerProps> = ({
           }`}
         >
           {/* Header */}
-          <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-4 bg-white/80 dark:bg-[#131926]/80 backdrop-blur-sm z-10 shrink-0 no-print">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-slate-900 dark:text-white tracking-tight truncate">
-                  {title}
-                </h2>
-                {badge}
+          {customHeader ? (
+            <div className="shrink-0 z-10 no-print">{customHeader}</div>
+          ) : (
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-4 bg-white/80 dark:bg-[#131926]/80 backdrop-blur-sm z-10 shrink-0 no-print">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base font-bold text-slate-900 dark:text-white tracking-tight truncate">
+                    {title}
+                  </h2>
+                  {badge}
+                </div>
+                {subtitle && (
+                  <p className="text-xs text-slate-400 dark:text-slate-500 font-medium truncate mt-0.5">
+                    {subtitle}
+                  </p>
+                )}
               </div>
-              {subtitle && (
-                <p className="text-xs text-slate-400 dark:text-slate-500 font-medium truncate mt-0.5">
-                  {subtitle}
-                </p>
-              )}
-            </div>
 
-            <div className="flex items-center gap-2 shrink-0">
-              {headerActions}
-              <button
-                type="button"
-                onClick={onClose}
-                className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors active:scale-95"
-                aria-label="Close drawer"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                {headerActions}
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors active:scale-95 cursor-pointer"
+                  aria-label="Close drawer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Scrollable Progressive Disclosure Body */}
-          <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+          <div className={`flex-1 overflow-y-auto ${contentClassName || 'px-6 py-5 space-y-6'}`}>
             {children}
           </div>
 

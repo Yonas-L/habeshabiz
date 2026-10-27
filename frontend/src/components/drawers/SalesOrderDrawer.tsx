@@ -5,20 +5,20 @@ import { api } from '../../api/client';
 import { SlideOverDrawer } from './SlideOverDrawer';
 import { toast } from 'sonner';
 import {
+  ArrowLeft,
+  X,
+  Download,
   Copy,
   Check,
-  Printer,
   Share2,
-  CheckCircle2,
-  Clock,
+  ShieldCheck,
+  Lock,
   ChevronDown,
   ChevronUp,
-  Lock,
-  ArrowRightLeft,
   Loader2,
-  Repeat,
   Undo2,
   ArrowLeftRight,
+  Repeat,
 } from 'lucide-react';
 import { SwapDeviceModal } from '../inventory/SwapDeviceModal';
 import { downloadPdf } from '../../utils/downloadPdf';
@@ -81,19 +81,23 @@ export const SalesOrderDrawer: React.FC<SalesOrderDrawerProps> = ({
         setCollectAccountId((prev) => prev || active[0].id);
       }
     } else if (isOpen) {
-      api.getAccounts().then((res) => {
-        const treasury = res.treasury_accounts || [];
-        setInternalAccounts(treasury);
-        const active = treasury.filter((a) => !a.is_custom_asset && a.is_active !== false);
-        if (active.length > 0) {
-          setCollectAccountId((prev) => prev || active[0].id);
-        }
-      }).catch(() => {});
+      api
+        .getAccounts()
+        .then((res) => {
+          const treasury = res.treasury_accounts || [];
+          setInternalAccounts(treasury);
+          const active = treasury.filter((a) => !a.is_custom_asset && a.is_active !== false);
+          if (active.length > 0) {
+            setCollectAccountId((prev) => prev || active[0].id);
+          }
+        })
+        .catch(() => {});
     }
   }, [accounts, isOpen]);
 
   const isOwner = user?.role === 'owner';
-  const canManageInv = isOwner || !!user?.can_manage_inventory || !!user?.permissions?.can_manage_inventory;
+  const canManageInv =
+    isOwner || !!user?.can_manage_inventory || !!user?.permissions?.can_manage_inventory;
 
   const swappableUnits = useMemo(() => {
     if (!order) return [];
@@ -125,11 +129,24 @@ export const SalesOrderDrawer: React.FC<SalesOrderDrawerProps> = ({
   const netPayable = Math.max(0, grossAmount - discountAmount - exchangeAllowance);
   const paidAmount = parseFloat(String(order.paid_amount)) || 0;
   const remainingDebt = Math.max(0, netPayable - paidAmount - writeOffAmount);
-  const isRefunded = order.payment_status === 'refunded' || (order.items.length > 0 && order.items.every((i) => i.inventory_unit?.status === 'returned' || i.inventory_unit?.status === 'returned_to_vendor'));
+  const isRefunded =
+    order.payment_status === 'refunded' ||
+    (order.items.length > 0 &&
+      order.items.every(
+        (i) =>
+          i.inventory_unit?.status === 'returned' ||
+          i.inventory_unit?.status === 'returned_to_vendor'
+      ));
   const isOffset = order.payment_method === 'debt_offset';
-  const isB2B = isOffset || (order.customer?.roles?.some((r: string) => ['peer_vendor', 'vendor', 'supplier', 'partner'].includes(r)) ?? false);
+  const isB2B =
+    isOffset ||
+    (order.customer?.roles?.some((r: string) =>
+      ['peer_vendor', 'vendor', 'supplier', 'partner'].includes(r)
+    ) ??
+      false);
   const isPaid = !isRefunded && (order.payment_status === 'paid' || remainingDebt === 0);
   const settledSaleValue = Math.max(0, netPayable - writeOffAmount);
+  const totalItemCount = order.items.reduce((sum, item) => sum + (item.quantity || 1), 0);
 
   const sanitizeOrderNotes = (notes?: string | null) => {
     if (!notes) return null;
@@ -214,7 +231,9 @@ export const SalesOrderDrawer: React.FC<SalesOrderDrawerProps> = ({
     setCollectAmount(rem > 0 ? rem.toString() : '');
     const activeAccounts = internalAccounts.filter((a) => !a.is_custom_asset && a.is_active !== false);
     if (activeAccounts.length > 0) {
-      setCollectAccountId((prev) => (prev && activeAccounts.some((a) => a.id === prev) ? prev : activeAccounts[0].id));
+      setCollectAccountId((prev) =>
+        prev && activeAccounts.some((a) => a.id === prev) ? prev : activeAccounts[0].id
+      );
     }
     setIsCollectSplit(false);
     setCollectSplits([]);
@@ -236,10 +255,15 @@ export const SalesOrderDrawer: React.FC<SalesOrderDrawerProps> = ({
     if (isCollectSplit) {
       const totalAllocated = collectSplits.reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
       if (Math.abs(totalAllocated - amt) > 0.01) {
-        toast.error(`Split amounts (${totalAllocated.toLocaleString()} ETB) must equal total collection (${amt.toLocaleString()} ETB)`);
+        toast.error(
+          `Split amounts (${totalAllocated.toLocaleString()} ETB) must equal total collection (${amt.toLocaleString()} ETB)`
+        );
         return;
       }
-      if (collectSplits.length === 0 || collectSplits.some((s) => !s.financial_account_id || s.amount <= 0)) {
+      if (
+        collectSplits.length === 0 ||
+        collectSplits.some((s) => !s.financial_account_id || s.amount <= 0)
+      ) {
         toast.error('All split accounts must have a valid account and amount greater than 0');
         return;
       }
@@ -297,16 +321,27 @@ export const SalesOrderDrawer: React.FC<SalesOrderDrawerProps> = ({
         const tagText = isExchanged ? ' - Exchanged' : '';
         const imeiText = unit?.imei_or_serial ? `\n   SN: ${unit.imei_or_serial}` : '';
         const batteryText = unit?.battery_health ? ` · ${unit.battery_health}% Batt` : '';
-        const cycleText = unit?.cycle_count !== null && unit?.cycle_count !== undefined ? ` · ${unit.cycle_count} cycles` : '';
+        const cycleText =
+          unit?.cycle_count !== null && unit?.cycle_count !== undefined
+            ? ` · ${unit.cycle_count} cycles`
+            : '';
         const isAccessory = item.is_accessory || Boolean(item.accessory_name);
-        const isVendoredAcc = isAccessory && (item.sourcing_type === 'brokered_neighbour' || Boolean(item.vendor_contact_id));
-        const itemName = item.accessory_name || (isVendoredAcc ? 'Vendored Accessory' : isAccessory ? 'Accessory' : (variant?.product?.name || item.variant?.product?.name || 'Device'));
+        const isVendoredAcc =
+          isAccessory && (item.sourcing_type === 'brokered_neighbour' || Boolean(item.vendor_contact_id));
+        const itemName =
+          item.accessory_name ||
+          (isVendoredAcc
+            ? 'Vendored Accessory'
+            : isAccessory
+            ? 'Accessory'
+            : variant?.product?.name || item.variant?.product?.name || 'Device');
         const tagPrefix = isVendoredAcc ? ' [Vendored Accessory]' : isAccessory ? ' [Accessory]' : '';
         const spec = [variant?.storage, variant?.color].filter(Boolean).join(' · ');
         const specText = spec && !isAccessory ? ` - ${spec}` : '';
-        const receiptUnitPrice = order.items.length === 1
-          ? settledSaleValue / Math.max(1, Number(item.quantity || 1))
-          : Number(item.unit_price);
+        const receiptUnitPrice =
+          order.items.length === 1
+            ? settledSaleValue / Math.max(1, Number(item.quantity || 1))
+            : Number(item.unit_price);
         const hardwareSpecs = !isAccessory ? `${tagText}${imeiText}${batteryText}${cycleText}` : '';
         return `${index + 1}. ${item.quantity}x ${itemName}${tagPrefix}${specText}${hardwareSpecs}\n   ${receiptUnitPrice.toLocaleString()} ETB`;
       })
@@ -342,12 +377,16 @@ Subtotal: ${grossAmount.toLocaleString()} ETB
 ${discountAmount > 0 ? `Discount: -${discountAmount.toLocaleString()} ETB\n` : ''}${writeOffAmount > 0 ? `Intentional Price Concession: -${writeOffAmount.toLocaleString()} ETB\n` : ''}${exchangeAllowance > 0 ? `Exchanged Device: ${exchangeAllowance.toLocaleString()} ETB\n` : ''}${exchangeAllowance > 0 ? 'Cash Difference to Pay' : 'Final Agreed Value'}: ${settledSaleValue.toLocaleString()} ETB
 Amount Paid: ${paidAmount.toLocaleString()} ETB
 ${remainingDebt > 0 ? `Balance Due: ${remainingDebt.toLocaleString()} ETB\n` : ''}========================================
-${isB2B ? `B2B SETTLEMENT NOTICE:
+${
+  isB2B
+    ? `B2B SETTLEMENT NOTICE:
 • Transacted as mutual partner trade / debt offset.
-• Subject to standard bilateral trade & defect agreements.` : `WARRANTY & TERMS:
+• Subject to standard bilateral trade & defect agreements.`
+    : `WARRANTY & TERMS:
 • 7 Days Testing Warranty on internal hardware.
 • Valid receipt and matching IMEI required for warranty claims.
-• Physical or water damage voids warranty.`}
+• Physical or water damage voids warranty.`
+}
 
 Thank you for choosing Habeshabiz Electronics!
 ========================================`;
@@ -384,377 +423,328 @@ Thank you for choosing Habeshabiz Electronics!
     } catch (err) {
       console.warn('Backend vector PDF download failed, falling back to client-side capture:', err);
       // Seamless client-side fallback
-      await downloadPdf(
-        'printable-invoice',
-        filename,
-        undefined,
-        undefined,
-      );
+      await downloadPdf('printable-invoice', filename, undefined, undefined);
     } finally {
       setIsDownloadingPdf(false);
     }
   };
+
+  // Determine settlement destination display
+  const settlementDestination =
+    order.payment_splits && order.payment_splits.length > 1
+      ? `Split Accounts (${order.payment_splits.length})`
+      : order.financial_account?.name || formatPaymentMethod(order.payment_method);
 
   return (
     <>
       <SlideOverDrawer
         isOpen={isOpen}
         onClose={onClose}
-        widthClass="sm:max-w-2xl"
-        title={`Order #${order.order_number}`}
-        subtitle={`${formattedDate}${formattedTime ? ` • ${formattedTime}` : ''}`}
-        badge={
-          <span
-            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-              isRefunded
-                ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border border-rose-200/60 dark:border-rose-800/60'
-                : writeOffAmount > 0
-                ? 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
-                : isPaid && isOffset
-                ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border border-indigo-200/60 dark:border-indigo-800/60'
-                : isPaid
-                ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60'
-                : 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/60 dark:border-amber-800/60'
-            }`}
-          >
-            {isRefunded ? (
-              <Undo2 className="w-3 h-3 shrink-0" />
-            ) : isPaid && isOffset ? (
-              <ArrowLeftRight className="w-3 h-3 shrink-0" />
-            ) : isPaid ? (
-              <CheckCircle2 className="w-3 h-3 shrink-0" />
-            ) : (
-              <Clock className="w-3 h-3 shrink-0" />
-            )}
-            <span>
-              {isRefunded
-                ? 'Refunded / Returned'
-                : writeOffAmount > 0
-                ? 'Concession Settled'
-                : isPaid && isOffset
-                ? 'Settled (B2B Offset)'
-                : isPaid
-                ? 'Paid in Full'
-                : 'Credit Due'}
-            </span>
-          </span>
-        }
-        headerActions={
-          <div className="flex items-center gap-1">
-            <button
-              onClick={handleCopyReceipt}
-              title="Copy Sharable Receipt"
-              className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-            >
-              {copiedReceipt ? <Check className="w-4 h-4 text-emerald-600" /> : <Share2 className="w-4 h-4" />}
-            </button>
-            <button
-              onClick={handlePrint}
-              disabled={isDownloadingPdf}
-              title="Download invoice as PDF"
-              className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50 cursor-pointer"
-            >
-              {isDownloadingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
-            </button>
-          </div>
-        }
-        footerActions={
-          <div className="w-full">
-            {/* Desktop Action Row (≥ sm): Clean aligned buttons */}
-            <div className="hidden sm:flex sm:items-center sm:justify-between sm:w-full gap-3">
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-colors cursor-pointer shrink-0 whitespace-nowrap"
-                >
-                  Close
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCopyReceipt}
-                  className="h-9 px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 whitespace-nowrap"
-                >
-                  {copiedReceipt ? <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" /> : <Share2 className="w-3.5 h-3.5 shrink-0" />}
-                  <span>{copiedReceipt ? 'Copied' : 'Share Receipt'}</span>
-                </button>
+        widthClass="sm:max-w-2xl lg:max-w-[760px]"
+        contentClassName="px-5 sm:px-8 py-5 space-y-6 overflow-x-hidden"
+        customHeader={
+          <div className="px-5 sm:px-8 pt-5 pb-4 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-[#111C2D]">
+            {/* Top Navigation Row: Back to orders + Close X */}
+            <div className="flex items-center justify-between mb-3.5">
+              <button
+                type="button"
+                onClick={onClose}
+                className="text-xs font-medium text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer group"
+              >
+                <ArrowLeft className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 group-hover:-translate-x-0.5 transition-transform" />
+                <span>Back to orders</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                aria-label="Close drawer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Main Order Header Row: Order Number + Date/Status (Left) and Download PDF (Right) */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight font-mono">
+                    #{order.order_number}
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={handleCopyOrderNumber}
+                    title="Copy Order Number"
+                    className="text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors p-1"
+                  >
+                    {copiedId ? (
+                      <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5 text-emerald-600/70 dark:text-emerald-400/70" />
+                    )}
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2 mt-1 text-xs text-slate-500 dark:text-slate-400 flex-wrap">
+                  <span>
+                    {formattedDate} • {formattedTime}
+                  </span>
+                  <span>•</span>
+                  {/* Status indicator pill matching reference image: green dot + Paid in Full */}
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700">
+                    <span
+                      className={`w-2 h-2 rounded-full ${
+                        isRefunded
+                          ? 'bg-rose-500'
+                          : remainingDebt > 0
+                          ? 'bg-amber-500'
+                          : 'bg-emerald-500'
+                      }`}
+                    />
+                    <span>
+                      {isRefunded
+                        ? 'Refunded'
+                        : writeOffAmount > 0
+                        ? 'Concession Settled'
+                        : isPaid && isOffset
+                        ? 'Settled (Offset)'
+                        : isPaid
+                        ? 'Paid in Full'
+                        : 'Credit Due'}
+                    </span>
+                  </span>
+                </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                {canManageInv && swappableUnits.length > 0 && onInitiateReturn && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (order) onInitiateReturn(order);
-                    }}
-                    className="h-9 px-3.5 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/60 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 border border-rose-200/60 dark:border-rose-800/60 text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 active:scale-95 cursor-pointer shrink-0 whitespace-nowrap"
-                    title="Process customer return"
-                  >
-                    <Undo2 className="w-3.5 h-3.5 shrink-0" />
-                    <span>Return</span>
-                  </button>
-                )}
-
-                {canManageInv && swappableUnits.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (onInitiateSwap && order) {
-                        onInitiateSwap(order);
-                      } else if (swappableUnits.length === 1) {
-                        setSwapUnitTarget(swappableUnits[0]);
-                      } else {
-                        setShowMultiSwapPicker(true);
-                      }
-                    }}
-                    className="h-9 px-3.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60 text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 active:scale-95 cursor-pointer shrink-0 whitespace-nowrap"
-                    title="Warranty Swap"
-                  >
-                    <ArrowLeftRight className="w-3.5 h-3.5 shrink-0" />
-                    <span>Warranty Swap</span>
-                  </button>
-                )}
-
+              {/* Top Primary Action: Download PDF */}
+              <div className="flex items-center gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={handlePrint}
                   disabled={isDownloadingPdf}
-                  className="h-9 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs flex items-center gap-1.5 active:scale-95 cursor-pointer shrink-0 disabled:opacity-60 whitespace-nowrap"
+                  className="h-9 px-3.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/60 text-xs font-medium flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer disabled:opacity-50 active:scale-95 whitespace-nowrap"
                 >
-                  {isDownloadingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" /> : <Printer className="w-3.5 h-3.5 shrink-0" />}
-                  <span>{isDownloadingPdf ? 'Generating…' : 'Download PDF'}</span>
+                  {isDownloadingPdf ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-600 dark:text-emerald-400" />
+                  ) : (
+                    <Download className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  )}
+                  <span>Download PDF</span>
                 </button>
-              </div>
-            </div>
-
-            {/* Mobile Action Rows (< sm): High contrast full-width primary + secondary */}
-            <div className="flex sm:hidden flex-col gap-2 w-full">
-              {/* Row 1: Primary Action */}
-              <button
-                type="button"
-                onClick={handlePrint}
-                disabled={isDownloadingPdf}
-                className="w-full h-10 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer whitespace-nowrap disabled:opacity-60"
-              >
-                {isDownloadingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" /> : <Printer className="w-3.5 h-3.5 shrink-0" />}
-                <span>{isDownloadingPdf ? 'Generating PDF…' : 'Download Invoice PDF'}</span>
-              </button>
-
-              {/* Row 2: Secondary Contextual Actions */}
-              <div className="flex items-center gap-2 w-full">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="flex-1 h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center justify-center whitespace-nowrap cursor-pointer"
-                >
-                  Close
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleCopyReceipt}
-                  className="flex-1 h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer active:scale-95 whitespace-nowrap"
-                >
-                  {copiedReceipt ? <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" /> : <Share2 className="w-3.5 h-3.5 shrink-0" />}
-                  <span>{copiedReceipt ? 'Copied' : 'Share'}</span>
-                </button>
-
-                {canManageInv && swappableUnits.length > 0 && onInitiateReturn && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (order) onInitiateReturn(order);
-                    }}
-                    className="flex-1 h-9 px-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/60 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 border border-rose-200/60 dark:border-rose-800/60 text-xs font-bold transition-all shadow-2xs flex items-center justify-center gap-1 active:scale-95 cursor-pointer whitespace-nowrap"
-                    title="Process customer return"
-                  >
-                    <Undo2 className="w-3.5 h-3.5 shrink-0" />
-                    <span>Return</span>
-                  </button>
-                )}
-
-                {canManageInv && swappableUnits.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (onInitiateSwap && order) {
-                        onInitiateSwap(order);
-                      } else if (swappableUnits.length === 1) {
-                        setSwapUnitTarget(swappableUnits[0]);
-                      } else {
-                        setShowMultiSwapPicker(true);
-                      }
-                    }}
-                    className="flex-1 h-9 px-2.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60 text-xs font-bold transition-all shadow-2xs flex items-center justify-center gap-1 active:scale-95 cursor-pointer whitespace-nowrap"
-                    title="Warranty Swap"
-                  >
-                    <ArrowLeftRight className="w-3.5 h-3.5 shrink-0" />
-                    <span>Swap</span>
-                  </button>
-                )}
               </div>
             </div>
           </div>
         }
+        footerActions={
+          <div className="w-full flex items-center justify-between gap-2.5 flex-wrap">
+            {/* Left: Secondary actions (Close, Share) */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="h-9 px-3.5 sm:px-4 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-medium transition-colors cursor-pointer shrink-0 whitespace-nowrap"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={handleCopyReceipt}
+                className="h-9 px-3 sm:px-3.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 whitespace-nowrap"
+              >
+                {copiedReceipt ? (
+                  <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                ) : (
+                  <Share2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                )}
+                <span>{copiedReceipt ? 'Copied' : 'Share Receipt'}</span>
+              </button>
+            </div>
+
+            {/* Right: Contextual actions (Return, Swap) + Primary Download PDF */}
+            <div className="flex items-center gap-2">
+              {canManageInv && swappableUnits.length > 0 && onInitiateReturn && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (order) onInitiateReturn(order);
+                  }}
+                  className="h-9 px-2.5 sm:px-3 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer shrink-0 whitespace-nowrap"
+                  title="Process customer return"
+                >
+                  <Undo2 className="w-3.5 h-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  <span>Return</span>
+                </button>
+              )}
+
+              {canManageInv && swappableUnits.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onInitiateSwap && order) {
+                      onInitiateSwap(order);
+                    } else if (swappableUnits.length === 1) {
+                      setSwapUnitTarget(swappableUnits[0]);
+                    } else {
+                      setShowMultiSwapPicker(true);
+                    }
+                  }}
+                  className="h-9 px-2.5 sm:px-3 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer shrink-0 whitespace-nowrap"
+                  title="Warranty Swap"
+                >
+                  <ArrowLeftRight className="w-3.5 h-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  <span className="hidden sm:inline">Warranty Swap</span>
+                  <span className="sm:hidden">Swap</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={handlePrint}
+                disabled={isDownloadingPdf}
+                className="h-9 px-3.5 sm:px-4 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-semibold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer shrink-0 disabled:opacity-60 whitespace-nowrap"
+              >
+                {isDownloadingPdf ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0 text-emerald-400" />
+                ) : (
+                  <Download className="w-3.5 h-3.5 shrink-0 text-emerald-400 dark:text-emerald-600" />
+                )}
+                <span>Download PDF</span>
+              </button>
+            </div>
+          </div>
+        }
       >
-        <div id="printable-invoice" className="space-y-4">
-          {/* ═══ SECTION 1: CLEAN TRANSACTION SUMMARY TILES ═══ */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-            {/* Tile 1: Total Sale */}
-            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200/80 dark:border-slate-800">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                Total Agreed Sale
+        <div id="printable-invoice" className="space-y-6">
+          {/* ═══════════════════════════════════════════════════════════════
+              SECTION B: FINANCIAL SUMMARY (3-Column Layout, Flat, Subtle Divider)
+             ═══════════════════════════════════════════════════════════════ */}
+          <div className="grid grid-cols-3 gap-2 sm:gap-6 pb-5 sm:pb-6 border-b border-slate-100 dark:border-slate-800">
+            {/* Column 1: Total Amount */}
+            <div className="min-w-0">
+              <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-slate-400 block truncate">
+                Total Amount
               </span>
-              <div className="text-base sm:text-lg font-black font-mono text-slate-900 dark:text-white tabular-nums mt-0.5">
-                {settledSaleValue.toLocaleString()} <span className="text-xs font-normal text-slate-400 font-sans">ETB</span>
+              <div className="text-sm min-[390px]:text-base sm:text-2xl font-bold font-mono text-emerald-700 dark:text-emerald-400 tabular-nums mt-0.5 sm:mt-1 truncate">
+                {settledSaleValue.toLocaleString()}{' '}
+                <span className="text-[10px] sm:text-xs font-normal text-slate-400 font-sans">ETB</span>
               </div>
-              <span className="text-[10px] text-slate-400 block mt-0.5">
-                {order.items.reduce((s, i) => s + (i.quantity || 1), 0)} unit(s) in order
+              <span className="text-[10px] sm:text-xs text-slate-400 block mt-0.5 truncate">
+                {totalItemCount} unit{totalItemCount !== 1 ? 's' : ''} in order
               </span>
             </div>
 
-            {/* Tile 2: Amount Paid */}
-            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200/80 dark:border-slate-800">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+            {/* Column 2: Amount Paid */}
+            <div className="border-l border-slate-100 dark:border-slate-800 pl-2.5 sm:pl-6 min-w-0">
+              <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-slate-400 block truncate">
                 Amount Paid
               </span>
-              <div className="text-base sm:text-lg font-black font-mono text-emerald-600 dark:text-emerald-400 tabular-nums mt-0.5">
-                {paidAmount.toLocaleString()} <span className="text-xs font-normal text-slate-400 font-sans">ETB</span>
+              <div className="text-sm min-[390px]:text-base sm:text-2xl font-bold font-mono text-emerald-700 dark:text-emerald-400 tabular-nums mt-0.5 sm:mt-1 truncate">
+                {paidAmount.toLocaleString()}{' '}
+                <span className="text-[10px] sm:text-xs font-normal text-slate-400 font-sans">ETB</span>
               </div>
-              <span className="text-[10px] text-slate-400 block mt-0.5 truncate">
-                {order.payment_splits && order.payment_splits.length > 1
-                  ? `via Split Accounts (${order.payment_splits.length})`
-                  : `via ${formatPaymentMethod(order.payment_method)}`}
+              <span className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 block mt-0.5 truncate">
+                {isPaid ? 'Paid in Full' : `Balance Remaining: ${remainingDebt.toLocaleString()} ETB`}
               </span>
             </div>
 
-            {/* Tile 3: Balance or Trade-in */}
-            <div className="col-span-2 sm:col-span-1 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200/80 dark:border-slate-800">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                {remainingDebt > 0 ? 'Balance Outstanding' : exchangeAllowance > 0 ? 'Trade Allowance' : 'Settlement'}
+            {/* Column 3: Settlement */}
+            <div className="border-l border-slate-100 dark:border-slate-800 pl-2.5 sm:pl-6 min-w-0">
+              <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-slate-400 block truncate">
+                Settlement
               </span>
-              <div
-                className={`text-base sm:text-lg font-black font-mono tabular-nums mt-0.5 ${
-                  remainingDebt > 0
-                    ? 'text-amber-600 dark:text-amber-400'
-                    : exchangeAllowance > 0
-                    ? 'text-purple-600 dark:text-purple-400'
-                    : 'text-emerald-600 dark:text-emerald-400'
-                }`}
-              >
-                {remainingDebt > 0
-                  ? `${remainingDebt.toLocaleString()} ETB`
-                  : exchangeAllowance > 0
-                  ? `−${exchangeAllowance.toLocaleString()} ETB`
-                  : 'Settled in Full'}
-              </div>
-              <span className="text-[10px] text-slate-400 block mt-0.5 truncate">
-                {order.financial_account?.name || (isPaid ? 'Ledger verified' : 'Collection pending')}
-              </span>
-            </div>
-
-            {/* Split Breakdown Details if present */}
-            {order.payment_splits && order.payment_splits.length > 1 && (
-              <div className="col-span-2 sm:col-span-3 p-3 rounded-2xl bg-slate-50/80 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800 space-y-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                  Deposit Accounts Split Breakdown
-                </span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {order.payment_splits.map((s, idx) => (
-                    <div key={idx} className="p-2 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/60 dark:border-slate-800 flex items-center justify-between text-xs">
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">
-                        {s.account_name || 'Account'}
-                      </span>
-                      <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                        {Number(s.amount).toLocaleString()} ETB
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* ═══ SECTION 2: CUSTOMER & ATtENDANT METADATA ═══ */}
-          <div className="p-4 rounded-2xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800 space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              {/* Customer / Partner */}
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                  {isB2B ? 'Trade Partner / Vendor' : 'Customer'}
-                </span>
-                <div className="font-bold text-slate-900 dark:text-white mt-0.5 flex items-center gap-1.5">
-                  <span>{order.customer?.name || (isB2B ? 'Partner' : 'Walk-in Customer')}</span>
-                  {isB2B && (
-                    <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border border-indigo-200/50 dark:border-indigo-800/50">
-                      B2B Partner
-                    </span>
-                  )}
-                </div>
-                {order.customer?.phone && (
-                  <div className="text-[11px] font-mono text-slate-500 dark:text-slate-400 mt-0.5">
-                    {order.customer.phone}
-                  </div>
+              <div className="text-xs min-[390px]:text-sm sm:text-xl font-bold text-slate-900 dark:text-white mt-0.5 sm:mt-1 truncate">
+                {remainingDebt > 0 ? (
+                  <span className="text-amber-600 dark:text-amber-400 font-mono">
+                    {remainingDebt.toLocaleString()} ETB Due
+                  </span>
+                ) : isRefunded ? (
+                  <span className="text-rose-600 dark:text-rose-400">Refunded</span>
+                ) : (
+                  <span>Settled in Full</span>
                 )}
               </div>
+              <span className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 block mt-0.5 truncate">
+                {settlementDestination}
+              </span>
+            </div>
+          </div>
 
-              {/* Order Attendant & Date */}
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                  Sales Attendant & Date
-                </span>
-                <div className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">
-                  {order.salesperson?.name || 'Store Sales Staff'}
+          {/* ═══════════════════════════════════════════════════════════════
+              SECTION C: CUSTOMER AND SALES ATTENDANT (2-Column Layout)
+             ═══════════════════════════════════════════════════════════════ */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 pb-6 border-b border-slate-100 dark:border-slate-800">
+            {/* Customer */}
+            <div>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block">
+                Customer
+              </span>
+              <div className="text-sm font-semibold text-slate-900 dark:text-white mt-1 flex items-center gap-1.5">
+                <span>{order.customer?.name || (isB2B ? 'Trade Partner' : 'Walk-in Customer')}</span>
+                {isB2B && (
+                  <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400">
+                    (B2B Partner)
+                  </span>
+                )}
+              </div>
+              {order.customer?.phone && (
+                <div className="text-xs font-mono text-slate-500 dark:text-slate-400 mt-0.5">
+                  {order.customer.phone}
                 </div>
-                <div className="text-[11px] text-slate-400 mt-0.5">
-                  {formattedDate} {formattedTime && `· ${formattedTime}`}
-                </div>
+              )}
+            </div>
+
+            {/* Sales Attendant & Date */}
+            <div className="sm:border-l sm:border-slate-100 dark:sm:border-slate-800 sm:pl-6">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block">
+                Sales Attendant & Date
+              </span>
+              <div className="text-sm font-semibold text-slate-900 dark:text-white mt-1">
+                {order.salesperson?.name || 'Sales Staff'}
+              </div>
+              <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                {formattedDate} • {formattedTime}
               </div>
             </div>
 
-            {/* Vendor Sourced Banner if applicable */}
-            {(order.is_vendor_sourced || order.vendor || order.items.some((i) => i.sourcing_type === 'brokered_neighbour' || i.inventory_unit?.source_type === 'vendor_direct')) && (
-              <div className="pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs flex-wrap gap-2">
-                <span className="text-[11px] text-amber-700 dark:text-amber-300 font-medium flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
-                  Vendor Sourced: <strong className="font-bold text-slate-900 dark:text-white">{order.vendor?.name || order.items.find((i) => i.vendor_contact)?.vendor_contact?.name || 'Partner Vendor'}</strong>
-                </span>
+            {/* Subtle Vendor Sourcing Row if applicable */}
+            {(order.is_vendor_sourced ||
+              order.vendor ||
+              order.items.some((i) => i.sourcing_type === 'brokered_neighbour')) && (
+              <div className="col-span-1 sm:col-span-2 pt-2 text-xs text-slate-500 dark:text-slate-400">
+                Vendor Sourced:{' '}
+                <strong className="text-slate-800 dark:text-slate-200 font-medium">
+                  {order.vendor?.name ||
+                    order.items.find((i) => i.vendor_contact)?.vendor_contact?.name ||
+                    'Partner Vendor'}
+                </strong>
                 {order.vendor_cost_basis != null && (
-                  <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400">
-                    Cost Basis: {Number(order.vendor_cost_basis).toLocaleString()} ETB ({order.vendor_payment_status || 'settled'})
+                  <span className="font-mono ml-2">
+                    (Cost Basis: {Number(order.vendor_cost_basis).toLocaleString()} ETB)
                   </span>
                 )}
               </div>
             )}
           </div>
 
-          {/* ═══ SECTION 3: ITEMIZED PURCHASED ITEMS ═══ */}
-          <div className="p-4 rounded-2xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800 space-y-3">
-            <div className="flex items-center justify-between">
-              <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                Purchased Items ({order.items.length})
-              </h4>
-              <button
-                type="button"
-                onClick={handleCopyOrderNumber}
-                className="text-[10px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 flex items-center gap-1 font-mono cursor-pointer"
-                title="Copy order number"
-              >
-                <span>#{order.order_number}</span>
-                {copiedId ? <Check className="w-2.5 h-2.5 text-emerald-600" /> : <Copy className="w-2.5 h-2.5" />}
-              </button>
-            </div>
+          {/* ═══════════════════════════════════════════════════════════════
+              SECTION D: PURCHASED ITEMS TABLE (Clean, Minimal, No Images)
+             ═══════════════════════════════════════════════════════════════ */}
+          <div className="space-y-3 pb-6 border-b border-slate-100 dark:border-slate-800">
+            <h3 className="text-sm sm:text-base font-semibold text-slate-900 dark:text-white">
+              Purchased Items ({order.items.length})
+            </h3>
 
-            {/* Desktop Table View (≥ md) */}
-            <div className="hidden md:block overflow-x-auto">
+            {/* Desktop Table View */}
+            <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-slate-100 dark:border-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    <th className="py-2 px-1 w-6 text-center">#</th>
-                    <th className="py-2 px-2">Item & Hardware</th>
-                    <th className="py-2 px-2 text-center w-10">Qty</th>
-                    <th className="py-2 px-2 text-right whitespace-nowrap">Unit Price</th>
-                    <th className="py-2 px-2 text-right whitespace-nowrap">Total</th>
+                  <tr className="border-b border-slate-100 dark:border-slate-800 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                    <th className="py-2.5 px-1.5 sm:px-2 w-6 sm:w-8 text-center font-mono">#</th>
+                    <th className="py-2.5 px-2 sm:px-3">Item & Hardware</th>
+                    <th className="py-2.5 px-2 sm:px-3 text-center w-10 sm:w-12">Qty</th>
+                    <th className="hidden sm:table-cell py-2.5 px-3 text-right whitespace-nowrap">Unit Price</th>
+                    <th className="py-2.5 px-2 sm:px-3 text-right whitespace-nowrap">Total</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
@@ -762,9 +752,17 @@ Thank you for choosing Habeshabiz Electronics!
                     const unit = item.inventory_unit;
                     const variant = unit?.variant || item.variant;
                     const isAccessory = item.is_accessory || Boolean(item.accessory_name);
-                    const isVendoredAcc = isAccessory && (item.sourcing_type === 'brokered_neighbour' || Boolean(item.vendor_contact_id));
+                    const isVendoredAcc =
+                      isAccessory &&
+                      (item.sourcing_type === 'brokered_neighbour' || Boolean(item.vendor_contact_id));
                     const specString = [variant?.storage, variant?.color].filter(Boolean).join(' · ');
-                    const pName = item.accessory_name || (isVendoredAcc ? 'Vendored Accessory' : isAccessory ? 'Accessory' : (variant?.product?.name || item.variant?.product?.name || 'Device'));
+                    const pName =
+                      item.accessory_name ||
+                      (isVendoredAcc
+                        ? 'Vendored Accessory'
+                        : isAccessory
+                        ? 'Accessory'
+                        : variant?.product?.name || item.variant?.product?.name || 'Device');
                     const conditionStr = formatCondition(unit?.condition);
                     const simStr = formatSimType(unit?.sim_type);
                     const lineUnitPrice =
@@ -775,41 +773,46 @@ Thank you for choosing Habeshabiz Electronics!
 
                     return (
                       <tr key={item.id || idx} className="align-top">
-                        <td className="py-2.5 px-1 text-center text-slate-400 font-mono text-[11px]">{idx + 1}</td>
-                        <td className="py-2.5 px-2 space-y-1">
-                          <div className="font-bold text-slate-900 dark:text-white text-xs flex items-center flex-wrap gap-1.5">
+                        <td className="py-3 px-1.5 sm:px-2 text-center text-slate-400 font-mono text-xs">
+                          {idx + 1}
+                        </td>
+                        <td className="py-3 px-2 sm:px-3 space-y-1">
+                          <div className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-white">
                             <span>{pName}</span>
-                            {specString && !isAccessory && <span className="font-normal text-slate-400">({specString})</span>}
+                            {specString && !isAccessory && (
+                              <span className="font-normal text-slate-500 dark:text-slate-400 ml-1.5">
+                                ({specString})
+                              </span>
+                            )}
                             {isAccessory && (
-                              <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
-                                isVendoredAcc
-                                  ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50 dark:border-amber-800/50'
-                                  : 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border border-indigo-200/50 dark:border-indigo-800/50'
-                              }`}>
-                                {isVendoredAcc ? 'Vendored Accessory' : 'Accessory'}
+                              <span className="ml-1.5 text-[10px] text-slate-400 font-normal">
+                                [Accessory]
                               </span>
                             )}
                           </div>
 
+                          {/* Cost info if authorized */}
                           {canViewCost && item.unit_cost != null && Number(item.unit_cost) > 0 && (
-                            <div className="text-[10px] text-slate-400 font-mono">
+                            <div className="text-[10.5px] text-slate-400 font-mono">
                               Cost: {Number(item.unit_cost).toLocaleString()} ETB
                             </div>
                           )}
 
+                          {/* Hardware specifications */}
                           {!isAccessory && (
-                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-slate-400 font-mono">
+                            <div className="flex flex-wrap items-center gap-x-2 text-[10.5px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">
                               {unit?.imei_or_serial && (
                                 <button
                                   type="button"
                                   onClick={() => handleCopyImei(unit.imei_or_serial!)}
-                                  className="inline-flex items-center gap-1 hover:text-slate-800 dark:hover:text-slate-100 transition-colors text-emerald-600 dark:text-emerald-400 font-bold"
+                                  className="inline-flex items-center gap-1 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
+                                  title="Click to copy serial number"
                                 >
                                   <span>SN: {unit.imei_or_serial}</span>
                                   {copiedImei === unit.imei_or_serial ? (
                                     <Check className="w-2.5 h-2.5 text-emerald-600" />
                                   ) : (
-                                    <Copy className="w-2.5 h-2.5 opacity-60" />
+                                    <Copy className="w-2.5 h-2.5 opacity-50" />
                                   )}
                                 </button>
                               )}
@@ -820,47 +823,43 @@ Thank you for choosing Habeshabiz Electronics!
                             </div>
                           )}
 
-                          {/* Swapped Defect History */}
+                          {/* Replacement or Return Notice */}
                           {Boolean(unit?.swapped_from_unit || unit?.swapped_from_unit_id) && (
-                            <div className="mt-1 flex items-center gap-1.5 text-[10px] text-indigo-700 dark:text-indigo-300 bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200/50 dark:border-indigo-900/40 rounded-lg px-2 py-0.5 font-mono">
-                              <ArrowLeftRight className="w-2.5 h-2.5 shrink-0" />
-                              <span>
-                                Warranty Replacement (Original: {unit?.swapped_from_unit?.imei_or_serial || 'Defective Unit'})
-                              </span>
+                            <div className="text-[10.5px] text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1">
+                              <ArrowLeftRight className="w-3 h-3 text-slate-400" />
+                              <span>Warranty Replacement</span>
                             </div>
                           )}
-
-                          {/* Customer Return History */}
                           {unit?.returned_at && (
-                            <div className="mt-1 flex items-center gap-1.5 text-[10px] text-rose-700 dark:text-rose-300 bg-rose-50/80 dark:bg-rose-950/40 border border-rose-200/50 dark:border-rose-900/40 rounded-lg px-2 py-0.5">
-                              <Undo2 className="w-2.5 h-2.5 shrink-0" />
-                              <span>Customer returned: {unit.return_reason || 'Defect reported'}</span>
+                            <div className="text-[10.5px] text-rose-600 dark:text-rose-400 flex items-center gap-1">
+                              <Undo2 className="w-3 h-3" />
+                              <span>Returned: {unit.return_reason || 'Defect reported'}</span>
                             </div>
                           )}
                         </td>
 
-                        <td className="py-2.5 px-2 text-center font-mono text-slate-800 dark:text-slate-200 font-bold">{item.quantity}</td>
+                        <td className="py-3 px-2 sm:px-3 text-center font-mono text-slate-800 dark:text-slate-200">
+                          {item.quantity}
+                        </td>
 
-                        <td className="py-2.5 px-2 text-right">
+                        <td className="hidden sm:table-cell py-3 px-3 text-right">
                           {lineUnitPrice === 0 ? (
-                            <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/70 dark:text-amber-300">
-                              Free Gift (0 ETB)
-                            </span>
+                            <span className="text-slate-400 text-xs">Free Gift</span>
                           ) : (
-                            <span className="font-mono text-slate-700 dark:text-slate-300 tabular-nums">
-                              {lineUnitPrice.toLocaleString()} <span className="text-[9px] text-slate-400 font-sans">ETB</span>
+                            <span className="font-mono text-slate-700 dark:text-slate-300">
+                              {lineUnitPrice.toLocaleString()}{' '}
+                              <span className="text-[10px] text-slate-400 font-sans">ETB</span>
                             </span>
                           )}
                         </td>
 
-                        <td className="py-2.5 px-2 text-right">
-                          <span className="font-mono font-bold text-slate-900 dark:text-white tabular-nums">
-                            {lineTotal === 0 ? (
-                              <span className="text-amber-600 dark:text-amber-400">0 ETB</span>
-                            ) : (
-                              `${lineTotal.toLocaleString()} ETB`
-                            )}
+                        <td className="py-3 px-2 sm:px-3 text-right">
+                          <span className="font-mono font-bold text-emerald-700 dark:text-emerald-400">
+                            {lineTotal === 0 ? '0 ETB' : `${lineTotal.toLocaleString()} ETB`}
                           </span>
+                          <div className="sm:hidden text-[10px] font-mono text-slate-400 mt-0.5">
+                            {lineUnitPrice === 0 ? 'Free' : `@ ${lineUnitPrice.toLocaleString()} ETB`}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -868,307 +867,203 @@ Thank you for choosing Habeshabiz Electronics!
                 </tbody>
               </table>
             </div>
-
-            {/* Mobile Cards View (< md) */}
-            <div className="md:hidden space-y-2.5">
-              {order.items.map((item, idx) => {
-                const unit = item.inventory_unit;
-                const variant = unit?.variant || item.variant;
-                const isAccessory = item.is_accessory || Boolean(item.accessory_name);
-                const isVendoredAcc = isAccessory && (item.sourcing_type === 'brokered_neighbour' || Boolean(item.vendor_contact_id));
-                const specString = [variant?.storage, variant?.color].filter(Boolean).join(' · ');
-                const pName = item.accessory_name || (isVendoredAcc ? 'Vendored Accessory' : isAccessory ? 'Accessory' : (variant?.product?.name || item.variant?.product?.name || 'Device'));
-                const conditionStr = formatCondition(unit?.condition);
-                const lineUnitPrice =
-                  order.items.length === 1
-                    ? settledSaleValue / Math.max(1, Number(item.quantity || 1))
-                    : parseFloat(String(item.unit_price)) || 0;
-                const lineTotal = item.quantity * lineUnitPrice;
-
-                return (
-                  <div
-                    key={item.id || idx}
-                    className="p-3 rounded-xl bg-slate-50/80 dark:bg-slate-900/40 border border-slate-200/60 dark:border-slate-800/80 space-y-2"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <div className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5 flex-wrap">
-                          <span>{pName}</span>
-                          {isAccessory && (
-                            <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
-                              isVendoredAcc
-                                ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50 dark:border-amber-800/50'
-                                : 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border border-indigo-200/50 dark:border-indigo-800/50'
-                            }`}>
-                              {isVendoredAcc ? 'Vendored Accessory' : 'Accessory'}
-                            </span>
-                          )}
-                        </div>
-                        {specString && !isAccessory && (
-                          <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                            {specString}
-                          </div>
-                        )}
-                        {canViewCost && item.unit_cost != null && Number(item.unit_cost) > 0 && (
-                          <div className="text-[10px] text-slate-400 font-mono mt-0.5">
-                            Cost: {Number(item.unit_cost).toLocaleString()} ETB
-                          </div>
-                        )}
-                      </div>
-                      <div className="text-right shrink-0">
-                        <div className="font-mono font-bold text-slate-900 dark:text-white text-xs">
-                          {lineTotal === 0 ? (
-                            <span className="text-amber-600 dark:text-amber-400">0 ETB</span>
-                          ) : (
-                            `${lineTotal.toLocaleString()} ETB`
-                          )}
-                        </div>
-                        <span className="text-[10px] text-slate-400 font-mono">
-                          {lineUnitPrice === 0 ? (
-                            <span className="text-amber-600 dark:text-amber-400 font-bold">Free Gift</span>
-                          ) : (
-                            `${item.quantity}x @ ${lineUnitPrice.toLocaleString()}`
-                          )}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Hardware info row with 1-tap IMEI copy */}
-                    {!isAccessory && (
-                      <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-200/50 dark:border-slate-800/60 text-[10px] font-mono">
-                        {unit?.imei_or_serial && (
-                          <button
-                            type="button"
-                            onClick={() => handleCopyImei(unit.imei_or_serial!)}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-emerald-600 dark:text-emerald-400 font-bold active:scale-95"
-                          >
-                            <span>SN: {unit.imei_or_serial}</span>
-                            {copiedImei === unit.imei_or_serial ? <Check className="w-2.5 h-2.5 text-emerald-600" /> : <Copy className="w-2.5 h-2.5 opacity-60" />}
-                          </button>
-                        )}
-                        {unit?.battery_health != null && (
-                          <span className="px-1.5 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300">
-                            {unit.battery_health}% Batt
-                          </span>
-                        )}
-                        {unit?.cycle_count != null && (
-                          <span className="px-1.5 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300">
-                            {unit.cycle_count} cycles
-                          </span>
-                        )}
-                        {conditionStr && (
-                          <span className="px-1.5 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400">
-                            {conditionStr}
-                          </span>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Swapped Warranty History */}
-                    {Boolean(unit?.swapped_from_unit || unit?.swapped_from_unit_id) && (
-                      <div className="text-[10px] text-indigo-700 dark:text-indigo-300 bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200/50 dark:border-indigo-900/40 rounded-lg p-2 font-mono flex items-center gap-1.5">
-                        <ArrowLeftRight className="w-3 h-3 shrink-0" />
-                        <span>Replaced SN: {unit?.swapped_from_unit?.imei_or_serial || 'Defective unit'}</span>
-                      </div>
-                    )}
-
-                    {/* Return History */}
-                    {unit?.returned_at && (
-                      <div className="text-[10px] text-rose-700 dark:text-rose-300 bg-rose-50/80 dark:bg-rose-950/40 border border-rose-200/50 dark:border-rose-900/40 rounded-lg p-2 flex items-center gap-1.5">
-                        <Undo2 className="w-3 h-3 shrink-0" />
-                        <span>Returned: {unit.return_reason || 'Defect reported'}</span>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
           </div>
 
-          {/* ═══ SECTION 4: FINANCIAL SETTLEMENT BREAKDOWN ═══ */}
-          <div className="p-4 rounded-2xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800 space-y-2 text-xs">
-            <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+          {/* ═══════════════════════════════════════════════════════════════
+              SECTION E: RECEIPT & SETTLEMENT SUMMARY (Direct, Clean, Flat)
+             ═══════════════════════════════════════════════════════════════ */}
+          <div className="space-y-3 pb-6 border-b border-slate-100 dark:border-slate-800">
+            <h3 className="text-sm sm:text-base font-semibold text-slate-900 dark:text-white">
               Receipt & Settlement Summary
-            </h4>
+            </h3>
 
-            {grossAmount !== netPayable && (
-              <div className="flex justify-between text-slate-500 dark:text-slate-400">
-                <span>Gross Subtotal</span>
-                <span className="font-mono tabular-nums">{grossAmount.toLocaleString()} ETB</span>
-              </div>
-            )}
-
-            {discountAmount > 0 && (
-              <div className="flex justify-between text-rose-600 dark:text-rose-400 font-medium">
-                <span>Discount Applied</span>
-                <span className="font-mono tabular-nums">−{discountAmount.toLocaleString()} ETB</span>
-              </div>
-            )}
-
-            {writeOffAmount > 0 && (
-              <div className="flex justify-between text-rose-600 dark:text-rose-400 font-medium">
-                <span>Price Concession (Write-Off)</span>
-                <span className="font-mono tabular-nums">−{writeOffAmount.toLocaleString()} ETB</span>
-              </div>
-            )}
-
-            {exchangeAllowance > 0 && (
-              <div className="flex justify-between text-purple-700 dark:text-purple-300 font-semibold bg-purple-50/70 dark:bg-purple-950/30 p-2 rounded-xl border border-purple-200/60 dark:border-purple-800/40">
-                <span className="flex items-center gap-1.5">
-                  <Repeat className="w-3.5 h-3.5 text-purple-500 shrink-0" />
-                  <span>
-                    Trade-In Credit ({order.exchange_unit?.variant?.product?.name || 'Device'}
-                    {order.exchange_unit?.imei_or_serial ? ` · ${order.exchange_unit.imei_or_serial}` : ''})
-                  </span>
-                </span>
-                <span className="font-mono tabular-nums whitespace-nowrap">−{exchangeAllowance.toLocaleString()} ETB</span>
-              </div>
-            )}
-
-            <div className="flex justify-between items-baseline pt-2 border-t border-slate-200/80 dark:border-slate-800">
-              <span className="font-bold text-slate-900 dark:text-white">
-                {exchangeAllowance > 0 ? 'Cash Difference to Pay' : 'Final Agreed Sale Value'}
-              </span>
-              <span className="inline-flex items-baseline gap-1 whitespace-nowrap font-black font-mono text-base text-slate-900 dark:text-white tabular-nums">
-                {settledSaleValue.toLocaleString()}
-                <span className="text-xs font-bold text-slate-400 font-sans">ETB</span>
-              </span>
-            </div>
-
-            <div className="flex justify-between text-slate-600 dark:text-slate-300 pt-1">
-              <span>Amount Paid</span>
-              <span className="font-mono tabular-nums font-bold text-emerald-600 dark:text-emerald-400">
-                +{paidAmount.toLocaleString()} ETB
-              </span>
-            </div>
-
-            {remainingDebt > 0 ? (
-              <div className="flex items-center justify-between font-bold text-amber-600 dark:text-amber-400 pt-1.5 border-t border-amber-200/60 dark:border-amber-800/40 bg-amber-50/50 dark:bg-amber-950/20 px-3 py-2 rounded-xl">
-                <div>
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300 block">Balance Due</span>
-                  <span className="font-mono tabular-nums text-sm font-bold">{remainingDebt.toLocaleString()} ETB</span>
+            {/* Optional gross / discount lines if applied */}
+            {(discountAmount > 0 || writeOffAmount > 0 || exchangeAllowance > 0) && (
+              <div className="space-y-1.5 text-xs text-slate-500 dark:text-slate-400 pb-2">
+                <div className="flex justify-between">
+                  <span>Gross Subtotal</span>
+                  <span className="font-mono">{grossAmount.toLocaleString()} ETB</span>
                 </div>
+                {discountAmount > 0 && (
+                  <div className="flex justify-between text-rose-600 dark:text-rose-400">
+                    <span>Discount Applied</span>
+                    <span className="font-mono">−{discountAmount.toLocaleString()} ETB</span>
+                  </div>
+                )}
+                {writeOffAmount > 0 && (
+                  <div className="flex justify-between text-rose-600 dark:text-rose-400">
+                    <span>Price Concession</span>
+                    <span className="font-mono">−{writeOffAmount.toLocaleString()} ETB</span>
+                  </div>
+                )}
+                {exchangeAllowance > 0 && (
+                  <div className="flex justify-between text-slate-700 dark:text-slate-300">
+                    <span className="flex items-center gap-1">
+                      <Repeat className="w-3 h-3 text-slate-400" />
+                      <span>Trade-in Allowance</span>
+                    </span>
+                    <span className="font-mono">−{exchangeAllowance.toLocaleString()} ETB</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 2-Column Summary matching reference image */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 pt-1">
+              {/* Final Agreed Sale Value */}
+              <div>
+                <span className="text-xs text-slate-500 dark:text-slate-400 block">
+                  Final Agreed Sale Value
+                </span>
+                <div className="text-xl sm:text-2xl font-bold font-mono text-emerald-700 dark:text-emerald-400 tabular-nums mt-1">
+                  {settledSaleValue.toLocaleString()}{' '}
+                  <span className="text-xs font-normal text-slate-400 font-sans">ETB</span>
+                </div>
+              </div>
+
+              {/* Amount Paid & Settlement Status */}
+              <div className="sm:border-l sm:border-slate-100 dark:sm:border-slate-800 sm:pl-6">
+                <span className="text-xs text-slate-500 dark:text-slate-400 block">
+                  Amount Paid
+                </span>
+                <div className="text-xl sm:text-2xl font-bold font-mono text-emerald-700 dark:text-emerald-400 tabular-nums mt-1">
+                  +{paidAmount.toLocaleString()}{' '}
+                  <span className="text-xs font-normal text-slate-400 font-sans">ETB</span>
+                </div>
+                <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-2">
+                  <span>Payment Settlement</span>
+                  <span className="font-medium text-slate-800 dark:text-slate-200">
+                    {remainingDebt > 0 ? (
+                      <span className="text-amber-600 dark:text-amber-400 font-bold">
+                        {remainingDebt.toLocaleString()} ETB Due
+                      </span>
+                    ) : (
+                      'Paid in Full'
+                    )}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* If balance is due, show a clean collection button */}
+            {remainingDebt > 0 && (
+              <div className="pt-2 flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800">
+                <span className="text-xs text-slate-600 dark:text-slate-300">
+                  Outstanding Debt:{' '}
+                  <strong className="text-amber-600 dark:text-amber-400 font-mono">
+                    {remainingDebt.toLocaleString()} ETB
+                  </strong>
+                </span>
                 <button
                   type="button"
                   onClick={handleOpenCollect}
-                  className="h-7 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-semibold transition-all shadow-2xs cursor-pointer whitespace-nowrap"
+                  className="h-8 px-3 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-semibold hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors cursor-pointer"
                 >
                   Collect Balance
                 </button>
               </div>
-            ) : (
-              <div className="flex justify-between font-semibold text-emerald-600 dark:text-emerald-400 pt-1">
-                <span>Payment Settlement</span>
-                <span>{writeOffAmount > 0 ? 'Settled with agreed price concession' : 'Paid in Full'}</span>
-              </div>
             )}
           </div>
 
-          {/* ═══ SECTION 5: NOTES & SERVICE RECORD ═══ */}
+          {/* ═══════════════════════════════════════════════════════════════
+              SECTION F: ORDER NOTES (if available)
+             ═══════════════════════════════════════════════════════════════ */}
           {order.notes && (
-            <div className="p-4 rounded-2xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800 space-y-1.5 text-xs">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                Order Notes & Service History
+            <div className="space-y-1 pb-6 border-b border-slate-100 dark:border-slate-800 text-xs">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block">
+                Order Notes
               </span>
-              <div className="text-slate-700 dark:text-slate-300 font-sans whitespace-pre-line leading-relaxed">
+              <p className="text-slate-600 dark:text-slate-300 whitespace-pre-line leading-relaxed">
                 {sanitizeOrderNotes(order.notes)}
-              </div>
+              </p>
             </div>
           )}
 
-          {/* ═══ SECTION 6: WARRANTY & TERMS NOTICE ═══ */}
-          <div className="text-[10px] text-slate-400 space-y-0.5 px-2">
-            <span className="font-semibold text-slate-500 dark:text-slate-400">Warranty Coverage: </span>
-            {tenant?.settings?.footer_note ||
-              '7-day testing warranty on internal hardware. Valid receipt and matching serial number required for claims. Physical or liquid damage excluded.'}
+          {/* ═══════════════════════════════════════════════════════════════
+              SECTION G: WARRANTY COVERAGE (Subtle & Minimal)
+             ═══════════════════════════════════════════════════════════════ */}
+          <div className="flex items-start gap-3 py-1 text-xs">
+            <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 mt-0.5 shrink-0" />
+            <div>
+              <div className="font-semibold text-slate-800 dark:text-slate-200">
+                Warranty Coverage
+              </div>
+              <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5 leading-relaxed">
+                {tenant?.settings?.footer_note ||
+                  'Thank you for your business. 7-day testing warranty on internal hardware.'}
+              </p>
+            </div>
           </div>
 
-          {/* ═══ SECTION 7: INTERNAL MARGIN AUDIT (Owner Only) ═══ */}
+          {/* ═══════════════════════════════════════════════════════════════
+              SECTION H: INTERNAL MARGIN AUDIT (Collapsible, Owner Only)
+             ═══════════════════════════════════════════════════════════════ */}
           {canViewCost && (
-            <div className="no-print border border-slate-200/80 dark:border-slate-800 rounded-2xl overflow-hidden bg-slate-50/60 dark:bg-slate-900/30">
+            <div className="no-print pt-3 border-t border-slate-100 dark:border-slate-800">
               <button
                 type="button"
                 onClick={() => setShowInternalAudit(!showInternalAudit)}
-                className="w-full px-4 py-3 flex items-center justify-between text-xs font-bold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
+                className="w-full py-2 flex items-center justify-between text-xs font-semibold text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
               >
-                <span className="flex items-center gap-2">
-                  <Lock className="w-3.5 h-3.5 text-slate-400" />
+                <span className="flex items-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                   <span>Internal Margin & Cost Basis</span>
                 </span>
-                <span className="flex items-center gap-2 font-mono text-emerald-600 dark:text-emerald-400">
-                  {totalProfit >= 0 ? '+' : '−'}{Math.abs(totalProfit).toLocaleString()} ETB Net
-                  {showInternalAudit ? <ChevronUp className="w-3.5 h-3.5 text-slate-400" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />}
+                <span className="flex items-center gap-2 font-mono text-slate-700 dark:text-slate-300">
+                  <span
+                    className={
+                      totalProfit >= 0
+                        ? 'text-emerald-600 dark:text-emerald-400 font-semibold'
+                        : 'text-rose-600 dark:text-rose-400 font-semibold'
+                    }
+                  >
+                    {totalProfit >= 0 ? '+' : '−'}
+                    {Math.abs(totalProfit).toLocaleString()} ETB Net
+                  </span>
+                  {showInternalAudit ? (
+                    <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
+                  ) : (
+                    <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                  )}
                 </span>
               </button>
 
               {showInternalAudit && (
-                <div className="px-4 pb-4 border-t border-slate-200/60 dark:border-slate-800/60 space-y-2 pt-3 animate-collapse-open">
+                <div className="pt-3 pb-2 space-y-2 text-xs divide-y divide-slate-100 dark:divide-slate-800/60">
                   {order.items.map((item, idx) => {
-                    const isBrokered = item.sourcing_type === 'brokered_neighbour';
-                    const isAccessory = item.is_accessory || Boolean(item.accessory_name);
-                    const isVendoredAcc = isAccessory && (isBrokered || Boolean(item.vendor_contact_id));
-                    const pName = item.accessory_name || (isVendoredAcc ? 'Vendored Accessory' : isAccessory ? 'Accessory' : (item.inventory_unit?.variant?.product?.name || item.variant?.product?.name || 'Device'));
-                    const itemProfit = Number(item.profit || 0);
+                    const pName =
+                      item.accessory_name ||
+                      item.inventory_unit?.variant?.product?.name ||
+                      item.variant?.product?.name ||
+                      'Device';
+                    const itemProfitVal = Number(item.profit || 0);
 
                     return (
                       <div
                         key={idx}
-                        className="flex items-center justify-between gap-3 text-xs py-1.5 border-b border-slate-100 dark:border-slate-800/60 last:border-0"
+                        className="pt-2 first:pt-0 flex items-center justify-between text-xs"
                       >
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="font-semibold text-slate-800 dark:text-slate-200 truncate block">
-                              {pName}
-                            </span>
-                            {isAccessory && (
-                              <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
-                                isVendoredAcc
-                                  ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50 dark:border-amber-800/50'
-                                  : 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border border-indigo-200/50 dark:border-indigo-800/50'
-                              }`}>
-                                {isVendoredAcc ? 'Vendored Accessory' : 'Accessory'}
-                              </span>
-                            )}
-                          </div>
-                          {isBrokered ? (
-                            <span className="text-[10px] text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                              <ArrowRightLeft className="w-3 h-3" />
-                              {item.vendor_contact?.name || 'Neighbour Vendor'}
-                            </span>
-                          ) : isAccessory ? (
-                            <span className="text-[10px] text-slate-400">Shop stock accessory</span>
-                          ) : (item.inventory_unit?.source_type === 'exchange' || Boolean(item.inventory_unit?.exchange_sales_order_id)) ? (
-                            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
-                              Exchanged unit stock
-                            </span>
-                          ) : (
-                            <span className="text-[10px] text-slate-400">Shop counter stock</span>
-                          )}
-                        </div>
-                        <div className="text-right font-mono shrink-0">
+                        <div>
+                          <span className="font-medium text-slate-800 dark:text-slate-200">
+                            {pName}
+                          </span>
                           {item.unit_cost != null && (
-                            <div className="text-[10px] text-slate-400">Cost: {Number(item.unit_cost).toLocaleString()} ETB</div>
-                          )}
-                          {item.bonus_amount != null && Number(item.bonus_amount) > 0 && (
-                            <div className="text-[10px] text-slate-500 dark:text-slate-400">
-                              Agent bonus: +{Number(item.bonus_amount).toLocaleString()} ETB
+                            <div className="text-[11px] text-slate-400 font-mono">
+                              Cost: {Number(item.unit_cost).toLocaleString()} ETB
                             </div>
                           )}
-                          <div
-                            className={`font-bold ${
-                              itemProfit > 0
+                        </div>
+                        <div className="text-right font-mono font-medium">
+                          <span
+                            className={
+                              itemProfitVal >= 0
                                 ? 'text-emerald-600 dark:text-emerald-400'
-                                : itemProfit < 0
-                                ? 'text-rose-600 dark:text-rose-400'
-                                : 'text-slate-400'
-                            }`}
+                                : 'text-rose-600 dark:text-rose-400'
+                            }
                           >
-                            {itemProfit > 0
-                              ? `+${itemProfit.toLocaleString()} ETB`
-                              : itemProfit < 0
-                              ? `−${Math.abs(itemProfit).toLocaleString()} ETB`
-                              : '0 ETB'}
-                          </div>
+                            {itemProfitVal >= 0 ? '+' : '−'}
+                            {Math.abs(itemProfitVal).toLocaleString()} ETB
+                          </span>
                         </div>
                       </div>
                     );
@@ -1181,143 +1076,150 @@ Thank you for choosing Habeshabiz Electronics!
       </SlideOverDrawer>
 
       {/* Collect Balance Modal */}
-      {showCollectModal && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in">
-          <div
-            className="relative w-full max-w-md bg-white dark:bg-[#131926] rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden"
-            role="dialog"
-            aria-modal="true"
-          >
-            {/* Header */}
-            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                  Collect Balance
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Order #{order.order_number} • {order.customer?.name || 'Walk-in Customer'}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowCollectModal(false)}
-                disabled={submittingPayment}
-                className="text-xs font-semibold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 px-2 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-              >
-                Close
-              </button>
-            </div>
-
-            {/* Form */}
-            <form onSubmit={handleConfirmCollect} className="p-6 space-y-4">
-              {/* Balance summary pill */}
-              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between">
+      {showCollectModal &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in">
+            <div
+              className="relative w-full max-w-md bg-white dark:bg-[#131926] rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden"
+              role="dialog"
+              aria-modal="true"
+            >
+              {/* Header */}
+              <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
                 <div>
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Outstanding</div>
-                  <div className="text-lg font-black font-mono text-amber-600 dark:text-amber-400 tabular-nums">
-                    {remainingDebt.toLocaleString()} <span className="text-xs font-bold font-sans">ETB</span>
-                  </div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                    Collect Balance
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Order #{order.order_number} • {order.customer?.name || 'Walk-in Customer'}
+                  </p>
                 </div>
-                <div className="text-right">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Order</div>
-                  <div className="text-xs font-mono font-semibold text-slate-600 dark:text-slate-300">
-                    {netPayable.toLocaleString()} ETB
-                  </div>
-                </div>
-              </div>
-
-              {/* Amount Input */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Collection Amount (ETB) <span className="text-rose-500">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    max={remainingDebt}
-                    value={collectAmount}
-                    onChange={(e) => setCollectAmount(e.target.value)}
-                    placeholder="0.00"
-                    required
-                    className="w-full h-10 px-3.5 pr-14 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm font-mono font-bold text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setCollectAmount(remainingDebt.toString())}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-                  >
-                    Full
-                  </button>
-                </div>
-              </div>
-
-              {/* Financial Account Selector / Split */}
-              <SplitPaymentSelector
-                accounts={internalAccounts}
-                targetAmount={parseFloat(collectAmount) || 0}
-                singleAccountId={collectAccountId}
-                onSingleAccountChange={setCollectAccountId}
-                isSplit={isCollectSplit}
-                onIsSplitChange={setIsCollectSplit}
-                splits={collectSplits}
-                onSplitsChange={setCollectSplits}
-                direction="inflow"
-                label="Deposit Account"
-              />
-
-              {/* Reference Number */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Transaction Reference <span className="text-slate-400 font-normal">Optional</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Telebirr TxID or CBE Transfer Ref"
-                  value={collectRef}
-                  onChange={(e) => setCollectRef(e.target.value)}
-                  className="w-full h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
-                />
-              </div>
-
-              {/* Notes */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Notes <span className="text-slate-400 font-normal">Optional</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Settled remaining balance"
-                  value={collectNotes}
-                  onChange={(e) => setCollectNotes(e.target.value)}
-                  className="w-full h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
-                />
-              </div>
-
-              {/* Action Buttons */}
-              <div className="pt-2 flex items-center justify-end gap-2.5">
                 <button
                   type="button"
                   onClick={() => setShowCollectModal(false)}
                   disabled={submittingPayment}
-                  className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                  className="text-xs font-semibold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 px-2 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submittingPayment}
-                  className="h-9 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs disabled:opacity-50 cursor-pointer"
-                >
-                  {submittingPayment ? 'Recording...' : 'Confirm Collection'}
+                  Close
                 </button>
               </div>
-            </form>
-          </div>
-        </div>,
-        document.body
-      )}
+
+              {/* Form */}
+              <form onSubmit={handleConfirmCollect} className="p-6 space-y-4">
+                {/* Balance summary */}
+                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between">
+                  <div>
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Total Outstanding
+                    </div>
+                    <div className="text-lg font-black font-mono text-amber-600 dark:text-amber-400 tabular-nums">
+                      {remainingDebt.toLocaleString()}{' '}
+                      <span className="text-xs font-bold font-sans">ETB</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Total Order
+                    </div>
+                    <div className="text-xs font-mono font-semibold text-slate-600 dark:text-slate-300">
+                      {netPayable.toLocaleString()} ETB
+                    </div>
+                  </div>
+                </div>
+
+                {/* Amount Input */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                    Collection Amount (ETB) <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      max={remainingDebt}
+                      value={collectAmount}
+                      onChange={(e) => setCollectAmount(e.target.value)}
+                      placeholder="0.00"
+                      required
+                      className="w-full h-10 px-3.5 pr-14 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm font-mono font-bold text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setCollectAmount(remainingDebt.toString())}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                    >
+                      Full
+                    </button>
+                  </div>
+                </div>
+
+                {/* Financial Account Selector / Split */}
+                <SplitPaymentSelector
+                  accounts={internalAccounts}
+                  targetAmount={parseFloat(collectAmount) || 0}
+                  singleAccountId={collectAccountId}
+                  onSingleAccountChange={setCollectAccountId}
+                  isSplit={isCollectSplit}
+                  onIsSplitChange={setIsCollectSplit}
+                  splits={collectSplits}
+                  onSplitsChange={setCollectSplits}
+                  direction="inflow"
+                  label="Deposit Account"
+                />
+
+                {/* Reference Number */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                    Transaction Reference <span className="text-slate-400 font-normal">Optional</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Telebirr TxID or CBE Transfer Ref"
+                    value={collectRef}
+                    onChange={(e) => setCollectRef(e.target.value)}
+                    className="w-full h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                {/* Notes */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                    Notes <span className="text-slate-400 font-normal">Optional</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Settled remaining balance"
+                    value={collectNotes}
+                    onChange={(e) => setCollectNotes(e.target.value)}
+                    className="w-full h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                {/* Action Buttons */}
+                <div className="pt-2 flex items-center justify-end gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setShowCollectModal(false)}
+                    disabled={submittingPayment}
+                    className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submittingPayment}
+                    className="h-9 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold transition-all shadow-xs disabled:opacity-50 cursor-pointer"
+                  >
+                    {submittingPayment ? 'Recording...' : 'Confirm Collection'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>,
+          document.body
+        )}
 
       {/* Warranty Swap Modal */}
       <SwapDeviceModal
@@ -1342,72 +1244,74 @@ Thank you for choosing Habeshabiz Electronics!
         }}
       />
 
-      {/* Multi-Device Swap Picker Modal (if order contains multiple sold serialized units) */}
-      {showMultiSwapPicker && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in">
-          <div className="relative w-full max-w-md bg-white dark:bg-[#131926] rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden p-5 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <div>
-                <h3 className="font-bold text-slate-900 dark:text-white text-sm">
-                  Select Device to Swap
-                </h3>
-                <p className="text-[11px] text-slate-400">
-                  Order #{order.order_number} contains multiple devices
+      {/* Multi-Device Swap Picker Modal */}
+      {showMultiSwapPicker &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in">
+            <div className="relative w-full max-w-md bg-white dark:bg-[#131926] rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden p-5 space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+                <div>
+                  <h3 className="font-bold text-slate-900 dark:text-white text-sm">
+                    Select Device to Swap
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Order #{order.order_number} contains multiple devices
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowMultiSwapPicker(false)}
+                  className="text-xs font-semibold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 px-2 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-xs text-slate-600 dark:text-slate-400">
+                  Choose the device the customer is returning for a warranty swap:
                 </p>
+                <div className="divide-y divide-slate-100 dark:divide-slate-800 border border-slate-100 dark:border-slate-800 rounded-xl overflow-hidden">
+                  {swappableUnits.map((u) => (
+                    <button
+                      key={u.id}
+                      type="button"
+                      onClick={() => {
+                        setSwapUnitTarget(u);
+                        setShowMultiSwapPicker(false);
+                      }}
+                      className="w-full p-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors flex items-center justify-between group cursor-pointer"
+                    >
+                      <div>
+                        <div className="font-semibold text-slate-900 dark:text-white text-xs group-hover:text-emerald-600 dark:group-hover:text-emerald-400">
+                          {u.variant?.product?.name || 'Device'}
+                        </div>
+                        <div className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 mt-0.5">
+                          SN: {u.imei_or_serial || 'Unrecorded'}
+                        </div>
+                      </div>
+                      <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                        <span>Select</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowMultiSwapPicker(false)}
-                className="text-xs font-semibold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 px-2 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
-              >
-                Close
-              </button>
-            </div>
 
-            <div className="space-y-2">
-              <p className="text-xs text-slate-600 dark:text-slate-400">
-                Choose the device the customer is returning for a warranty swap:
-              </p>
-              <div className="divide-y divide-slate-100 dark:divide-slate-800 border border-slate-100 dark:border-slate-800 rounded-xl overflow-hidden">
-                {swappableUnits.map((u) => (
-                  <button
-                    key={u.id}
-                    type="button"
-                    onClick={() => {
-                      setSwapUnitTarget(u);
-                      setShowMultiSwapPicker(false);
-                    }}
-                    className="w-full p-3 text-left hover:bg-indigo-50/50 dark:hover:bg-indigo-950/30 transition-colors flex items-center justify-between group cursor-pointer"
-                  >
-                    <div>
-                      <div className="font-semibold text-slate-900 dark:text-white text-xs group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
-                        {u.variant?.product?.name || 'Device'}
-                      </div>
-                      <div className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 mt-0.5">
-                        SN: {u.imei_or_serial || 'Unrecorded'}
-                      </div>
-                    </div>
-                    <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1">
-                      <span>Select</span>
-                    </span>
-                  </button>
-                ))}
+              <div className="flex justify-end pt-2 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowMultiSwapPicker(false)}
+                  className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
+                >
+                  Cancel
+                </button>
               </div>
             </div>
-
-            <div className="flex justify-end pt-2 border-t border-slate-100 dark:border-slate-800">
-              <button
-                type="button"
-                onClick={() => setShowMultiSwapPicker(false)}
-                className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
+          </div>,
+          document.body
+        )}
     </>
   );
 };
