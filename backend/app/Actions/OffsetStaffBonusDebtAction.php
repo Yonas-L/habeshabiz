@@ -99,7 +99,7 @@ class OffsetStaffBonusDebtAction
 
                 $refNum = ! empty($data['reference_number'])
                     ? $data['reference_number']
-                    : "BONUS-OFFSET-REC";
+                    : 'BONUS-OFFSET-REC';
 
                 $customNotes = ! empty($data['notes']) && ! str_starts_with(trim($data['notes']), 'Commission bonus payout')
                     ? ': '.trim($data['notes'])

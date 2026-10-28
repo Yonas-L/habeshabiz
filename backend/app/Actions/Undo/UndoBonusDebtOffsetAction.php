@@ -3,7 +3,6 @@
 namespace App\Actions\Undo;
 
 use App\Actions\Undo\Contracts\UndoActionInterface;
-use App\Exceptions\UndoBlockedException;
 use App\Models\AuditLog;
 use App\Models\Debt;
 use App\Models\DebtPayment;

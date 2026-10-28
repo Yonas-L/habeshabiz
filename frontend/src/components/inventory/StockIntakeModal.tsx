@@ -1006,13 +1006,14 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
 
     if (sourceType === 'consignment' && intakeMode === 'single' && isImmediateHandover) {
       if (immediateHandoverMode === 'offset') {
-        if (!immediateRecipientContactId) {
+        if (!immediateRecipientContactId || immediateRecipientContactId === '__custom__') {
           toast.error('Please select a partner with open payables to settle');
           return;
         }
       } else {
-        if (!immediateRecipientContactId && !immediateRecipientName.trim()) {
-          toast.error('Please select a staff member or partner to hand out to');
+        const hasRecipient = (immediateRecipientContactId && immediateRecipientContactId !== '__custom__') || immediateRecipientName.trim().length > 0;
+        if (!hasRecipient) {
+          toast.error('Please select a recipient or enter a recipient name to hand out to');
           return;
         }
       }
@@ -1175,7 +1176,7 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
           payload.immediate_handover = true;
           payload.handover_mode = immediateHandoverMode;
           payload.handover_to = immediateRecipientName.trim() || undefined;
-          payload.handover_contact_id = immediateRecipientContactId || undefined;
+          payload.handover_contact_id = (immediateRecipientContactId && immediateRecipientContactId !== '__custom__') ? immediateRecipientContactId : undefined;
           const payoutNum = parseFormattedNumber(immediatePayoutAmount) ?? (parseFormattedNumber(sellingPrice) || parseFormattedNumber(costBasis) || undefined);
           payload.handover_payout = payoutNum;
           payload.handover_return_deadline = calculatedImmediateDeadline;

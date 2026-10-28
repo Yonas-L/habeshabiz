@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Actions\GeneratePartnerStatementAction;
+use App\Actions\Undo\UndoHandoverSoldAction;
+use App\Models\AuditLog;
 use App\Models\Contact;
 use App\Models\Debt;
 use App\Models\DebtPayment;
@@ -780,7 +782,7 @@ test('cannot handover unit as debt offset if payout exceeds open payables', func
         ->and((float) $unit->selling_price)->toBe(50000.0);
 
     // 4. Partner statement reflects Device Handover
-    $statementAction = app(\App\Actions\GeneratePartnerStatementAction::class);
+    $statementAction = app(GeneratePartnerStatementAction::class);
     $statement = $statementAction->execute($partnerSmall);
     $ledger = $statement['ledger'];
 
@@ -1021,12 +1023,12 @@ test('vendor stock intake with immediate handover exceeding open payable clears 
         ->and((float) $entry['balance_effect'])->toBe(7000.00);
 
     // 7. Test Undo / Revert functionality
-    $auditLog = \App\Models\AuditLog::where('entity_id', $unitId)
+    $auditLog = AuditLog::where('entity_id', $unitId)
         ->where('action', 'unit_instant_offset')
         ->first();
     expect($auditLog)->not->toBeNull();
 
-    $undoAction = app(\App\Actions\Undo\UndoHandoverSoldAction::class);
+    $undoAction = app(UndoHandoverSoldAction::class);
     $undoResult = $undoAction->execute($auditLog);
     expect($undoResult)->toContain('has been reversed');
 
@@ -1089,7 +1091,7 @@ test('device handover settling multiple debts and creating excess receivable con
     ]);
 
     // 2. Intake a phone to hand over: Vivo V40 (SN: 54432)
-    $vivoProduct = \App\Models\Product::create([
+    $vivoProduct = Product::create([
         'tenant_id' => $this->tenant->id,
         'name' => 'Vivo V40',
         'category' => 'phones',
@@ -1097,7 +1099,7 @@ test('device handover settling multiple debts and creating excess receivable con
         'model' => 'V40',
         'is_active' => true,
     ]);
-    $vivoVariant = \App\Models\ProductVariant::create([
+    $vivoVariant = ProductVariant::create([
         'tenant_id' => $this->tenant->id,
         'product_id' => $vivoProduct->id,
         'sku' => 'VIVO-V40-256',
@@ -1156,4 +1158,61 @@ test('device handover settling multiple debts and creating excess receivable con
         ->and((float) $entry['payable'])->toBe(0.00)
         ->and((float) $entry['receivable'])->toBe(200000.00)
         ->and((float) $entry['balance_effect'])->toBe(200000.00);
+});
+
+test('immediate handover with custom recipient name (__custom__ contact id sentinel) successfully creates recipient without SQL 22P02 error', function () {
+    $broker = Contact::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Broker Custom Test',
+        'roles' => ['vendor', 'broker'],
+        'is_active' => true,
+    ]);
+
+    $res = $this->actingAs($this->user, 'sanctum')->postJson('/api/v1/inventory/units', [
+        'variant_id' => $this->variantA->id,
+        'imei_or_serial' => 'CUSTOM-HANDOVER-001',
+        'condition' => 'brand_new',
+        'cost_basis' => 50000.00,
+        'selling_price' => 60000.00,
+        'source_type' => 'consignment',
+        'supplier_contact_id' => $broker->id,
+        'immediate_handover' => true,
+        'handover_mode' => 'temporary',
+        'handover_to' => 'New Staff / Custom Partner',
+        'handover_contact_id' => '__custom__',
+        'handover_payout' => 60000.00,
+    ]);
+
+    $res->assertCreated();
+    $unitId = $res->json('data.id');
+
+    $unit = InventoryUnit::find($unitId);
+    expect($unit->status)->toBe('out')
+        ->and($unit->handover_to)->toBe('New Staff / Custom Partner');
+
+    $contact = Contact::where('tenant_id', $this->tenant->id)
+        ->where('name', 'New Staff / Custom Partner')
+        ->first();
+    expect($contact)->not->toBeNull();
+
+    $debt = Debt::where('tenant_id', $this->tenant->id)
+        ->where('contact_id', $contact->id)
+        ->where('reference_type', 'handover_holding')
+        ->first();
+    expect($debt)->not->toBeNull()
+        ->and((float) $debt->remaining_amount)->toBe(60000.00);
+});
+
+test('intake with non-uuid foreign keys returns 422 validation response instead of 500 error', function () {
+    $res = $this->actingAs($this->user, 'sanctum')->postJson('/api/v1/inventory/units', [
+        'variant_id' => 'not-a-valid-uuid',
+        'imei_or_serial' => 'INVALID-UUID-001',
+        'condition' => 'brand_new',
+        'cost_basis' => 50000.00,
+        'source_type' => 'consignment',
+        'supplier_contact_id' => 'malformed-supplier-uuid',
+    ]);
+
+    $res->assertStatus(422);
+    $res->assertJsonValidationErrors(['variant_id', 'supplier_contact_id']);
 });

@@ -2,6 +2,7 @@
 
 use App\Actions\OffsetStaffBonusDebtAction;
 use App\Actions\RecordSaleAction;
+use App\Models\AuditLog;
 use App\Models\Contact;
 use App\Models\Debt;
 use App\Models\DebtPayment;
@@ -9,7 +10,6 @@ use App\Models\FinancialAccount;
 use App\Models\InventoryUnit;
 use App\Models\Product;
 use App\Models\ProductVariant;
-use App\Models\SalesOrder;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Scopes\TenantScope;
@@ -207,7 +207,7 @@ test('staff bonus debt offset can be undone via audit log reversal', function ()
     expect($bonusDebt->status)->toBe('settled');
 
     // Find the audit log for the action
-    $log = \App\Models\AuditLog::where('action', 'bonus_used_for_debt')->latest()->first();
+    $log = AuditLog::where('action', 'bonus_used_for_debt')->latest()->first();
     expect($log)->not->toBeNull();
 
     // Check undo preview
@@ -417,4 +417,3 @@ test('creating a receivable loan to a staff member does not automatically clear 
     expect($receivableDebt->status)->toBe('open');
     expect($receivableDebt->payments)->toHaveCount(0);
 });
-

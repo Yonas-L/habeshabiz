@@ -158,12 +158,22 @@ class InventoryController extends Controller
             ], 403);
         }
 
+        // Sanitize foreign key sentinel values (e.g. '__custom__' from UI dropdowns or empty strings)
+        foreach (['handover_contact_id', 'supplier_contact_id', 'receivable_contact_id', 'payment_account_id'] as $fkField) {
+            if ($request->has($fkField)) {
+                $val = $request->input($fkField);
+                if ($val === '__custom__' || $val === '' || $val === 'null') {
+                    $request->merge([$fkField => null]);
+                }
+            }
+        }
+
         $isBatch = $request->has('units') && is_array($request->input('units'));
 
         if ($isBatch) {
             $validated = $request->validate([
                 'units' => ['required', 'array', 'min:1'],
-                'units.*.variant_id' => ['required', 'exists:product_variants,id'],
+                'units.*.variant_id' => ['required', 'uuid', 'exists:product_variants,id'],
                 'units.*.imei_or_serial' => ['nullable', 'string', 'max:100'],
                 'units.*.serial_number' => ['nullable', 'string', 'max:100'],
                 'units.*.battery_health' => ['nullable', 'integer', 'min:0', 'max:100'],
@@ -175,16 +185,16 @@ class InventoryController extends Controller
                 'units.*.location' => ['nullable', 'string', 'max:100'],
                 'units.*.notes' => ['nullable', 'string'],
                 'source_type' => ['nullable', 'string', 'in:purchase,consignment'],
-                'supplier_contact_id' => ['nullable', 'exists:contacts,id'],
+                'supplier_contact_id' => ['nullable', 'uuid', 'exists:contacts,id'],
                 'return_deadline' => ['nullable', 'date'],
                 'funding_source' => ['nullable', 'string', 'in:none,unpaid,account,shop_account,debtor_offset,split'],
-                'payment_account_id' => ['nullable', 'exists:financial_accounts,id'],
+                'payment_account_id' => ['nullable', 'uuid', 'exists:financial_accounts,id'],
                 'payment_splits' => ['nullable', 'array', 'min:1'],
-                'payment_splits.*.financial_account_id' => ['required', 'exists:financial_accounts,id'],
+                'payment_splits.*.financial_account_id' => ['required', 'uuid', 'exists:financial_accounts,id'],
                 'payment_splits.*.amount' => ['required', 'numeric', 'min:0.01'],
                 'payment_splits.*.fee' => ['nullable', 'numeric', 'min:0'],
                 'payment_amount' => ['nullable', 'numeric', 'min:0'],
-                'receivable_contact_id' => ['nullable', 'exists:contacts,id'],
+                'receivable_contact_id' => ['nullable', 'uuid', 'exists:contacts,id'],
                 'receivable_offset_amount' => ['nullable', 'numeric', 'min:0'],
                 'offset_amount' => ['nullable', 'numeric', 'min:0'],
             ]);
@@ -192,7 +202,7 @@ class InventoryController extends Controller
             $unitItems = $validated['units'];
         } else {
             $validated = $request->validate([
-                'variant_id' => ['required', 'exists:product_variants,id'],
+                'variant_id' => ['required', 'uuid', 'exists:product_variants,id'],
                 'imei_or_serial' => ['nullable', 'string', 'max:100'],
                 'serial_number' => ['nullable', 'string', 'max:100'],
                 'imeis' => ['nullable', 'array'],
@@ -207,16 +217,16 @@ class InventoryController extends Controller
                 'cost_basis' => ['required', 'numeric', 'min:0'],
                 'selling_price' => ['nullable', 'numeric', 'min:0'],
                 'source_type' => ['nullable', 'string', 'in:purchase,consignment'],
-                'supplier_contact_id' => ['nullable', 'exists:contacts,id'],
+                'supplier_contact_id' => ['nullable', 'uuid', 'exists:contacts,id'],
                 'return_deadline' => ['nullable', 'date'],
                 'funding_source' => ['nullable', 'string', 'in:none,unpaid,account,shop_account,debtor_offset,split'],
-                'payment_account_id' => ['nullable', 'exists:financial_accounts,id'],
+                'payment_account_id' => ['nullable', 'uuid', 'exists:financial_accounts,id'],
                 'payment_splits' => ['nullable', 'array', 'min:1'],
-                'payment_splits.*.financial_account_id' => ['required', 'exists:financial_accounts,id'],
+                'payment_splits.*.financial_account_id' => ['required', 'uuid', 'exists:financial_accounts,id'],
                 'payment_splits.*.amount' => ['required', 'numeric', 'min:0.01'],
                 'payment_splits.*.fee' => ['nullable', 'numeric', 'min:0'],
                 'payment_amount' => ['nullable', 'numeric', 'min:0'],
-                'receivable_contact_id' => ['nullable', 'exists:contacts,id'],
+                'receivable_contact_id' => ['nullable', 'uuid', 'exists:contacts,id'],
                 'receivable_offset_amount' => ['nullable', 'numeric', 'min:0'],
                 'offset_amount' => ['nullable', 'numeric', 'min:0'],
                 'location' => ['nullable', 'string', 'max:100'],
@@ -224,7 +234,7 @@ class InventoryController extends Controller
                 'immediate_handover' => ['nullable', 'boolean'],
                 'handover_mode' => ['nullable', 'string', 'in:offset,temporary'],
                 'handover_to' => ['required_if:immediate_handover,true', 'nullable', 'string', 'max:100'],
-                'handover_contact_id' => ['nullable', 'exists:contacts,id'],
+                'handover_contact_id' => ['nullable', 'uuid', 'exists:contacts,id'],
                 'handover_payout' => ['nullable', 'numeric', 'min:0'],
                 'handover_return_deadline' => ['nullable', 'date'],
                 'handover_location' => ['nullable', 'string', 'max:100'],
@@ -851,7 +861,7 @@ class InventoryController extends Controller
                             'remaining_amount' => $excessReceivable,
                             'due_date' => $now->copy()->addDays(7),
                             'status' => 'open',
-                            'notes' => "Device handover balance: {$devName}{$sn} (Settled ".number_format($totalDeducted, 2)." ETB debt, ".number_format($excessReceivable, 2)." ETB remaining to collect)",
+                            'notes' => "Device handover balance: {$devName}{$sn} (Settled ".number_format($totalDeducted, 2).' ETB debt, '.number_format($excessReceivable, 2).' ETB remaining to collect)',
                         ]);
                     }
 
@@ -1891,7 +1901,7 @@ class InventoryController extends Controller
                         'remaining_amount' => $excessReceivable,
                         'due_date' => $now->copy()->addDays(7),
                         'status' => 'open',
-                        'notes' => "Device handover balance: {$devName}{$sn} (Settled ".number_format($totalDeducted, 2)." ETB debt, ".number_format($excessReceivable, 2)." ETB remaining to collect)",
+                        'notes' => "Device handover balance: {$devName}{$sn} (Settled ".number_format($totalDeducted, 2).' ETB debt, '.number_format($excessReceivable, 2).' ETB remaining to collect)',
                     ]);
                 }
 
