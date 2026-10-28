@@ -2598,7 +2598,12 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 dark:bg-slate-800/60 rounded-xl">
                 <button
                   type="button"
-                  onClick={() => setHandoverMode('temporary')}
+                  onClick={() => {
+                    if (handoverMode !== 'temporary') {
+                      setHandoverMode('temporary');
+                      setHandoverTo('');
+                    }
+                  }}
                   className={`flex flex-col items-center justify-center py-2 px-3 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                     handoverMode === 'temporary'
                       ? 'bg-white dark:bg-[#1a2234] text-slate-900 dark:text-white shadow-xs'
@@ -2607,17 +2612,20 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 >
                   <div className="flex items-center gap-1.5">
                     <UserCheck className="w-3.5 h-3.5" />
-                    <span>Temporary Handout</span>
+                    <span>Handout to Others</span>
                   </div>
-                  <span className="text-[10px] text-slate-400 font-normal mt-0.5">Staff / Broker to sell</span>
+                  <span className="text-[10px] text-slate-400 font-normal mt-0.5">Staff & partners to sell</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => {
-                    setHandoverMode('offset');
-                    if (!handoverPayout && handoverTargetUnit.selling_price) {
-                      setHandoverPayout(String(handoverTargetUnit.selling_price));
+                    if (handoverMode !== 'offset') {
+                      setHandoverMode('offset');
+                      setHandoverTo('');
+                      if (!handoverPayout && handoverTargetUnit.selling_price) {
+                        setHandoverPayout(String(handoverTargetUnit.selling_price));
+                      }
                     }
                   }}
                   className={`flex flex-col items-center justify-center py-2 px-3 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
@@ -2628,7 +2636,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 >
                   <div className="flex items-center gap-1.5">
                     <ArrowLeftRight className="w-3.5 h-3.5" />
-                    <span>Deduct from Debt</span>
+                    <span>Settle Debt</span>
                   </div>
                   <span className={`text-[10px] font-normal mt-0.5 ${handoverMode === 'offset' ? 'text-emerald-100' : 'text-slate-400'}`}>
                     Settle what you owe
@@ -2642,34 +2650,101 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 </label>
 
                 {/* Partner Dropdown */}
-                <select
-                  value={contacts.some((c) => c.name.toLowerCase() === handoverTo.toLowerCase()) ? contacts.find((c) => c.name.toLowerCase() === handoverTo.toLowerCase())?.name : ''}
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      setHandoverTo(e.target.value);
-                    }
-                  }}
-                  className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700 cursor-pointer mb-2"
-                >
-                  <option value="">-- Choose Partner or Vendor --</option>
-                  {contacts
-                    .filter((c) => c.is_active !== false)
-                    .map((c) => {
-                      const payable = c.open_payable ?? 0;
-                      const net = c.net_balance ?? 0;
-                      let debtHint = '';
-                      if (handoverMode === 'offset') {
-                        debtHint = payable > 0 ? ` (You owe ${payable.toLocaleString()} ETB)` : ' (No debt to offset)';
-                      } else {
-                        debtHint = net < 0 ? ` (You owe ${Math.abs(net).toLocaleString()} ETB)` : net > 0 ? ` (Owes you ${net.toLocaleString()} ETB)` : '';
+                {handoverMode === 'offset' ? (
+                  <select
+                    value={contacts.some((c) => c.name.toLowerCase() === handoverTo.toLowerCase()) ? contacts.find((c) => c.name.toLowerCase() === handoverTo.toLowerCase())?.name : ''}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        setHandoverTo(e.target.value);
                       }
+                    }}
+                    className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700 cursor-pointer mb-2"
+                  >
+                    <option value="">-- Choose Partner You Owe --</option>
+                    {(() => {
+                      const payablePartners = contacts
+                        .filter((c) => c.is_active !== false)
+                        .filter((c) => {
+                          const payable = c.open_payable ?? (typeof c.net_balance === 'number' && c.net_balance < 0 ? Math.abs(c.net_balance) : 0);
+                          return payable > 0;
+                        });
+                      if (payablePartners.length === 0) {
+                        return <option value="" disabled>No partners with open payables</option>;
+                      }
+                      return payablePartners.map((c) => {
+                        const payable = c.open_payable ?? (typeof c.net_balance === 'number' && c.net_balance < 0 ? Math.abs(c.net_balance) : 0);
+                        return (
+                          <option key={c.id} value={c.name}>
+                            {c.name} (You owe {payable.toLocaleString()} ETB)
+                          </option>
+                        );
+                      });
+                    })()}
+                  </select>
+                ) : (
+                  <select
+                    value={contacts.some((c) => c.name.toLowerCase() === handoverTo.toLowerCase()) ? contacts.find((c) => c.name.toLowerCase() === handoverTo.toLowerCase())?.name : ''}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        setHandoverTo(e.target.value);
+                      }
+                    }}
+                    className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700 cursor-pointer mb-2"
+                  >
+                    <option value="">-- Choose Partner or Staff --</option>
+                    {(() => {
+                      const isStaff = (c: any) =>
+                        c.roles?.some((r: string) => ['staff', 'salesperson', 'employee'].includes(r.toLowerCase()));
+                      const eligible = contacts
+                        .filter((c) => c.is_active !== false)
+                        .filter((c) => {
+                          const payable = c.open_payable ?? (typeof c.net_balance === 'number' && c.net_balance < 0 ? Math.abs(c.net_balance) : 0);
+                          return payable <= 0; // Exclude anyone with payables
+                        });
+                      const debtors = eligible.filter((c) => !isStaff(c) && ((c.open_receivable ?? 0) > 0 || (typeof c.net_balance === 'number' && c.net_balance > 0)));
+                      const staff = eligible.filter((c) => isStaff(c));
+                      const others = eligible.filter((c) => !isStaff(c) && !debtors.some((d) => d.id === c.id));
+
                       return (
-                        <option key={c.id} value={c.name}>
-                          {c.name} {debtHint}
-                        </option>
+                        <>
+                          {debtors.length > 0 && (
+                            <optgroup label="Partners Who Owe You (Receivables)">
+                              {debtors.map((c) => {
+                                const rec = c.open_receivable ?? (typeof c.net_balance === 'number' && c.net_balance > 0 ? c.net_balance : 0);
+                                return (
+                                  <option key={c.id} value={c.name}>
+                                    {c.name} (owes you {rec.toLocaleString()} ETB)
+                                  </option>
+                                );
+                              })}
+                            </optgroup>
+                          )}
+                          {staff.length > 0 && (
+                            <optgroup label="Staff Members">
+                              {staff.map((c) => {
+                                const rec = c.open_receivable ?? (typeof c.net_balance === 'number' && c.net_balance > 0 ? c.net_balance : 0);
+                                return (
+                                  <option key={c.id} value={c.name}>
+                                    {c.name} {rec > 0 ? `(owes you ${rec.toLocaleString()} ETB)` : `(0 ETB balance)`}
+                                  </option>
+                                );
+                              })}
+                            </optgroup>
+                          )}
+                          {others.length > 0 && (
+                            <optgroup label="Other Partners (No Debt)">
+                              {others.map((c) => (
+                                <option key={c.id} value={c.name}>
+                                  {c.name} (0 ETB balance)
+                                </option>
+                              ))}
+                            </optgroup>
+                          )}
+                        </>
                       );
-                    })}
-                </select>
+                    })()}
+                  </select>
+                )}
 
                 {/* Direct Name Input */}
                 <div className="relative">
@@ -2847,6 +2922,42 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                       <p className="text-[10px] text-slate-400 mt-0.5">Amount recipient owes on sale</p>
                     </div>
                   </div>
+
+                  {/* Live calculation card for handout */}
+                  {(() => {
+                    const selectedPartner = contacts.find((c) => c.name.toLowerCase() === handoverTo.trim().toLowerCase());
+                    if (!selectedPartner) return null;
+                    const currentReceivable = (selectedPartner.open_receivable && selectedPartner.open_receivable > 0)
+                      ? selectedPartner.open_receivable
+                      : (typeof selectedPartner.net_balance === 'number' && selectedPartner.net_balance > 0 ? selectedPartner.net_balance : 0);
+                    const handoverVal = parseFloat(handoverPayout) || 0;
+                    return (
+                      <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 space-y-1.5 text-xs">
+                        <div className="flex justify-between items-center text-slate-600 dark:text-slate-400">
+                          <span>Current Balance:</span>
+                          <span className="font-mono font-semibold text-slate-900 dark:text-white">
+                            {currentReceivable > 0
+                              ? `${selectedPartner.name} owes you ${currentReceivable.toLocaleString()} ETB`
+                              : `${selectedPartner.name} (0.00 ETB)`}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center text-slate-600 dark:text-slate-400">
+                          <span>This Handover Value:</span>
+                          <strong className="font-mono font-bold text-blue-600 dark:text-blue-400">
+                            +{handoverVal.toLocaleString()} ETB
+                          </strong>
+                        </div>
+                        <div className="pt-1.5 border-t border-blue-500/20 flex justify-between items-center">
+                          <span className="text-slate-800 dark:text-slate-200 font-semibold">
+                            Total Receivable After Handover:
+                          </span>
+                          <span className="font-mono text-xs font-bold bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 px-2 py-0.5 rounded-md">
+                            {(currentReceivable + handoverVal).toLocaleString()} ETB
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </>
               )}
 

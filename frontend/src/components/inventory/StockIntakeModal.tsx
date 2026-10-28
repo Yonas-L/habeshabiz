@@ -723,25 +723,85 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
     return Array.from(map.values());
   }, [receivableDebts]);
 
-  const partnersWeOwe = useMemo(() => {
-    const map = new Map<string, { contact: Contact; totalOwed: number }>();
+  const payablesMap = useMemo(() => {
+    const map = new Map<string, number>();
     for (const d of payableDebts) {
-      if (!d.contact_id || !d.contact) continue;
+      if (!d.contact_id) continue;
       const remaining = Number(d.remaining_amount || 0);
       if (remaining <= 0) continue;
-      const existing = map.get(d.contact_id);
-      if (existing) {
-        existing.totalOwed += remaining;
-      } else {
-        map.set(d.contact_id, { contact: d.contact, totalOwed: remaining });
+      map.set(d.contact_id, (map.get(d.contact_id) || 0) + remaining);
+    }
+    for (const c of liveContacts) {
+      if (c.open_payable && c.open_payable > 0 && !map.has(c.id)) {
+        map.set(c.id, c.open_payable);
       }
     }
-    return Array.from(map.values());
-  }, [payableDebts]);
+    return map;
+  }, [payableDebts, liveContacts]);
+
+  const receivablesMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const d of receivableDebts) {
+      if (!d.contact_id) continue;
+      const remaining = Number(d.remaining_amount || 0);
+      if (remaining <= 0) continue;
+      map.set(d.contact_id, (map.get(d.contact_id) || 0) + remaining);
+    }
+    for (const c of liveContacts) {
+      if (c.open_receivable && c.open_receivable > 0 && !map.has(c.id)) {
+        map.set(c.id, c.open_receivable);
+      }
+    }
+    return map;
+  }, [receivableDebts, liveContacts]);
+
+  const partnersWeOwe = useMemo(() => {
+    const list: { contact: Contact; totalOwed: number }[] = [];
+    for (const c of liveContacts) {
+      const owed = payablesMap.get(c.id) || 0;
+      if (owed > 0) {
+        list.push({ contact: c, totalOwed: owed });
+      }
+    }
+    return list.sort((a, b) => b.totalOwed - a.totalOwed);
+  }, [liveContacts, payablesMap]);
 
   const selectedPayablePartner = useMemo(() => {
     return partnersWeOwe.find((p) => p.contact.id === immediateRecipientContactId) || null;
   }, [partnersWeOwe, immediateRecipientContactId]);
+
+  const handoutCandidates = useMemo(() => {
+    const payableContactIds = new Set(partnersWeOwe.map((p) => p.contact.id));
+    // Strictly exclude anyone with open payables
+    const eligible = liveContacts.filter((c) => !payableContactIds.has(c.id));
+
+    const isStaff = (c: Contact) =>
+      c.roles?.some((r) => ['staff', 'salesperson', 'employee'].includes(r.toLowerCase()));
+
+    const debtors = eligible
+      .filter((c) => !isStaff(c) && (receivablesMap.get(c.id) || 0) > 0)
+      .map((c) => ({ contact: c, owed: receivablesMap.get(c.id) || 0 }))
+      .sort((a, b) => b.owed - a.owed);
+
+    const staff = eligible
+      .filter((c) => isStaff(c))
+      .map((c) => ({ contact: c, owed: receivablesMap.get(c.id) || 0 }))
+      .sort((a, b) => b.owed - a.owed);
+
+    const others = eligible
+      .filter((c) => !isStaff(c) && (!receivablesMap.get(c.id) || receivablesMap.get(c.id) === 0))
+      .map((c) => ({ contact: c, owed: 0 }));
+
+    return { debtors, staff, others };
+  }, [liveContacts, partnersWeOwe, receivablesMap]);
+
+  const selectedHandoutPartner = useMemo(() => {
+    if (!immediateRecipientContactId) return null;
+    const c = liveContacts.find((item) => item.id === immediateRecipientContactId);
+    if (!c) return null;
+    const owed = receivablesMap.get(c.id) || c.open_receivable || 0;
+    return { contact: c, currentReceivable: owed };
+  }, [immediateRecipientContactId, liveContacts, receivablesMap]);
 
   const selectedAccount = useMemo(() => {
     return accounts.find((a) => a.id === paymentAccountId) || accounts[0];
@@ -946,13 +1006,13 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
 
     if (sourceType === 'consignment' && intakeMode === 'single' && isImmediateHandover) {
       if (immediateHandoverMode === 'offset') {
-        if (!immediateRecipientContactId && !immediateRecipientName.trim()) {
-          toast.error('Please select a partner to settle debt with');
+        if (!immediateRecipientContactId) {
+          toast.error('Please select a partner with open payables to settle');
           return;
         }
       } else {
-        if (!immediateRecipientName.trim()) {
-          toast.error('Please specify who the device is handed to');
+        if (!immediateRecipientContactId && !immediateRecipientName.trim()) {
+          toast.error('Please select a staff member or partner to hand out to');
           return;
         }
       }
@@ -3332,7 +3392,13 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                     <div className="grid grid-cols-2 gap-1.5 p-1 bg-amber-500/10 dark:bg-amber-950/40 rounded-xl text-xs font-semibold">
                       <button
                         type="button"
-                        onClick={() => setImmediateHandoverMode('offset')}
+                        onClick={() => {
+                          if (immediateHandoverMode !== 'offset') {
+                            setImmediateHandoverMode('offset');
+                            setImmediateRecipientContactId('');
+                            setImmediateRecipientName('');
+                          }
+                        }}
                         className={`py-1.5 px-3 rounded-lg text-center transition-all cursor-pointer ${
                           immediateHandoverMode === 'offset'
                             ? 'bg-amber-500 text-white font-bold shadow-xs'
@@ -3343,14 +3409,20 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                       </button>
                       <button
                         type="button"
-                        onClick={() => setImmediateHandoverMode('temporary')}
+                        onClick={() => {
+                          if (immediateHandoverMode !== 'temporary') {
+                            setImmediateHandoverMode('temporary');
+                            setImmediateRecipientContactId('');
+                            setImmediateRecipientName('');
+                          }
+                        }}
                         className={`py-1.5 px-3 rounded-lg text-center transition-all cursor-pointer ${
                           immediateHandoverMode === 'temporary'
                             ? 'bg-amber-500 text-white font-bold shadow-xs'
                             : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                         }`}
                       >
-                        Staff Handout
+                        Handout to Others
                       </button>
                     </div>
 
@@ -3359,40 +3431,35 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
                             <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                              Partner to Settle <span className="text-rose-500">*</span>
+                              Partner to Settle (Open Payables Only) <span className="text-rose-500">*</span>
                             </label>
-                            <select
-                              value={immediateRecipientContactId}
-                              onChange={(e) => {
-                                const cId = e.target.value;
-                                setImmediateRecipientContactId(cId);
-                                const found = liveContacts.find((c) => c.id === cId) || partnersWeOwe.find((p) => p.contact.id === cId)?.contact;
-                                if (found) {
-                                  setImmediateRecipientName(found.name);
-                                }
-                              }}
-                              className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none cursor-pointer"
-                            >
-                              <option value="">Select partner</option>
-                              {partnersWeOwe.length > 0 && (
-                                <optgroup label="Partners with Open Debt">
-                                  {partnersWeOwe.map((p) => (
-                                    <option key={p.contact.id} value={p.contact.id}>
-                                      {p.contact.name} ({p.totalOwed.toLocaleString()} ETB owed)
-                                    </option>
-                                  ))}
-                                </optgroup>
-                              )}
-                              <optgroup label="Other Contacts">
-                                {liveContacts
-                                  .filter((c) => !partnersWeOwe.some((p) => p.contact.id === c.id))
-                                  .map((c) => (
-                                    <option key={c.id} value={c.id}>
-                                      {c.name}
-                                    </option>
-                                  ))}
-                              </optgroup>
-                            </select>
+                            {partnersWeOwe.length === 0 ? (
+                              <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-700 dark:text-amber-300">
+                                You have no open payables to settle with any partner. Switch to <strong>Handout to Others</strong> to hand out devices.
+                              </div>
+                            ) : (
+                              <select
+                                value={immediateRecipientContactId}
+                                onChange={(e) => {
+                                  const cId = e.target.value;
+                                  setImmediateRecipientContactId(cId);
+                                  const found = partnersWeOwe.find((p) => p.contact.id === cId)?.contact;
+                                  if (found) {
+                                    setImmediateRecipientName(found.name);
+                                  } else {
+                                    setImmediateRecipientName('');
+                                  }
+                                }}
+                                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none cursor-pointer"
+                              >
+                                <option value="">Select partner you owe ({partnersWeOwe.length} available)...</option>
+                                {partnersWeOwe.map((p) => (
+                                  <option key={p.contact.id} value={p.contact.id}>
+                                    {p.contact.name} (You owe {p.totalOwed.toLocaleString()} ETB)
+                                  </option>
+                                ))}
+                              </select>
+                            )}
                           </div>
 
                           <div>
@@ -3410,34 +3477,59 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                         </div>
 
                         {selectedPayablePartner && (
-                          <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs">
-                            <span className="text-slate-600 dark:text-slate-400">
-                              Current Debt: <strong className="text-slate-900 dark:text-white font-mono">{selectedPayablePartner.totalOwed.toLocaleString()} ETB</strong>
-                            </span>
-                            {(() => {
-                              const payoutVal =
-                                parseFormattedNumber(immediatePayoutAmount) ||
-                                parseFormattedNumber(sellingPrice) ||
-                                parseFormattedNumber(costBasis) ||
-                                0;
-                              const owed = selectedPayablePartner.totalOwed;
-                              if (payoutVal > owed) {
-                                const excess = payoutVal - owed;
+                          <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 space-y-1.5 text-xs">
+                            <div className="flex justify-between items-center text-slate-600 dark:text-slate-400">
+                              <span>Current Debt You Owe:</span>
+                              <strong className="text-slate-900 dark:text-white font-mono">
+                                {selectedPayablePartner.totalOwed.toLocaleString()} ETB
+                              </strong>
+                            </div>
+                            <div className="flex justify-between items-center text-slate-600 dark:text-slate-400">
+                              <span>Settlement Deduction:</span>
+                              <strong className="text-emerald-600 dark:text-emerald-400 font-mono font-bold">
+                                -{(() => {
+                                  const payoutVal =
+                                    parseFormattedNumber(immediatePayoutAmount) ||
+                                    parseFormattedNumber(sellingPrice) ||
+                                    parseFormattedNumber(costBasis) ||
+                                    0;
+                                  return payoutVal.toLocaleString();
+                                })()} ETB
+                              </strong>
+                            </div>
+                            <div className="pt-1.5 border-t border-amber-500/20 flex justify-between items-center">
+                              {(() => {
+                                const payoutVal =
+                                  parseFormattedNumber(immediatePayoutAmount) ||
+                                  parseFormattedNumber(sellingPrice) ||
+                                  parseFormattedNumber(costBasis) ||
+                                  0;
+                                const owed = selectedPayablePartner.totalOwed;
+                                if (payoutVal > owed) {
+                                  const excess = payoutVal - owed;
+                                  return (
+                                    <>
+                                      <span className="text-emerald-700 dark:text-emerald-400 font-semibold">
+                                        Debt Cleared (0 ETB) · Excess Receivable:
+                                      </span>
+                                      <span className="font-mono text-xs font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 px-2 py-0.5 rounded-md">
+                                        +{excess.toLocaleString()} ETB
+                                      </span>
+                                    </>
+                                  );
+                                }
                                 return (
-                                  <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
-                                    Debt Cleared: 0 ETB · <strong className="font-mono">+{excess.toLocaleString()} ETB</strong> excess receivable to collect
-                                  </span>
+                                  <>
+                                    <span className="text-slate-700 dark:text-slate-300 font-semibold">
+                                      Remaining Debt After Settlement:
+                                    </span>
+                                    <strong className="font-mono text-slate-900 dark:text-white font-bold">
+                                      {(owed - payoutVal).toLocaleString()} ETB
+                                    </strong>
+                                  </>
                                 );
-                              }
-                              return (
-                                <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
-                                  Remaining After Settlement:{' '}
-                                  <strong className="font-mono">
-                                    {(owed - payoutVal).toLocaleString()} ETB
-                                  </strong>
-                                </span>
-                              );
-                            })()}
+                              })()}
+                            </div>
                           </div>
                         )}
                       </div>
@@ -3446,31 +3538,71 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
                             <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                              Handed To <span className="text-rose-500">*</span>
+                              Hand Out To <span className="text-rose-500">*</span>
                             </label>
-                            <input
-                              type="text"
-                              list="handover-contacts-list"
-                              value={immediateRecipientName}
+                            <select
+                              value={immediateRecipientContactId}
                               onChange={(e) => {
-                                const val = e.target.value;
-                                setImmediateRecipientName(val);
-                                const match = liveContacts.find((c) => c.name.toLowerCase() === val.toLowerCase());
-                                if (match) setImmediateRecipientContactId(match.id);
+                                const cId = e.target.value;
+                                setImmediateRecipientContactId(cId);
+                                if (cId === '__custom__') {
+                                  setImmediateRecipientName('');
+                                } else {
+                                  const found = liveContacts.find((c) => c.id === cId);
+                                  if (found) {
+                                    setImmediateRecipientName(found.name);
+                                  } else {
+                                    setImmediateRecipientName('');
+                                  }
+                                }
                               }}
-                              placeholder="Staff name..."
-                              className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
-                            />
-                            <datalist id="handover-contacts-list">
-                              {liveContacts.map((c) => (
-                                <option key={c.id} value={c.name} />
-                              ))}
-                            </datalist>
+                              className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none cursor-pointer"
+                            >
+                              <option value="">Select recipient...</option>
+                              {handoutCandidates.debtors.length > 0 && (
+                                <optgroup label="Partners Who Owe You (Receivables)">
+                                  {handoutCandidates.debtors.map((d) => (
+                                    <option key={d.contact.id} value={d.contact.id}>
+                                      {d.contact.name} (owes you {d.owed.toLocaleString()} ETB)
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              )}
+                              {handoutCandidates.staff.length > 0 && (
+                                <optgroup label="Staff Members">
+                                  {handoutCandidates.staff.map((s) => (
+                                    <option key={s.contact.id} value={s.contact.id}>
+                                      {s.contact.name} {s.owed > 0 ? `(owes you ${s.owed.toLocaleString()} ETB)` : `(0 ETB balance)`}
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              )}
+                              {handoutCandidates.others.length > 0 && (
+                                <optgroup label="Other Partners (No Debt)">
+                                  {handoutCandidates.others.map((o) => (
+                                    <option key={o.contact.id} value={o.contact.id}>
+                                      {o.contact.name} (0 ETB balance)
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              )}
+                              <option value="__custom__">+ Other / Enter new name...</option>
+                            </select>
+
+                            {immediateRecipientContactId === '__custom__' && (
+                              <input
+                                type="text"
+                                value={immediateRecipientName}
+                                onChange={(e) => setImmediateRecipientName(e.target.value)}
+                                placeholder="Enter recipient name..."
+                                className="w-full h-9 mt-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none"
+                              />
+                            )}
                           </div>
 
                           <div>
                             <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                              Target Payout (ETB)
+                              Agreed Handover Value / Payout (ETB)
                             </label>
                             <input
                               type="text"
@@ -3481,6 +3613,48 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                             />
                           </div>
                         </div>
+
+                        {/* Live calculation card showing current balance, this handover value, and new balance after handover */}
+                        {selectedHandoutPartner && (
+                          <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 space-y-1.5 text-xs">
+                            <div className="flex justify-between items-center text-slate-600 dark:text-slate-400">
+                              <span>Current Balance:</span>
+                              <span className="font-mono font-semibold text-slate-900 dark:text-white">
+                                {selectedHandoutPartner.currentReceivable > 0
+                                  ? `${selectedHandoutPartner.contact.name} owes you ${selectedHandoutPartner.currentReceivable.toLocaleString()} ETB`
+                                  : `${selectedHandoutPartner.contact.name} (0.00 ETB)`}
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center text-slate-600 dark:text-slate-400">
+                              <span>This Handover Value:</span>
+                              <strong className="font-mono font-bold text-blue-600 dark:text-blue-400">
+                                +{(() => {
+                                  const hVal =
+                                    parseFormattedNumber(immediatePayoutAmount) ||
+                                    parseFormattedNumber(sellingPrice) ||
+                                    parseFormattedNumber(costBasis) ||
+                                    0;
+                                  return hVal.toLocaleString();
+                                })()} ETB
+                              </strong>
+                            </div>
+                            <div className="pt-1.5 border-t border-blue-500/20 flex justify-between items-center">
+                              <span className="text-slate-800 dark:text-slate-200 font-semibold">
+                                Total Receivable After Handover:
+                              </span>
+                              <span className="font-mono text-xs font-bold bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 px-2 py-0.5 rounded-md">
+                                {(() => {
+                                  const hVal =
+                                    parseFormattedNumber(immediatePayoutAmount) ||
+                                    parseFormattedNumber(sellingPrice) ||
+                                    parseFormattedNumber(costBasis) ||
+                                    0;
+                                  return (selectedHandoutPartner.currentReceivable + hVal).toLocaleString();
+                                })()} ETB
+                              </span>
+                            </div>
+                          </div>
+                        )}
 
                         <div>
                           <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1.5">

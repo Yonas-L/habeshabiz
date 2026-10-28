@@ -662,9 +662,9 @@ class GeneratePartnerStatementAction
                         'type' => 'device_offset',
                         'type_label' => 'Device Handover',
                         'context' => $this->sanitizeContext($payment->notes ?: 'Device'),
-                        'payable' => $debt->type === 'payable' ? -(float) $payment->amount : 0.0,
-                        'receivable' => $debt->type === 'receivable' ? -(float) $payment->amount : 0.0,
-                        'balance_effect' => $debt->type === 'payable' ? (float) $payment->amount : -(float) $payment->amount,
+                        'payable' => 0.0,
+                        'receivable' => (float) $payment->amount,
+                        'balance_effect' => (float) $payment->amount,
                         'reference_number' => 'DEVICE-OFFSET',
                     ];
                 } elseif (in_array($payment->reference_number, ['REPAIR-REDELIVERY', 'VENDOR-SWAP-DELIVERY', 'WARRANTY-SWAP'], true)) {
@@ -716,6 +716,7 @@ class GeneratePartnerStatementAction
         foreach ($bilateralGroups as $groupKey => $group) {
             $totalDeducted = (float) ($group['total_deducted'] ?? 0);
             $excessReceivable = (float) ($group['receivable'] ?? 0);
+            $totalHandoverVal = $totalDeducted + $excessReceivable;
             $entryDate = $group['date'] ?? now();
             $context = $group['context'] ?? 'Device';
 
@@ -729,9 +730,9 @@ class GeneratePartnerStatementAction
                 'type' => 'bilateral_offset',
                 'type_label' => 'Device Handover',
                 'context' => $cleanDesc ?: 'Device',
-                'payable' => -$totalDeducted,
-                'receivable' => $excessReceivable,
-                'balance_effect' => $totalDeducted + $excessReceivable,
+                'payable' => 0.0,
+                'receivable' => $totalHandoverVal,
+                'balance_effect' => $totalHandoverVal,
                 'reference_number' => 'BILATERAL-OFFSET',
             ];
         }

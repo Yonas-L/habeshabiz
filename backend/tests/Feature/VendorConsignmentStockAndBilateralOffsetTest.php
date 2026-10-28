@@ -1016,8 +1016,8 @@ test('vendor stock intake with immediate handover exceeding open payable clears 
     expect($handoverEntries->count())->toBe(1);
 
     $entry = $handoverEntries->first();
-    expect((float) $entry['payable'])->toBe(-5000.00)
-        ->and((float) $entry['receivable'])->toBe(2000.00)
+    expect((float) $entry['payable'])->toBe(0.00)
+        ->and((float) $entry['receivable'])->toBe(7000.00)
         ->and((float) $entry['balance_effect'])->toBe(7000.00);
 
     // 7. Test Undo / Revert functionality
@@ -1153,7 +1153,7 @@ test('device handover settling multiple debts and creating excess receivable con
     $entry = $handoverEntries->first();
     expect($entry['context'])->toContain('Vivo V40')
         ->and($entry['context'])->toContain('54432')
-        ->and((float) $entry['payable'])->toBe(-113000.00)
-        ->and((float) $entry['receivable'])->toBe(87000.00)
+        ->and((float) $entry['payable'])->toBe(0.00)
+        ->and((float) $entry['receivable'])->toBe(200000.00)
         ->and((float) $entry['balance_effect'])->toBe(200000.00);
 });
