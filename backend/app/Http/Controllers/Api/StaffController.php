@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Contact;
 use App\Models\Debt;
+use App\Models\DebtPayment;
 use App\Models\InventoryUnit;
 use App\Models\SalesOrder;
 use App\Models\User;
@@ -728,7 +729,7 @@ class StaffController extends Controller
                 'debt_offset_notes' => $offsetPayment?->notes,
                 'due_date' => $debt->due_date?->toDateString(),
                 'notes' => $debt->notes,
-                'payments' => $debt->payments->map(fn ($p) => [
+                'payments' => $debt->payments->map(fn (DebtPayment $p) => [
                     'id' => $p->id,
                     'amount' => (float) $p->amount,
                     'payment_date' => $p->payment_date?->toIso8601String(),

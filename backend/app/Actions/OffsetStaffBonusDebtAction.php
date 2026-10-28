@@ -18,7 +18,9 @@ class OffsetStaffBonusDebtAction
      * @param  array{
      *     amount: float|int,
      *     receivable_debt_id: string,
-     *     notes?: string|null
+     *     notes?: string|null,
+     *     reference_number?: string|null,
+     *     payment_date?: string|\DateTimeInterface|null
      * }  $data
      * @return array{
      *     bonus_debts: Debt[],
@@ -32,7 +34,7 @@ class OffsetStaffBonusDebtAction
     {
         return DB::transaction(function () use ($staff, $data) {
             $tenantId = TenantScope::getActiveTenantId() ?? $staff->tenant_id;
-            $amount = round((float) ($data['amount'] ?? 0), 2);
+            $amount = round((float) $data['amount'], 2);
 
             if ($amount <= 0) {
                 throw new InvalidArgumentException('Offset amount must be greater than zero.');
@@ -82,7 +84,7 @@ class OffsetStaffBonusDebtAction
             $remToAllocate = $amount;
             $createdBonusPayments = [];
             $updatedBonusDebts = [];
-            $contactName = $receivableDebt->contact?->name ?? 'Customer';
+            $contactName = $receivableDebt->contact ? $receivableDebt->contact->name : 'Customer';
             $userNotes = ! empty($data['notes']) && ! str_starts_with(trim($data['notes']), 'Commission bonus payout') ? ' | '.trim($data['notes']) : '';
 
             // 1. Consume from bonus debts sequentially (FIFO)
@@ -174,7 +176,7 @@ class OffsetStaffBonusDebtAction
                     'receivable_payment_id' => $recPayment->id,
                     'bonus_debt_ids' => array_map(fn ($d) => $d->id, $updatedBonusDebts),
                     'notes' => $data['notes'] ?? null,
-                    'paid_by' => auth()->user()?->name ?? 'Owner',
+                    'paid_by' => auth()->user() ? auth()->user()->name : 'Owner',
                     'settled_at' => now()->toIso8601String(),
                 ]
             );

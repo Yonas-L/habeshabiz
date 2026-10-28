@@ -56,6 +56,9 @@ class SalesOrderItem extends Model
         return $this->belongsTo(ProductVariant::class, 'variant_id')->withTrashed();
     }
 
+    /**
+     * @return BelongsTo<InventoryUnit, $this>
+     */
     public function inventoryUnit(): BelongsTo
     {
         return $this->belongsTo(InventoryUnit::class, 'inventory_unit_id')->withTrashed();

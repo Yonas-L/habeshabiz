@@ -186,6 +186,7 @@ class UndoHandoverSoldAction implements UndoActionInterface
                 ->where('notes', 'like', "%[unit_id:{$unit->id}]%")
                 ->get();
             foreach ($offsetPayments as $opPmt) {
+                /** @var Debt|null $parentDebt */
                 $parentDebt = $opPmt->debt;
                 $opPmt->delete();
                 $parentDebt?->recalculateSettlement();

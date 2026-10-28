@@ -314,9 +314,9 @@ class GeneratePartnerStatementAction
                     if ($isHandoverOffset) {
                         $unitId = null;
                         if ($order && $order->items->isNotEmpty()) {
-                            $unitId = $order->items->first()?->inventory_unit_id;
+                            $unitId = $order->items->first()->inventory_unit_id;
                         }
-                        if (! $unitId && ! empty($order?->notes) && preg_match('/\[unit_id:([a-zA-Z0-9_-]+)\]/', $order->notes, $m)) {
+                        if (! $unitId && $order && ! empty($order->notes) && preg_match('/\[unit_id:([a-zA-Z0-9_-]+)\]/', $order->notes, $m)) {
                             $unitId = $m[1];
                         }
                         if (! $unitId && ! empty($debt->notes) && preg_match('/\[unit_id:([a-zA-Z0-9_-]+)\]/', $debt->notes, $m)) {
@@ -325,7 +325,7 @@ class GeneratePartnerStatementAction
 
                         $sn = null;
                         if ($order && $order->items->isNotEmpty()) {
-                            $sn = $order->items->first()?->inventoryUnit?->imei_or_serial;
+                            $sn = $order->items->first()->inventoryUnit?->imei_or_serial;
                         }
                         if (! $sn && preg_match('/\(SN:\s*([a-zA-Z0-9_-]+)\)/i', $itemDesc, $m)) {
                             $sn = $m[1];
@@ -714,11 +714,11 @@ class GeneratePartnerStatementAction
 
         // Emit consolidated bilateral offset entries (1 single row per handover event/unit)
         foreach ($bilateralGroups as $groupKey => $group) {
-            $totalDeducted = (float) ($group['total_deducted'] ?? 0);
-            $excessReceivable = (float) ($group['receivable'] ?? 0);
+            $totalDeducted = (float) $group['total_deducted'];
+            $excessReceivable = (float) $group['receivable'];
             $totalHandoverVal = $totalDeducted + $excessReceivable;
-            $entryDate = $group['date'] ?? now();
-            $context = $group['context'] ?? 'Device';
+            $entryDate = $group['date'];
+            $context = $group['context'];
 
             $cleanDesc = preg_replace('/^Handover\s+device:\s*/i', '', $context);
             $cleanDesc = preg_replace('/\s*\[unit_id:[a-zA-Z0-9_-]+\]/i', '', $cleanDesc);

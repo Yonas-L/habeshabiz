@@ -117,6 +117,9 @@ class SalesOrder extends Model
         return $this->hasMany(Debt::class, 'reference_id')->where('reference_type', 'sales_order');
     }
 
+    /**
+     * @return HasMany<Debt, $this>
+     */
     public function bonusDebts(): HasMany
     {
         return $this->hasMany(Debt::class, 'reference_id')->where('reference_type', 'salesperson_bonus');

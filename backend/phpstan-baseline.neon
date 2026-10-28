@@ -13,12 +13,6 @@ parameters:
 			path: app/Actions/GenerateBusinessReportAction.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$imei_or_serial\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Actions/GenerateBusinessReportAction.php
-
-		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
 			identifier: property.notFound
 			count: 1
@@ -111,7 +105,7 @@ parameters:
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$amount\.$#'
 			identifier: property.notFound
-			count: 24
+			count: 21
 			path: app/Actions/GeneratePartnerStatementAction.php
 
 		-
@@ -136,12 +130,6 @@ parameters:
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
 			identifier: property.notFound
 			count: 11
-			path: app/Actions/GeneratePartnerStatementAction.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$imei_or_serial\.$#'
-			identifier: property.notFound
-			count: 7
 			path: app/Actions/GeneratePartnerStatementAction.php
 
 		-
@@ -171,7 +159,7 @@ parameters:
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$product\.$#'
 			identifier: property.notFound
-			count: 17
+			count: 24
 			path: app/Actions/GeneratePartnerStatementAction.php
 
 		-
@@ -190,12 +178,6 @@ parameters:
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$storage\.$#'
 			identifier: property.notFound
 			count: 3
-			path: app/Actions/GeneratePartnerStatementAction.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$variant\.$#'
-			identifier: property.notFound
-			count: 7
 			path: app/Actions/GeneratePartnerStatementAction.php
 
 		-
@@ -269,6 +251,12 @@ parameters:
 			identifier: nullsafe.neverNull
 			count: 1
 			path: app/Actions/GeneratePartnerStatementAction.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/OffsetStaffBonusDebtAction.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\FinancialAccount\>\:\:\$id\.$#'
@@ -1189,25 +1177,7 @@ parameters:
 			path: app/Http/Controllers/Api/SaleController.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$amount\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/StaffController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$financialAccount\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/StaffController.php
-
-		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Api/StaffController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$imei_or_serial\.$#'
 			identifier: property.notFound
 			count: 1
 			path: app/Http/Controllers/Api/StaffController.php
@@ -1216,6 +1186,12 @@ parameters:
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$items\.$#'
 			identifier: property.notFound
 			count: 2
+			path: app/Http/Controllers/Api/StaffController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
 			path: app/Http/Controllers/Api/StaffController.php
 
 		-
@@ -1231,21 +1207,9 @@ parameters:
 			path: app/Http/Controllers/Api/StaffController.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$payment_date\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/StaffController.php
-
-		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$product\.$#'
 			identifier: property.notFound
 			count: 2
-			path: app/Http/Controllers/Api/StaffController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$reference_number\.$#'
-			identifier: property.notFound
-			count: 1
 			path: app/Http/Controllers/Api/StaffController.php
 
 		-
@@ -1257,7 +1221,7 @@ parameters:
 		-
 			message: '#^Cannot call method toIso8601String\(\) on string\.$#'
 			identifier: method.nonObject
-			count: 2
+			count: 3
 			path: app/Http/Controllers/Api/StaffController.php
 
 		-
@@ -1273,20 +1237,20 @@ parameters:
 			path: app/Http/Controllers/Api/StaffController.php
 
 		-
-			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\SalesOrder\>\:\:map\(\) contains unresolvable type\.$#'
-			identifier: argument.unresolvableType
-			count: 1
-			path: app/Http/Controllers/Api/StaffController.php
-
-		-
-			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\SalesOrderItem\>\:\:map\(\) contains unresolvable type\.$#'
-			identifier: argument.unresolvableType
-			count: 1
-			path: app/Http/Controllers/Api/StaffController.php
-
-		-
 			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) contains unresolvable type\.$#'
 			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/Api/StaffController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array\{id\: string, amount\: float, payment_date\: mixed, created_at\: string\|null, account_name\: mixed, reference_number\: string\|null, notes\: string\|null, is_debt_offset\: bool\}, Closure\(App\\Models\\DebtPayment\)\: array\{id\: string, amount\: float, payment_date\: mixed, created_at\: string\|null, account_name\: mixed, reference_number\: string\|null, notes\: string\|null, is_debt_offset\: bool\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/StaffController.php
+
+		-
+			message: '#^Using nullsafe method call on non\-nullable type string\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
 			count: 1
 			path: app/Http/Controllers/Api/StaffController.php
 
@@ -1357,6 +1321,12 @@ parameters:
 			path: app/Models/ProductVariant.php
 
 		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$notes\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Models/SalesOrder.php
+
+		-
 			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
 			identifier: larastan.noEnvCallsOutsideOfConfig
 			count: 1
@@ -1414,12 +1384,6 @@ parameters:
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$settings\.$#'
 			identifier: property.notFound
 			count: 3
-			path: app/Services/PdfGeneratorService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$status\.$#'
-			identifier: property.notFound
-			count: 1
 			path: app/Services/PdfGeneratorService.php
 
 		-
