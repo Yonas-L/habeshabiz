@@ -181,12 +181,26 @@ class UndoHandoverSoldAction implements UndoActionInterface
                 $order->delete();
             }
 
-            // 2. Restore unit status to 'out'
-            $custodian = $oldValues['handover_to'] ?? $newValues['handover_to'] ?? $unit->handover_to;
-            $handedOutAt = $oldValues['handed_out_at'] ?? now();
+            // Reverse any bilateral debt offset payments created for this unit and reopen payables
+            $offsetPayments = DebtPayment::where('tenant_id', $log->tenant_id)
+                ->where('notes', 'like', "%[unit_id:{$unit->id}]%")
+                ->get();
+            foreach ($offsetPayments as $opPmt) {
+                $parentDebt = $opPmt->debt;
+                $opPmt->delete();
+                $parentDebt?->recalculateSettlement();
+            }
+
+            // 2. Restore unit status
+            $isImmediateIntake = ! empty($newValues['immediate']);
+            $restoredStatus = $isImmediateIntake ? 'in_stock' : ($oldValues['status'] ?? 'out');
+            $restoredLocation = $oldValues['location'] ?? ($isImmediateIntake ? 'Shop Counter' : 'With Staff/Broker');
+            $custodian = $restoredStatus === 'in_stock' ? null : ($oldValues['handover_to'] ?? $newValues['handover_to'] ?? $unit->handover_to);
+            $handedOutAt = $restoredStatus === 'in_stock' ? null : ($oldValues['handed_out_at'] ?? now());
 
             $unit->update([
-                'status' => 'out',
+                'status' => $restoredStatus,
+                'location' => $restoredLocation,
                 'handover_to' => $custodian,
                 'handed_out_at' => $handedOutAt,
                 'sold_at' => null,

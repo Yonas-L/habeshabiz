@@ -2757,8 +2757,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                         )}
 
                         {isOverOffset && (
-                          <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-700 dark:text-rose-400 text-xs">
-                            Deduction value ({offsetVal.toLocaleString()} ETB) exceeds what you owe ({currentPayable.toLocaleString()} ETB max).
+                          <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-800 dark:text-emerald-300 text-xs">
+                            Handover value ({offsetVal.toLocaleString()} ETB) clears your debt ({currentPayable.toLocaleString()} ETB), and records +{(offsetVal - currentPayable).toLocaleString()} ETB as an open receivable from {selectedPartner.name}.
                           </div>
                         )}
 
@@ -2770,9 +2770,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                             </span>
                           </div>
                           <div className="flex justify-between text-slate-700 dark:text-slate-200 font-medium">
-                            <span>Deducted by this Handover:</span>
+                            <span>Deducted from Debt:</span>
                             <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                              -{offsetVal.toLocaleString()} ETB
+                              -{Math.min(offsetVal, currentPayable).toLocaleString()} ETB
                             </span>
                           </div>
                           <div className="flex justify-between pt-1.5 border-t border-slate-200/60 dark:border-slate-800 font-semibold">
@@ -2781,10 +2781,18 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                               {remainingDebt.toLocaleString()} ETB
                             </span>
                           </div>
-                          {profit > 0 && (
+                          {isOverOffset && (
                             <div className="flex justify-between items-center pt-1.5 border-t border-emerald-200/50 dark:border-emerald-900/50 text-emerald-700 dark:text-emerald-400 font-semibold">
-                              <span>Your Profit from Handover:</span>
+                              <span>New Receivable to Collect:</span>
                               <span className="font-mono text-xs bg-emerald-100 dark:bg-emerald-950 px-2 py-0.5 rounded-md">
+                                +{(offsetVal - currentPayable).toLocaleString()} ETB
+                              </span>
+                            </div>
+                          )}
+                          {profit > 0 && (
+                            <div className="flex justify-between items-center pt-1.5 border-t border-slate-200/60 dark:border-slate-800 text-slate-600 dark:text-slate-300 font-semibold">
+                              <span>Your Realized Profit:</span>
+                              <span className="font-mono text-xs text-emerald-600 dark:text-emerald-400 font-bold">
                                 +{profit.toLocaleString()} ETB
                               </span>
                             </div>
@@ -2869,7 +2877,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   const offsetAmt = parseFloat(handoverPayout) || 0;
                   const isBlockedOffset = handoverMode === 'offset' && (
                     offsetAmt <= 0 ||
-                    (selPartner && (payableDebt <= 0 || offsetAmt > payableDebt))
+                    (selPartner && payableDebt <= 0)
                   );
 
                   return (

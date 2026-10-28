@@ -3410,24 +3410,34 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                         </div>
 
                         {selectedPayablePartner && (
-                          <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between text-xs">
+                          <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs">
                             <span className="text-slate-600 dark:text-slate-400">
                               Current Debt: <strong className="text-slate-900 dark:text-white font-mono">{selectedPayablePartner.totalOwed.toLocaleString()} ETB</strong>
                             </span>
-                            <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
-                              Remaining After Settlement:{' '}
-                              <strong className="font-mono">
-                                {Math.max(
-                                  0,
-                                  selectedPayablePartner.totalOwed -
-                                    (parseFormattedNumber(immediatePayoutAmount) ||
-                                      parseFormattedNumber(sellingPrice) ||
-                                      parseFormattedNumber(costBasis) ||
-                                      0)
-                                ).toLocaleString()}{' '}
-                                ETB
-                              </strong>
-                            </span>
+                            {(() => {
+                              const payoutVal =
+                                parseFormattedNumber(immediatePayoutAmount) ||
+                                parseFormattedNumber(sellingPrice) ||
+                                parseFormattedNumber(costBasis) ||
+                                0;
+                              const owed = selectedPayablePartner.totalOwed;
+                              if (payoutVal > owed) {
+                                const excess = payoutVal - owed;
+                                return (
+                                  <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                                    Debt Cleared: 0 ETB · <strong className="font-mono">+{excess.toLocaleString()} ETB</strong> excess receivable to collect
+                                  </span>
+                                );
+                              }
+                              return (
+                                <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                                  Remaining After Settlement:{' '}
+                                  <strong className="font-mono">
+                                    {(owed - payoutVal).toLocaleString()} ETB
+                                  </strong>
+                                </span>
+                              );
+                            })()}
                           </div>
                         )}
                       </div>

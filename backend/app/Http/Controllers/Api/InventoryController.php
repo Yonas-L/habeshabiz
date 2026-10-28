@@ -742,9 +742,11 @@ class InventoryController extends Controller
                     }
 
                     // Strict validation: Verify partner actually has open payables to offset against
+                    // Strict validation: Verify partner actually has open payables to offset against
                     $openPayables = Debt::where('tenant_id', $tenantId)
                         ->where('contact_id', $partnerContact->id)
                         ->where('type', 'payable')
+                        ->where('reference_type', '!=', 'salesperson_bonus')
                         ->whereIn('status', ['open', 'partially_paid'])
                         ->with('payments')
                         ->orderBy('due_date', 'asc')
@@ -759,11 +761,9 @@ class InventoryController extends Controller
                         ]);
                     }
 
-                    if ($finalPrice > $totalOpenPayables) {
-                        throw ValidationException::withMessages([
-                            'handover_payout' => ['Agreed deduction amount ('.number_format($finalPrice, 2)." ETB) exceeds your total open payables to {$partnerContact->name} (".number_format($totalOpenPayables, 2)." ETB). You can only offset up to the amount you owe. To hand out devices for {$partnerContact->name} to sell, choose 'Temporary Handout' instead."],
-                        ]);
-                    }
+                    // Settle existing payables up to total open balance, and record excess as a receivable debt
+                    $totalDeducted = min($finalPrice, $totalOpenPayables);
+                    $excessReceivable = max(0.0, $finalPrice - $totalDeducted);
 
                     $now = now();
                     $unitNotes = ! empty($validated['handover_notes'])
@@ -780,8 +780,11 @@ class InventoryController extends Controller
                         'notes' => $unitNotes,
                     ]);
 
-                    if ($finalPrice > 0) {
-                        $remOffset = $finalPrice;
+                    $sn = $unit->imei_or_serial ? " (SN: {$unit->imei_or_serial})" : '';
+                    $devName = $unit->variant?->product?->name ?? 'Device';
+
+                    if ($totalDeducted > 0) {
+                        $remOffset = $totalDeducted;
 
                         foreach ($openPayables as $op) {
                             if ($remOffset <= 0) {
@@ -790,8 +793,6 @@ class InventoryController extends Controller
                             $rem = (float) $op->remaining_amount;
                             $deduct = min($rem, $remOffset);
 
-                            $sn = $unit->imei_or_serial ? " (SN: {$unit->imei_or_serial})" : '';
-                            $devName = $unit->variant?->product?->name ?? 'Device';
                             $pmt = DebtPayment::create([
                                 'tenant_id' => $tenantId,
                                 'debt_id' => $op->id,
@@ -816,9 +817,10 @@ class InventoryController extends Controller
                         'salesperson_id' => $user->id,
                         'total_amount' => $finalPrice,
                         'discount_amount' => 0.0,
-                        'paid_amount' => $finalPrice,
-                        'payment_status' => 'paid',
+                        'paid_amount' => $totalDeducted,
+                        'payment_status' => $excessReceivable > 0 ? 'partially_paid' : 'paid',
                         'payment_method' => 'debt_offset',
+                        'credit_sale' => $excessReceivable > 0,
                         'financial_account_id' => null,
                         'notes' => "Handover debt offset to {$partnerContact->name} [unit_id:{$unit->id}]",
                         'order_date' => $now,
@@ -837,6 +839,22 @@ class InventoryController extends Controller
                         'sourcing_type' => 'consignment',
                     ]);
 
+                    if ($excessReceivable > 0) {
+                        Debt::create([
+                            'tenant_id' => $tenantId,
+                            'contact_id' => $partnerContact->id,
+                            'type' => 'receivable',
+                            'reference_type' => 'sales_order',
+                            'reference_id' => $salesOrder->id,
+                            'original_amount' => $excessReceivable,
+                            'paid_amount' => 0.0,
+                            'remaining_amount' => $excessReceivable,
+                            'due_date' => $now->copy()->addDays(7),
+                            'status' => 'open',
+                            'notes' => "Device handover balance: {$devName}{$sn} (Settled ".number_format($totalDeducted, 2)." ETB debt, ".number_format($excessReceivable, 2)." ETB remaining to collect)",
+                        ]);
+                    }
+
                     (new SynchronizeInventoryStockAction)->execute();
 
                     AuditLog::record(
@@ -849,6 +867,9 @@ class InventoryController extends Controller
                             'selling_price' => $finalPrice,
                             'offset_debt' => true,
                             'immediate' => true,
+                            'deducted_amount' => $totalDeducted,
+                            'excess_receivable' => $excessReceivable,
+                            'sales_order_id' => $salesOrder->id,
                         ],
                         revertGroupId: $revertGroupId
                     );
@@ -1763,16 +1784,16 @@ class InventoryController extends Controller
                 ]);
             }
 
-            if ($finalPrice > $totalOpenPayables) {
-                throw ValidationException::withMessages([
-                    'handover_payout' => ['Agreed deduction amount ('.number_format($finalPrice, 2)." ETB) exceeds your total open payables to {$partnerContact->name} (".number_format($totalOpenPayables, 2)." ETB). You can only offset up to the amount you owe. To hand out devices for {$partnerContact->name} to sell, choose 'Temporary Handout' instead."],
-                ]);
-            }
+            // Settle existing payables up to total open balance, and record excess as a receivable debt
+            $totalDeducted = min($finalPrice, $totalOpenPayables);
+            $excessReceivable = max(0.0, $finalPrice - $totalDeducted);
 
             DB::transaction(function () use (
                 $unit,
                 $partnerContact,
                 $finalPrice,
+                $totalDeducted,
+                $excessReceivable,
                 $validated,
                 $user,
                 $openPayables,
@@ -1796,9 +1817,12 @@ class InventoryController extends Controller
                         : $unit->notes,
                 ]);
 
+                $sn = $unit->imei_or_serial ? " (SN: {$unit->imei_or_serial})" : '';
+                $devName = $unit->variant?->product?->name ?? 'Device';
+
                 // 2. Deduct directly from partner's open payable debts
-                if ($finalPrice > 0) {
-                    $remOffset = $finalPrice;
+                if ($totalDeducted > 0) {
+                    $remOffset = $totalDeducted;
 
                     foreach ($openPayables as $op) {
                         if ($remOffset <= 0) {
@@ -1807,8 +1831,6 @@ class InventoryController extends Controller
                         $rem = (float) $op->remaining_amount;
                         $deduct = min($rem, $remOffset);
 
-                        $sn = $unit->imei_or_serial ? " (SN: {$unit->imei_or_serial})" : '';
-                        $devName = $unit->variant?->product?->name ?? 'Device';
                         $pmt = DebtPayment::create([
                             'tenant_id' => $user->tenant_id,
                             'debt_id' => $op->id,
@@ -1834,9 +1856,10 @@ class InventoryController extends Controller
                     'salesperson_id' => $user->id,
                     'total_amount' => $finalPrice,
                     'discount_amount' => 0.0,
-                    'paid_amount' => $finalPrice,
-                    'payment_status' => 'paid',
+                    'paid_amount' => $totalDeducted,
+                    'payment_status' => $excessReceivable > 0 ? 'partially_paid' : 'paid',
                     'payment_method' => 'debt_offset',
+                    'credit_sale' => $excessReceivable > 0,
                     'financial_account_id' => null,
                     'notes' => "Handover debt offset to {$partnerContact->name} [unit_id:{$unit->id}]",
                     'order_date' => $now,
@@ -1855,6 +1878,23 @@ class InventoryController extends Controller
                     'sourcing_type' => 'internal_stock',
                 ]);
 
+                // 4. If agreed handover value exceeds debt, record remaining balance as receivable debt
+                if ($excessReceivable > 0) {
+                    Debt::create([
+                        'tenant_id' => $user->tenant_id,
+                        'contact_id' => $partnerContact->id,
+                        'type' => 'receivable',
+                        'reference_type' => 'sales_order',
+                        'reference_id' => $salesOrder->id,
+                        'original_amount' => $excessReceivable,
+                        'paid_amount' => 0.0,
+                        'remaining_amount' => $excessReceivable,
+                        'due_date' => $now->copy()->addDays(7),
+                        'status' => 'open',
+                        'notes' => "Device handover balance: {$devName}{$sn} (Settled ".number_format($totalDeducted, 2)." ETB debt, ".number_format($excessReceivable, 2)." ETB remaining to collect)",
+                    ]);
+                }
+
                 (new SynchronizeInventoryStockAction)->execute();
 
                 AuditLog::record(
@@ -1871,16 +1911,25 @@ class InventoryController extends Controller
                         'handover_to' => $partnerContact->name,
                         'selling_price' => $finalPrice,
                         'offset_debt' => true,
+                        'deducted_amount' => $totalDeducted,
+                        'excess_receivable' => $excessReceivable,
+                        'sales_order_id' => $salesOrder->id,
                     ],
                     revertGroupId: $revertGroupId
                 );
             });
 
+            $successMsg = $excessReceivable > 0
+                ? 'Device handed over. Cleared '.number_format($totalDeducted, 2)." ETB debt to {$partnerContact->name}, and recorded ".number_format($excessReceivable, 2).' ETB receivable to collect.'
+                : 'Device handed over and '.number_format($totalDeducted, 2)." ETB deducted from {$partnerContact->name}'s debt.";
+
             return response()->json([
                 'success' => true,
-                'message' => 'Device handed over and '.number_format($finalPrice, 2)." ETB deducted from {$partnerContact->name}'s debt.",
+                'message' => $successMsg,
                 'data' => $unit->fresh()->load('variant.product'),
                 'instant_offset' => true,
+                'deducted_amount' => $totalDeducted,
+                'excess_receivable' => $excessReceivable,
             ]);
         }
 

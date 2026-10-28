@@ -111,6 +111,7 @@ class GeneratePartnerStatementAction
             ->keyBy(fn ($ft) => str_starts_with($ft->reference_number, 'DEBT-') ? substr($ft->reference_number, 5) : $ft->reference_number);
 
         $rawEntries = [];
+        $bilateralGroups = [];
 
         foreach ($debts as $debt) {
             if (str_contains(strtolower($debt->notes ?? ''), 'exclude_statement')) {
@@ -307,17 +308,61 @@ class GeneratePartnerStatementAction
                         $itemDesc = $this->sanitizeContext($debt->notes);
                     }
 
-                    $rawEntries[] = [
-                        'id' => "debt-{$debt->id}",
-                        'date' => $debtCreatedDate,
-                        'type' => 'sales_credit',
-                        'type_label' => 'Sales Credit',
-                        'context' => $itemDesc,
-                        'payable' => 0.0,
-                        'receivable' => (float) $debt->original_amount,
-                        'balance_effect' => (float) $debt->original_amount,
-                        'reference_number' => null,
-                    ];
+                    $isHandoverOffset = ($order && ($order->payment_method === 'debt_offset' || str_contains(strtolower($order->notes ?? ''), 'handover debt offset')))
+                        || str_contains(strtolower($debt->notes ?? ''), 'handover debt offset');
+
+                    if ($isHandoverOffset) {
+                        $unitId = null;
+                        if ($order && $order->items->isNotEmpty()) {
+                            $unitId = $order->items->first()?->inventory_unit_id;
+                        }
+                        if (! $unitId && ! empty($order?->notes) && preg_match('/\[unit_id:([a-zA-Z0-9_-]+)\]/', $order->notes, $m)) {
+                            $unitId = $m[1];
+                        }
+                        if (! $unitId && ! empty($debt->notes) && preg_match('/\[unit_id:([a-zA-Z0-9_-]+)\]/', $debt->notes, $m)) {
+                            $unitId = $m[1];
+                        }
+
+                        $sn = null;
+                        if ($order && $order->items->isNotEmpty()) {
+                            $sn = $order->items->first()?->inventoryUnit?->imei_or_serial;
+                        }
+                        if (! $sn && preg_match('/\(SN:\s*([a-zA-Z0-9_-]+)\)/i', $itemDesc, $m)) {
+                            $sn = $m[1];
+                        }
+
+                        $groupKey = $unitId ? "unit-{$unitId}" : ($sn ? "sn-{$sn}" : "so-{$debt->reference_id}");
+
+                        if (! isset($bilateralGroups[$groupKey])) {
+                            $bilateralGroups[$groupKey] = [
+                                'unit_id' => $unitId,
+                                'date' => $debtCreatedDate,
+                                'context' => $itemDesc,
+                                'total_deducted' => 0.0,
+                                'receivable' => 0.0,
+                            ];
+                        }
+
+                        $bilateralGroups[$groupKey]['receivable'] += (float) $debt->original_amount;
+                        if (! empty($itemDesc) && $itemDesc !== 'Sales Credit') {
+                            $bilateralGroups[$groupKey]['context'] = $itemDesc;
+                        }
+                    } else {
+                        $isDeviceHandover = ($order && str_contains(strtolower($order->notes ?? ''), 'handover'))
+                            || str_contains(strtolower($debt->notes ?? ''), 'device handover');
+
+                        $rawEntries[] = [
+                            'id' => "debt-{$debt->id}",
+                            'date' => $debtCreatedDate,
+                            'type' => $isDeviceHandover ? 'device_handover' : 'sales_credit',
+                            'type_label' => $isDeviceHandover ? 'Device Handover' : 'Sales Credit',
+                            'context' => $itemDesc,
+                            'payable' => 0.0,
+                            'receivable' => (float) $debt->original_amount,
+                            'balance_effect' => (float) $debt->original_amount,
+                            'reference_number' => null,
+                        ];
+                    }
                 } elseif ($debt->reference_type === 'handover_holding') {
                     // If this holding debt was settled via bilateral offset, suppress the temporary holding
                     // record and its clearing payment so the partner statement cleanly shows only the direct debt offset.
@@ -527,6 +572,18 @@ class GeneratePartnerStatementAction
                         continue;
                     }
 
+                    $unitId = null;
+                    if (preg_match('/\[unit_id:([a-zA-Z0-9_-]+)\]/', $payment->notes ?? '', $m)) {
+                        $unitId = $m[1];
+                    }
+
+                    $sn = null;
+                    if (preg_match('/\(SN:\s*([a-zA-Z0-9_-]+)\)/i', $payment->notes ?? '', $m)) {
+                        $sn = $m[1];
+                    }
+
+                    $groupKey = $unitId ? "unit-{$unitId}" : ($sn ? "sn-{$sn}" : "pmt-{$payment->id}");
+
                     $rawContext = $payment->notes;
                     if ($rawContext && preg_match('/(?:Order\s*#|#ORD-|ORD-)([A-Za-z0-9_-]+)/i', $rawContext, $matches) && ! str_contains($rawContext, 'SN:')) {
                         $orderNumOrId = $matches[1];
@@ -543,17 +600,23 @@ class GeneratePartnerStatementAction
 
                     $cleanContext = $this->sanitizeContext($rawContext ?: 'Device');
 
-                    $rawEntries[] = [
-                        'id' => "pay-{$payment->id}",
-                        'date' => $payDate,
-                        'type' => 'bilateral_offset',
-                        'type_label' => 'Device Handover',
-                        'context' => $cleanContext,
-                        'payable' => -(float) $payment->amount,
-                        'receivable' => 0.0,
-                        'balance_effect' => (float) $payment->amount,
-                        'reference_number' => 'BILATERAL-OFFSET',
-                    ];
+                    if (! isset($bilateralGroups[$groupKey])) {
+                        $bilateralGroups[$groupKey] = [
+                            'unit_id' => $unitId,
+                            'date' => $payDate,
+                            'context' => $cleanContext,
+                            'total_deducted' => 0.0,
+                            'receivable' => 0.0,
+                        ];
+                    }
+
+                    $bilateralGroups[$groupKey]['total_deducted'] += (float) $payment->amount;
+                    if ($payDate->gt($bilateralGroups[$groupKey]['date'])) {
+                        $bilateralGroups[$groupKey]['date'] = $payDate;
+                    }
+                    if (! empty($cleanContext) && $cleanContext !== 'Device') {
+                        $bilateralGroups[$groupKey]['context'] = $cleanContext;
+                    }
                 } elseif ($payment->reference_number === 'RETURN-OFFSET' || str_starts_with($payment->reference_number ?? '', 'RETURN-OFFSET')) {
                     $revPayable = abs((float) $payment->amount);
                     $rawEntries[] = [
@@ -647,6 +710,30 @@ class GeneratePartnerStatementAction
                     ];
                 }
             }
+        }
+
+        // Emit consolidated bilateral offset entries (1 single row per handover event/unit)
+        foreach ($bilateralGroups as $groupKey => $group) {
+            $totalDeducted = (float) ($group['total_deducted'] ?? 0);
+            $excessReceivable = (float) ($group['receivable'] ?? 0);
+            $entryDate = $group['date'] ?? now();
+            $context = $group['context'] ?? 'Device';
+
+            $cleanDesc = preg_replace('/^Handover\s+device:\s*/i', '', $context);
+            $cleanDesc = preg_replace('/\s*\[unit_id:[a-zA-Z0-9_-]+\]/i', '', $cleanDesc);
+            $cleanDesc = preg_replace('/\s+x1$/i', '', trim($cleanDesc));
+
+            $rawEntries[] = [
+                'id' => "pay-bilateral-{$groupKey}",
+                'date' => $entryDate,
+                'type' => 'bilateral_offset',
+                'type_label' => 'Device Handover',
+                'context' => $cleanDesc ?: 'Device',
+                'payable' => -$totalDeducted,
+                'receivable' => $excessReceivable,
+                'balance_effect' => $totalDeducted + $excessReceivable,
+                'reference_number' => 'BILATERAL-OFFSET',
+            ];
         }
 
         // Customer purchases (sales orders where this contact is the buyer and no credit debt exists)
@@ -935,6 +1022,9 @@ class GeneratePartnerStatementAction
                 }
                 if ($entry['payable'] < 0) {
                     $rangePaidSentSum += abs($entry['payable']);
+                }
+                if ($entry['receivable'] > 0) {
+                    $rangeReceivableSum += $entry['receivable'];
                 }
             }
 

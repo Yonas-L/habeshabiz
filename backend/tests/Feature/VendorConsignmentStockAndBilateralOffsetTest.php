@@ -720,7 +720,7 @@ test('cannot handover unit as debt offset if payout exceeds open payables', func
         'is_active' => true,
     ]);
 
-    Debt::create([
+    $payableDebt = Debt::create([
         'tenant_id' => $this->tenant->id,
         'contact_id' => $partnerSmall->id,
         'type' => 'payable',
@@ -742,19 +742,50 @@ test('cannot handover unit as debt offset if payout exceeds open payables', func
         'location' => 'Shop Counter',
     ]);
 
-    // Attempting to offset 50,000 ETB when we only owe 20,000 ETB
+    // Handing over 50,000 ETB device when we only owe 20,000 ETB
     $res = $this->actingAs($this->user, 'sanctum')->postJson("/api/v1/inventory/units/{$unit->id}/handover", [
         'handover_to' => $partnerSmall->name,
         'handover_payout' => 50000.00,
         'instant_offset' => true,
     ]);
 
-    $res->assertStatus(422);
-    $res->assertJsonValidationErrors(['handover_payout']);
-    expect($res->json('errors.handover_payout.0'))->toContain('exceeds your total open payables');
+    $res->assertOk();
+    $res->assertJson([
+        'success' => true,
+        'instant_offset' => true,
+        'deducted_amount' => 20000.0,
+        'excess_receivable' => 30000.0,
+    ]);
 
-    // Unit must remain in_stock
-    expect($unit->fresh()->status)->toBe('in_stock');
+    // 1. Existing payable is fully settled
+    $payableDebt->refresh();
+    expect($payableDebt->status)->toBe('settled')
+        ->and((float) $payableDebt->paid_amount)->toBe(20000.0)
+        ->and((float) $payableDebt->remaining_amount)->toBe(0.0);
+
+    // 2. Excess receivable debt (30,000 ETB) is created on partner
+    $receivable = Debt::where('tenant_id', $this->tenant->id)
+        ->where('contact_id', $partnerSmall->id)
+        ->where('type', 'receivable')
+        ->first();
+    expect($receivable)->not->toBeNull()
+        ->and((float) $receivable->original_amount)->toBe(30000.0)
+        ->and((float) $receivable->remaining_amount)->toBe(30000.0)
+        ->and($receivable->status)->toBe('open');
+
+    // 3. Unit is marked sold
+    $unit->refresh();
+    expect($unit->status)->toBe('sold')
+        ->and($unit->handover_to)->toBe($partnerSmall->name)
+        ->and((float) $unit->selling_price)->toBe(50000.0);
+
+    // 4. Partner statement reflects Device Handover
+    $statementAction = app(\App\Actions\GeneratePartnerStatementAction::class);
+    $statement = $statementAction->execute($partnerSmall);
+    $ledger = $statement['ledger'];
+
+    $handoverEntries = collect($ledger)->filter(fn ($e) => ($e['type_label'] ?? '') === 'Device Handover');
+    expect($handoverEntries->count())->toBeGreaterThanOrEqual(1);
 });
 
 test('partner statement renders chronological ledger with mutual credit offset having zero balance effect', function () {
@@ -903,4 +934,226 @@ test('partner statement formats incoming cash linked to payable debt as Payment 
         ->and((float) $ledger[0]['balance_effect'])->toBe(-50000.00)
         ->and((float) $ledger[0]['running_balance'])->toBe(-50000.00)
         ->and($ledger[0]['reference_number'])->toBe('TXN-TEST1234');
+});
+
+test('vendor stock intake with immediate handover exceeding open payable clears debt and creates excess receivable', function () {
+    // 1. Partner Tomas: We owe Tomas 5,000 ETB
+    $tomas = Contact::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Tomas Creditor',
+        'roles' => ['vendor', 'supplier', 'customer'],
+        'is_active' => true,
+    ]);
+
+    $tomasPayable = Debt::create([
+        'tenant_id' => $this->tenant->id,
+        'contact_id' => $tomas->id,
+        'type' => 'payable',
+        'reference_type' => 'direct_credit',
+        'original_amount' => 5000.00,
+        'paid_amount' => 0.0,
+        'remaining_amount' => 5000.00,
+        'status' => 'open',
+    ]);
+
+    // Broker who provided the stock
+    $broker = Contact::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Broker Abebe',
+        'roles' => ['vendor', 'broker'],
+        'is_active' => true,
+    ]);
+
+    // 2. Intake stock item with agreed price 5,000 ETB, and immediate handover to Tomas for 7,000 ETB
+    $res = $this->actingAs($this->user, 'sanctum')->postJson('/api/v1/inventory/units', [
+        'variant_id' => $this->variantA->id,
+        'imei_or_serial' => 'INTAKE-EXCESS-001',
+        'condition' => 'brand_new',
+        'cost_basis' => 5000.00,
+        'selling_price' => 7000.00,
+        'source_type' => 'consignment',
+        'supplier_contact_id' => $broker->id,
+        'immediate_handover' => true,
+        'handover_mode' => 'offset',
+        'handover_to' => $tomas->name,
+        'handover_contact_id' => $tomas->id,
+        'handover_payout' => 7000.00,
+    ]);
+
+    $res->assertCreated();
+    $unitId = $res->json('data.id');
+
+    // 3. Verify Tomas payable (5,000 ETB) is cleared completely
+    $tomasPayable->refresh();
+    expect($tomasPayable->status)->toBe('settled')
+        ->and((float) $tomasPayable->paid_amount)->toBe(5000.0)
+        ->and((float) $tomasPayable->remaining_amount)->toBe(0.0);
+
+    // 4. Verify new receivable (2,000 ETB) is created on Tomas
+    $tomasReceivable = Debt::where('tenant_id', $this->tenant->id)
+        ->where('contact_id', $tomas->id)
+        ->where('type', 'receivable')
+        ->first();
+
+    expect($tomasReceivable)->not->toBeNull()
+        ->and((float) $tomasReceivable->original_amount)->toBe(2000.0)
+        ->and((float) $tomasReceivable->remaining_amount)->toBe(2000.0)
+        ->and($tomasReceivable->status)->toBe('open');
+
+    // 5. Verify unit is marked sold and delivered
+    $unit = InventoryUnit::find($unitId);
+    expect($unit->status)->toBe('sold')
+        ->and($unit->location)->toBe('Delivered (Debt Offset)')
+        ->and((float) $unit->selling_price)->toBe(7000.0);
+
+    // 6. Verify partner statement between store and Tomas
+    $statementAction = new GeneratePartnerStatementAction;
+    $statement = $statementAction->execute($tomas);
+    $ledger = $statement['ledger'];
+
+    // The clearing payment and excess receivable must be consolidated into 1 clean non-redundant Device Handover row
+    $handoverEntries = collect($ledger)->filter(fn ($e) => ($e['type_label'] ?? '') === 'Device Handover');
+    expect($handoverEntries->count())->toBe(1);
+
+    $entry = $handoverEntries->first();
+    expect((float) $entry['payable'])->toBe(-5000.00)
+        ->and((float) $entry['receivable'])->toBe(2000.00)
+        ->and((float) $entry['balance_effect'])->toBe(7000.00);
+
+    // 7. Test Undo / Revert functionality
+    $auditLog = \App\Models\AuditLog::where('entity_id', $unitId)
+        ->where('action', 'unit_instant_offset')
+        ->first();
+    expect($auditLog)->not->toBeNull();
+
+    $undoAction = app(\App\Actions\Undo\UndoHandoverSoldAction::class);
+    $undoResult = $undoAction->execute($auditLog);
+    expect($undoResult)->toContain('has been reversed');
+
+    // After undo: Tomas payable is reopened to 5,000 ETB
+    $tomasPayable->refresh();
+    expect($tomasPayable->status)->toBe('open')
+        ->and((float) $tomasPayable->remaining_amount)->toBe(5000.0);
+
+    // Excess receivable is deleted
+    expect(Debt::find($tomasReceivable->id))->toBeNull();
+
+    // Unit is back in stock
+    $unit->refresh();
+    expect($unit->status)->toBe('in_stock');
+});
+
+test('device handover settling multiple debts and creating excess receivable consolidates into exactly one non-redundant statement row', function () {
+    $maki = Contact::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'maki',
+        'roles' => ['vendor', 'supplier'],
+        'is_active' => true,
+    ]);
+
+    // 1. Create 3 open payables for maki: 10k, 3k, 100k (Total = 113,000 ETB)
+    $debt1 = Debt::create([
+        'tenant_id' => $this->tenant->id,
+        'contact_id' => $maki->id,
+        'type' => 'payable',
+        'reference_type' => 'stock_intake',
+        'original_amount' => 10000.0,
+        'paid_amount' => 0.0,
+        'remaining_amount' => 10000.0,
+        'status' => 'open',
+        'due_date' => now()->addDays(5),
+    ]);
+
+    $debt2 = Debt::create([
+        'tenant_id' => $this->tenant->id,
+        'contact_id' => $maki->id,
+        'type' => 'payable',
+        'reference_type' => 'stock_intake',
+        'original_amount' => 3000.0,
+        'paid_amount' => 0.0,
+        'remaining_amount' => 3000.0,
+        'status' => 'open',
+        'due_date' => now()->addDays(6),
+    ]);
+
+    $debt3 = Debt::create([
+        'tenant_id' => $this->tenant->id,
+        'contact_id' => $maki->id,
+        'type' => 'payable',
+        'reference_type' => 'stock_intake',
+        'original_amount' => 100000.0,
+        'paid_amount' => 0.0,
+        'remaining_amount' => 100000.0,
+        'status' => 'open',
+        'due_date' => now()->addDays(7),
+    ]);
+
+    // 2. Intake a phone to hand over: Vivo V40 (SN: 54432)
+    $vivoProduct = \App\Models\Product::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Vivo V40',
+        'category' => 'phones',
+        'brand' => 'Vivo',
+        'model' => 'V40',
+        'is_active' => true,
+    ]);
+    $vivoVariant = \App\Models\ProductVariant::create([
+        'tenant_id' => $this->tenant->id,
+        'product_id' => $vivoProduct->id,
+        'sku' => 'VIVO-V40-256',
+        'storage' => '256GB',
+        'color' => 'Blue',
+        'cost_price' => 150000.0,
+        'default_selling_price' => 200000.0,
+    ]);
+
+    $unit = InventoryUnit::create([
+        'tenant_id' => $this->tenant->id,
+        'variant_id' => $vivoVariant->id,
+        'imei_or_serial' => '54432',
+        'status' => 'in_stock',
+        'location' => 'Main Store',
+        'cost_basis' => 150000.0,
+        'selling_price' => 200000.0,
+        'source_type' => 'direct_purchase',
+    ]);
+
+    // 3. Hand over the unit to maki with instant_offset at 200,000 ETB
+    // Total debts = 113,000 ETB; Handover value = 200,000 ETB.
+    // Clears all 3 debts (113k) + creates 87k excess receivable.
+    $response = $this->actingAs($this->user, 'sanctum')->postJson("/api/v1/inventory/units/{$unit->id}/handover", [
+        'handover_to' => $maki->name,
+        'handover_payout' => 200000.0,
+        'instant_offset' => true,
+        'notes' => 'Settling all open payables plus credit',
+    ]);
+    $response->assertOk();
+
+    // Verify all 3 payables are settled
+    expect((float) $debt1->fresh()->remaining_amount)->toBe(0.0)
+        ->and((float) $debt2->fresh()->remaining_amount)->toBe(0.0)
+        ->and((float) $debt3->fresh()->remaining_amount)->toBe(0.0);
+
+    // Verify excess receivable exists for 87k
+    $excess = Debt::where('contact_id', $maki->id)
+        ->where('type', 'receivable')
+        ->where('reference_type', 'sales_order')
+        ->first();
+    expect($excess)->not->toBeNull()
+        ->and((float) $excess->remaining_amount)->toBe(87000.0);
+
+    // 4. Generate Statement for maki: MUST HAVE EXACTLY ONE ROW for this device handover!
+    $statementAction = new GeneratePartnerStatementAction;
+    $statement = $statementAction->execute($maki);
+    $ledger = $statement['ledger'];
+
+    $handoverEntries = collect($ledger)->filter(fn ($e) => ($e['type_label'] ?? '') === 'Device Handover');
+    expect($handoverEntries->count())->toBe(1);
+
+    $entry = $handoverEntries->first();
+    expect($entry['context'])->toContain('Vivo V40')
+        ->and($entry['context'])->toContain('54432')
+        ->and((float) $entry['payable'])->toBe(-113000.00)
+        ->and((float) $entry['receivable'])->toBe(87000.00)
+        ->and((float) $entry['balance_effect'])->toBe(200000.00);
 });
