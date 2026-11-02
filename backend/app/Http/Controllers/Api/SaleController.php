@@ -454,6 +454,19 @@ class SaleController extends Controller
             'vendor_payment_splits.*.amount' => ['required', 'numeric', 'min:0.01'],
             'vendor_payment_splits.*.reference_number' => ['nullable', 'string', 'max:100'],
 
+            // Optional trade-in device exchange
+            'exchange' => ['nullable', 'array'],
+            'exchange.variant_id' => ['required_with:exchange', 'exists:product_variants,id'],
+            'exchange.trade_in_value' => ['required_with:exchange', 'numeric', 'min:0.01'],
+            'exchange.imei_or_serial' => ['nullable', 'string', 'max:100'],
+            'exchange.serial_number' => ['nullable', 'string', 'max:100'],
+            'exchange.condition' => ['nullable', 'string', 'max:50'],
+            'exchange.battery_health' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'exchange.cycle_count' => ['nullable', 'integer', 'min:0'],
+            'exchange.sim_type' => ['nullable', 'string', 'max:50'],
+            'exchange.location' => ['nullable', 'string', 'max:100'],
+            'exchange.notes' => ['nullable', 'string', 'max:500'],
+
             // Sale & Customer details
             'selling_price' => ['required', 'numeric', 'min:0'],
             'paid_amount' => ['required', 'numeric', 'min:0'],
@@ -789,6 +802,7 @@ class SaleController extends Controller
                 'financial_account_id' => $validated['financial_account_id'] ?? ($hasCustomerSplits ? $rawCustomerSplits[0]['financial_account_id'] : null),
                 'payment_splits' => $validated['payment_splits'] ?? null,
                 'notes' => $validated['notes'] ?? 'Vendor Direct Sale',
+                'exchange' => $validated['exchange'] ?? null,
                 'items' => (function () use ($variantId, $unit, $validated, $vendorCost, $vendorPaidAmount, $preparedVendorSplits, $hasVendorSplits) {
                     $orderItems = [
                         [

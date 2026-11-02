@@ -77,9 +77,11 @@ class SettleDebtPaymentAction
      *     amount: float|int,
      *     financial_account_id?: string|null,
      *     payment_splits?: array|null,
+     *     splits?: array|null,
      *     payment_date?: string|null,
      *     reference_number?: string|null,
-     *     notes?: string|null
+     *     notes?: string|null,
+     *     split_group_id?: string|null
      * } $data
      * @return array{debts: Debt[], payments: DebtPayment[]}
      */
@@ -116,9 +118,11 @@ class SettleDebtPaymentAction
      *     amount: float|int,
      *     financial_account_id?: string|null,
      *     payment_splits?: array|null,
+     *     splits?: array|null,
      *     payment_date?: string|null,
      *     reference_number?: string|null,
-     *     notes?: string|null
+     *     notes?: string|null,
+     *     split_group_id?: string|null
      * } $data
      * @return array{debts: Debt[], payments: DebtPayment[]}
      */
@@ -158,6 +162,7 @@ class SettleDebtPaymentAction
             ], $splits);
 
             $remPayment = $amount;
+            $waterfallGroupId = $data['split_group_id'] ?? (string) Str::uuid();
             $updatedDebts = [];
             $createdPayments = [];
 
@@ -196,6 +201,7 @@ class SettleDebtPaymentAction
                 $singleData = array_merge($data, [
                     'amount' => $allocAmount,
                     'payment_splits' => $debtSplits,
+                    'split_group_id' => $waterfallGroupId,
                 ]);
 
                 $paymentsForDebt = $this->executeSingleDebtPayment($debt, $singleData);
@@ -235,7 +241,7 @@ class SettleDebtPaymentAction
             ];
         }
 
-        $splitGroupId = count($splits) > 1 ? (string) Str::uuid() : null;
+        $splitGroupId = $data['split_group_id'] ?? (count($splits) > 1 ? (string) Str::uuid() : null);
         $contactName = $debt->contact instanceof Contact ? $debt->contact->name : 'Contact';
         $createdPayments = [];
 

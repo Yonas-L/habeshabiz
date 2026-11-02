@@ -249,11 +249,15 @@ class UndoSaleAction implements UndoActionInterface
                 /** @var InventoryUnit|null $invUnit */
                 $invUnit = $item->inventoryUnit;
                 if ($invUnit) {
-                    $invUnit->update([
-                        'status' => 'in_stock',
-                        'sold_at' => null,
-                    ]);
-                    $variantIdsToSync[$invUnit->variant_id] = true;
+                    if ($invUnit->source_type === 'vendor_direct') {
+                        $invUnit->delete();
+                    } else {
+                        $invUnit->update([
+                            'status' => 'in_stock',
+                            'sold_at' => null,
+                        ]);
+                        $variantIdsToSync[$invUnit->variant_id] = true;
+                    }
                 } elseif ($item->variant_id) {
                     // Non-serialized item stock restoration
                     $stock = InventoryStock::where('tenant_id', $order->tenant_id)
@@ -305,7 +309,20 @@ class UndoSaleAction implements UndoActionInterface
                 }
             }
 
-            // 6. Delete financial transactions linked to this order
+            // 6. Delete financial transactions linked to this order & restore vendor payout if debited from shop accounts
+            $supplierTxns = FinancialTransaction::where('tenant_id', $order->tenant_id)
+                ->where('type', 'supplier_payment')
+                ->where(function ($q) use ($orderNumber) {
+                    $q->where('description', 'like', "%#{$orderNumber}%")
+                        ->orWhere('reference_number', $orderNumber);
+                })->get();
+
+            foreach ($supplierTxns as $sTxn) {
+                if ($sTxn->source_account_id && $sTxn->amount > 0) {
+                    FinancialAccount::where('id', $sTxn->source_account_id)->increment('current_balance', (float) $sTxn->amount + (float) $sTxn->fee);
+                }
+            }
+
             // Search by exact revert_group_id if available, or reference description
             if (! empty($log->revert_group_id)) {
                 FinancialTransaction::where('tenant_id', $order->tenant_id)
@@ -322,7 +339,7 @@ class UndoSaleAction implements UndoActionInterface
             // 7. Delete debts and debt payments created by this sale
             $debts = Debt::where('tenant_id', $order->tenant_id)
                 ->where('reference_id', $order->id)
-                ->whereIn('reference_type', ['sales_order', 'brokered_sourcing', 'salesperson_bonus', 'consignment_sale'])
+                ->whereIn('reference_type', ['sales_order', 'brokered_sourcing', 'salesperson_bonus', 'consignment_sale', 'vendor_direct_sale'])
                 ->get();
 
             foreach ($debts as $debt) {

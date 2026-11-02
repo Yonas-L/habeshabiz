@@ -2995,6 +2995,54 @@ class InventoryController extends Controller
             $totalRefundOwed = 0.0;
 
             foreach ($unitPayables as $debt) {
+                // If this payable was settled or reduced by a mutual credit offset against a receivable debt,
+                // returning the device cancels that mutual offset so the partner's receivable obligation is restored!
+                $offsetPayments = $debt->payments->filter(function ($p) {
+                    return (str_starts_with($p->reference_number ?? '', 'OFFSET-') && $p->reference_number !== 'OFFSET-INTAKE')
+                        || str_contains(strtolower($p->notes ?? ''), 'mutual credit offset');
+                });
+
+                foreach ($offsetPayments as $offsetPmt) {
+                    $linkedRecDebtId = null;
+                    if (str_starts_with($offsetPmt->reference_number ?? '', 'OFFSET-')) {
+                        $linkedRecDebtId = substr($offsetPmt->reference_number, 7);
+                    }
+
+                    $linkedRecDebt = null;
+                    if ($linkedRecDebtId) {
+                        $linkedRecDebt = Debt::where('tenant_id', $unit->tenant_id)->find($linkedRecDebtId);
+                    }
+
+                    if (! $linkedRecDebt) {
+                        $linkedRecDebt = Debt::where('tenant_id', $unit->tenant_id)
+                            ->where('contact_id', $debt->contact_id)
+                            ->where('type', 'receivable')
+                            ->whereHas('payments', fn ($q) => $q->where('amount', $offsetPmt->amount))
+                            ->first();
+                    }
+
+                    if ($linkedRecDebt) {
+                        $pairedPayment = $linkedRecDebt->payments()
+                            ->where('amount', $offsetPmt->amount)
+                            ->where(function ($q) use ($debt, $offsetPmt) {
+                                if (! empty($offsetPmt->split_group_id)) {
+                                    $q->where('split_group_id', $offsetPmt->split_group_id);
+                                } else {
+                                    $q->where('reference_number', "OFFSET-{$debt->id}")
+                                        ->orWhere('reference_number', 'MUTUAL-OFFSET');
+                                }
+                            })
+                            ->first();
+
+                        if ($pairedPayment) {
+                            $pairedPayment->delete();
+                        }
+                    }
+
+                    $offsetPmt->delete();
+                    $debt->recalculateSettlement();
+                }
+
                 // Only actual cash/wire payments (backed by a financial account) constitute
                 // real money paid that the vendor must refund in cash.
                 // Device handovers (BILATERAL-OFFSET) and internal credit offsets are NOT cash payments.
@@ -3819,6 +3867,8 @@ class InventoryController extends Controller
      * Resolve all supplier/vendor payable debts associated with an inventory unit.
      * Accurately matches intake debts (by unit ID / IMEI) as well as brokered sourcing
      * and consignment sales (linked via SalesOrder ID or order number).
+     *
+     * @return \Illuminate\Database\Eloquent\Collection<int, \App\Models\Debt>
      */
     private function resolveUnitSupplierPayables(InventoryUnit $unit, string $tenantId): Collection
     {

@@ -23,11 +23,13 @@ import {
   User as UserIcon,
   RotateCcw,
   Package,
+  Repeat,
 } from 'lucide-react';
 import { LdrsSpinner } from '../loading/LdrsSpinner';
 import { PartnerFormModal } from '../partners/PartnerFormModal';
 import { SplitPaymentSelector, type PaymentSplitItem } from '../common/SplitPaymentSelector';
 import { AccessoryAttachmentSection, type AttachedAccessoryItem } from './AccessoryAttachmentSection';
+import { ExchangeDeviceModal, type ExchangeDevicePayload } from './ExchangeDeviceModal';
 import {
   getCategoryArchetype,
   getArchetypeFields,
@@ -146,6 +148,10 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
   const [isAddPartnerOpen, setIsAddPartnerOpen] = useState(false);
   const [liveContacts, setLiveContacts] = useState<Contact[]>(contacts);
 
+  // Exchange / Trade-In State
+  const [exchangeDevice, setExchangeDevice] = useState<ExchangeDevicePayload | null>(null);
+  const [isExchangeModalOpen, setIsExchangeModalOpen] = useState(false);
+
   // Customer & POS Sale Details
   const [sellingPrice, setSellingPrice] = useState('');
   const [paidAmount, setPaidAmount] = useState('');
@@ -259,6 +265,7 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
       setVendorPaymentSplits([]);
       setIsCustomerSplit(false);
       setCustomerPaymentSplits([]);
+      setExchangeDevice(null);
       setIsCreatingProduct(false);
       setNewProductName('');
       setNewProductBrand('');
@@ -708,11 +715,16 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
     return attachedAccessories.reduce((sum, a) => sum + (Number(a.cost) || 0) * (Number(a.quantity) || 1), 0);
   }, [attachedAccessories]);
 
+  const tradeInAllowance = useMemo(() => {
+    return exchangeDevice ? Number(exchangeDevice.trade_in_value || 0) : 0;
+  }, [exchangeDevice]);
+
   const totalOrderSellingPrice = sellingPriceNum + accessoriesTotalSellingPrice;
   const totalOrderCost = vendorCostNum + accessoriesTotalCost;
   const grossProfit = totalOrderSellingPrice - totalOrderCost;
   const marginPct = totalOrderSellingPrice > 0 ? (grossProfit / totalOrderSellingPrice) * 100 : 0;
   const isLossDeal = totalOrderSellingPrice > 0 && totalOrderCost > 0 && grossProfit < 0;
+  const netCustomerCashDue = Math.max(0, totalOrderSellingPrice - tradeInAllowance);
 
   const handleAccessoriesChange = (newAccs: AttachedAccessoryItem[]) => {
     const prevAccTotal = attachedAccessories.reduce((sum, a) => sum + (Number(a.price) || 0) * (Number(a.quantity) || 1), 0);
@@ -720,10 +732,11 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
     setAttachedAccessories(newAccs);
 
     const currentPaid = parseFormattedNumber(paidAmount) || 0;
-    const oldTotal = sellingPriceNum + prevAccTotal;
-    if (currentPaid === oldTotal || !paidAmount) {
-      const newTotal = sellingPriceNum + newAccTotal;
-      setPaidAmount(formatCurrencyInput(newTotal));
+    const oldExpected = Math.max(0, sellingPriceNum + prevAccTotal - tradeInAllowance);
+    const oldGross = sellingPriceNum + prevAccTotal;
+    if (currentPaid === oldExpected || currentPaid === oldGross || !paidAmount) {
+      const newExpected = Math.max(0, sellingPriceNum + newAccTotal - tradeInAllowance);
+      setPaidAmount(formatCurrencyInput(newExpected));
     }
   };
 
@@ -806,8 +819,10 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
     const formatted = formatCurrencyInput(val);
     setSellingPrice(formatted);
     const parsed = parseFormattedNumber(formatted);
-    if (parsed !== null && (!paidAmount || parseFormattedNumber(paidAmount) === sellingPriceNum)) {
-      setPaidAmount(formatted);
+    const oldExpected = Math.max(0, sellingPriceNum + accessoriesTotalSellingPrice - tradeInAllowance);
+    if (parsed !== null && (!paidAmount || paidAmountNum === oldExpected || paidAmountNum === sellingPriceNum)) {
+      const newExpected = Math.max(0, parsed + accessoriesTotalSellingPrice - tradeInAllowance);
+      setPaidAmount(formatCurrencyInput(newExpected));
     }
   };
 
@@ -979,6 +994,19 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
               amount: Number(s.amount) || 0,
             }))
           : undefined,
+        exchange: exchangeDevice
+          ? {
+              variant_id: exchangeDevice.variant_id,
+              trade_in_value: Number(exchangeDevice.trade_in_value),
+              imei_or_serial: exchangeDevice.imei_or_serial || undefined,
+              condition: exchangeDevice.condition || undefined,
+              battery_health: exchangeDevice.battery_health ?? undefined,
+              cycle_count: exchangeDevice.cycle_count ?? undefined,
+              sim_type: exchangeDevice.sim_type || undefined,
+              location: exchangeDevice.location || 'Shop Counter',
+              notes: exchangeDevice.notes || undefined,
+            }
+          : undefined,
         selling_price: sellingPriceNum,
         paid_amount: totalCustomerPaid,
         debt_offset_amount: isDebtOffset ? debtOffsetNum : undefined,
@@ -1070,6 +1098,7 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
       setVendorPaymentSplits([]);
       setIsCustomerSplit(false);
       setCustomerPaymentSplits([]);
+      setExchangeDevice(null);
       setIsCreditSale(false);
       setIsWriteOff(false);
       setPaymentMethod('cash');
@@ -2741,9 +2770,23 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                  Amount Customer Pays Now (ETB) *
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+                    Amount Customer Pays Now (ETB) *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setIsExchangeModalOpen(true)}
+                    className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg transition-colors cursor-pointer ${
+                      exchangeDevice
+                        ? 'bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
+                        : 'bg-slate-100 dark:bg-slate-800 hover:bg-purple-50 dark:hover:bg-purple-950/40 text-slate-700 dark:text-slate-300 hover:text-purple-700'
+                    }`}
+                  >
+                    <Repeat className="w-3 h-3 text-purple-500" />
+                    <span>{exchangeDevice ? 'Exchange Added' : 'Exchange'}</span>
+                  </button>
+                </div>
                 <input
                   type="text"
                   inputMode="decimal"
@@ -2753,6 +2796,62 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
                   onChange={(e) => setPaidAmount(formatCurrencyInput(e.target.value))}
                   className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
                 />
+
+                {/* Active Exchange Chip */}
+                {exchangeDevice && (
+                  <div className="mt-2 px-3 py-2 rounded-xl bg-purple-50/80 dark:bg-purple-950/40 border border-purple-200/70 dark:border-purple-800/50 flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2 min-w-0 pr-2">
+                      <Repeat className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
+                      <div className="min-w-0">
+                        <div className="font-bold text-purple-900 dark:text-purple-200 truncate">
+                          Exchange: {exchangeDevice.product_name} {exchangeDevice.variant_label ? `(${exchangeDevice.variant_label})` : ''}
+                        </div>
+                        <div className="text-[10px] text-purple-600 dark:text-purple-400 flex items-center gap-2">
+                          <span>Trade-in: <strong className="font-mono">{Number(exchangeDevice.trade_in_value).toLocaleString()} ETB</strong></span>
+                          {exchangeDevice.imei_or_serial && (
+                            <span className="font-mono opacity-80 truncate">SN: {exchangeDevice.imei_or_serial}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setIsExchangeModalOpen(true)}
+                        className="text-[10px] font-bold text-purple-700 dark:text-purple-300 hover:underline px-1 cursor-pointer"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setExchangeDevice(null);
+                          setPaidAmount(formatCurrencyInput(String(totalOrderSellingPrice)));
+                        }}
+                        className="w-5 h-5 rounded-md flex items-center justify-center text-purple-400 hover:text-purple-700 hover:bg-purple-100 dark:hover:bg-purple-900/50 transition-colors cursor-pointer"
+                        title="Remove exchange"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {netCustomerCashDue >= 0 && paidAmountNum !== netCustomerCashDue && (
+                  <button
+                    type="button"
+                    onClick={() => setPaidAmount(formatCurrencyInput(String(netCustomerCashDue)))}
+                    className="text-[11px] text-purple-600 dark:text-purple-400 hover:underline mt-1 font-semibold flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>Set cash customer pays:</span>
+                    <span className="font-mono font-bold">{netCustomerCashDue.toLocaleString()} ETB</span>
+                    {exchangeDevice && (
+                      <span className="text-[10px] text-slate-400">
+                        (Price {totalOrderSellingPrice.toLocaleString()} − Trade-in {tradeInAllowance.toLocaleString()})
+                      </span>
+                    )}
+                  </button>
+                )}
               </div>
             </div>
 
@@ -3103,6 +3202,35 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
         onSuccess={(saved) => {
           setLiveContacts((prev) => [...prev.filter((c) => c.id !== saved.id), saved]);
           setVendorContactId(saved.id);
+        }}
+      />
+
+      {/* Exchange Device Modal */}
+      <ExchangeDeviceModal
+        isOpen={isExchangeModalOpen}
+        onClose={() => setIsExchangeModalOpen(false)}
+        categories={categories}
+        products={localProducts}
+        availableUnits={[]}
+        outgoingUnitCost={vendorCostNum}
+        outgoingUnitPrice={sellingPriceNum}
+        currentPaidCash={paidAmountNum}
+        initialExchange={exchangeDevice}
+        onConfirmExchange={(payload) => {
+          const allowance = Number(payload.trade_in_value || 0);
+          const oldAllowance = exchangeDevice ? Number(exchangeDevice.trade_in_value || 0) : 0;
+          const oldExpected = Math.max(0, totalOrderSellingPrice - oldAllowance);
+          const newExpected = Math.max(0, totalOrderSellingPrice - allowance);
+          setExchangeDevice(payload);
+          if (
+            !paidAmount ||
+            paidAmountNum === 0 ||
+            paidAmountNum === totalOrderSellingPrice ||
+            paidAmountNum === oldExpected
+          ) {
+            setPaidAmount(formatCurrencyInput(String(newExpected)));
+          }
+          toast.success(`Exchange attached: ${payload.product_name}`);
         }}
       />
     </div>

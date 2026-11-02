@@ -39,7 +39,9 @@ beforeEach(function (): void {
         'currency' => 'ETB',
         'current_balance' => 5000,
         'is_active' => true,
+        'created_at' => Carbon::parse('2026-10-01 00:00:00'),
     ]);
+    $this->account->forceFill(['created_at' => Carbon::parse('2026-10-01 00:00:00')])->saveQuietly();
     $product = Product::create([
         'tenant_id' => $this->tenant->id,
         'name' => 'Report Phone',
@@ -68,7 +70,9 @@ beforeEach(function (): void {
         'current_balance' => 1000,
         'is_custom_asset' => true,
         'is_active' => true,
+        'created_at' => Carbon::parse('2026-10-01 00:00:00'),
     ]);
+    $this->customAsset->forceFill(['created_at' => Carbon::parse('2026-10-01 00:00:00')])->saveQuietly();
 });
 
 test('owner can generate a reconciled dated business report', function (): void {

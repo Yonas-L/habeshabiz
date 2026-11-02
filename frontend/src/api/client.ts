@@ -1632,6 +1632,18 @@ export const api = {
     vendor_paid_amount?: number;
     vendor_payment_account_id?: string | null;
     vendor_payment_splits?: { financial_account_id: string; amount: number; reference_number?: string }[];
+    exchange?: {
+      variant_id: string;
+      trade_in_value: number;
+      imei_or_serial?: string;
+      serial_number?: string;
+      condition?: string;
+      battery_health?: number | null;
+      cycle_count?: number | null;
+      sim_type?: string | null;
+      location?: string;
+      notes?: string;
+    };
     selling_price: number;
     paid_amount: number;
     payment_method: 'cash' | 'telebirr' | 'cbe' | 'bank_transfer' | 'cash_transfer' | 'credit' | 'debt_offset' | 'split';

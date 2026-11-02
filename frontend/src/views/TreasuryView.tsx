@@ -1,25 +1,611 @@
 import React, { useState, useEffect } from 'react';
-import type { FinancialAccount } from '../api/client';
+import type { FinancialAccount, AccountActivity } from '../api/client';
 import { api } from '../api/client';
 import { toast } from 'sonner';
 import {
   ArrowRightLeft,
+  ArrowDownLeft,
+  ArrowUpRight,
   Coins,
   Loader2,
   X,
-  TrendingUp,
   Plus,
   Trash2,
   Landmark,
+  ChevronLeft,
+  ChevronRight,
+  DollarSign,
+  Home,
+  Car,
+  Gem,
+  Globe,
+  FileText,
+  Inbox,
 } from 'lucide-react';
-import { MiniSparkline, MiniBarHistogram } from '../components/Charts';
 import { AnimatedNumber } from '../components/AnimatedNumber';
 import { ManageAccountModal } from '../components/treasury/ManageAccountModal';
 import { AddBalanceModal } from '../components/treasury/AddBalanceModal';
 import { AccountLedgerDrawer } from '../components/drawers/AccountLedgerDrawer';
-import { AccountLogo } from '../utils/bankLogos';
+import { AccountLogo, matchBankPreset } from '../utils/bankLogos';
 import { CustomPageLoader } from '../components/loading/CustomPageLoader';
-import { Pagination } from '../components/Pagination';
+// Pagination import removed — desktop uses carousel slider, not pagination
+
+// Helpers for Bank Clean Name and Cash Account Detection (No Amharic script)
+const getBankCleanName = (acc: FinancialAccount): string => {
+  if (isCashAccount(acc)) return 'Cash on Hand';
+
+  const explicitLogo = acc.logo || (acc.asset_details?.logo as string | undefined);
+  const matched = matchBankPreset(acc.name, acc.type, explicitLogo);
+  if (matched) return matched.name;
+
+  if (acc.account_number) return acc.account_number;
+  if (acc.type === 'bank') return 'Bank Account';
+  if (acc.type === 'mobile_money') return 'Mobile Wallet';
+  return acc.type ? acc.type.replace(/_/g, ' ') : 'Account';
+};
+
+const isCashAccount = (acc: FinancialAccount): boolean => {
+  return (
+    acc.type === 'cash' ||
+    acc.name.toLowerCase().includes('safe') ||
+    acc.name.toLowerCase().includes('cash') ||
+    acc.name.toLowerCase().includes('drawer')
+  );
+};
+
+// Variant 0: Glowing Bar Chart Wave (matches Card 1 in reference)
+const BarChartWave: React.FC<{ gradId: string }> = ({ gradId }) => (
+  <div className="absolute bottom-0 right-0 w-44 h-32 pointer-events-none select-none overflow-hidden z-0">
+    <svg viewBox="0 0 180 130" fill="none" className="w-full h-full">
+      <defs>
+        <linearGradient id={`wave0-${gradId}`} x1="40" y1="130" x2="180" y2="20" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#ecfdf5" stopOpacity="0.9" />
+          <stop offset="0.6" stopColor="#d1fae5" stopOpacity="0.5" />
+          <stop offset="1" stopColor="#ffffff" stopOpacity="0.05" />
+        </linearGradient>
+        <linearGradient id={`barGrad-${gradId}`} x1="0" y1="0" x2="0" y2="1">
+          <stop stopColor="#34d399" />
+          <stop offset="1" stopColor="#059669" />
+        </linearGradient>
+      </defs>
+      {/* Soft translucent curved wave */}
+      <path d="M40,130 Q90,75 150,30 L180,30 L180,130 Z" fill={`url(#wave0-${gradId})`} />
+      {/* 3 vertical rounded bars with increasing height */}
+      <rect x="135" y="75" width="5.5" height="32" rx="2.75" fill="#34d399" fillOpacity="0.9" />
+      <rect x="145" y="60" width="5.5" height="47" rx="2.75" fill="#059669" fillOpacity="0.95" />
+      <rect x="155" y="70" width="5.5" height="37" rx="2.75" fill="#10b981" fillOpacity="0.9" />
+    </svg>
+  </div>
+);
+
+// Variant 1: Laser Streak Fold (matches Card 2 in reference with subtle corner fold and short glowing laser line)
+const LaserStreakFold: React.FC<{ gradId: string }> = ({ gradId }) => (
+  <div className="absolute bottom-0 right-0 w-44 h-32 pointer-events-none select-none overflow-hidden z-0">
+    <svg viewBox="0 0 180 130" fill="none" className="w-full h-full">
+      <defs>
+        <linearGradient id={`wave1-${gradId}`} x1="50" y1="130" x2="180" y2="25" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#f0f9ff" stopOpacity="0.9" />
+          <stop offset="0.6" stopColor="#e0f2fe" stopOpacity="0.5" />
+          <stop offset="1" stopColor="#ffffff" stopOpacity="0.05" />
+        </linearGradient>
+        <linearGradient id={`streakGrad-${gradId}`} x1="118" y1="96" x2="162" y2="68" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#0284c7" />
+          <stop offset="0.3" stopColor="#0ea5e9" />
+          <stop offset="0.75" stopColor="#2dd4bf" />
+          <stop offset="1" stopColor="#67e8f9" />
+        </linearGradient>
+      </defs>
+      {/* Soft translucent corner fold */}
+      <path d="M50,130 Q105,80 155,25 L180,25 L180,130 Z" fill={`url(#wave1-${gradId})`} />
+      {/* Subtle curved crease highlight */}
+      <path d="M78,126 Q120,84 165,30" stroke="#bae6fd" strokeWidth="1" strokeOpacity="0.6" />
+      {/* Sleek, short luminous cyan curved streak matching Card 2 reference fold */}
+      <path
+        d="M 124,80 Q 146,68 166,52"
+        stroke="#0ea5e9"
+        strokeWidth="3.2"
+        strokeLinecap="round"
+      />
+    </svg>
+  </div>
+);
+
+// Variant 2: Sparkline Trend Wave (matches Card 3 in reference)
+const SparklineTrendWave: React.FC<{ gradId: string }> = ({ gradId }) => (
+  <div className="absolute bottom-0 right-0 w-44 h-32 pointer-events-none select-none overflow-hidden z-0">
+    <svg viewBox="0 0 180 130" fill="none" className="w-full h-full">
+      <defs>
+        <linearGradient id={`wave2-${gradId}`} x1="45" y1="130" x2="180" y2="20" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#fff7ed" stopOpacity="0.8" />
+          <stop offset="0.6" stopColor="#ecfdf5" stopOpacity="0.5" />
+          <stop offset="1" stopColor="#ffffff" stopOpacity="0.05" />
+        </linearGradient>
+      </defs>
+      {/* Soft translucent curved wave */}
+      <path d="M45,130 Q98,78 155,25 L180,25 L180,130 Z" fill={`url(#wave2-${gradId})`} />
+      {/* Rising trendline zigzag graph floating cleanly above button area */}
+      <path
+        d="M 122,80 L 136,68 L 148,76 L 168,46"
+        stroke="#10b981"
+        strokeWidth="2.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  </div>
+);
+
+// Variant 3: Concentric Pulse Rings
+const ConcentricPulseRings: React.FC<{ gradId: string }> = ({ gradId }) => (
+  <div className="absolute bottom-0 right-0 w-44 h-32 pointer-events-none select-none overflow-hidden z-0">
+    <svg viewBox="0 0 180 130" fill="none" className="w-full h-full">
+      <defs>
+        <linearGradient id={`wave3-${gradId}`} x1="45" y1="130" x2="180" y2="25" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#faf5ff" stopOpacity="0.85" />
+          <stop offset="0.6" stopColor="#f3e8ff" stopOpacity="0.4" />
+          <stop offset="1" stopColor="#ffffff" stopOpacity="0.05" />
+        </linearGradient>
+      </defs>
+      <path d="M45,130 Q98,78 158,25 L180,25 L180,130 Z" fill={`url(#wave3-${gradId})`} />
+      <circle cx="162" cy="78" r="16" stroke="#c084fc" strokeWidth="2" strokeOpacity="0.5" fill="none" />
+      <circle cx="162" cy="78" r="28" stroke="#a855f7" strokeWidth="2" strokeOpacity="0.35" fill="none" />
+      <circle cx="162" cy="78" r="40" stroke="#9333ea" strokeWidth="1.8" strokeOpacity="0.2" fill="none" />
+    </svg>
+  </div>
+);
+
+// Variant 4: Double Wave Ribbon
+const DoubleWaveRibbon: React.FC<{ gradId: string }> = ({ gradId }) => (
+  <div className="absolute bottom-0 right-0 w-44 h-32 pointer-events-none select-none overflow-hidden z-0">
+    <svg viewBox="0 0 180 130" fill="none" className="w-full h-full">
+      <defs>
+        <linearGradient id={`wave4-${gradId}`} x1="40" y1="130" x2="180" y2="35" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#f0f9ff" stopOpacity="0.8" />
+          <stop offset="0.7" stopColor="#e0f2fe" stopOpacity="0.4" />
+          <stop offset="1" stopColor="#ffffff" stopOpacity="0.05" />
+        </linearGradient>
+      </defs>
+      <path d="M40,130 Q96,82 152,32 L180,32 L180,130 Z" fill={`url(#wave4-${gradId})`} />
+      <path d="M 116,78 Q 142,60 168,44" stroke="#0ea5e9" strokeWidth="2.8" strokeLinecap="round" />
+      <path d="M 126,84 Q 148,70 170,56" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" strokeOpacity="0.8" />
+    </svg>
+  </div>
+);
+
+// Variant 5: Flow Stream Wave
+const FlowStreamWave: React.FC<{ gradId: string }> = ({ gradId }) => (
+  <div className="absolute bottom-0 right-0 w-44 h-32 pointer-events-none select-none overflow-hidden z-0">
+    <svg viewBox="0 0 180 130" fill="none" className="w-full h-full">
+      <defs>
+        <linearGradient id={`wave5-${gradId}`} x1="45" y1="130" x2="180" y2="25" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#fefce8" stopOpacity="0.8" />
+          <stop offset="0.6" stopColor="#fef3c7" stopOpacity="0.4" />
+          <stop offset="1" stopColor="#ffffff" stopOpacity="0.05" />
+        </linearGradient>
+      </defs>
+      <path d="M45,130 Q98,75 158,25 L180,25 L180,130 Z" fill={`url(#wave5-${gradId})`} />
+      <path d="M 118,78 Q 144,60 168,44" stroke="#eab308" strokeWidth="2.8" strokeLinecap="round" />
+    </svg>
+  </div>
+);
+
+// Dynamic Card Ambient Art selector ensuring cards across slide 1 and slide 2 are all unique
+const DynamicCardAmbientArt: React.FC<{ acc: FinancialAccount; index: number }> = ({ acc, index }) => {
+  const safeId = `${acc.id.replace(/[^a-zA-Z0-9]/g, '')}-${index}`;
+  const variant = Math.abs(index) % 6;
+  switch (variant) {
+    case 0:
+      return <BarChartWave gradId={safeId} />;
+    case 1:
+      return <LaserStreakFold gradId={safeId} />;
+    case 2:
+      return <SparklineTrendWave gradId={safeId} />;
+    case 3:
+      return <ConcentricPulseRings gradId={safeId} />;
+    case 4:
+      return <DoubleWaveRibbon gradId={safeId} />;
+    case 5:
+    default:
+      return <FlowStreamWave gradId={safeId} />;
+  }
+};
+
+// Subtle Golden EMV Smart Chip for ATM/Debit Card Styling (Solid golden bevel & etched circuitry)
+const EmvChip: React.FC<{ className?: string }> = ({ className = 'w-9 h-7' }) => (
+  <div
+    className={`${className} shrink-0 rounded-md p-[1.5px] shadow-[0_2px_5px_rgba(180,83,9,0.35),inset_0_1px_1px_rgba(255,255,255,0.6)] relative overflow-hidden select-none`}
+    style={{
+      background: 'linear-gradient(135deg, #fef08a 0%, #facc15 30%, #eab308 65%, #ca8a04 100%)',
+      backgroundColor: '#facc15',
+    }}
+  >
+    <div
+      className="w-full h-full rounded-[4px] relative overflow-hidden flex items-center justify-center border border-[#ca8a04]/40"
+      style={{
+        background: 'linear-gradient(135deg, #fef9c3 0%, #fde047 30%, #eab308 70%, #d97706 100%)',
+        backgroundColor: '#eab308',
+      }}
+    >
+      {/* Specular metallic highlight band */}
+      <div
+        className="absolute inset-0 pointer-events-none opacity-40"
+        style={{
+          background: 'linear-gradient(115deg, transparent 20%, rgba(255,255,255,0.8) 45%, transparent 60%)',
+        }}
+      />
+      <svg viewBox="0 0 36 28" className="w-full h-full relative z-10" fill="none">
+        <path d="M0 10.5 H12 C13.5 10.5 14.5 11.5 14.5 13 V15 C14.5 16.5 13.5 17.5 12 17.5 H0" stroke="#78350f" strokeWidth="0.9" strokeOpacity="0.8" />
+        <path d="M36 10.5 H24 C22.5 10.5 21.5 11.5 21.5 13 V15 C21.5 16.5 22.5 17.5 24 17.5 H36" stroke="#78350f" strokeWidth="0.9" strokeOpacity="0.8" />
+        <path d="M12 0 V28" stroke="#78350f" strokeWidth="0.9" strokeOpacity="0.8" />
+        <path d="M24 0 V28" stroke="#78350f" strokeWidth="0.9" strokeOpacity="0.8" />
+        <circle cx="18" cy="14" r="3.2" fill="#fef9c3" stroke="#78350f" strokeWidth="0.85" strokeOpacity="0.85" />
+      </svg>
+    </div>
+  </div>
+);
+
+// Contactless EMV Payment Wave Icon (Classic radiating arcs for tap-to-pay)
+const ContactlessWave: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    className={className}
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+  >
+    <path d="M8.5 15.5 A5 5 0 0 1 8.5 8.5" strokeOpacity="0.5" />
+    <path d="M12 18 A8.5 8.5 0 0 1 12 6" strokeOpacity="0.75" />
+    <path d="M15.5 20.5 A12 12 0 0 1 15.5 3.5" strokeOpacity="0.95" />
+  </svg>
+);
+
+// Format account number like an authentic physical debit card (e.g. 1000  ••••  ••••  9821)
+const formatCardNumber = (accountNumber?: string | null, accountId?: string): string => {
+  if (accountNumber && accountNumber.trim()) {
+    const raw = accountNumber.trim().replace(/\s+/g, '');
+    if (raw.length >= 12) {
+      const first4 = raw.slice(0, 4);
+      const last4 = raw.slice(-4);
+      return `${first4}  ••••  ••••  ${last4}`;
+    }
+    if (raw.length >= 8) {
+      const first4 = raw.slice(0, 4);
+      const last4 = raw.slice(-4);
+      return `${first4}  ••••  ••••  ${last4}`;
+    }
+    return raw;
+  }
+  const fallbackLast4 = (accountId || '0000').slice(-4).toUpperCase();
+  return `••••  ••••  ••••  ${fallbackLast4}`;
+};
+
+// Human-friendly date formatting for transactions (e.g. "Today, 09:30", "Yesterday, 18:42")
+const formatActivityDate = (dateStr?: string): string => {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  const now = new Date();
+  const isToday = d.toDateString() === now.toDateString();
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday = d.toDateString() === yesterday.toDateString();
+
+  const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  if (isToday) return `Today, ${timeStr}`;
+  if (isYesterday) return `Yesterday, ${timeStr}`;
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+// 3D Realistic Stack of Gold Bullion Ingots with Metallic Bevels and Sparkle Sheen
+const GoldIngotStack: React.FC<{ className?: string }> = ({ className = 'w-14 h-12' }) => (
+  <svg
+    viewBox="0 0 64 52"
+    className={`${className} drop-shadow-[0_4px_14px_rgba(245,158,11,0.45)]`}
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <defs>
+      <linearGradient id="goldTopGrad" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stopColor="#fffbeb" />
+        <stop offset="30%" stopColor="#fef08a" />
+        <stop offset="70%" stopColor="#facc15" />
+        <stop offset="100%" stopColor="#eab308" />
+      </linearGradient>
+      <linearGradient id="goldFrontGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="#facc15" />
+        <stop offset="50%" stopColor="#eab308" />
+        <stop offset="100%" stopColor="#ca8a04" />
+      </linearGradient>
+      <linearGradient id="goldSideGrad" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stopColor="#ca8a04" />
+        <stop offset="100%" stopColor="#854d0e" />
+      </linearGradient>
+    </defs>
+    {/* Bottom Left Ingot */}
+    <g transform="translate(2, 22)">
+      <polygon points="4,9 26,9 23,20 1,20" fill="url(#goldFrontGrad)" stroke="#a16207" strokeWidth="0.6" />
+      <polygon points="7,2 29,2 26,9 4,9" fill="url(#goldTopGrad)" stroke="#ca8a04" strokeWidth="0.6" />
+      <polygon points="29,2 26,9 23,20 26,13" fill="url(#goldSideGrad)" stroke="#854d0e" strokeWidth="0.6" />
+    </g>
+    {/* Bottom Right Ingot */}
+    <g transform="translate(30, 22)">
+      <polygon points="4,9 26,9 23,20 1,20" fill="url(#goldFrontGrad)" stroke="#a16207" strokeWidth="0.6" />
+      <polygon points="7,2 29,2 26,9 4,9" fill="url(#goldTopGrad)" stroke="#ca8a04" strokeWidth="0.6" />
+      <polygon points="29,2 26,9 23,20 26,13" fill="url(#goldSideGrad)" stroke="#854d0e" strokeWidth="0.6" />
+    </g>
+    {/* Top Center Ingot (Elevated & Prominent) */}
+    <g transform="translate(16, 5)">
+      <ellipse cx="16" cy="20" rx="14" ry="2.5" fill="#78350f" fillOpacity="0.4" />
+      <polygon points="4,10 28,10 25,22 1,22" fill="url(#goldFrontGrad)" stroke="#a16207" strokeWidth="0.8" />
+      <polygon points="8,2 32,2 28,10 4,10" fill="url(#goldTopGrad)" stroke="#ca8a04" strokeWidth="0.8" />
+      <polygon points="32,2 28,10 25,22 29,14" fill="url(#goldSideGrad)" stroke="#854d0e" strokeWidth="0.8" />
+      <text x="17" y="7" textAnchor="middle" fill="#854d0e" fontSize="3.6" fontWeight="900" fontFamily="sans-serif" letterSpacing="0.4">
+        999.9 FINE GOLD
+      </text>
+    </g>
+    {/* Sparkle glints */}
+    <path d="M18 4 L19 7 L22 8 L19 9 L18 12 L17 9 L14 8 L17 7 Z" fill="#ffffff" />
+    <path d="M48 24 L48.8 26 L51 26.8 L48.8 27.6 L48 30 L47.2 27.6 L45 26.8 L47.2 26 Z" fill="#ffffff" opacity="0.8" />
+  </svg>
+);
+
+type AssetCategory = 'gold' | 'fx_usd' | 'fx_eur' | 'fx_gbp' | 'fx_crypto' | 'fx_general' | 'property' | 'vehicle' | 'gem' | 'custom';
+
+const detectAssetCategory = (acc: FinancialAccount): AssetCategory => {
+  const nameLower = (acc.name || '').toLowerCase();
+  const currLower = (acc.currency || '').toLowerCase();
+  const typeLower = (acc.type || '').toLowerCase();
+  const categoryLower = ((acc.asset_details as any)?.category || '').toLowerCase();
+
+  // 1. Gold Bullion / Reserve
+  if (
+    typeLower === 'asset_gold' ||
+    currLower === 'gold' ||
+    currLower === 'xau' ||
+    nameLower.includes('gold') ||
+    nameLower.includes('bullion') ||
+    nameLower.includes('ingot') ||
+    nameLower.includes('ወርቅ')
+  ) {
+    return 'gold';
+  }
+
+  // 2. Real Estate / Property / House
+  if (
+    nameLower.includes('house') ||
+    nameLower.includes('home') ||
+    nameLower.includes('property') ||
+    nameLower.includes('villa') ||
+    nameLower.includes('building') ||
+    nameLower.includes('land') ||
+    nameLower.includes('apartment') ||
+    nameLower.includes('condo') ||
+    nameLower.includes('estate') ||
+    categoryLower.includes('property') ||
+    categoryLower.includes('real_estate')
+  ) {
+    return 'property';
+  }
+
+  // 3. Vehicles
+  if (
+    nameLower.includes('car') ||
+    nameLower.includes('vehicle') ||
+    nameLower.includes('auto') ||
+    nameLower.includes('truck') ||
+    nameLower.includes('toyota') ||
+    nameLower.includes('mercedes') ||
+    categoryLower.includes('vehicle')
+  ) {
+    return 'vehicle';
+  }
+
+  // 4. Jewelry / Gems / Watches
+  if (
+    nameLower.includes('gem') ||
+    nameLower.includes('diamond') ||
+    nameLower.includes('jewelry') ||
+    nameLower.includes('jewel') ||
+    nameLower.includes('watch') ||
+    nameLower.includes('rolex')
+  ) {
+    return 'gem';
+  }
+
+  // 5. Foreign Currency & Crypto
+  if (typeLower === 'asset_fx' || ['usd', 'eur', 'gbp', 'usdt', 'aed', 'sar', 'cad'].includes(currLower)) {
+    if (currLower === 'usd' || nameLower.includes('usd') || nameLower.includes('dollar')) return 'fx_usd';
+    if (currLower === 'eur' || nameLower.includes('eur') || nameLower.includes('euro')) return 'fx_eur';
+    if (currLower === 'gbp' || nameLower.includes('gbp') || nameLower.includes('pound')) return 'fx_gbp';
+    if (currLower === 'usdt' || currLower === 'crypto' || nameLower.includes('usdt') || nameLower.includes('tether') || nameLower.includes('crypto')) return 'fx_crypto';
+    return 'fx_general';
+  }
+
+  return 'custom';
+};
+
+const ReserveAssetIcon: React.FC<{ acc: FinancialAccount; size?: 'sm' | 'md' | 'lg' }> = ({ acc, size = 'md' }) => {
+  const category = detectAssetCategory(acc);
+  const isSm = size === 'sm';
+  const isLg = size === 'lg';
+  const sizeClasses = isLg ? 'w-20 h-20 rounded-3xl' : isSm ? 'w-10 h-10 rounded-xl' : 'w-18 h-18 rounded-2xl';
+
+  if (category === 'gold') {
+    return (
+      <div className={`${sizeClasses} bg-gradient-to-br from-amber-400/35 via-yellow-400/30 to-amber-600/20 shadow-[0_12px_28px_-6px_rgba(245,158,11,0.45)] flex items-center justify-center relative overflow-hidden group-hover:scale-105 transition-transform duration-300`}>
+        <GoldIngotStack className={isLg ? 'w-14 h-12' : isSm ? 'w-7 h-6' : 'w-13 h-11'} />
+      </div>
+    );
+  }
+
+  if (category === 'fx_usd') {
+    return (
+      <div className={`${sizeClasses} bg-gradient-to-br from-emerald-400/35 via-teal-400/30 to-emerald-600/20 shadow-[0_12px_28px_-6px_rgba(16,185,129,0.45)] flex flex-col items-center justify-center relative overflow-hidden group-hover:scale-105 transition-transform duration-300`}>
+        <div className="flex items-center text-emerald-600 dark:text-emerald-400 font-black">
+          <DollarSign className={isLg ? 'w-10 h-10 stroke-[2.75]' : isSm ? 'w-5 h-5 stroke-[2.75]' : 'w-8 h-8 stroke-[2.75]'} />
+        </div>
+        {!isSm && (
+          <span className="text-[10px] font-mono font-black tracking-wider text-emerald-700 dark:text-emerald-300 -mt-1 uppercase">
+            USD
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  if (category === 'fx_eur') {
+    return (
+      <div className={`${sizeClasses} bg-gradient-to-br from-blue-400/35 via-indigo-400/30 to-blue-600/20 shadow-[0_12px_28px_-6px_rgba(59,130,246,0.45)] flex flex-col items-center justify-center relative overflow-hidden group-hover:scale-105 transition-transform duration-300`}>
+        <span className={`${isSm ? 'text-lg' : isLg ? 'text-4xl' : 'text-3xl'} font-black text-blue-600 dark:text-blue-400 leading-none`}>€</span>
+        {!isSm && (
+          <span className="text-[10px] font-mono font-black tracking-wider text-blue-700 dark:text-blue-300 mt-0.5 uppercase">
+            EUR
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  if (category === 'fx_gbp') {
+    return (
+      <div className={`${sizeClasses} bg-gradient-to-br from-violet-400/35 via-purple-400/30 to-violet-600/20 shadow-[0_12px_28px_-6px_rgba(139,92,246,0.45)] flex flex-col items-center justify-center relative overflow-hidden group-hover:scale-105 transition-transform duration-300`}>
+        <span className={`${isSm ? 'text-lg' : isLg ? 'text-4xl' : 'text-3xl'} font-black text-violet-600 dark:text-violet-400 leading-none`}>£</span>
+        {!isSm && (
+          <span className="text-[10px] font-mono font-black tracking-wider text-violet-700 dark:text-violet-300 mt-0.5 uppercase">
+            GBP
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  if (category === 'fx_crypto') {
+    return (
+      <div className={`${sizeClasses} bg-gradient-to-br from-teal-400/35 via-cyan-400/30 to-teal-600/20 shadow-[0_12px_28px_-6px_rgba(20,184,166,0.45)] flex flex-col items-center justify-center relative overflow-hidden group-hover:scale-105 transition-transform duration-300`}>
+        <span className={`${isSm ? 'text-lg' : isLg ? 'text-4xl' : 'text-3xl'} font-black text-teal-600 dark:text-teal-400 leading-none`}>₮</span>
+        {!isSm && (
+          <span className="text-[10px] font-mono font-black tracking-wider text-teal-700 dark:text-teal-300 mt-0.5 uppercase">
+            USDT
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  if (category === 'property') {
+    return (
+      <div className={`${sizeClasses} bg-gradient-to-br from-blue-500/35 via-indigo-600/30 to-slate-800/15 shadow-[0_12px_28px_-6px_rgba(59,130,246,0.45)] flex flex-col items-center justify-center relative overflow-hidden group-hover:scale-105 transition-transform duration-300`}>
+        <Home className={`${isLg ? 'w-10 h-10' : isSm ? 'w-5 h-5' : 'w-8 h-8'} text-blue-600 dark:text-blue-400 stroke-[2.2]`} />
+        {!isSm && (
+          <span className="text-[9.5px] font-bold tracking-wider text-blue-700 dark:text-blue-300 mt-0.5 uppercase">
+            ESTATE
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  if (category === 'vehicle') {
+    return (
+      <div className={`${sizeClasses} bg-gradient-to-br from-purple-500/35 via-violet-600/30 to-slate-800/15 shadow-[0_12px_28px_-6px_rgba(168,85,247,0.45)] flex flex-col items-center justify-center relative overflow-hidden group-hover:scale-105 transition-transform duration-300`}>
+        <Car className={`${isLg ? 'w-10 h-10' : isSm ? 'w-5 h-5' : 'w-8 h-8'} text-purple-600 dark:text-purple-400 stroke-[2.2]`} />
+        {!isSm && (
+          <span className="text-[9.5px] font-bold tracking-wider text-purple-700 dark:text-purple-300 mt-0.5 uppercase">
+            VEHICLE
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  if (category === 'gem') {
+    return (
+      <div className={`${sizeClasses} bg-gradient-to-br from-rose-500/35 via-pink-600/30 to-amber-600/15 shadow-[0_12px_28px_-6px_rgba(244,63,94,0.45)] flex flex-col items-center justify-center relative overflow-hidden group-hover:scale-105 transition-transform duration-300`}>
+        <Gem className={`${isLg ? 'w-10 h-10' : isSm ? 'w-5 h-5' : 'w-8 h-8'} text-rose-600 dark:text-rose-400 stroke-[2.2]`} />
+        {!isSm && (
+          <span className="text-[9.5px] font-bold tracking-wider text-rose-700 dark:text-rose-300 mt-0.5 uppercase">
+            LUXURY
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  if (category === 'fx_general') {
+    return (
+      <div className={`${sizeClasses} bg-gradient-to-br from-emerald-400/35 via-teal-500/30 to-emerald-600/15 shadow-[0_12px_28px_-6px_rgba(16,185,129,0.45)] flex flex-col items-center justify-center relative overflow-hidden group-hover:scale-105 transition-transform duration-300`}>
+        <Globe className={`${isLg ? 'w-10 h-10' : isSm ? 'w-5 h-5' : 'w-8 h-8'} text-emerald-600 dark:text-emerald-400 stroke-[2.2]`} />
+        {!isSm && (
+          <span className="text-[10px] font-mono font-black tracking-wider text-emerald-700 dark:text-emerald-300 mt-0.5 uppercase">
+            {acc.currency || 'FX'}
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  // Default Custom Asset
+  return (
+    <div className={`${sizeClasses} bg-gradient-to-br from-slate-500/35 via-zinc-600/30 to-slate-800/15 shadow-[0_12px_28px_-6px_rgba(100,116,139,0.45)] flex flex-col items-center justify-center relative overflow-hidden group-hover:scale-105 transition-transform duration-300`}>
+      <Landmark className={`${isLg ? 'w-10 h-10' : isSm ? 'w-5 h-5' : 'w-8 h-8'} text-slate-700 dark:text-slate-300 stroke-[2.2]`} />
+      {!isSm && (
+        <span className="text-[9.5px] font-bold tracking-wider text-slate-700 dark:text-slate-300 mt-0.5 uppercase">
+          ASSET
+        </span>
+      )}
+    </div>
+  );
+};
+
+// getAssetCategoryMeta removed — unused after cardless reserve redesign
+
+const getAssetCardTheme = (acc: FinancialAccount) => {
+  const category = detectAssetCategory(acc);
+  switch (category) {
+    case 'gold':
+      return {
+        bg: 'bg-gradient-to-b from-white via-amber-50/30 to-amber-100/10 dark:from-[#1b170e] dark:via-[#141109] dark:to-[#0d0b06] border-amber-200/70 dark:border-amber-500/25 shadow-[0_18px_35px_-10px_rgba(245,158,11,0.1),0_4px_12px_rgba(0,0,0,0.02)] hover:border-amber-400/80 hover:shadow-[0_24px_45px_-10px_rgba(245,158,11,0.22)]',
+        glow: 'from-amber-400/20 via-transparent to-transparent',
+        dot: 'bg-amber-500',
+      };
+    case 'fx_usd':
+    case 'fx_crypto':
+    case 'fx_general':
+      return {
+        bg: 'bg-gradient-to-b from-white via-emerald-50/30 to-emerald-100/10 dark:from-[#0d1a15] dark:via-[#09130f] dark:to-[#050c09] border-emerald-200/70 dark:border-emerald-500/25 shadow-[0_18px_35px_-10px_rgba(16,185,129,0.1),0_4px_12px_rgba(0,0,0,0.02)] hover:border-emerald-400/80 hover:shadow-[0_24px_45px_-10px_rgba(16,185,129,0.22)]',
+        glow: 'from-emerald-400/20 via-transparent to-transparent',
+        dot: 'bg-emerald-500',
+      };
+    case 'fx_eur':
+    case 'property':
+      return {
+        bg: 'bg-gradient-to-b from-white via-blue-50/30 to-indigo-100/10 dark:from-[#0f172a] dark:via-[#0a0f1d] dark:to-[#060912] border-blue-200/70 dark:border-blue-500/25 shadow-[0_18px_35px_-10px_rgba(59,130,246,0.1),0_4px_12px_rgba(0,0,0,0.02)] hover:border-blue-400/80 hover:shadow-[0_24px_45px_-10px_rgba(59,130,246,0.22)]',
+        glow: 'from-blue-400/20 via-transparent to-transparent',
+        dot: 'bg-blue-500',
+      };
+    case 'vehicle':
+    case 'fx_gbp':
+      return {
+        bg: 'bg-gradient-to-b from-white via-purple-50/30 to-violet-100/10 dark:from-[#181024] dark:via-[#110a1a] dark:to-[#0a0610] border-purple-200/70 dark:border-purple-500/25 shadow-[0_18px_35px_-10px_rgba(168,85,247,0.1),0_4px_12px_rgba(0,0,0,0.02)] hover:border-purple-400/80 hover:shadow-[0_24px_45px_-10px_rgba(168,85,247,0.22)]',
+        glow: 'from-purple-400/20 via-transparent to-transparent',
+        dot: 'bg-purple-500',
+      };
+    case 'gem':
+      return {
+        bg: 'bg-gradient-to-b from-white via-rose-50/30 to-pink-100/10 dark:from-[#1f1017] dark:via-[#150a0f] dark:to-[#0c0508] border-rose-200/70 dark:border-rose-500/25 shadow-[0_18px_35px_-10px_rgba(244,63,94,0.1),0_4px_12px_rgba(0,0,0,0.02)] hover:border-rose-400/80 hover:shadow-[0_24px_45px_-10px_rgba(244,63,94,0.22)]',
+        glow: 'from-rose-400/20 via-transparent to-transparent',
+        dot: 'bg-rose-500',
+      };
+    case 'custom':
+    default:
+      return {
+        bg: 'bg-gradient-to-b from-white via-slate-50/50 to-slate-100/20 dark:from-[#172033] dark:via-[#111726] dark:to-[#0c101a] border-slate-200/80 dark:border-slate-700/60 shadow-[0_18px_35px_-10px_rgba(0,0,0,0.07),0_4px_12px_rgba(0,0,0,0.02)] hover:border-slate-400/80 hover:shadow-[0_24px_45px_-10px_rgba(0,0,0,0.12)]',
+        glow: 'from-slate-400/15 via-transparent to-transparent',
+        dot: 'bg-slate-500',
+      };
+  }
+};
 
 interface TreasuryViewProps {
   accounts?: FinancialAccount[];
@@ -64,39 +650,202 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
     }
   }, [accounts]);
 
-  const [treasuryPage, setTreasuryPage] = useState(1);
-  const [assetPage, setAssetPage] = useState(1);
-  const ACCOUNTS_PER_PAGE = 6;
+  // Pagination removed — desktop uses carousel slider approach
 
-  const paginatedTreasuryAccounts = React.useMemo(() => {
-    const start = (treasuryPage - 1) * ACCOUNTS_PER_PAGE;
-    return treasuryAccounts.slice(start, start + ACCOUNTS_PER_PAGE);
-  }, [treasuryAccounts, treasuryPage]);
-
-  const paginatedAssetAccounts = React.useMemo(() => {
-    const start = (assetPage - 1) * ACCOUNTS_PER_PAGE;
-    return assetAccounts.slice(start, start + ACCOUNTS_PER_PAGE);
-  }, [assetAccounts, assetPage]);
-
-  // Dynamic distributions for KPI micro-charts grounded in real account balances
-  const treasuryDistribution = React.useMemo(() => {
-    if (treasuryAccounts.length === 0) return [0, 0, 0, 0, 0];
-    const vals = treasuryAccounts.map((a) => Number(a.current_balance));
-    return vals.length >= 2 ? vals : [0, ...vals];
+  // Desktop Carousel Slides (max 2 rows x 3 columns = 6 for banks, 1 row x 3 columns = 3 for assets)
+  const BANK_SLIDE_SIZE = 6;
+  const bankSlides = React.useMemo(() => {
+    const slides: FinancialAccount[][] = [];
+    for (let i = 0; i < treasuryAccounts.length; i += BANK_SLIDE_SIZE) {
+      slides.push(treasuryAccounts.slice(i, i + BANK_SLIDE_SIZE));
+    }
+    return slides.length > 0 ? slides : [[]];
   }, [treasuryAccounts]);
 
-  const assetsDistribution = React.useMemo(() => {
-    if (assetAccounts.length === 0 || totalAssets === 0) return [0, 0, 0, 0, 0];
-    const vals = assetAccounts.map((a) => Number(a.current_balance));
-    return vals.length >= 2 ? vals : [0, ...vals];
-  }, [assetAccounts, totalAssets]);
+  const bankScrollRef = React.useRef<HTMLDivElement>(null);
+  const [canScrollBankLeft, setCanScrollBankLeft] = useState(false);
+  const [canScrollBankRight, setCanScrollBankRight] = useState(false);
 
-  const combinedDistribution = React.useMemo(() => {
-    const all = [...treasuryAccounts, ...assetAccounts];
-    if (all.length === 0) return [0, 0, 0, 0, 0];
-    const vals = all.map((a) => Number(a.current_balance));
-    return vals.length >= 2 ? vals : [0, ...vals];
-  }, [treasuryAccounts, assetAccounts]);
+  const updateBankScrollState = () => {
+    const el = bankScrollRef.current;
+    if (!el) return;
+    const { scrollLeft, scrollWidth, clientWidth } = el;
+    setCanScrollBankLeft(scrollLeft > 4);
+    setCanScrollBankRight(scrollLeft < scrollWidth - clientWidth - 4);
+  };
+
+  useEffect(() => {
+    updateBankScrollState();
+    const timer = setTimeout(updateBankScrollState, 80);
+    const el = bankScrollRef.current;
+    if (!el) return () => clearTimeout(timer);
+    el.addEventListener('scroll', updateBankScrollState, { passive: true });
+    window.addEventListener('resize', updateBankScrollState);
+    return () => {
+      clearTimeout(timer);
+      el.removeEventListener('scroll', updateBankScrollState);
+      window.removeEventListener('resize', updateBankScrollState);
+    };
+  }, [treasuryAccounts.length, bankSlides.length]);
+
+  const scrollBank = (dir: 'left' | 'right') => {
+    const el = bankScrollRef.current;
+    if (!el) return;
+    const scrollAmt = el.clientWidth;
+    el.scrollBy({
+      left: dir === 'left' ? -scrollAmt : scrollAmt,
+      behavior: 'smooth',
+    });
+  };
+
+  const RESERVE_SLIDE_SIZE = 3;
+  const reserveSlides = React.useMemo(() => {
+    const slides: FinancialAccount[][] = [];
+    for (let i = 0; i < assetAccounts.length; i += RESERVE_SLIDE_SIZE) {
+      slides.push(assetAccounts.slice(i, i + RESERVE_SLIDE_SIZE));
+    }
+    return slides.length > 0 ? slides : [[]];
+  }, [assetAccounts]);
+
+  const reserveScrollRef = React.useRef<HTMLDivElement>(null);
+  const [canScrollReserveLeft, setCanScrollReserveLeft] = useState(false);
+  const [canScrollReserveRight, setCanScrollReserveRight] = useState(false);
+
+  const updateReserveScrollState = () => {
+    const el = reserveScrollRef.current;
+    if (!el) return;
+    const { scrollLeft, scrollWidth, clientWidth } = el;
+    setCanScrollReserveLeft(scrollLeft > 4);
+    setCanScrollReserveRight(scrollLeft < scrollWidth - clientWidth - 4);
+  };
+
+  useEffect(() => {
+    updateReserveScrollState();
+    const timer = setTimeout(updateReserveScrollState, 80);
+    const el = reserveScrollRef.current;
+    if (!el) return () => clearTimeout(timer);
+    el.addEventListener('scroll', updateReserveScrollState, { passive: true });
+    window.addEventListener('resize', updateReserveScrollState);
+    return () => {
+      clearTimeout(timer);
+      el.removeEventListener('scroll', updateReserveScrollState);
+      window.removeEventListener('resize', updateReserveScrollState);
+    };
+  }, [assetAccounts.length, reserveSlides.length]);
+
+  const scrollReserve = (dir: 'left' | 'right') => {
+    const el = reserveScrollRef.current;
+    if (!el) return;
+    const scrollAmt = el.clientWidth;
+    el.scrollBy({
+      left: dir === 'left' ? -scrollAmt : scrollAmt,
+      behavior: 'smooth',
+    });
+  };
+
+  // Mobile ATM Cards and Transactions State (matches reference screenshot)
+  const [mobileCategory, setMobileCategory] = useState<'banks' | 'reserves'>('banks');
+  const [mobileActiveIndex, setMobileActiveIndex] = useState(0);
+  const [mobileActivities, setMobileActivities] = useState<Record<string, AccountActivity[]>>({});
+  const [loadingMobileActivities, setLoadingMobileActivities] = useState(false);
+  const mobileCardScrollRef = React.useRef<HTMLDivElement>(null);
+
+  const mobileAccounts = mobileCategory === 'banks' ? treasuryAccounts : assetAccounts;
+  const activeMobileAccount = mobileAccounts[mobileActiveIndex] || mobileAccounts[0];
+
+  useEffect(() => {
+    if (!activeMobileAccount) return;
+    const accId = activeMobileAccount.id;
+    if (mobileActivities[accId]) return;
+
+    let isMounted = true;
+    setLoadingMobileActivities(true);
+    api.getAccountActivities(accId)
+      .then((res) => {
+        if (isMounted) {
+          setMobileActivities((prev) => ({
+            ...prev,
+            [accId]: res.activities || [],
+          }));
+        }
+      })
+      .catch((err) => {
+        console.warn('Failed to load mobile activities for', accId, err);
+      })
+      .finally(() => {
+        if (isMounted) setLoadingMobileActivities(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeMobileAccount?.id]);
+
+  const handleSwitchMobileCategory = (cat: 'banks' | 'reserves') => {
+    setMobileCategory(cat);
+    setMobileActiveIndex(0);
+    if (mobileCardScrollRef.current) {
+      mobileCardScrollRef.current.scrollTo({ left: 0, behavior: 'smooth' });
+    }
+  };
+
+  const handleSelectMobileCard = (idx: number) => {
+    setMobileActiveIndex(idx);
+    const el = mobileCardScrollRef.current;
+    if (!el) return;
+    const cardEl = el.children[idx] as HTMLElement;
+    if (cardEl) {
+      cardEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+  };
+
+  // High-Performance Touch & Mouse Gesture Handlers for Slidable Mobile Carousel
+  const swipeGestureRef = React.useRef<{
+    startX: number;
+    startY: number;
+    lastX: number;
+    lastY: number;
+    startTime: number;
+    isTracking: boolean;
+  }>({ startX: 0, startY: 0, lastX: 0, lastY: 0, startTime: 0, isTracking: false });
+
+  const handleGestureStart = (clientX: number, clientY: number) => {
+    swipeGestureRef.current = {
+      startX: clientX,
+      startY: clientY,
+      lastX: clientX,
+      lastY: clientY,
+      startTime: Date.now(),
+      isTracking: true,
+    };
+  };
+
+  const handleGestureMove = (clientX: number, clientY: number) => {
+    if (!swipeGestureRef.current.isTracking) return;
+    swipeGestureRef.current.lastX = clientX;
+    swipeGestureRef.current.lastY = clientY;
+  };
+
+  const handleGestureEnd = () => {
+    const gesture = swipeGestureRef.current;
+    if (!gesture.isTracking) return;
+    gesture.isTracking = false;
+
+    const diffX = gesture.startX - gesture.lastX;
+    const diffY = gesture.startY - gesture.lastY;
+    const elapsed = Date.now() - gesture.startTime;
+
+    // Trigger swipe if horizontal drag is significantly greater than vertical movement
+    if (Math.abs(diffX) > Math.abs(diffY) * 1.15 && (Math.abs(diffX) > 28 || (Math.abs(diffX) > 16 && elapsed < 250))) {
+      if (diffX > 0) {
+        // Swipe left -> Next card / reserve
+        setMobileActiveIndex((prev) => (prev < mobileAccounts.length - 1 ? prev + 1 : 0));
+      } else {
+        // Swipe right -> Previous card / reserve
+        setMobileActiveIndex((prev) => (prev > 0 ? prev - 1 : mobileAccounts.length - 1));
+      }
+    }
+  };
 
   // Dedicated Ledger Drawer
   const [selectedAccountForLedger, setSelectedAccountForLedger] = useState<FinancialAccount | null>(null);
@@ -283,500 +1032,795 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
 
   return (
     <div className="space-y-5 animate-page-enter">
-      {/* Header actions */}
-      <div className="flex items-center justify-end gap-2">
-        <button
-          onClick={() => handleOpenCreate()}
-          className="h-9 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-sm flex items-center gap-2 active:scale-[0.98]"
-        >
-          <Plus className="w-4 h-4" />
-          Add Account
-        </button>
-        <button
-          onClick={() => handleOpenTransfer()}
-          className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-all flex items-center gap-2 active:scale-[0.98]"
-        >
-          <ArrowRightLeft className="w-4 h-4 text-emerald-500" />
-          Transfer
-        </button>
-      </div>
-
-      {/* Summary Matrix - Desktop View (≥ sm) */}
-      <div className="hidden sm:grid sm:grid-cols-3 gap-4">
-        {/* 1. Cash and Banks */}
-        <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-100 dark:border-slate-800/80 p-5 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                Liquid Cash and Banks
-              </span>
-              <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/40 flex items-center justify-center">
-                <Landmark className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-              </div>
-            </div>
-            <div className="text-2xl font-black text-slate-900 dark:text-white font-mono tabular-nums tracking-tight mt-2">
-              <AnimatedNumber value={totalTreasury} decimals={2} />{' '}
-              <span className="text-xs font-bold text-slate-400 font-sans">ETB</span>
-            </div>
+      {/* 1. Treasury Capital Strip — Desktop Only (hidden sm:grid) */}
+      <div className="hidden sm:grid grid-cols-3 gap-px bg-slate-200/60 dark:bg-slate-800/50 rounded-xl overflow-hidden border border-slate-200/60 dark:border-slate-800/60 shadow-xs mb-4">
+        {/* Metric 1: Liquid Cash & Banks */}
+        <div className="bg-white dark:bg-[#131926] px-4 sm:px-6 py-3 text-left">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-0.5 truncate">
+            Bank Accounts
           </div>
-          <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-end justify-between">
-            <span className="text-[11px] text-slate-400 font-medium">Active liquid working cash</span>
-            <MiniBarHistogram values={treasuryDistribution} color="emerald" />
+          <div className="text-sm sm:text-base font-bold font-mono tracking-tight text-slate-900 dark:text-slate-100 truncate">
+            <AnimatedNumber value={totalTreasury} decimals={2} />
+            <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 ml-1 font-sans">ETB</span>
           </div>
         </div>
 
-        {/* 2. Hedge Reserves */}
-        <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-100 dark:border-slate-800/80 p-5 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                Hedge Reserves
-              </span>
-              <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/40 flex items-center justify-center">
-                <Coins className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-              </div>
-            </div>
-            <div className="text-2xl font-black text-slate-900 dark:text-white font-mono tabular-nums tracking-tight mt-2">
-              <AnimatedNumber value={totalAssets} decimals={2} />{' '}
-              <span className="text-xs font-bold text-slate-400 font-sans">ETB</span>
-            </div>
+        {/* Metric 2: Other Assets & Reserves */}
+        <div className="bg-white dark:bg-[#131926] px-4 sm:px-6 py-3 text-left">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-0.5 truncate">
+            Other Assets
           </div>
-          <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-end justify-between">
-            <span className="text-[11px] text-slate-400 font-medium">Gold and foreign currency</span>
-            <MiniSparkline values={assetsDistribution} color="emerald" />
+          <div className="text-sm sm:text-base font-bold font-mono tracking-tight text-slate-900 dark:text-slate-100 truncate">
+            <AnimatedNumber value={totalAssets} decimals={2} />
+            <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 ml-1 font-sans">ETB</span>
           </div>
         </div>
 
-        {/* 3. Combined Total */}
-        <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-100 dark:border-slate-800/80 p-5 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-                Total Combined Treasury
-              </span>
-              <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/40 flex items-center justify-center">
-                <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-              </div>
-            </div>
-            <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono tabular-nums tracking-tight mt-2">
-              <AnimatedNumber value={totalTreasury + totalAssets} decimals={2} />{' '}
-              <span className="text-xs font-bold text-emerald-500/80 font-sans">ETB</span>
-            </div>
+        {/* Metric 3: Total Combined Treasury */}
+        <div className="bg-white dark:bg-[#131926] px-4 sm:px-6 py-3 text-left">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-0.5 truncate">
+            Total Combined
           </div>
-          <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-end justify-between">
-            <span className="text-[11px] text-slate-400 font-medium">All balances combined</span>
-            <MiniSparkline values={combinedDistribution} color="emerald" />
+          <div className="text-sm sm:text-base font-bold font-mono tracking-tight text-emerald-600 dark:text-emerald-400 truncate">
+            <AnimatedNumber value={totalTreasury + totalAssets} decimals={2} />
+            <span className="text-[10px] font-medium text-emerald-500/80 ml-1 font-sans">ETB</span>
           </div>
         </div>
       </div>
 
-      {/* Summary Matrix - Mobile View (< sm): 2 Stat Cards on top + Full Width Total Combined Card */}
-      <div className="flex sm:hidden flex-col gap-2.5">
-        {/* 2 Stat Cards Grid */}
-        <div className="grid grid-cols-2 gap-2.5">
-          {/* Liquid Cash and Banks */}
-          <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-100 dark:border-slate-800/80 p-3.5 shadow-xs flex flex-col justify-between">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 truncate">
-                Cash & Banks
-              </span>
-              <div className="w-6 h-6 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/40 flex items-center justify-center shrink-0">
-                <Landmark className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-              </div>
-            </div>
-            <div className="mt-2.5">
-              <div className="text-base font-black text-slate-900 dark:text-white font-mono tabular-nums tracking-tight truncate">
-                <AnimatedNumber value={totalTreasury} decimals={2} />
-              </div>
-              <span className="text-[9px] font-bold text-slate-400 font-sans">ETB</span>
-            </div>
-          </div>
-
-          {/* Hedge Reserves */}
-          <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-100 dark:border-slate-800/80 p-3.5 shadow-xs flex flex-col justify-between">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 truncate">
-                Reserves
-              </span>
-              <div className="w-6 h-6 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/40 flex items-center justify-center shrink-0">
-                <Coins className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-              </div>
-            </div>
-            <div className="mt-2.5">
-              <div className="text-base font-black text-slate-900 dark:text-white font-mono tabular-nums tracking-tight truncate">
-                <AnimatedNumber value={totalAssets} decimals={2} />
-              </div>
-              <span className="text-[9px] font-bold text-slate-400 font-sans">ETB</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Full-Width Total Combined Card */}
-        <div className="w-full bg-white dark:bg-[#131926] rounded-2xl border border-slate-100 dark:border-slate-800/80 p-4 shadow-xs flex items-center justify-between">
-          <div className="min-w-0 flex-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 block">
-              Total Combined Treasury
+      {/* ========================================================================= */}
+      {/* DESKTOP VIEW (≥ sm): Full desktop view preserved and completely unaffected */}
+      {/* ========================================================================= */}
+      <div className="hidden sm:block space-y-8">
+        {/* Bank Accounts & Mobile Wallets Section */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between pt-1">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              Bank Accounts & Wallets
             </span>
-            <div className="text-xl font-black text-emerald-600 dark:text-emerald-400 font-mono tabular-nums tracking-tight mt-0.5 truncate">
-              <AnimatedNumber value={totalTreasury + totalAssets} decimals={2} />{' '}
-              <span className="text-xs font-bold text-emerald-500/80 font-sans">ETB</span>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">
+                {treasuryAccounts.length} {treasuryAccounts.length === 1 ? 'account' : 'accounts'}
+              </span>
+              <button
+                onClick={() => handleOpenCreate('bank')}
+                className="h-7 px-2.5 rounded-lg border border-slate-200/80 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 transition-all flex items-center gap-1 active:scale-95 cursor-pointer ml-1"
+              >
+                <Plus className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Add Account</span>
+              </button>
+              <button
+                onClick={() => handleOpenTransfer()}
+                className="h-7 px-2.5 rounded-lg border border-slate-200/80 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 transition-all flex items-center gap-1 active:scale-95 cursor-pointer"
+              >
+                <ArrowRightLeft className="w-3.5 h-3.5 text-emerald-500" />
+                <span>Transfer</span>
+              </button>
             </div>
           </div>
-          <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/40 flex items-center justify-center shrink-0 ml-3">
-            <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-          </div>
-        </div>
-      </div>
 
-      {/* Bank Accounts & Mobile Wallets */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-            Bank Accounts & Wallets
-          </span>
-          <span className="text-[10px] text-slate-400">{treasuryAccounts.length} accounts</span>
-        </div>
-
-        {/* Desktop Bank Cards (≥ sm) */}
-        <div className="hidden sm:grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {paginatedTreasuryAccounts.map((acc) => {
-            const isInactive = acc.is_active === false;
-            return (
-              <div
-                key={acc.id}
-                onClick={() => setSelectedAccountForLedger(acc)}
-                className={`bg-white dark:bg-[#131926] rounded-2xl border p-5 transition-all flex flex-col justify-between cursor-pointer group shadow-[0_4px_20px_-4px_rgba(0,0,0,0.03)] hover:shadow-lg ${
-                  isInactive
-                    ? 'border-slate-200/50 dark:border-slate-800/50 opacity-60'
-                    : 'border-slate-100 dark:border-slate-800/80 hover:border-emerald-500/30 dark:hover:border-emerald-500/20'
+          {/* Desktop Bank Cards (≥ sm): Max 2 rows x 3 columns visible, horizontally scrollable with big floating nav arrows */}
+          <div className="relative group/bank-slider">
+            {/* Big Left Floating Slider Arrow */}
+            {bankSlides.length > 1 && (
+              <button
+                onClick={() => scrollBank('left')}
+                disabled={!canScrollBankLeft}
+                className={`hidden sm:flex absolute -left-4 sm:-left-5 top-1/2 -translate-y-1/2 z-30 w-11 h-11 sm:w-12 sm:h-12 rounded-full items-center justify-center transition-all duration-300 border cursor-pointer ${
+                  canScrollBankLeft
+                    ? 'bg-white/95 dark:bg-slate-800/95 backdrop-blur-md border-slate-200/90 dark:border-slate-700 text-slate-700 dark:text-slate-100 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-600 dark:hover:text-emerald-400 hover:scale-110 active:scale-95 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.15),0_4px_10px_-2px_rgba(0,0,0,0.06)] dark:shadow-[0_10px_25px_-5px_rgba(0,0,0,0.6)]'
+                    : 'opacity-0 pointer-events-none scale-90'
                 }`}
+                aria-label="Previous bank accounts"
               >
-                <div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <AccountLogo account={acc} size="md" />
-                      <div>
-                        <div className="font-bold text-slate-900 dark:text-white text-sm leading-tight group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">{acc.name}</div>
-                        <span className="text-[10px] text-slate-400 capitalize">{acc.type.replace(/_/g, ' ')}</span>
-                      </div>
-                    </div>
+                <ChevronLeft className="w-6 h-6 stroke-[2.5]" />
+              </button>
+            )}
 
-                    <div className="flex items-center gap-1.5">
-                      <span className={`text-[10px] font-semibold flex items-center gap-1 ${
-                        isInactive ? 'text-slate-400' : 'text-emerald-600 dark:text-emerald-400'
-                      }`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${isInactive ? 'bg-slate-400' : 'bg-emerald-500 animate-pulse'}`} />
-                        {isInactive ? 'Inactive' : 'Live'}
-                      </span>
-                      <span className="text-[10px] font-bold text-slate-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors ml-0.5 hidden group-hover:inline-flex items-center">
-                        Ledger &rarr;
-                      </span>
-                    </div>
-                  </div>
+            <div
+              ref={bankScrollRef}
+              className="hidden sm:flex items-start overflow-x-auto scrollbar-none snap-x snap-mandatory gap-5 pb-2 pt-1"
+            >
+              {bankSlides.map((slide, sIdx) => (
+                <div
+                  key={sIdx}
+                  className="w-full shrink-0 snap-start grid grid-cols-3 gap-5 items-start content-start auto-rows-max"
+                >
+                  {slide.map((acc, aIdx) => {
+                    const globalIndex = sIdx * BANK_SLIDE_SIZE + aIdx;
+                    const isInactive = acc.is_active === false;
+                    const isCash = isCashAccount(acc);
+                    return (
+                      <div
+                        key={acc.id}
+                        onClick={() => setSelectedAccountForLedger(acc)}
+                        className={`relative overflow-hidden rounded-3xl border p-5 sm:p-6 transition-all duration-300 flex flex-col justify-between cursor-pointer group min-h-[220px] h-[220px] self-start w-full ${
+                          isInactive
+                            ? 'bg-slate-50/80 dark:bg-[#131926]/60 border-slate-200/50 dark:border-slate-800/50 opacity-60'
+                            : 'bg-gradient-to-br from-white via-[#fcfdfe] to-[#f8fafc] dark:from-[#182133] dark:via-[#131926] dark:to-[#0f1420] border-slate-200/70 dark:border-slate-800 shadow-[0_20px_35px_-10px_rgba(0,0,0,0.07),0_10px_20px_-5px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1)] dark:shadow-[0_20px_35px_-10px_rgba(0,0,0,0.5),0_10px_20px_-5px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.06)] hover:shadow-[0_28px_45px_-12px_rgba(0,0,0,0.12),0_12px_24px_-6px_rgba(0,0,0,0.05)] hover:-translate-y-1'
+                        }`}
+                      >
+                        <DynamicCardAmbientArt acc={acc} index={globalIndex} />
 
-                  <div className="flex items-center gap-2 mt-2">
-                    {acc.account_number && (
-                      <span className="font-mono text-[11px] text-slate-400 dark:text-slate-500">
-                        {acc.account_number}
-                      </span>
-                    )}
-                    {acc.default_fee_type && acc.default_fee_type !== 'none' && Number(acc.default_fee_amount) > 0 && (
-                      <span className="inline-flex items-center text-[9px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-200/60 dark:border-amber-900/40">
-                        Fee: {Number(acc.default_fee_amount)}{acc.default_fee_type === 'percentage' ? '%' : ' ETB'}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-end justify-between">
-                  <div>
-                    <span className="text-[10px] text-slate-400 block mb-0.5">Balance</span>
-                    <span className="inline-flex items-baseline gap-1 whitespace-nowrap font-mono font-bold text-slate-900 dark:text-white">
-                      <AnimatedNumber value={Number(acc.current_balance)} decimals={2} />
-                      <span className="text-[10px] font-medium text-slate-400 font-sans">ETB</span>
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOpenAddBalance(acc);
-                      }}
-                      title="Add balance"
-                      className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDeletingAccount(acc);
-                      }}
-                      title="Remove account"
-                      className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOpenTransfer(acc.id);
-                      }}
-                      className="h-7 px-2.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-700 dark:hover:text-emerald-300 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all flex items-center gap-1 active:scale-95 cursor-pointer"
-                    >
-                      <ArrowRightLeft className="w-3 h-3 text-emerald-500" />
-                      Transfer
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Mobile Bank Logo Grid (< sm): Compact tiles with bank logos, minimal info, and balance under them */}
-        <div className="grid grid-cols-2 gap-2.5 sm:hidden">
-          {paginatedTreasuryAccounts.map((acc) => {
-            const isInactive = acc.is_active === false;
-            return (
-              <div
-                key={acc.id}
-                onClick={() => setSelectedAccountForLedger(acc)}
-                className={`bg-white dark:bg-[#131926] rounded-2xl border p-3 flex flex-col justify-between cursor-pointer transition-all active:scale-[0.98] shadow-xs ${
-                  isInactive
-                    ? 'border-slate-200/50 dark:border-slate-800/50 opacity-60'
-                    : 'border-slate-100 dark:border-slate-800/80 hover:border-emerald-500/30'
-                }`}
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <AccountLogo account={acc} size="sm" />
-                    <span className={`w-1.5 h-1.5 rounded-full ${isInactive ? 'bg-slate-400' : 'bg-emerald-500 animate-pulse'}`} />
-                  </div>
-                  <h4 className="font-bold text-slate-900 dark:text-white text-xs leading-tight truncate">
-                    {acc.name}
-                  </h4>
-                  {acc.account_number ? (
-                    <p className="font-mono text-[10px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
-                      {acc.account_number}
-                    </p>
-                  ) : (
-                    <p className="text-[10px] text-slate-400 capitalize truncate mt-0.5">
-                      {acc.type.replace(/_/g, ' ')}
-                    </p>
-                  )}
-                  {acc.default_fee_type && acc.default_fee_type !== 'none' && Number(acc.default_fee_amount) > 0 && (
-                    <div className="mt-1">
-                      <span className="inline-flex items-center text-[8px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-1 py-0.2 rounded border border-amber-200/60 dark:border-amber-900/40">
-                        Fee: {Number(acc.default_fee_amount)}{acc.default_fee_type === 'percentage' ? '%' : ' ETB'}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-800/80">
-                  <div className="text-[10px] text-slate-400">Balance</div>
-                  <div className="font-mono font-bold text-xs text-slate-900 dark:text-white tabular-nums truncate">
-                    <AnimatedNumber value={Number(acc.current_balance)} decimals={2} />{' '}
-                    <span className="text-[9px] font-medium text-slate-400 font-sans">ETB</span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Bank Accounts Pagination */}
-        <Pagination
-          currentPage={treasuryPage}
-          totalItems={treasuryAccounts.length}
-          pageSize={ACCOUNTS_PER_PAGE}
-          onPageChange={setTreasuryPage}
-        />
-      </div>
-
-      {/* Asset Reserves */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-              Hedge Reserves
-            </span>
-            <span className="text-[11px] text-slate-400">Gold & foreign currency</span>
-          </div>
-          <button
-            onClick={() => handleOpenCreate('asset_fx')}
-            className="h-8 px-3 rounded-xl bg-slate-900 dark:bg-slate-900 hover:bg-slate-800 dark:hover:bg-slate-800 text-emerald-400 border border-slate-800 text-xs font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-xs cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5 text-emerald-400" />
-            Add Reserve
-          </button>
-        </div>
-
-        {assetAccounts.length === 0 ? (
-          <div className="bg-white dark:bg-[#131926] rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 p-8 text-center">
-            <Coins className="w-7 h-7 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
-            <p className="text-xs text-slate-400">No asset reserves yet</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">Add gold, USD, USDT, or other hedge assets</p>
-          </div>
-        ) : (
-          <>
-            {/* Desktop Asset Cards (≥ sm): Clean 3-Column Grid matching Bank Accounts */}
-            <div className="hidden sm:grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {paginatedAssetAccounts.map((acc) => {
-                const isGold = acc.type === 'asset_gold';
-                const isInactive = acc.is_active === false;
-                return (
-                  <div
-                    key={acc.id}
-                    onClick={() => setSelectedAccountForLedger(acc)}
-                    className={`bg-white dark:bg-[#131926] rounded-2xl border p-5 transition-all flex flex-col justify-between cursor-pointer group shadow-[0_4px_20px_-4px_rgba(0,0,0,0.03)] hover:shadow-lg ${
-                      isInactive
-                        ? 'border-slate-200/50 dark:border-slate-800/50 opacity-60'
-                        : 'border-slate-100 dark:border-slate-800/80 hover:border-emerald-500/30 dark:hover:border-emerald-500/20'
-                    }`}
-                  >
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2.5">
-                          <AccountLogo account={acc} size="md" />
-                          <div>
-                            <div className="font-bold text-slate-900 dark:text-white text-sm leading-tight group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                              {acc.name}
+                        <div className="relative z-10">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <AccountLogo account={acc} size="md" className="w-10 h-10 rounded-xl shrink-0 shadow-xs" />
+                              <div className="min-w-0">
+                                <div className="font-bold text-slate-800 dark:text-slate-100 text-sm sm:text-[14px] leading-tight truncate">
+                                  {acc.name}
+                                </div>
+                                <div className="text-[11px] text-slate-400 dark:text-slate-500 font-medium truncate mt-0.5">
+                                  {getBankCleanName(acc)}
+                                </div>
+                              </div>
                             </div>
-                            <span className="text-[10px] text-slate-400 capitalize">
-                              {isGold ? 'Gold Reserve' : acc.type === 'custom' ? 'Custom Asset' : 'Forex / Crypto'}
+
+                            <div className="shrink-0">
+                              {isCash ? (
+                                <div className="w-9 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/70 dark:border-emerald-800/40 flex items-center justify-center shrink-0 shadow-xs">
+                                  <Landmark className="w-4.5 h-4.5 text-emerald-600 dark:text-emerald-400" />
+                                </div>
+                              ) : (
+                                <EmvChip className="w-9 h-7" />
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="mt-5">
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 block mb-1">
+                              {isCash ? 'CASH IN SAFE' : 'AVAILABLE BALANCE'}
                             </span>
+                            <div className="font-mono font-black tabular-nums text-slate-900 dark:text-white text-2xl sm:text-[26px] tracking-tight leading-none">
+                              <AnimatedNumber value={Number(acc.current_balance)} decimals={2} />
+                              <span className="text-xs font-semibold text-slate-400 font-sans ml-1.5">ETB</span>
+                            </div>
+                            <div className="font-mono text-xs font-medium text-slate-400 dark:text-slate-500 tracking-wider mt-2 truncate">
+                              {isCash ? 'Physical Cash Safe' : formatCardNumber(acc.account_number, acc.id)}
+                            </div>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-1.5">
-                          <span className={`text-[10px] font-semibold flex items-center gap-1 ${
-                            isInactive ? 'text-slate-400' : 'text-emerald-600 dark:text-emerald-400'
-                          }`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${isInactive ? 'bg-slate-400' : 'bg-emerald-500 animate-pulse'}`} />
-                            {isInactive ? 'Inactive' : 'Live'}
-                          </span>
-                          <span className="text-[10px] font-bold text-slate-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors ml-0.5 hidden group-hover:inline-flex items-center">
-                            Ledger &rarr;
-                          </span>
+                        <div className="mt-4 pt-2.5 border-t border-slate-100/90 dark:border-slate-800/80 flex items-center justify-between gap-2 relative z-10" onClick={(e) => e.stopPropagation()}>
+                          <div className="min-w-0">
+                            {acc.default_fee_type && acc.default_fee_type !== 'none' && Number(acc.default_fee_amount) > 0 && (
+                              <span className="inline-flex items-center text-[9px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-200/60 dark:border-amber-900/40">
+                                Fee: {Number(acc.default_fee_amount)}{acc.default_fee_type === 'percentage' ? '%' : ' ETB'}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {!isCash && (
+                              <>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenAddBalance(acc);
+                                  }}
+                                  title="Deposit / Add balance"
+                                  className="w-7.5 h-7.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 shadow-[0_1px_3px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-none hover:border-emerald-500/40 text-slate-500 hover:text-emerald-600 dark:text-slate-400 dark:hover:text-emerald-400 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/30 transition-all flex items-center justify-center active:scale-95 cursor-pointer"
+                                >
+                                  <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDeletingAccount(acc);
+                                  }}
+                                  title="Remove account"
+                                  className="w-7.5 h-7.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 shadow-[0_1px_3px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-none hover:border-rose-500/40 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50/50 dark:hover:bg-rose-950/30 transition-all flex items-center justify-center active:scale-95 cursor-pointer"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </>
+                            )}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenTransfer(acc.id);
+                              }}
+                              className="h-7.5 px-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 shadow-[0_1px_3px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-none hover:border-emerald-500/40 hover:text-emerald-600 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
+                            >
+                              <ArrowRightLeft className="w-3.5 h-3.5 text-emerald-500" />
+                              <span>Transfer</span>
+                            </button>
+                          </div>
                         </div>
                       </div>
-
-                      {/* Clean Minimal Foreign Holdings Display (No nested bordered card) */}
-                      <div className="flex items-center justify-between gap-2 mt-2">
-                        {acc.asset_details?.total_foreign_amount != null ? (
-                          <span className="font-mono text-[11px] font-bold text-emerald-600 dark:text-emerald-400 truncate">
-                            {Number(acc.asset_details.total_foreign_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{' '}
-                            <span className="text-[10px] font-sans font-bold text-slate-400 uppercase">
-                              {acc.currency === 'GOLD' ? 'g' : (acc.currency || 'USD')}
-                            </span>
-                          </span>
-                        ) : (
-                          <span className="font-mono text-[11px] text-slate-400 dark:text-slate-500 uppercase truncate">
-                            {acc.currency}
-                          </span>
-                        )}
-
-                        {acc.asset_details?.holdings && acc.asset_details.holdings.length > 1 && (
-                          <span className="text-[10px] font-mono text-slate-400 shrink-0 whitespace-nowrap">
-                            {acc.asset_details.holdings.length} lots
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-end justify-between">
-                      <div>
-                        <span className="text-[10px] text-slate-400 block mb-0.5">Valuation</span>
-                        <span className="inline-flex items-baseline gap-1 whitespace-nowrap font-mono font-bold text-slate-900 dark:text-white">
-                          <AnimatedNumber value={Number(acc.current_balance)} decimals={2} />
-                          <span className="text-[10px] font-medium text-slate-400 font-sans">ETB</span>
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleOpenAddBalance(acc); }}
-                          title="Add balance"
-                          className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors cursor-pointer"
-                        >
-                          <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                        </button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setDeletingAccount(acc); }}
-                          title="Remove account"
-                          className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+                    );
+                  })}
+                </div>
+              ))}
             </div>
 
-            {/* Mobile Asset Logo Grid (< sm): Clean 2-column tiles */}
-            <div className="grid grid-cols-2 gap-2.5 sm:hidden">
-              {paginatedAssetAccounts.map((acc) => {
-                const isGold = acc.type === 'asset_gold';
-                const isInactive = acc.is_active === false;
-                return (
+            {/* Big Right Floating Slider Arrow */}
+            {bankSlides.length > 1 && (
+              <button
+                onClick={() => scrollBank('right')}
+                disabled={!canScrollBankRight}
+                className={`hidden sm:flex absolute -right-4 sm:-right-5 top-1/2 -translate-y-1/2 z-30 w-11 h-11 sm:w-12 sm:h-12 rounded-full items-center justify-center transition-all duration-300 border cursor-pointer ${
+                  canScrollBankRight
+                    ? 'bg-white/95 dark:bg-slate-800/95 backdrop-blur-md border-slate-200/90 dark:border-slate-700 text-slate-700 dark:text-slate-100 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-600 dark:hover:text-emerald-400 hover:scale-110 active:scale-95 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.15),0_4px_10px_-2px_rgba(0,0,0,0.06)] dark:shadow-[0_10px_25px_-5px_rgba(0,0,0,0.6)]'
+                    : 'opacity-0 pointer-events-none scale-90'
+                }`}
+                aria-label="Next bank accounts"
+              >
+                <ChevronRight className="w-6 h-6 stroke-[2.5]" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Hedge Reserves Section - Cardless, Icon-first, Minimal, Vibrant */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between pt-2">
+            <div>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block">
+                Hedge Reserves
+              </span>
+              <span className="text-xs text-slate-400 dark:text-slate-500 font-medium">Gold & foreign currency</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleOpenCreate('asset_fx')}
+                className="h-8 px-3.5 rounded-xl bg-[#064e3b] hover:bg-[#065f46] text-white text-xs font-semibold transition-all flex items-center gap-1.5 active:scale-95 shadow-xs cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Add Reserve
+              </button>
+            </div>
+          </div>
+
+          {assetAccounts.length === 0 ? (
+            <div className="bg-white dark:bg-[#131926] rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 p-8 text-center">
+              <Coins className="w-7 h-7 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+              <p className="text-xs text-slate-400">No asset reserves yet</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Add gold, USD, USDT, or other hedge assets</p>
+            </div>
+          ) : (
+            <div className="relative group/reserve-slider">
+              {/* Big Left Floating Slider Arrow */}
+              {reserveSlides.length > 1 && (
+                <button
+                  onClick={() => scrollReserve('left')}
+                  disabled={!canScrollReserveLeft}
+                  className={`hidden sm:flex absolute -left-4 sm:-left-5 top-1/2 -translate-y-1/2 z-30 w-11 h-11 sm:w-12 sm:h-12 rounded-full items-center justify-center transition-all duration-300 border cursor-pointer ${
+                    canScrollReserveLeft
+                      ? 'bg-white/95 dark:bg-slate-800/95 backdrop-blur-md border-slate-200/90 dark:border-slate-700 text-slate-700 dark:text-slate-100 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-600 dark:hover:text-emerald-400 hover:scale-110 active:scale-95 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.15),0_4px_10px_-2px_rgba(0,0,0,0.06)] dark:shadow-[0_10px_25px_-5px_rgba(0,0,0,0.6)]'
+                      : 'opacity-0 pointer-events-none scale-90'
+                  }`}
+                  aria-label="Previous reserves"
+                >
+                  <ChevronLeft className="w-6 h-6 stroke-[2.5]" />
+                </button>
+              )}
+
+              <div
+                ref={reserveScrollRef}
+                className="hidden sm:flex items-start overflow-x-auto scrollbar-none snap-x snap-mandatory gap-5 pb-2 pt-1"
+              >
+                {reserveSlides.map((slide, sIdx) => (
                   <div
-                    key={acc.id}
-                    onClick={() => setSelectedAccountForLedger(acc)}
-                    className={`bg-white dark:bg-[#131926] rounded-2xl border p-3 flex flex-col justify-between cursor-pointer transition-all active:scale-[0.98] shadow-xs ${
-                      isInactive
-                        ? 'border-slate-200/50 dark:border-slate-800/50 opacity-60'
-                        : 'border-slate-100 dark:border-slate-800/80 hover:border-emerald-500/30'
-                    }`}
+                    key={sIdx}
+                    className="w-full shrink-0 snap-start grid grid-cols-3 gap-6 items-start content-start auto-rows-max"
                   >
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <AccountLogo account={acc} size="sm" />
-                        <span className={`w-1.5 h-1.5 rounded-full ${isInactive ? 'bg-slate-400' : 'bg-emerald-500 animate-pulse'}`} />
-                      </div>
-                      <h4 className="font-bold text-slate-900 dark:text-white text-xs leading-tight truncate">
-                        {acc.name}
-                      </h4>
-                      <div className="flex items-center justify-between text-[10px] text-slate-400 mt-0.5">
-                        <span className="capitalize truncate">{isGold ? 'Gold' : acc.type === 'custom' ? 'Custom' : 'Forex'}</span>
-                        {acc.asset_details?.holdings && acc.asset_details.holdings.length > 1 && (
-                          <span className="text-[9px] font-mono font-bold text-slate-400 dark:text-slate-500 shrink-0 whitespace-nowrap ml-1">
-                            {acc.asset_details.holdings.length} lots
-                          </span>
-                        )}
-                      </div>
-                      {acc.asset_details?.total_foreign_amount != null && (
-                        <div className="mt-1">
-                          <span className="font-mono font-bold text-[10px] text-emerald-600 dark:text-emerald-400 block truncate">
-                            {Number(acc.asset_details.total_foreign_amount).toLocaleString()} {acc.currency === 'GOLD' ? 'g' : (acc.currency || 'USD')}
-                          </span>
+                    {slide.map((acc) => {
+                      const isInactive = acc.is_active === false;
+                      const theme = getAssetCardTheme(acc);
+                      return (
+                        <div
+                          key={acc.id}
+                          onClick={() => setSelectedAccountForLedger(acc)}
+                          className={`relative p-6 rounded-3xl transition-all duration-300 flex flex-col items-center justify-between cursor-pointer group min-h-[220px] self-start w-full hover:-translate-y-1 hover:bg-slate-50/70 dark:hover:bg-slate-800/30 ${
+                            isInactive ? 'opacity-60' : ''
+                          }`}
+                        >
+                          {/* Quick Action Buttons on hover */}
+                          <div
+                            className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-1 z-20"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenAddBalance(acc);
+                              }}
+                              title="Deposit / Add balance"
+                              className="w-7 h-7 rounded-lg bg-white/90 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-emerald-600 shadow-xs flex items-center justify-center transition-all active:scale-95 cursor-pointer"
+                            >
+                              <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeletingAccount(acc);
+                              }}
+                              title="Remove reserve"
+                              className="w-7 h-7 rounded-lg bg-white/90 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 text-slate-400 hover:text-rose-600 shadow-xs flex items-center justify-center transition-all active:scale-95 cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+
+                          {/* Big Vibrant Centered Emblem with Radiant Ambient Halo */}
+                          <div className="relative mb-2 mt-1">
+                            <div className={`absolute inset-0 rounded-3xl blur-2xl opacity-70 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-tr ${theme.glow}`} />
+                            <div className="relative z-10 group-hover:scale-110 transition-transform duration-300">
+                              <ReserveAssetIcon acc={acc} size="lg" />
+                            </div>
+                          </div>
+
+                          {/* Asset Name: Minimal & Bold */}
+                          <h4 className="font-bold text-slate-900 dark:text-white text-base tracking-tight truncate max-w-full text-center leading-tight mt-1">
+                            {acc.name}
+                          </h4>
+
+                          {/* Clean Numbers (Holdings & Valuation on one line) */}
+                          <div className="flex items-center justify-center gap-2 mt-1 text-center">
+                            {acc.asset_details?.total_foreign_amount != null && (
+                              <span className="font-mono font-bold text-sm text-emerald-600 dark:text-emerald-400">
+                                {Number(acc.asset_details.total_foreign_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{' '}
+                                <span className="text-[11px] font-bold text-slate-400 uppercase font-sans">
+                                  {acc.currency === 'GOLD' ? 'g' : (acc.currency || 'USD')}
+                                </span>
+                              </span>
+                            )}
+                            {acc.asset_details?.total_foreign_amount != null && (
+                              <span className="text-slate-300 dark:text-slate-600 text-xs">•</span>
+                            )}
+                            <div className="font-mono font-black tabular-nums text-slate-900 dark:text-white text-base tracking-tight">
+                              <AnimatedNumber value={Number(acc.current_balance)} decimals={2} />
+                              <span className="text-[10px] font-semibold text-slate-400 font-sans ml-1">ETB</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+
+              {/* Big Right Floating Slider Arrow */}
+              {reserveSlides.length > 1 && (
+                <button
+                  onClick={() => scrollReserve('right')}
+                  disabled={!canScrollReserveRight}
+                  className={`hidden sm:flex absolute -right-4 sm:-right-5 top-1/2 -translate-y-1/2 z-30 w-11 h-11 sm:w-12 sm:h-12 rounded-full items-center justify-center transition-all duration-300 border cursor-pointer ${
+                    canScrollReserveRight
+                      ? 'bg-white/95 dark:bg-slate-800/95 backdrop-blur-md border-slate-200/90 dark:border-slate-700 text-slate-700 dark:text-slate-100 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-600 dark:hover:text-emerald-400 hover:scale-110 active:scale-95 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.15),0_4px_10px_-2px_rgba(0,0,0,0.06)] dark:shadow-[0_10px_25px_-5px_rgba(0,0,0,0.6)]'
+                      : 'opacity-0 pointer-events-none scale-90'
+                  }`}
+                  aria-label="Next reserves"
+                >
+                  <ChevronRight className="w-6 h-6 stroke-[2.5]" />
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* MOBILE VIEW (< sm): ATM-sized cards, touch-slidable, cardless reserves   */}
+      {/* ========================================================================= */}
+      <div className="sm:hidden space-y-4">
+        {/* Centered Tab Switcher: Bank Accounts & Wallets vs Hedge Reserves */}
+        <div className="flex items-center justify-center pt-1">
+          <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800/90 rounded-2xl shadow-inner">
+            <button
+              onClick={() => handleSwitchMobileCategory('banks')}
+              className={`py-1.5 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                mobileCategory === 'banks'
+                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'
+              }`}
+            >
+              Banks ({treasuryAccounts.length})
+            </button>
+            <button
+              onClick={() => handleSwitchMobileCategory('reserves')}
+              className={`py-1.5 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                mobileCategory === 'reserves'
+                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'
+              }`}
+            >
+              Reserves ({assetAccounts.length})
+            </button>
+          </div>
+        </div>
+
+        {/* 3D Carousel Display — Slidable, No Arrow Icons, Larger ATM Size */}
+        {mobileAccounts.length === 0 ? (
+          <div className="bg-white dark:bg-[#131926] rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 p-8 text-center my-4">
+            <p className="text-xs text-slate-400">No accounts in this category yet</p>
+          </div>
+        ) : (
+          <>
+            <div
+              className="relative py-3 overflow-hidden select-none cursor-grab active:cursor-grabbing"
+              onTouchStart={(e) => handleGestureStart(e.targetTouches[0].clientX, e.targetTouches[0].clientY)}
+              onTouchMove={(e) => handleGestureMove(e.targetTouches[0].clientX, e.targetTouches[0].clientY)}
+              onTouchEnd={handleGestureEnd}
+              onTouchCancel={handleGestureEnd}
+              onMouseDown={(e) => handleGestureStart(e.clientX, e.clientY)}
+              onMouseMove={(e) => handleGestureMove(e.clientX, e.clientY)}
+              onMouseUp={handleGestureEnd}
+              onMouseLeave={handleGestureEnd}
+              style={{
+                touchAction: 'pan-y',
+              }}
+            >
+              {/* 3D Stack Container */}
+              <div
+                className="flex items-center justify-center relative"
+                style={{
+                  perspective: '1200px',
+                  minHeight: mobileCategory === 'reserves' ? '175px' : '215px',
+                }}
+              >
+                {mobileAccounts.map((acc, idx) => {
+                  const isCash = isCashAccount(acc);
+                  const isReserve = mobileCategory === 'reserves';
+                  const total = mobileAccounts.length;
+
+                  // Circular offset calculation
+                  let offset = idx - mobileActiveIndex;
+                  if (total > 2) {
+                    if (offset > Math.floor(total / 2)) offset -= total;
+                    if (offset < -Math.floor(total / 2)) offset += total;
+                  }
+                  const isCenter = offset === 0;
+                  const isVisible = Math.abs(offset) <= 1;
+                  if (!isVisible) return null;
+
+                  // 3D positioning: spacious separation for reserves, fanning for ATM cards
+                  const translateX = isCenter ? 0 : offset * (isReserve ? 105 : 75);
+                  const translateZ = isCenter ? 35 : -50;
+                  const rotateY = isCenter ? 0 : offset * (isReserve ? 0 : -5);
+                  const scale = isCenter ? 1 : isReserve ? 0.72 : 0.88;
+                  const zIndex = isCenter ? 25 : 10;
+                  const opacity = isCenter ? 1 : isReserve ? 0.4 : 0.65;
+                  const isInactive = acc.is_active === false;
+                  const globalIndex = idx;
+                  const theme = isReserve ? getAssetCardTheme(acc) : null;
+
+                  return (
+                    <div
+                      key={acc.id}
+                      onClick={() => handleSelectMobileCard(idx)}
+                      className="absolute transition-all duration-500 ease-out flex items-center justify-center"
+                      style={{
+                        transform: `translateX(${translateX}px) translateZ(${translateZ}px) rotateY(${rotateY}deg) scale(${scale})`,
+                        zIndex,
+                        opacity,
+                        width: isReserve ? '130px' : 'min(88vw, 340px)',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {isReserve ? (
+                        /* CARDLESS ASSET DISPLAY (Uncongested, ample breathing room, direct tap or swipe) */
+                        <div
+                          className={`flex flex-col items-center justify-center text-center p-2 transition-all duration-300 w-full select-none ${
+                            isInactive ? 'opacity-60' : ''
+                          }`}
+                        >
+                          <div className="relative mb-2">
+                            {isCenter && (
+                              <div
+                                className={`absolute inset-0 rounded-full blur-2xl opacity-75 bg-gradient-to-tr ${theme?.glow || 'from-amber-400/20 to-transparent'}`}
+                              />
+                            )}
+                            <div className="relative z-10 transition-transform duration-300 hover:scale-105 active:scale-95">
+                              <ReserveAssetIcon acc={acc} size={isCenter ? 'lg' : 'md'} />
+                            </div>
+                          </div>
+                          {isCenter ? (
+                            <>
+                              <h4 className="font-black text-slate-900 dark:text-white text-base tracking-tight truncate max-w-[130px] leading-tight">
+                                {acc.name}
+                              </h4>
+                              {acc.asset_details?.total_foreign_amount != null && (
+                                <div className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                                  {Number(acc.asset_details.total_foreign_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{' '}
+                                  <span className="text-[10px] font-sans font-bold text-slate-400 uppercase">
+                                    {acc.currency === 'GOLD' ? 'g' : (acc.currency || 'USD')}
+                                  </span>
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-[11px] font-bold text-slate-400 truncate max-w-[110px] mt-1 block">
+                              {acc.name}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        /* AUTHENTIC PHYSICAL ATM / DEBIT CARD (Realistic debit proportions, specular sheen, embossed number, EMV chip, contactless wave) */
+                        <div
+                          className={`relative overflow-hidden rounded-[22px] border transition-all duration-300 flex flex-col justify-between h-[202px] w-full select-none ${
+                            isInactive
+                              ? 'bg-slate-100/90 dark:bg-[#131926]/60 border-slate-200/60 dark:border-slate-800/60 opacity-60'
+                              : 'bg-gradient-to-br from-white via-[#fbfcfd] to-[#f1f5f9] dark:from-[#1c2436] dark:via-[#141b29] dark:to-[#0d121c] border-slate-200/90 dark:border-slate-700/80'
+                          } ${
+                            isCenter
+                              ? 'shadow-[0_22px_45px_-10px_rgba(0,0,0,0.2),0_8px_18px_-4px_rgba(0,0,0,0.08),0_0_0_1px_rgba(0,0,0,0.06),inset_0_1.5px_1px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.05)] dark:shadow-[0_24px_50px_-10px_rgba(0,0,0,0.8),0_0_0_1px_rgba(255,255,255,0.12),inset_0_1.5px_1px_rgba(255,255,255,0.1)]'
+                              : 'shadow-md opacity-60'
+                          }`}
+                        >
+                          {/* Specular Diagonal Gloss Reflection Sheen */}
+                          <div
+                            className="absolute inset-0 pointer-events-none rounded-[22px] overflow-hidden z-0"
+                            style={{
+                              background:
+                                'linear-gradient(125deg, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.15) 22%, transparent 45%, rgba(255,255,255,0.06) 75%, transparent 100%)',
+                            }}
+                          />
+
+                          {/* Ambient wave/bar art in bottom right identical to desktop */}
+                          <DynamicCardAmbientArt acc={acc} index={globalIndex} />
+
+                          {/* Card Content Layer */}
+                          <div className="relative z-10 p-5 flex flex-col justify-between h-full">
+                            {/* Top Row: Bank Info & Contactless Wave */}
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <AccountLogo account={acc} size="sm" className="w-8 h-8 rounded-lg shrink-0 shadow-xs" />
+                                <div className="min-w-0">
+                                  <div className="font-bold text-slate-900 dark:text-slate-100 text-[13px] leading-tight truncate">
+                                    {acc.name}
+                                  </div>
+                                  <div className="text-[10px] text-slate-400 dark:text-slate-500 font-medium truncate mt-0.5">
+                                    {getBankCleanName(acc)}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="shrink-0 flex items-center">
+                                {isCash ? (
+                                  <div className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/40">
+                                    <Landmark className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                                    <span className="text-[8.5px] font-black text-emerald-700 dark:text-emerald-300 uppercase tracking-widest">
+                                      SAFE
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <ContactlessWave className="w-5 h-5 text-slate-400 dark:text-slate-500" />
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Middle Row: Golden EMV Chip & DEBIT Watermark */}
+                            <div className="flex items-center justify-between my-auto pt-1">
+                              {isCash ? (
+                                <div className="w-10 h-7.5 rounded-md bg-emerald-100/70 dark:bg-emerald-900/40 border border-emerald-300/50 dark:border-emerald-700/50 flex items-center justify-center">
+                                  <Landmark className="w-4 h-4 text-emerald-700 dark:text-emerald-300" />
+                                </div>
+                              ) : (
+                                <EmvChip className="w-10 h-7.5" />
+                              )}
+
+                              <span className="text-[9.5px] font-black tracking-[0.25em] uppercase text-slate-300 dark:text-slate-600 select-none">
+                                {isCash ? 'CASH SAFE' : 'DEBIT'}
+                              </span>
+                            </div>
+
+                            {/* Center / Embossed 16-Digit Card Number */}
+                            <div className="my-1">
+                              <div className="font-mono font-bold tracking-[0.22em] text-[15px] sm:text-[16px] text-slate-800 dark:text-slate-100 drop-shadow-[0_1px_1px_rgba(255,255,255,0.9)] dark:drop-shadow-[0_1px_1px_rgba(0,0,0,0.85)] truncate select-none">
+                                {isCash ? '••••  ••••  ••••  SAFE' : formatCardNumber(acc.account_number, acc.id)}
+                              </div>
+                            </div>
+
+                            {/* Bottom Row: Cardholder & Expiry Date */}
+                            <div className="flex items-end justify-between pt-2 border-t border-slate-100/70 dark:border-slate-800/70">
+                              <div className="min-w-0 pr-2">
+                                <span className="text-[7.5px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 block leading-none mb-0.5">
+                                  CARDHOLDER
+                                </span>
+                                <span className="font-mono text-[10.5px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-widest truncate block">
+                                  {acc.name ? acc.name.toUpperCase().slice(0, 18) : 'HALO MARKET'}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <div className="text-[7px] leading-tight text-slate-400 dark:text-slate-500 font-sans uppercase font-bold text-right tracking-tighter">
+                                  VALID<br />THRU
+                                </div>
+                                <div className="font-mono text-[11px] font-bold text-slate-700 dark:text-slate-200 tracking-wider">
+                                  {acc.is_active === false ? 'EXPIRED' : '08/29'}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       )}
                     </div>
+                  );
+                })}
+              </div>
 
-                    <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-800/80">
-                      <div className="text-[10px] text-slate-400">Valuation</div>
-                      <div className="font-mono font-bold text-xs text-slate-900 dark:text-white tabular-nums truncate">
-                        <AnimatedNumber value={Number(acc.current_balance)} decimals={2} />{' '}
-                        <span className="text-[9px] font-medium text-slate-400 font-sans">ETB</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+              {/* Dot Indicators */}
+              {mobileAccounts.length > 1 && (
+                <div className="flex items-center justify-center gap-1.5 mt-3">
+                  {mobileAccounts.map((_, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => handleSelectMobileCard(idx)}
+                      className={`rounded-full transition-all duration-300 cursor-pointer ${
+                        idx === mobileActiveIndex
+                          ? 'w-5 h-1.5 bg-slate-900 dark:bg-white'
+                          : 'w-1.5 h-1.5 bg-slate-300 dark:bg-slate-600 hover:bg-slate-400'
+                      }`}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* Asset Reserves Pagination */}
-            <Pagination
-              currentPage={assetPage}
-              totalItems={assetAccounts.length}
-              pageSize={ACCOUNTS_PER_PAGE}
-              onPageChange={setAssetPage}
-            />
+            {/* Total Balance for Selected Account — Bold Green & Amount First */}
+            <div className="flex flex-col items-center text-center my-2">
+              <span className="text-[11px] font-bold tracking-wider uppercase text-slate-400 dark:text-slate-500">
+                Total balance
+              </span>
+              <div className="mt-1 flex items-baseline justify-center gap-1.5">
+                <span className="font-mono font-black text-3xl sm:text-4xl text-emerald-600 dark:text-emerald-400 tracking-tight tabular-nums">
+                  <AnimatedNumber value={Number(activeMobileAccount?.current_balance || 0)} decimals={2} />
+                </span>
+                <span className="font-bold text-sm text-emerald-600/90 dark:text-emerald-400/90 font-sans">
+                  ETB
+                </span>
+              </div>
+              {activeMobileAccount?.asset_details?.total_foreign_amount != null && (
+                <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                  {Number(activeMobileAccount.asset_details.total_foreign_amount).toLocaleString()}{' '}
+                  {activeMobileAccount.currency === 'GOLD' ? 'g' : activeMobileAccount.currency} Holdings
+                </span>
+              )}
+            </div>
+
+            {/* Action Buttons: Top Up, Transfer, Delete, Date Filter (All Time) */}
+            <div className="flex items-center justify-center gap-5 my-3">
+              <div className="flex flex-col items-center gap-1.5">
+                <button
+                  onClick={() => activeMobileAccount && handleOpenAddBalance(activeMobileAccount)}
+                  className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-200 transition-all active:scale-95 shadow-xs cursor-pointer"
+                  title="Top Up / Deposit"
+                >
+                  <Plus className="w-5 h-5 stroke-[2.5]" />
+                </button>
+                <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Top Up</span>
+              </div>
+
+              <div className="flex flex-col items-center gap-1.5">
+                <button
+                  onClick={() => activeMobileAccount && handleOpenTransfer(activeMobileAccount.id)}
+                  className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-200 transition-all active:scale-95 shadow-xs cursor-pointer"
+                  title="Transfer"
+                >
+                  <ArrowRightLeft className="w-5 h-5 stroke-[2]" />
+                </button>
+                <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Transfer</span>
+              </div>
+
+              <div className="flex flex-col items-center gap-1.5">
+                <button
+                  onClick={() => activeMobileAccount && setDeletingAccount(activeMobileAccount)}
+                  className="w-12 h-12 rounded-full bg-rose-50 dark:bg-rose-950/30 hover:bg-rose-100 dark:hover:bg-rose-950/50 flex items-center justify-center text-rose-600 dark:text-rose-400 transition-all active:scale-95 shadow-xs cursor-pointer"
+                  title="Delete Account"
+                >
+                  <Trash2 className="w-5 h-5 stroke-[2]" />
+                </button>
+                <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Delete</span>
+              </div>
+
+              <div className="flex flex-col items-center gap-1.5">
+                <button
+                  onClick={() => activeMobileAccount && setSelectedAccountForLedger(activeMobileAccount)}
+                  className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-200 transition-all active:scale-95 shadow-xs cursor-pointer"
+                  title="All Time Ledger"
+                >
+                  <FileText className="w-5 h-5 stroke-[2]" />
+                </button>
+                <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">All Time</span>
+              </div>
+            </div>
+
+            {/* Transactions Section — Fixed height container sized for at least 6 records */}
+            <div className="rounded-3xl bg-white dark:bg-[#131926] p-5 border border-slate-200/70 dark:border-slate-800/80 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.04)] mt-2">
+              <div className="flex items-center justify-between mb-3.5">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-base text-slate-900 dark:text-white">
+                    Transactions
+                  </h3>
+                  {activeMobileAccount && mobileActivities[activeMobileAccount.id]?.length > 0 && (
+                    <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded-full">
+                      {mobileActivities[activeMobileAccount.id].length}
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={() => activeMobileAccount && setSelectedAccountForLedger(activeMobileAccount)}
+                  className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
+                >
+                  See all
+                </button>
+              </div>
+
+              {/* Fixed-Height Scrollable Container (Sized for 6+ records) */}
+              <div className="h-[320px] overflow-y-auto overscroll-contain pr-1 scrollbar-thin">
+                {loadingMobileActivities && !mobileActivities[activeMobileAccount?.id || ''] ? (
+                  <div className="space-y-3.5 py-2">
+                    {[1, 2, 3, 4, 5, 6].map((n) => (
+                      <div key={n} className="flex items-center justify-between gap-3 animate-pulse">
+                        <div className="w-10 h-10 rounded-2xl bg-slate-100 dark:bg-slate-800 shrink-0" />
+                        <div className="flex-1 space-y-1.5">
+                          <div className="h-3.5 bg-slate-100 dark:bg-slate-800 rounded w-1/2" />
+                          <div className="h-2.5 bg-slate-100 dark:bg-slate-800 rounded w-1/3" />
+                        </div>
+                        <div className="h-4 bg-slate-100 dark:bg-slate-800 rounded w-16" />
+                      </div>
+                    ))}
+                  </div>
+                ) : (!activeMobileAccount || !(mobileActivities[activeMobileAccount.id] && mobileActivities[activeMobileAccount.id].length > 0)) ? (
+                  <div className="h-full flex flex-col items-center justify-center text-center py-10">
+                    <Inbox className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+                    <p className="text-xs font-medium text-slate-400">No transactions recorded yet</p>
+                    <p className="text-[11px] text-slate-400/80 mt-0.5">Transactions will appear as payments are processed</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {(mobileActivities[activeMobileAccount.id] || []).map((act) => {
+                      const isInflow = act.direction === 'inflow';
+                      const title = act.counterparty || act.type_label || act.description || 'Transaction';
+                      const dateFormatted = formatActivityDate(act.date);
+                      return (
+                        <div
+                          key={act.id}
+                          onClick={() => activeMobileAccount && setSelectedAccountForLedger(activeMobileAccount)}
+                          className="flex items-center justify-between gap-3 py-1.5 cursor-pointer group hover:bg-slate-50/60 dark:hover:bg-slate-800/40 rounded-xl px-2 transition-colors"
+                        >
+                          <div
+                            className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${
+                              isInflow
+                                ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'
+                                : 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400'
+                            }`}
+                          >
+                            {isInflow ? (
+                              <ArrowDownLeft className="w-4.5 h-4.5 stroke-[2.5]" />
+                            ) : (
+                              <ArrowUpRight className="w-4.5 h-4.5 stroke-[2.5]" />
+                            )}
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-bold text-sm text-slate-900 dark:text-white truncate">
+                              {title}
+                            </h4>
+                            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 truncate">
+                              {dateFormatted}
+                            </p>
+                          </div>
+
+                          <div className="text-right shrink-0">
+                            <span
+                              className={`font-mono font-bold text-sm ${
+                                isInflow ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+                              }`}
+                            >
+                              {isInflow ? '+ ' : '- '}
+                              ETB {Number(act.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
           </>
         )}
       </div>

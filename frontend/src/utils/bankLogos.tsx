@@ -359,7 +359,7 @@ export const PRESET_BANK_LOGOS: BankPreset[] = [
     name: 'TeleBirr Counter Wallet',
     shortCode: 'TeleBirr',
     primaryColor: '#0284c7',
-    keywords: ['telebirr', 'tele birr', 'ቴሌብር'],
+    keywords: ['telebirr', 'telebir', 'tele birr', 'tele', 'ethio telecom', 'ethiotel', 'ቴሌብር'],
     dataUri: svgToDataUri(TELEBIRR_SVG),
     svgElement: <div dangerouslySetInnerHTML={{ __html: TELEBIRR_SVG }} className="w-full h-full" />,
   },
@@ -429,13 +429,38 @@ export const PRESET_BANK_LOGOS: BankPreset[] = [
 ];
 
 /**
- * Detect matching bank preset by name or account type
+ * Detect matching bank preset by name, account type, or explicit logo
  */
-export function matchBankPreset(name?: string, type?: string): BankPreset | undefined {
+export function matchBankPreset(name?: string, type?: string, logo?: string | null): BankPreset | undefined {
   const query = (name || '').toLowerCase();
   const typeQuery = (type || '').toLowerCase();
 
-  // 1. Direct type matching first for special types
+  // 1. Direct match by explicit logo if preset SVG dataUri was stored
+  if (logo && typeof logo === 'string' && logo.trim().length > 0) {
+    const directLogoMatch = PRESET_BANK_LOGOS.find((p) => p.dataUri === logo);
+    if (directLogoMatch) return directLogoMatch;
+
+    // Only inspect decoded SVG content; avoid searching raw base64 binary strings where random characters match
+    if (logo.startsWith('data:image/svg+xml')) {
+      let decoded = logo;
+      try {
+        decoded = decodeURIComponent(logo).toLowerCase();
+      } catch {
+        decoded = logo.toLowerCase();
+      }
+      for (const preset of PRESET_BANK_LOGOS) {
+        if (
+          decoded.includes(`id="${preset.id}`) ||
+          decoded.includes(`>${preset.id}<`) ||
+          preset.keywords.some((kw) => decoded.includes(kw.toLowerCase()))
+        ) {
+          return preset;
+        }
+      }
+    }
+  }
+
+  // 2. Direct type matching first for special types
   if (typeQuery === 'asset_gold') {
     return PRESET_BANK_LOGOS.find((p) => p.id === 'gold');
   }
@@ -449,16 +474,11 @@ export function matchBankPreset(name?: string, type?: string): BankPreset | unde
     return PRESET_BANK_LOGOS.find((p) => p.id === 'telebirr');
   }
 
-  // 2. Keyword matching on name
+  // 3. Keyword matching on name
   for (const preset of PRESET_BANK_LOGOS) {
     if (preset.keywords.some((kw) => query.includes(kw))) {
       return preset;
     }
-  }
-
-  // 3. Fallback based on type
-  if (typeQuery === 'bank') {
-    return PRESET_BANK_LOGOS.find((p) => p.id === 'cbe');
   }
 
   return undefined;
@@ -467,7 +487,7 @@ export function matchBankPreset(name?: string, type?: string): BankPreset | unde
 export interface AccountLogoInfo {
   src: string;
   isCustom: boolean;
-  preset?: BankPreset;
+  preset?: BankPreset | ReservePreset;
   shortCode: string;
 }
 
@@ -483,15 +503,18 @@ export function getAccountLogoInfo(account: {
   // Check if account already has an uploaded or configured logo
   const explicitLogo = account.logo || (account.asset_details?.logo as string | undefined);
   if (explicitLogo && explicitLogo.trim().length > 0) {
+    const matchedPreset = PRESET_BANK_LOGOS.find((p) => p.dataUri === explicitLogo) ||
+      PRESET_RESERVE_LOGOS.find((p) => p.dataUri === explicitLogo);
     return {
       src: explicitLogo,
       isCustom: !explicitLogo.startsWith('data:image/svg+xml'),
-      shortCode: (account.name || 'ACC').slice(0, 3).toUpperCase(),
+      preset: matchedPreset,
+      shortCode: matchedPreset ? matchedPreset.shortCode : (account.name || 'ACC').slice(0, 3).toUpperCase(),
     };
   }
 
-  // Auto-detect based on name and type
-  const matched = matchBankPreset(account.name, account.type);
+  // Auto-detect based on name, type, and logo
+  const matched = matchBankPreset(account.name, account.type, explicitLogo);
   if (matched) {
     return {
       src: matched.dataUri,

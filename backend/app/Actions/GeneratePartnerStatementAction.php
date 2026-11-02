@@ -112,6 +112,7 @@ class GeneratePartnerStatementAction
 
         $rawEntries = [];
         $bilateralGroups = [];
+        $consolidatedPaymentGroups = [];
 
         foreach ($debts as $debt) {
             if (str_contains(strtolower($debt->notes ?? ''), 'exclude_statement')) {
@@ -684,32 +685,71 @@ class GeneratePartnerStatementAction
                 } elseif ($debt->type === 'payable') {
                     $accText = ($accountName && $accountName !== 'Wire') ? " ({$accountName})" : '';
                     $cleanPayRef = ($payment->reference_number && ! str_starts_with($payment->reference_number, 'ORD-')) ? $payment->reference_number : null;
-                    $rawEntries[] = [
-                        'id' => "pay-{$payment->id}",
-                        'date' => $payDate,
-                        'type' => 'payment_sent',
-                        'type_label' => 'Payment Sent',
-                        'context' => "Transferred{$accText}",
-                        'payable' => -(float) $payment->amount,
-                        'receivable' => 0.0,
-                        'balance_effect' => (float) $payment->amount,
-                        'reference_number' => $cleanPayRef,
-                    ];
+                    $groupKey = ! empty($payment->split_group_id)
+                        ? "split-{$payment->split_group_id}-payable"
+                        : "time-{$payDate->format('Y-m-d H:i')}-payable-".($payment->financial_account_id ?? 'wire');
+
+                    if (! isset($consolidatedPaymentGroups[$groupKey])) {
+                        $consolidatedPaymentGroups[$groupKey] = [
+                            'id' => "pay-{$payment->id}",
+                            'date' => $payDate,
+                            'type' => 'payment_sent',
+                            'type_label' => 'Payment Sent',
+                            'context' => "Transferred{$accText}",
+                            'payable' => -(float) $payment->amount,
+                            'receivable' => 0.0,
+                            'balance_effect' => (float) $payment->amount,
+                            'reference_number' => $cleanPayRef,
+                        ];
+                    } else {
+                        $consolidatedPaymentGroups[$groupKey]['payable'] -= (float) $payment->amount;
+                        $consolidatedPaymentGroups[$groupKey]['balance_effect'] += (float) $payment->amount;
+                        if (! $consolidatedPaymentGroups[$groupKey]['reference_number'] && $cleanPayRef) {
+                            $consolidatedPaymentGroups[$groupKey]['reference_number'] = $cleanPayRef;
+                        }
+                    }
                 } else {
                     $isRepair = in_array($debt->reference_type, ['repair_reimbursement', 'vendor_repair_reimbursement']);
-                    $rawEntries[] = [
-                        'id' => "pay-{$payment->id}",
-                        'date' => $payDate,
-                        'type' => 'payment_received',
-                        'type_label' => $isRepair ? 'Repair Payment' : 'Payment Received',
-                        'context' => $isRepair ? "Repair payment ({$accountName})" : "Payment received ({$accountName})",
-                        'payable' => 0.0,
-                        'receivable' => -(float) $payment->amount,
-                        'balance_effect' => -(float) $payment->amount,
-                        'reference_number' => $payment->reference_number,
-                    ];
+                    $groupKey = ! empty($payment->split_group_id)
+                        ? "split-{$payment->split_group_id}-receivable"
+                        : "time-{$payDate->format('Y-m-d H:i')}-receivable-".($payment->financial_account_id ?? 'wire');
+
+                    if (! isset($consolidatedPaymentGroups[$groupKey])) {
+                        $consolidatedPaymentGroups[$groupKey] = [
+                            'id' => "pay-{$payment->id}",
+                            'date' => $payDate,
+                            'type' => 'payment_received',
+                            'type_label' => $isRepair ? 'Repair Payment' : 'Payment Received',
+                            'context' => $isRepair ? "Repair payment ({$accountName})" : "Payment received ({$accountName})",
+                            'payable' => 0.0,
+                            'receivable' => -(float) $payment->amount,
+                            'balance_effect' => -(float) $payment->amount,
+                            'reference_number' => $payment->reference_number,
+                        ];
+                    } else {
+                        $consolidatedPaymentGroups[$groupKey]['receivable'] -= (float) $payment->amount;
+                        $consolidatedPaymentGroups[$groupKey]['balance_effect'] -= (float) $payment->amount;
+                        if (! $consolidatedPaymentGroups[$groupKey]['reference_number'] && $payment->reference_number) {
+                            $consolidatedPaymentGroups[$groupKey]['reference_number'] = $payment->reference_number;
+                        }
+                    }
                 }
             }
+        }
+
+        // Emit consolidated cash payment entries (combining multi-debt waterfall allocations)
+        foreach ($consolidatedPaymentGroups as $group) {
+            $rawEntries[] = [
+                'id' => $group['id'],
+                'date' => $group['date'],
+                'type' => $group['type'],
+                'type_label' => $group['type_label'],
+                'context' => $group['context'],
+                'payable' => $group['payable'],
+                'receivable' => $group['receivable'],
+                'balance_effect' => $group['balance_effect'],
+                'reference_number' => $group['reference_number'],
+            ];
         }
 
         // Emit consolidated bilateral offset entries (1 single row per handover event/unit)

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 class Debt extends Model
 {
@@ -50,6 +51,9 @@ class Debt extends Model
         return $this->belongsTo(User::class, 'salesperson_id')->withTrashed();
     }
 
+    /**
+     * @return HasMany<DebtPayment, $this>
+     */
     public function payments(): HasMany
     {
         return $this->hasMany(DebtPayment::class);
@@ -238,10 +242,13 @@ class Debt extends Model
                     continue;
                 }
 
+                $offsetGroupId = (string) Str::uuid();
+
                 // Downstream payment record on payable
                 DebtPayment::create([
                     'tenant_id' => $tenantId,
                     'debt_id' => $pay->id,
+                    'split_group_id' => $offsetGroupId,
                     'financial_account_id' => null,
                     'amount' => $offsetAmount,
                     'payment_date' => now(),
@@ -262,10 +269,11 @@ class Debt extends Model
                 DebtPayment::create([
                     'tenant_id' => $tenantId,
                     'debt_id' => $rec->id,
+                    'split_group_id' => $offsetGroupId,
                     'financial_account_id' => null,
                     'amount' => $offsetAmount,
                     'payment_date' => now(),
-                    'reference_number' => 'MUTUAL-OFFSET',
+                    'reference_number' => "OFFSET-{$pay->id}",
                     'notes' => 'Applied against open payable debt',
                     'created_by' => $userId,
                 ]);

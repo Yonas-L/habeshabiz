@@ -375,7 +375,7 @@ ITEMS TRANSACTED:
 ${itemsText}
 ========================================
 Subtotal: ${grossAmount.toLocaleString()} ETB
-${discountAmount > 0 ? `Discount: -${discountAmount.toLocaleString()} ETB\n` : ''}${writeOffAmount > 0 ? `Intentional Price Concession: -${writeOffAmount.toLocaleString()} ETB\n` : ''}${exchangeAllowance > 0 ? `Exchanged Device: ${exchangeAllowance.toLocaleString()} ETB\n` : ''}${exchangeAllowance > 0 ? 'Cash Difference to Pay' : 'Final Agreed Value'}: ${settledSaleValue.toLocaleString()} ETB
+${discountAmount > 0 ? `Discount: -${discountAmount.toLocaleString()} ETB\n` : ''}${writeOffAmount > 0 ? `Intentional Price Concession: -${writeOffAmount.toLocaleString()} ETB\n` : ''}${exchangeAllowance > 0 ? `Exchanged Device Trade-In: -${exchangeAllowance.toLocaleString()} ETB\n` : ''}${exchangeAllowance > 0 ? 'Cash Difference to Pay' : 'Final Agreed Value'}: ${settledSaleValue.toLocaleString()} ETB
 Amount Paid: ${paidAmount.toLocaleString()} ETB
 ${remainingDebt > 0 ? `Balance Due: ${remainingDebt.toLocaleString()} ETB\n` : ''}========================================
 ${
