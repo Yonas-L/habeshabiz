@@ -3868,7 +3868,7 @@ class InventoryController extends Controller
      * Accurately matches intake debts (by unit ID / IMEI) as well as brokered sourcing
      * and consignment sales (linked via SalesOrder ID or order number).
      *
-     * @return \Illuminate\Database\Eloquent\Collection<int, \App\Models\Debt>
+     * @return Collection<int, Debt>
      */
     private function resolveUnitSupplierPayables(InventoryUnit $unit, string $tenantId): Collection
     {
