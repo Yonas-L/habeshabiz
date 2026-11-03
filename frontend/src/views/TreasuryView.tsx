@@ -1867,15 +1867,15 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
               </button>
             </div>
 
-            {/* Transactions Section — Spanning Left to Right Like the Cards */}
-            <div className="w-full rounded-2xl sm:rounded-3xl bg-white dark:bg-[#131926] p-3.5 sm:p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm mt-1.5">
-              <div className="flex items-center justify-between mb-3 px-1">
+            {/* Transactions Section — Displayed Frameless Without an Enclosing Card */}
+            <div className="w-full mt-2">
+              <div className="flex items-center justify-between mb-2.5 px-1">
                 <div className="flex items-center gap-2">
-                  <h3 className="font-extrabold text-lg sm:text-xl text-[#0f2347] dark:text-white tracking-tight">
+                  <h3 className="font-extrabold text-lg text-[#0f2347] dark:text-white tracking-tight">
                     Transactions
                   </h3>
                   {activeMobileAccount && (
-                    <span className="text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-0.5 rounded-full">
+                    <span className="text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-200/70 dark:bg-slate-800 px-2.5 py-0.5 rounded-full">
                       ({mobileActivities[activeMobileAccount.id]?.length || 0})
                     </span>
                   )}
@@ -1890,8 +1890,8 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                 </button>
               </div>
 
-              {/* Fixed-Height Scrollable Container with Bigger, Bolder List Fonts */}
-              <div className="h-[235px] overflow-y-auto overscroll-contain pr-1 scrollbar-thin">
+              {/* Scrollable Container without a Card */}
+              <div className="overflow-y-auto overscroll-contain pr-1 scrollbar-thin max-h-[320px]">
                 {loadingMobileActivities && !mobileActivities[activeMobileAccount?.id || ''] ? (
                   <div className="space-y-3 py-1">
                     {[1, 2, 3, 4].map((n) => (
@@ -1921,7 +1921,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                         <div
                           key={act.id}
                           onClick={() => activeMobileAccount && setSelectedAccountForLedger(activeMobileAccount)}
-                          className="flex items-center justify-between gap-3 py-2.5 px-2 cursor-pointer group hover:bg-slate-50/80 dark:hover:bg-slate-800/40 rounded-xl transition-colors border-b border-slate-100/80 dark:border-slate-800/70 last:border-0"
+                          className="flex items-center justify-between gap-3 py-2.5 px-1.5 cursor-pointer group hover:bg-slate-100/60 dark:hover:bg-slate-800/40 active:bg-slate-100/80 dark:active:bg-slate-800/60 rounded-xl transition-colors border-b border-slate-200/60 dark:border-slate-800/60 last:border-0"
                         >
                           <div className="flex items-center gap-3 min-w-0">
                             <div
