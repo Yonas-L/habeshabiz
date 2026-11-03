@@ -1069,7 +1069,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
   const selectedDest = allAccounts.find((a) => a.id === destAccountId);
 
   return (
-    <div className="space-y-5 animate-page-enter">
+    <div className="space-y-2 sm:space-y-5 animate-page-enter">
       {/* 1. Treasury Capital Strip — Desktop Only (hidden sm:grid) */}
       <div className="hidden sm:grid grid-cols-3 gap-px bg-slate-200/60 dark:bg-slate-800/50 rounded-xl overflow-hidden border border-slate-200/60 dark:border-slate-800/60 shadow-xs mb-4">
         {/* Metric 1: Liquid Cash & Banks */}
@@ -1442,13 +1442,13 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
       {/* ========================================================================= */}
       {/* MOBILE VIEW (< sm): ATM-sized cards, touch-slidable, cardless reserves   */}
       {/* ========================================================================= */}
-      <div className="sm:hidden space-y-2.5">
+      <div className="sm:hidden space-y-1.5">
         {/* Centered Tab Switcher: Banks vs Reserves */}
-        <div className="flex items-center justify-center pt-0.5 pb-1">
+        <div className="flex items-center justify-center pt-0 pb-0.5">
           <div className="flex items-center p-1 bg-[#e9eef5] dark:bg-slate-800 rounded-full">
             <button
               onClick={() => handleSwitchMobileCategory('banks')}
-              className={`py-2 px-6 rounded-full text-xs font-bold transition-all cursor-pointer ${
+              className={`py-1.5 px-5.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
                 mobileCategory === 'banks'
                   ? 'bg-gradient-to-b from-[#094838] to-[#042d23] text-white shadow-sm border border-emerald-500/25'
                   : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
@@ -1458,7 +1458,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
             </button>
             <button
               onClick={() => handleSwitchMobileCategory('reserves')}
-              className={`py-2 px-6 rounded-full text-xs font-bold transition-all cursor-pointer ${
+              className={`py-1.5 px-5.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
                 mobileCategory === 'reserves'
                   ? 'bg-gradient-to-b from-[#094838] to-[#042d23] text-white shadow-sm border border-emerald-500/25'
                   : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
@@ -1477,7 +1477,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
         ) : (
           <>
             <div
-              className="relative -mx-4 px-4 py-3 overflow-hidden select-none cursor-grab active:cursor-grabbing"
+              className="relative -mx-4 px-4 pt-0 pb-1.5 overflow-hidden select-none cursor-grab active:cursor-grabbing"
               onTouchStart={(e) => handleGestureStart(e.targetTouches[0].clientX, e.targetTouches[0].clientY)}
               onTouchMove={(e) => handleGestureMove(e.targetTouches[0].clientX, e.targetTouches[0].clientY)}
               onTouchEnd={handleGestureEnd}
@@ -1495,7 +1495,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                 className="flex items-center justify-center relative"
                 style={{
                   perspective: '1200px',
-                  minHeight: mobileCategory === 'reserves' ? '180px' : '255px',
+                  minHeight: mobileCategory === 'reserves' ? '165px' : '226px',
                 }}
               >
                 {mobileCategory === 'banks' && (
@@ -1627,6 +1627,36 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                             }}
                           />
 
+                          {/* ── HORIZONTAL BLURRY MOSAIC: Minimal, soft ambient color haze spanning horizontally ── */}
+                          <div
+                            aria-hidden="true"
+                            className="absolute inset-x-0 top-[25%] bottom-[20%] pointer-events-none z-[1] select-none overflow-hidden"
+                            style={{ filter: 'blur(22px)', opacity: 0.5 }}
+                          >
+                            <svg
+                              viewBox="0 0 356 100"
+                              fill="none"
+                              className="w-full h-full"
+                              preserveAspectRatio="none"
+                            >
+                              {/* Staggered soft mosaic color cells spanning horizontally here and there — NO outlines, minimal soft tones */}
+                              {/* Left: soft whisper of emerald */}
+                              <rect x="25" y="18" width="55" height="42" rx="16" fill="#10b981" fillOpacity="0.22" />
+                              <rect x="55" y="44" width="45" height="36" rx="14" fill="#059669" fillOpacity="0.16" />
+
+                              {/* Center-left: warm champagne/gold touch */}
+                              <rect x="110" y="24" width="50" height="40" rx="15" fill="#f59e0b" fillOpacity="0.18" />
+
+                              {/* Center: delicate mint/teal */}
+                              <rect x="165" y="38" width="52" height="42" rx="16" fill="#10b981" fillOpacity="0.20" />
+                              <rect x="195" y="14" width="48" height="38" rx="14" fill="#14b8a6" fillOpacity="0.16" />
+
+                              {/* Right: soft sage and champagne */}
+                              <rect x="245" y="32" width="54" height="44" rx="16" fill="#059669" fillOpacity="0.18" />
+                              <rect x="295" y="20" width="45" height="40" rx="14" fill="#f59e0b" fillOpacity="0.14" />
+                            </svg>
+                          </div>
+
                           {/* ── TOP SECTION: Logo + bank name flush to top ── */}
                           <div className="relative z-10 px-5 pt-4.5 flex items-center justify-between gap-3">
                             {/* Left: logo + name stacked tight */}
@@ -1725,7 +1755,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
 
               {/* Dot Indicators matching theme */}
               {mobileAccounts.length > 1 && (
-                <div className="flex items-center justify-center gap-1.5 mt-2">
+                <div className="flex items-center justify-center gap-1.5 mt-1.5">
                   {mobileAccounts.map((_, idx) => (
                     <button
                       key={idx}
@@ -1742,7 +1772,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
             </div>
 
             {/* 4 Action Buttons: Emerald icons with dark theme background */}
-            <div className="grid grid-cols-4 gap-2.5 my-4 px-1">
+            <div className="grid grid-cols-4 gap-2.5 mt-2.5 mb-2 px-1">
               <button
                 type="button"
                 onClick={() => activeMobileAccount && handleOpenAddBalance(activeMobileAccount)}
@@ -1793,7 +1823,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
             </div>
 
             {/* Transactions Section — Spanning Left to Right Like the Cards */}
-            <div className="w-full rounded-2xl sm:rounded-3xl bg-white dark:bg-[#131926] p-4 sm:p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm mt-3">
+            <div className="w-full rounded-2xl sm:rounded-3xl bg-white dark:bg-[#131926] p-3.5 sm:p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm mt-1.5">
               <div className="flex items-center justify-between mb-3 px-1">
                 <div className="flex items-center gap-2">
                   <h3 className="font-extrabold text-lg sm:text-xl text-[#0f2347] dark:text-white tracking-tight">
