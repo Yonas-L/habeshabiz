@@ -1605,23 +1605,23 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                           />
                         )}
                         <div
-                          className={`relative z-10 overflow-hidden rounded-[24px] transition-all duration-300 flex flex-col w-full select-none ${
+                          className={`relative z-10 overflow-hidden rounded-[20px] transition-all duration-300 flex flex-col w-full select-none ${
                             isInactive ? 'opacity-60' : ''
                           }`}
                           style={{
-                            height: '236px',
+                            height: '216px',
                             backgroundColor: 'rgba(255, 255, 255, 0.55)',
                             backdropFilter: 'blur(20px)',
                             WebkitBackdropFilter: 'blur(20px)',
-                            border: '1px solid rgba(255, 255, 255, 0.75)',
+                            border: '1px solid rgba(255, 255, 255, 0.82)',
                             boxShadow: isCenter
-                              ? '0 10px 30px -4px rgba(0, 0, 0, 0.06), 0 4px 12px -2px rgba(0, 0, 0, 0.03), inset 0 1px 1px 0 rgba(255, 255, 255, 0.95)'
+                              ? '0 18px 38px -10px rgba(15, 23, 42, 0.20), 0 6px 14px -4px rgba(15, 23, 42, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.98), inset 0 0 0 1px rgba(15, 23, 42, 0.045)'
                               : '0 4px 16px -2px rgba(0, 0, 0, 0.03)',
                           }}
                         >
                           {/* Specular plastic lamination gloss — top-left catch light */}
                           <div
-                            className="absolute inset-0 pointer-events-none rounded-[24px] z-[1]"
+                            className="absolute inset-0 pointer-events-none rounded-[20px] z-[1]"
                             style={{
                               background: 'linear-gradient(130deg, rgba(255,255,255,0.7) 0%, rgba(255,255,255,0.15) 34%, transparent 54%, rgba(255,255,255,0.2) 100%)',
                             }}
@@ -1656,7 +1656,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                                   <Landmark className="w-4 h-4 text-emerald-600" />
                                 </div>
                               ) : (
-                                <EmvChip className="w-9 h-7" />
+                              <EmvChip className="w-10 h-8" />
                               )}
                             </div>
                           </div>
@@ -1676,13 +1676,13 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                               </div>
                               <span className="text-sm font-black text-slate-600 font-sans">ETB</span>
                             </div>
-                            <div className="font-mono text-[11px] font-bold text-slate-600 mt-[6px] tracking-wide">
+                            <div className="font-mono text-[11px] font-bold text-slate-600 mt-[6px] tracking-[0.14em]">
                               {isCash ? 'Physical Cash Safe' : formatUnhiddenAccountNumber(acc.account_number, acc.id)}
                             </div>
                           </div>
 
                           {/* ── BOTTOM FILL: Quiet etched line work gives the card a premium finish ── */}
-                          <div className="absolute bottom-0 left-0 right-0 h-[72px] pointer-events-none z-[2] overflow-hidden rounded-b-[24px]">
+                          <div className="absolute bottom-0 left-0 right-0 h-[58px] pointer-events-none z-[2] overflow-hidden rounded-b-[20px]">
                             <div
                               className="absolute inset-0"
                               style={{
@@ -1693,7 +1693,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                               className="absolute top-0 left-5 right-5 h-[0.5px]"
                               style={{ background: 'rgba(100,116,139,0.18)' }}
                             />
-                            <svg aria-hidden="true" viewBox="0 0 180 80" className="absolute right-0 bottom-0 h-[72px] w-[162px] text-emerald-900/30">
+                            <svg aria-hidden="true" viewBox="0 0 180 80" className="absolute right-0 bottom-0 h-[58px] w-[145px] text-emerald-900/30">
                               <path d="M75 80C95 54 120 34 180 19M103 80C119 57 142 42 180 32M132 80C146 64 160 56 180 49" fill="none" stroke="currentColor" strokeWidth="0.8" />
                               <path d="M121 80C140 57 159 41 180 29" fill="none" stroke="white" strokeOpacity="0.85" strokeWidth="0.8" />
                               <circle cx="153" cy="43" r="2" fill="currentColor" />
