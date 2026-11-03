@@ -366,7 +366,10 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
 
           {onOpenTransfer && !isAsset && (
             <button
-              onClick={() => onOpenTransfer(currentAccount.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenTransfer(currentAccount.id);
+              }}
               title="Transfer Funds"
               className="h-8 px-2 sm:px-2.5 rounded-xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-200 text-xs font-semibold transition-all flex items-center gap-1.5 active:scale-95 shadow-xs cursor-pointer"
             >
@@ -377,7 +380,10 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
 
           {onOpenAddBalance && (
             <button
-              onClick={() => onOpenAddBalance(currentAccount)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenAddBalance(currentAccount);
+              }}
               className="h-8 px-2 sm:px-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-all flex items-center gap-1.5 active:scale-95 shadow-xs cursor-pointer"
               title="Add Balance"
             >
@@ -687,7 +693,10 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
               {onOpenTransfer && !isAsset && (
                 <button
                   type="button"
-                  onClick={() => onOpenTransfer(currentAccount.id)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenTransfer(currentAccount.id);
+                  }}
                   className="h-9 px-3 rounded-xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-transform shadow-xs cursor-pointer"
                 >
                   <ArrowRightLeft className="w-3.5 h-3.5" />
@@ -697,7 +706,10 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
               {onOpenAddBalance && (
                 <button
                   type="button"
-                  onClick={() => onOpenAddBalance(currentAccount)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenAddBalance(currentAccount);
+                  }}
                   className={`h-9 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-transform shadow-xs cursor-pointer ${
                     !onOpenTransfer || isAsset ? 'col-span-2' : ''
                   }`}

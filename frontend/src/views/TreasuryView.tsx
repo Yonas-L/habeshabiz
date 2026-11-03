@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import type { FinancialAccount, AccountActivity } from '../api/client';
 import { api } from '../api/client';
 import { toast } from 'sonner';
@@ -972,12 +973,12 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
     if (preselectedSourceId) {
       chosenSourceId = preselectedSourceId;
       setSourceAccountId(preselectedSourceId);
-      const other = treasuryAccounts.find((a) => a.id !== preselectedSourceId);
+      const other = allAccounts.find((a) => a.id !== preselectedSourceId);
       if (other) setDestAccountId(other.id);
-    } else if (treasuryAccounts.length >= 2) {
-      chosenSourceId = treasuryAccounts[0].id;
-      setSourceAccountId(treasuryAccounts[0].id);
-      setDestAccountId(treasuryAccounts[1].id);
+    } else if (allAccounts.length >= 2) {
+      chosenSourceId = allAccounts[0].id;
+      setSourceAccountId(allAccounts[0].id);
+      setDestAccountId(allAccounts[1].id);
     }
     setTransferFee(calculateDefaultFee(chosenSourceId, transferAmount));
     setShowTransferModal(true);
@@ -2011,10 +2012,10 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
       />
 
       {/* Delete Confirmation Modal */}
-      {deletingAccount && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDeletingAccount(null)} />
-          <div className="relative w-full max-w-sm mx-4 bg-white dark:bg-[#0f1522] rounded-2xl shadow-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden animate-page-enter p-6 space-y-4">
+      {deletingAccount && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs animate-backdrop-enter" onClick={() => setDeletingAccount(null)} />
+          <div className="relative z-10 w-full max-w-sm mx-4 bg-white dark:bg-[#0f1522] rounded-2xl shadow-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden animate-page-enter p-6 space-y-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/40 flex items-center justify-center">
                 <Trash2 className="w-5 h-5 text-rose-600 dark:text-rose-400" />
@@ -2046,19 +2047,23 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Tactile Elevated Transfer Modal */}
-      {showTransferModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {showTransferModal && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
           <div
-            className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs animate-backdrop-enter"
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs animate-backdrop-enter"
             onClick={() => setShowTransferModal(false)}
           />
 
-          <div className="relative z-10 bg-white dark:bg-[#131926] rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-2xl max-w-lg w-full p-6 space-y-4 animate-modal-enter">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
+          <div className="relative z-10 bg-white dark:bg-[#131926] rounded-t-3xl sm:rounded-2xl border-t sm:border border-slate-200/80 dark:border-slate-800 shadow-2xl max-w-lg w-full p-5 sm:p-6 space-y-4 max-sm:animate-bottom-sheet sm:animate-modal-enter my-0 sm:my-auto max-h-[92vh] overflow-y-auto">
+            {/* Mobile Drag Handle */}
+            <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto -mt-1.5 mb-1 sm:hidden shrink-0" />
+
+            <div className="flex items-center justify-between pb-3 sm:pb-4 border-b border-slate-100 dark:border-slate-800">
               <div>
                 <h3 className="font-bold text-slate-900 dark:text-white text-base">Inter-Account Transfer</h3>
                 <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
@@ -2067,14 +2072,14 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
               </div>
               <button
                 onClick={() => setShowTransferModal(false)}
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <form onSubmit={handleTransferSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     Source Account
@@ -2136,7 +2141,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     Transfer Amount ETB
@@ -2215,21 +2220,22 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowTransferModal(false)}
-                  className="h-10 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                  className="h-10 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={transferring || !sourceAccountId || !destAccountId || !transferAmount}
-                  className="h-10 px-5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 disabled:opacity-50 transition-colors shadow-sm active:scale-[0.98]"
+                  className="h-10 px-5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 disabled:opacity-50 transition-colors shadow-sm active:scale-[0.98] cursor-pointer"
                 >
                   {transferring ? 'Executing...' : 'Execute Transfer'}
                 </button>
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
