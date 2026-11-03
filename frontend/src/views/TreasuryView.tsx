@@ -282,14 +282,13 @@ const formatCardNumber = (accountNumber?: string | null, accountId?: string): st
   return `••••  ••••  ••••  ${fallbackLast4}`;
 };
 
-// Format unhidden account number for mobile ATM card (e.g. 1000  2839  4829  2733)
+// Format unhidden account number for mobile ATM card (no gaps, continuous number)
 const formatUnhiddenAccountNumber = (accountNumber?: string | null, accountId?: string): string => {
   if (accountNumber && accountNumber.trim()) {
-    const raw = accountNumber.trim().replace(/\s+/g, '');
-    return raw.match(/.{1,4}/g)?.join('  ') || raw;
+    return accountNumber.trim().replace(/\s+/g, '');
   }
   const fallbackDigits = (accountId || '1000283948292733').replace(/[^0-9]/g, '').padEnd(16, '0').slice(0, 16);
-  return fallbackDigits.match(/.{1,4}/g)?.join('  ') || fallbackDigits;
+  return fallbackDigits;
 };
 
 // Frameless Bank Logo component for Mobile ATM Cards (large, prominent bank icon, no box border)
@@ -1521,12 +1520,12 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                 touchAction: 'pan-y',
               }}
             >
-              {/* 3D Stack Container — Increased Height & Clearance for Authentic ATM Card */}
+              {/* 3D Stack Container — Generous Height & Clearance for Authentic ATM Card */}
               <div
                 className="flex items-center justify-center relative"
                 style={{
                   perspective: '1200px',
-                  minHeight: mobileCategory === 'reserves' ? '180px' : '265px',
+                  minHeight: mobileCategory === 'reserves' ? '180px' : '300px',
                 }}
               >
                 {mobileAccounts.map((acc, idx) => {
@@ -1616,13 +1615,13 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                       ) : (
                         /* AUTHENTIC REALISTIC ATM / DEBIT CARD */
                         <div
-                          className={`relative overflow-hidden rounded-[24px] transition-all duration-300 flex flex-col justify-between h-[240px] w-full select-none ${cardTheme?.bg} ${cardTheme?.border} ${cardTheme?.glow} ${
+                          className={`relative overflow-hidden rounded-[26px] transition-all duration-300 flex flex-col justify-between h-[270px] w-full select-none ${cardTheme?.bg} ${cardTheme?.border} ${cardTheme?.glow} ${
                             isInactive ? 'opacity-60' : ''
                           }`}
                         >
                           {/* Specular Plastic Card Lamination Gloss Reflection */}
                           <div
-                            className="absolute inset-0 pointer-events-none rounded-[24px] z-1"
+                            className="absolute inset-0 pointer-events-none rounded-[26px] z-1"
                             style={{
                               background: 'linear-gradient(125deg, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.06) 40%, transparent 55%, rgba(255,255,255,0.12) 100%)',
                             }}
@@ -1666,7 +1665,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                               </div>
                             </div>
 
-                            {/* Middle Section: Bigger Bold Total Balance + Eye Toggle & Unhidden Account Number Underneath */}
+                            {/* Middle Section: Bigger Bold Total Balance + Eye Toggle & Unhidden Account Number (No Gaps) */}
                             <div className="my-auto py-1">
                               <div className="flex items-center gap-2 mb-1.5">
                                 <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">
@@ -1691,7 +1690,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
 
                               {/* Commanding Bigger Bold Total Balance */}
                               <div className="flex items-baseline gap-2.5 whitespace-nowrap select-none">
-                                <div className="font-mono font-black text-3xl sm:text-[38px] text-slate-900 dark:text-white tracking-tight leading-none tabular-nums drop-shadow-xs">
+                                <div className="font-mono font-black text-3xl sm:text-[40px] text-slate-900 dark:text-white tracking-tight leading-none tabular-nums drop-shadow-xs">
                                   {showMobileCardDetails ? (
                                     <AnimatedNumber value={Number(acc.current_balance || 0)} decimals={2} />
                                   ) : (
@@ -1703,23 +1702,20 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                                 </span>
                               </div>
 
-                              {/* Account Number Minimally Underneath and Unhidden */}
-                              <div className="font-mono text-sm sm:text-base font-bold text-slate-600 dark:text-slate-300 tracking-[0.22em] mt-2 select-none">
+                              {/* Account Number Minimally Underneath and Unhidden (No Gaps) */}
+                              <div className="font-mono text-sm sm:text-base font-bold text-slate-700 dark:text-slate-300 mt-2.5 select-none tracking-normal">
                                 {formatUnhiddenAccountNumber(acc.account_number, acc.id)}
                               </div>
                             </div>
 
-                            {/* Bottom Row: ATM / DEBIT Status Badge */}
-                            <div className="flex items-center justify-between pt-1">
-                              <span className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400 dark:text-slate-500">
-                                ATM / DEBIT
-                              </span>
-                              {acc.is_active === false && (
+                            {/* Bottom Row: Status if inactive */}
+                            {acc.is_active === false && (
+                              <div className="flex items-center justify-end pt-1">
                                 <span className="text-[9.5px] font-bold text-rose-500 dark:text-rose-400 uppercase tracking-widest bg-rose-50 dark:bg-rose-950/40 px-2.5 py-0.5 rounded-full border border-rose-200/60 dark:border-rose-900/40">
                                   Inactive
                                 </span>
-                              )}
-                            </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}
