@@ -31,7 +31,7 @@ export const AnimatedNumber: React.FC<AnimatedNumberProps> = ({
   if (shouldHide) {
     return (
       <span className={`tabular-nums font-mono tracking-wider select-none opacity-80 ${className}`}>
-        {prefix}••••••{suffix}
+        {prefix}******{decimals > 0 ? '.**' : ''}{suffix}
       </span>
     );
   }

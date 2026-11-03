@@ -21,10 +21,9 @@ import {
   Globe,
   FileText,
   Inbox,
-  Eye,
-  EyeOff,
 } from 'lucide-react';
 import { AnimatedNumber } from '../components/AnimatedNumber';
+import { useBalancePrivacy } from '../context/BalancePrivacyContext';
 import { ManageAccountModal } from '../components/treasury/ManageAccountModal';
 import { AddBalanceModal } from '../components/treasury/AddBalanceModal';
 import { AccountLedgerDrawer } from '../components/drawers/AccountLedgerDrawer';
@@ -813,7 +812,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
   // Mobile ATM Cards and Transactions State (matches reference screenshot)
   const [mobileCategory, setMobileCategory] = useState<'banks' | 'reserves'>('banks');
   const [mobileActiveIndex, setMobileActiveIndex] = useState(0);
-  const [showMobileCardDetails, setShowMobileCardDetails] = useState(true);
+  const { isBalancesHidden } = useBalancePrivacy();
   const [mobileActivities, setMobileActivities] = useState<Record<string, AccountActivity[]>>({});
   const [loadingMobileActivities, setLoadingMobileActivities] = useState(false);
   const mobileCardScrollRef = React.useRef<HTMLDivElement>(null);
@@ -1520,12 +1519,12 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                 touchAction: 'pan-y',
               }}
             >
-              {/* 3D Stack Container — Generous Height & Clearance for Authentic ATM Card */}
+              {/* 3D Stack Container — Balanced Height & Natural Proportions */}
               <div
                 className="flex items-center justify-center relative"
                 style={{
                   perspective: '1200px',
-                  minHeight: mobileCategory === 'reserves' ? '180px' : '300px',
+                  minHeight: mobileCategory === 'reserves' ? '180px' : '230px',
                 }}
               >
                 {mobileAccounts.map((acc, idx) => {
@@ -1593,7 +1592,11 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                               </h4>
                               <div className="flex items-center justify-center gap-1 mt-1">
                                 <span className="font-mono font-black text-lg text-slate-900 dark:text-white tabular-nums">
-                                  <AnimatedNumber value={Number(acc.current_balance || 0)} decimals={2} />
+                                  {!isBalancesHidden ? (
+                                    <AnimatedNumber value={Number(acc.current_balance || 0)} decimals={2} />
+                                  ) : (
+                                    <span className="tracking-wider">******.**</span>
+                                  )}
                                 </span>
                                 <span className="text-xs font-bold text-slate-500 font-sans">ETB</span>
                               </div>
@@ -1615,13 +1618,13 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                       ) : (
                         /* AUTHENTIC REALISTIC ATM / DEBIT CARD */
                         <div
-                          className={`relative overflow-hidden rounded-[26px] transition-all duration-300 flex flex-col justify-between h-[270px] w-full select-none ${cardTheme?.bg} ${cardTheme?.border} ${cardTheme?.glow} ${
+                          className={`relative overflow-hidden rounded-[24px] sm:rounded-[26px] transition-all duration-300 flex flex-col justify-between h-[208px] sm:h-[214px] w-full select-none ${cardTheme?.bg} ${cardTheme?.border} ${cardTheme?.glow} ${
                             isInactive ? 'opacity-60' : ''
                           }`}
                         >
                           {/* Specular Plastic Card Lamination Gloss Reflection */}
                           <div
-                            className="absolute inset-0 pointer-events-none rounded-[26px] z-1"
+                            className="absolute inset-0 pointer-events-none rounded-[24px] sm:rounded-[26px] z-1"
                             style={{
                               background: 'linear-gradient(125deg, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.06) 40%, transparent 55%, rgba(255,255,255,0.12) 100%)',
                             }}
@@ -1631,20 +1634,20 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                           <DynamicCardAmbientArt acc={acc} index={globalIndex} />
 
                           {/* Card Content Layer */}
-                          <div className="relative z-10 p-5 sm:p-6 flex flex-col justify-between h-full">
-                            {/* Top Row: Bigger Bank Logo + Bank Info (Left) and EMV Chip + Wave (Right) */}
+                          <div className="relative z-10 p-4.5 sm:p-5 flex flex-col justify-between h-full">
+                            {/* Top Row: Frameless Bank Logo + Bank Info (Left) and EMV Chip + Wave (Right) */}
                             <div className="flex items-start justify-between gap-3">
                               <div className="flex items-center gap-3 min-w-0">
-                                <FramelessCardLogo account={acc} className="w-13 h-13 sm:w-14 sm:h-14" />
+                                <FramelessCardLogo account={acc} className="w-11 h-11 sm:w-12 sm:h-12" />
                                 <div className="min-w-0">
-                                  <div className="font-black text-slate-900 dark:text-white text-lg sm:text-xl leading-tight tracking-tight truncate max-w-[180px]">
+                                  <div className="font-black text-slate-900 dark:text-white text-base sm:text-lg leading-tight tracking-tight truncate max-w-[180px]">
                                     {acc.name}
                                   </div>
                                   {(() => {
                                     const cleanBank = getBankCleanName(acc);
                                     const subtitle = cleanBank && cleanBank.toLowerCase() !== acc.name.toLowerCase() ? cleanBank : null;
                                     return subtitle ? (
-                                      <div className="text-xs text-slate-400 dark:text-slate-500 font-semibold truncate max-w-[180px] mt-0.5 leading-tight">
+                                      <div className="text-[11px] text-slate-400 dark:text-slate-500 font-semibold truncate max-w-[180px] mt-0.5 leading-tight">
                                         {subtitle}
                                       </div>
                                     ) : null;
@@ -1653,65 +1656,50 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                               </div>
 
                               {/* Chip on Top Right */}
-                              <div className="shrink-0 flex items-center gap-2.5 pt-1">
-                                <ContactlessWave className="w-5.5 h-5.5 text-slate-400 dark:text-slate-500 stroke-[2.4]" />
+                              <div className="shrink-0 flex items-center gap-2 pt-0.5">
+                                <ContactlessWave className="w-5 h-5 text-slate-400 dark:text-slate-500 stroke-[2.2]" />
                                 {isCash ? (
-                                  <div className="w-10.5 h-8.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/70 dark:border-emerald-800/40 flex items-center justify-center shrink-0 shadow-xs">
-                                    <Landmark className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                                  <div className="w-9.5 h-7.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/70 dark:border-emerald-800/40 flex items-center justify-center shrink-0 shadow-xs">
+                                    <Landmark className="w-4.5 h-4.5 text-emerald-600 dark:text-emerald-400" />
                                   </div>
                                 ) : (
-                                  <EmvChip className="w-10.5 h-8.5 rounded-lg" />
+                                  <EmvChip className="w-9.5 h-7.5 rounded-lg" />
                                 )}
                               </div>
                             </div>
 
-                            {/* Middle Section: Bigger Bold Total Balance + Eye Toggle & Unhidden Account Number (No Gaps) */}
-                            <div className="my-auto py-1">
-                              <div className="flex items-center gap-2 mb-1.5">
-                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">
+                            {/* Middle Section: Bigger Bold Total Balance & Unhidden Account Number (No Gaps) */}
+                            <div className="pt-1.5 pb-0.5">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-[9.5px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">
                                   TOTAL BALANCE
                                 </span>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setShowMobileCardDetails((prev) => !prev);
-                                  }}
-                                  className="p-1 -m-1 rounded-full text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 transition-colors cursor-pointer"
-                                  title={showMobileCardDetails ? 'Hide balance' : 'Show balance'}
-                                >
-                                  {showMobileCardDetails ? (
-                                    <Eye className="w-4 h-4 stroke-[2.2]" />
-                                  ) : (
-                                    <EyeOff className="w-4 h-4 stroke-[2.2]" />
-                                  )}
-                                </button>
                               </div>
 
                               {/* Commanding Bigger Bold Total Balance */}
-                              <div className="flex items-baseline gap-2.5 whitespace-nowrap select-none">
-                                <div className="font-mono font-black text-3xl sm:text-[40px] text-slate-900 dark:text-white tracking-tight leading-none tabular-nums drop-shadow-xs">
-                                  {showMobileCardDetails ? (
+                              <div className="flex items-baseline gap-2 whitespace-nowrap select-none">
+                                <div className="font-mono font-black text-3xl sm:text-[36px] text-slate-900 dark:text-white tracking-tight leading-none tabular-nums drop-shadow-xs">
+                                  {!isBalancesHidden ? (
                                     <AnimatedNumber value={Number(acc.current_balance || 0)} decimals={2} />
                                   ) : (
-                                    <span className="tracking-widest">••••••••</span>
+                                    <span className="tracking-wider">******.**</span>
                                   )}
                                 </div>
-                                <span className="text-base sm:text-lg font-black text-slate-400 dark:text-slate-500 font-sans tracking-tight">
+                                <span className="text-sm sm:text-base font-black text-slate-400 dark:text-slate-500 font-sans tracking-tight">
                                   ETB
                                 </span>
                               </div>
 
                               {/* Account Number Minimally Underneath and Unhidden (No Gaps) */}
-                              <div className="font-mono text-sm sm:text-base font-bold text-slate-700 dark:text-slate-300 mt-2.5 select-none tracking-normal">
+                              <div className="font-mono text-xs sm:text-[13px] font-bold text-slate-600 dark:text-slate-400 mt-1.5 select-none tracking-normal">
                                 {formatUnhiddenAccountNumber(acc.account_number, acc.id)}
                               </div>
                             </div>
 
                             {/* Bottom Row: Status if inactive */}
                             {acc.is_active === false && (
-                              <div className="flex items-center justify-end pt-1">
-                                <span className="text-[9.5px] font-bold text-rose-500 dark:text-rose-400 uppercase tracking-widest bg-rose-50 dark:bg-rose-950/40 px-2.5 py-0.5 rounded-full border border-rose-200/60 dark:border-rose-900/40">
+                              <div className="flex items-center justify-end pt-0.5">
+                                <span className="text-[9px] font-bold text-rose-500 dark:text-rose-400 uppercase tracking-widest bg-rose-50 dark:bg-rose-950/40 px-2 py-0.5 rounded-full border border-rose-200/60 dark:border-rose-900/40">
                                   Inactive
                                 </span>
                               </div>

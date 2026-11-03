@@ -329,7 +329,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               <div className="mt-1.5 min-[390px]:mt-2 min-[410px]:mt-2.5">
                 <div className="flex items-baseline gap-1.5 min-[390px]:gap-2">
                   <span className="text-[clamp(31px,8.2vw,36px)] min-[410px]:text-[41px] sm:text-[47px] font-black tracking-tight text-white font-sans [font-feature-settings:'normal'] leading-none drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]">
-                    {isBalancesHidden ? '••••••••' : <AnimatedNumber value={capital_overview.net_capital || 10293682} />}
+                    {isBalancesHidden ? '******' : <AnimatedNumber value={capital_overview.net_capital || 10293682} />}
                   </span>
                   <span className="text-[clamp(14px,3.8vw,16px)] min-[410px]:text-[17px] sm:text-[19px] font-bold text-slate-300 font-sans tracking-wide">
                     ETB
@@ -415,7 +415,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                   >
                     <span className="w-2 h-2 rounded-full bg-[#f87171] shrink-0" />
                     <span>Owe <strong className="text-rose-400 font-bold font-mono">
-                      {isBalancesHidden ? '−••••••' : (capital_overview.payables && capital_overview.payables > 0 ? `−${capital_overview.payables.toLocaleString()}` : '−315,700')}
+                      {isBalancesHidden ? '−******' : (capital_overview.payables && capital_overview.payables > 0 ? `−${capital_overview.payables.toLocaleString()}` : '−315,700')}
                     </strong></span>
                   </button>
                 </div>
@@ -433,7 +433,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
             type="button"
             onClick={() => openVital('inventory')}
             className="flex flex-col items-center text-center group cursor-pointer haptic-press"
-            title={`Stock: ${isBalancesHidden ? '••••••' : capital_overview.stock_value.toLocaleString()} ETB`}
+            title={`Stock: ${isBalancesHidden ? '******' : capital_overview.stock_value.toLocaleString()} ETB`}
           >
             <div className="size-12 min-[390px]:size-[52px] rounded-[18px] min-[390px]:rounded-[20px] p-1 bg-slate-100/80 dark:bg-slate-800/50 border border-slate-200/60 dark:border-white/5 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 transition-all duration-200">
               <div className="w-full h-full rounded-[14px] min-[390px]:rounded-[16px] bg-gradient-to-b from-[#eef9f2] to-[#ddf4e6] dark:from-[#0b2b1d] dark:to-[#071f15] flex items-center justify-center shadow-xs">
@@ -444,7 +444,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               Stock
             </span>
             <span className="text-[10px] min-[390px]:text-[11.5px] font-medium font-mono tracking-tight text-slate-500 dark:text-slate-400 mt-0.5 truncate max-w-full block transition-opacity duration-200">
-              {isBalancesHidden ? '••••••' : <AnimatedNumber value={capital_overview.stock_value} compact />}
+              {isBalancesHidden ? '******' : <AnimatedNumber value={capital_overview.stock_value} compact />}
             </span>
           </button>
 
@@ -453,7 +453,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
             type="button"
             onClick={() => openVital('cash')}
             className="flex flex-col items-center text-center group cursor-pointer haptic-press"
-            title={`Bank: ${isBalancesHidden ? '••••••' : capital_overview.cash_and_banks.toLocaleString()} ETB`}
+            title={`Bank: ${isBalancesHidden ? '******' : capital_overview.cash_and_banks.toLocaleString()} ETB`}
           >
             <div className="size-12 min-[390px]:size-[52px] rounded-[18px] min-[390px]:rounded-[20px] p-1 bg-slate-100/80 dark:bg-slate-800/50 border border-slate-200/60 dark:border-white/5 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 transition-all duration-200">
               <div className="w-full h-full rounded-[14px] min-[390px]:rounded-[16px] bg-gradient-to-b from-[#eaf4ff] to-[#d6ebff] dark:from-[#0d273a] dark:to-[#091b29] flex items-center justify-center shadow-xs">
@@ -464,7 +464,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               Bank
             </span>
             <span className="text-[10px] min-[390px]:text-[11.5px] font-medium font-mono tracking-tight text-slate-500 dark:text-slate-400 mt-0.5 truncate max-w-full block transition-opacity duration-200">
-              {isBalancesHidden ? '••••••' : <AnimatedNumber value={capital_overview.cash_and_banks} compact />}
+              {isBalancesHidden ? '******' : <AnimatedNumber value={capital_overview.cash_and_banks} compact />}
             </span>
           </button>
 
@@ -473,7 +473,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
             type="button"
             onClick={() => openVital('receivables')}
             className="flex flex-col items-center text-center group cursor-pointer haptic-press"
-            title={`Owed to You: ${isBalancesHidden ? '••••••' : capital_overview.receivables.toLocaleString()} ETB`}
+            title={`Owed to You: ${isBalancesHidden ? '******' : capital_overview.receivables.toLocaleString()} ETB`}
           >
             <div className="size-12 min-[390px]:size-[52px] rounded-[18px] min-[390px]:rounded-[20px] p-1 bg-slate-100/80 dark:bg-slate-800/50 border border-slate-200/60 dark:border-white/5 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 transition-all duration-200">
               <div className="w-full h-full rounded-[14px] min-[390px]:rounded-[16px] bg-gradient-to-b from-[#eef9f2] to-[#ddf4e6] dark:from-[#0b2b1d] dark:to-[#071f15] flex items-center justify-center shadow-xs">
@@ -484,7 +484,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               Owed
             </span>
             <span className="text-[10px] min-[390px]:text-[11.5px] font-semibold font-mono tracking-tight text-emerald-600 dark:text-emerald-400 mt-0.5 truncate max-w-full block transition-opacity duration-200">
-              {isBalancesHidden ? '••••••' : <AnimatedNumber value={capital_overview.receivables} compact prefix="+" />}
+              {isBalancesHidden ? '******' : <AnimatedNumber value={capital_overview.receivables} compact prefix="+" />}
             </span>
           </button>
 
@@ -493,7 +493,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
             type="button"
             onClick={() => openVital('payables')}
             className="flex flex-col items-center text-center group cursor-pointer haptic-press"
-            title={`You Owe: ${isBalancesHidden ? '••••••' : capital_overview.payables.toLocaleString()} ETB`}
+            title={`You Owe: ${isBalancesHidden ? '******' : capital_overview.payables.toLocaleString()} ETB`}
           >
             <div className="size-12 min-[390px]:size-[52px] rounded-[18px] min-[390px]:rounded-[20px] p-1 bg-slate-100/80 dark:bg-slate-800/50 border border-slate-200/60 dark:border-white/5 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 transition-all duration-200">
               <div className="w-full h-full rounded-[14px] min-[390px]:rounded-[16px] bg-gradient-to-b from-[#eef9f2] to-[#ddf4e6] dark:from-[#0b2b1d] dark:to-[#071f15] flex items-center justify-center shadow-xs">
@@ -504,7 +504,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               You Owe
             </span>
             <span className="text-[10px] min-[390px]:text-[11.5px] font-semibold font-mono tracking-tight text-rose-500 dark:text-rose-400 mt-0.5 truncate max-w-full block transition-opacity duration-200">
-              {isBalancesHidden ? '••••••' : <AnimatedNumber value={capital_overview.payables} compact prefix={(capital_overview.payables || 0) > 0 ? '-' : ''} />}
+              {isBalancesHidden ? '******' : <AnimatedNumber value={capital_overview.payables} compact prefix={(capital_overview.payables || 0) > 0 ? '-' : ''} />}
             </span>
           </button>
 
@@ -513,7 +513,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
             type="button"
             onClick={() => openVital('reserves')}
             className="flex flex-col items-center text-center group cursor-pointer haptic-press"
-            title={`Other Assets: ${isBalancesHidden ? '••••••' : capital_overview.custom_assets.toLocaleString()} ETB`}
+            title={`Other Assets: ${isBalancesHidden ? '******' : capital_overview.custom_assets.toLocaleString()} ETB`}
           >
             <div className="size-12 min-[390px]:size-[52px] rounded-[18px] min-[390px]:rounded-[20px] p-1 bg-slate-100/80 dark:bg-slate-800/50 border border-slate-200/60 dark:border-white/5 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 transition-all duration-200">
               <div className="w-full h-full rounded-[14px] min-[390px]:rounded-[16px] bg-gradient-to-b from-[#f3eefe] to-[#e7dbfc] dark:from-[#25153d] dark:to-[#1a0e2b] flex items-center justify-center shadow-xs">
@@ -524,7 +524,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               Other
             </span>
             <span className="text-[10px] min-[390px]:text-[11.5px] font-medium font-mono tracking-tight text-slate-500 dark:text-slate-400 mt-0.5 truncate max-w-full block transition-opacity duration-200">
-              {isBalancesHidden ? '••••••' : <AnimatedNumber value={capital_overview.custom_assets} compact />}
+              {isBalancesHidden ? '******' : <AnimatedNumber value={capital_overview.custom_assets} compact />}
             </span>
           </button>
         </div>
@@ -642,7 +642,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
 
               <div className="mt-2 min-[390px]:mt-2.5">
                 <div className="text-base min-[390px]:text-[17px] font-black font-mono tracking-tight text-white flex items-baseline leading-none transition-opacity duration-200">
-                  {isBalancesHidden ? '••••••' : <AnimatedNumber value={monthly_performance.revenue} />}
+                  {isBalancesHidden ? '******' : <AnimatedNumber value={monthly_performance.revenue} />}
                   <span className="text-[9.5px] min-[390px]:text-[10px] font-semibold text-slate-300 ml-1 font-sans opacity-80">
                     ETB
                   </span>
@@ -725,7 +725,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                     monthly_performance.gross_profit < 0 ? 'text-rose-600' : 'text-slate-900'
                   }`}>
                     {isBalancesHidden ? (
-                      '••••••'
+                      '******'
                     ) : (
                       <>
                         {monthly_performance.gross_profit > 0 ? '+' : monthly_performance.gross_profit < 0 ? '−' : ''}
@@ -820,7 +820,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               <div className="mt-2 min-[390px]:mt-2.5">
                 <div className="text-base min-[390px]:text-[17px] font-black font-mono tracking-tight text-[#e11d48] flex items-baseline leading-none transition-opacity duration-200">
                   {isBalancesHidden ? (
-                    '••••••'
+                    '******'
                   ) : (
                     <>
                       {(monthly_performance.operating_expenses || 0) > 0 ? '-' : ''}
@@ -879,7 +879,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                   monthly_performance.net_profit < 0 ? 'text-rose-600' : 'text-slate-900'
                 }`}>
                   {isBalancesHidden ? (
-                    '••••••'
+                    '******'
                   ) : (
                     <>
                       {monthly_performance.net_profit > 0 ? '+' : monthly_performance.net_profit < 0 ? '−' : ''}
@@ -985,13 +985,13 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                       <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
                         {group.openCount} {group.openCount === 1 ? 'obligation' : 'obligations'}
                         {group.offsetAmount > 0.01 &&
-                          ` · Offset −${isBalancesHidden ? '••••••' : group.offsetAmount.toLocaleString()} ETB`}
+                          ` · Offset −${isBalancesHidden ? '******' : group.offsetAmount.toLocaleString()} ETB`}
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0 pl-2">
                     <span className="font-semibold text-emerald-600 dark:text-emerald-400 font-mono tracking-tight transition-opacity duration-200">
-                      {isBalancesHidden ? '+••••••' : `+${group.netRemaining.toLocaleString()}`}
+                      {isBalancesHidden ? '+******' : `+${group.netRemaining.toLocaleString()}`}
                     </span>
                     <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0" />
                   </div>
@@ -1058,13 +1058,13 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                       <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
                         {group.openCount} {group.openCount === 1 ? 'obligation' : 'obligations'}
                         {group.offsetAmount > 0.01 &&
-                          ` · Offset −${isBalancesHidden ? '••••••' : group.offsetAmount.toLocaleString()} ETB`}
+                          ` · Offset −${isBalancesHidden ? '******' : group.offsetAmount.toLocaleString()} ETB`}
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0 pl-2">
                     <span className="font-semibold text-rose-600 dark:text-rose-400 font-mono tracking-tight transition-opacity duration-200">
-                      {isBalancesHidden ? '−••••••' : `−${group.netRemaining.toLocaleString()}`}
+                      {isBalancesHidden ? '−******' : `−${group.netRemaining.toLocaleString()}`}
                     </span>
                     <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0" />
                   </div>

@@ -55,7 +55,7 @@ export const BalancePrivacyProvider: React.FC<{ children: React.ReactNode }> = (
 
   const maskAmount = useCallback((amount: number | string | null | undefined, formattedValue?: string): string => {
     if (isBalancesHidden) {
-      return '••••••';
+      return '******';
     }
     if (formattedValue !== undefined) {
       return formattedValue;

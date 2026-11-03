@@ -552,13 +552,13 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                         </div>
                         <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
                           {group.openCount} {group.openCount === 1 ? 'obligation' : 'obligations'}
-                          {group.offsetAmount > 0.01 && ` · Offset −${isBalancesHidden ? '••••••' : group.offsetAmount.toLocaleString()} ETB`}
+                          {group.offsetAmount > 0.01 && ` · Offset −${isBalancesHidden ? '******' : group.offsetAmount.toLocaleString()} ETB`}
                         </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0 pl-2">
                       <span className="font-semibold text-emerald-600 dark:text-emerald-400 font-mono tracking-tight">
-                        {isBalancesHidden ? '+••••••' : `+${group.netRemaining.toLocaleString()}`}
+                        {isBalancesHidden ? '+******' : `+${group.netRemaining.toLocaleString()}`}
                       </span>
                       <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0" />
                     </div>
@@ -623,13 +623,13 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                         </div>
                         <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
                           {group.openCount} {group.openCount === 1 ? 'obligation' : 'obligations'}
-                          {group.offsetAmount > 0.01 && ` · Offset −${isBalancesHidden ? '••••••' : group.offsetAmount.toLocaleString()} ETB`}
+                          {group.offsetAmount > 0.01 && ` · Offset −${isBalancesHidden ? '******' : group.offsetAmount.toLocaleString()} ETB`}
                         </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0 pl-2">
                       <span className="font-semibold text-rose-600 dark:text-rose-400 font-mono tracking-tight">
-                        {isBalancesHidden ? '−••••••' : `−${group.netRemaining.toLocaleString()}`}
+                        {isBalancesHidden ? '−******' : `−${group.netRemaining.toLocaleString()}`}
                       </span>
                       <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0" />
                     </div>

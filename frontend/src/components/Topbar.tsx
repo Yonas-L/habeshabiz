@@ -288,8 +288,8 @@ export const Topbar: React.FC<TopbarProps> = ({
           )}
         </div>
 
-        {/* Dashboard Balance Privacy Toggle (Eye / EyeOff) */}
-        {activeTab === 'overview' && (
+        {/* Dashboard / Treasury Balance Privacy Toggle (Eye / EyeOff) */}
+        {(activeTab === 'overview' || activeTab === 'treasury') && (
           <button
             type="button"
             onClick={toggleHideBalances}

@@ -400,7 +400,7 @@ export const InteractiveSalesWaveChart: React.FC<{
               }}
             >
               <div className="font-bold text-emerald-400 font-mono">
-                {isBalancesHidden ? '••••••' : pt.val.toLocaleString()}{' '}
+                {isBalancesHidden ? '******' : pt.val.toLocaleString()}{' '}
                 <span className="text-[10px] font-sans text-slate-300 font-normal">{currency}</span>
               </div>
               <div className="text-[10px] text-slate-300 font-sans flex items-center gap-1.5 mt-0.5">
@@ -723,7 +723,7 @@ export const DonutCapitalChart: React.FC<{
             Net Capital
           </span>
           <span className="text-lg sm:text-xl font-bold font-mono text-slate-900 dark:text-white tracking-tight mt-0.5">
-            {isBalancesHidden ? '••••••' : `${(netCapital / 1000000).toFixed(2)}M`}
+            {isBalancesHidden ? '******' : `${(netCapital / 1000000).toFixed(2)}M`}
           </span>
           <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
             ETB
