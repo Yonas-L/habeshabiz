@@ -1613,17 +1613,62 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                             backgroundColor: 'rgba(255, 255, 255, 0.55)',
                             backdropFilter: 'blur(20px)',
                             WebkitBackdropFilter: 'blur(20px)',
-                            border: '1px solid rgba(255, 255, 255, 0.82)',
+                            border: '1px solid rgba(255, 255, 255, 0.85)',
                             boxShadow: isCenter
-                              ? '0 18px 38px -10px rgba(15, 23, 42, 0.20), 0 6px 14px -4px rgba(15, 23, 42, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.98), inset 0 0 0 1px rgba(15, 23, 42, 0.045)'
+                              ? '0 22px 45px -12px rgba(15, 23, 42, 0.22), 0 8px 18px -4px rgba(15, 23, 42, 0.10), 0 1px 3px 0 rgba(15, 23, 42, 0.04), inset 0 1.5px 0.5px 0 rgba(255, 255, 255, 0.98), inset 0 -1.5px 1.5px 0 rgba(15, 23, 42, 0.05), inset 0 0 0 1px rgba(255, 255, 255, 0.45)'
                               : '0 4px 16px -2px rgba(0, 0, 0, 0.03)',
                           }}
                         >
-                          {/* Specular plastic lamination gloss — top-left catch light */}
+                          {/* ── APPLE LIQUID GLASS PERIMETER TREATMENT: Edge refraction, optical highlights, translucent rim ── */}
+                          {/* 1. Translucent Rim & Dual-Edge Refraction Bevel (Inner stroke & rim refraction) */}
                           <div
-                            className="absolute inset-0 pointer-events-none rounded-[20px] z-[1]"
+                            aria-hidden="true"
+                            className="absolute inset-0 rounded-[20px] pointer-events-none z-[12]"
                             style={{
-                              background: 'linear-gradient(130deg, rgba(255,255,255,0.7) 0%, rgba(255,255,255,0.15) 34%, transparent 54%, rgba(255,255,255,0.2) 100%)',
+                              boxShadow: `
+                                inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.95),
+                                inset 0 -1.5px 2px 0 rgba(15, 23, 42, 0.07),
+                                inset 1.5px 0 1px 0 rgba(255, 255, 255, 0.65),
+                                inset -1.5px 0 1px 0 rgba(255, 255, 255, 0.35),
+                                inset 0 0 0 1px rgba(255, 255, 255, 0.40)
+                              `,
+                            }}
+                          />
+
+                          {/* 2. Top Edge Optical Highlight: Sharp specular reflection glint along upper rim */}
+                          <div
+                            aria-hidden="true"
+                            className="absolute inset-x-3 top-0 h-[1.5px] rounded-full pointer-events-none z-[13]"
+                            style={{
+                              background: 'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.98) 22%, rgba(255, 255, 255, 0.75) 70%, transparent 100%)',
+                              filter: 'drop-shadow(0 1px 1px rgba(255, 255, 255, 0.8))',
+                            }}
+                          />
+
+                          {/* 3. Left Edge Optical Highlight: Vertical liquid refraction sheen */}
+                          <div
+                            aria-hidden="true"
+                            className="absolute inset-y-3 left-0 w-[1.5px] rounded-full pointer-events-none z-[13]"
+                            style={{
+                              background: 'linear-gradient(180deg, rgba(255, 255, 255, 0.90) 0%, rgba(255, 255, 255, 0.35) 45%, transparent 100%)',
+                            }}
+                          />
+
+                          {/* 4. Top-Left Corner Glass Highlight: Concentrated corner specular glint */}
+                          <div
+                            aria-hidden="true"
+                            className="absolute top-0 left-0 w-12 h-12 rounded-tl-[20px] pointer-events-none z-[13]"
+                            style={{
+                              background: 'radial-gradient(circle at 4px 4px, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0.25) 35%, transparent 65%)',
+                            }}
+                          />
+
+                          {/* 5. Bottom Rim Caustic Refraction: Soft light bounce on bottom perimeter */}
+                          <div
+                            aria-hidden="true"
+                            className="absolute inset-x-8 bottom-0 h-[1px] rounded-full pointer-events-none z-[13]"
+                            style={{
+                              background: 'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.55) 45%, transparent 100%)',
                             }}
                           />
 
