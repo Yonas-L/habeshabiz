@@ -317,35 +317,6 @@ const FramelessCardLogo: React.FC<{ account: FinancialAccount; className?: strin
   );
 };
 
-// Desktop-Matching Bank Card Themes for Mobile ATM Cards (Bold edges and deep shadows on focus)
-const getMobileBankCardTheme = (acc: FinancialAccount, isCenter = true) => {
-  const isInactive = acc.is_active === false;
-
-  if (isInactive) {
-    return {
-      bg: 'bg-slate-50 dark:bg-[#131926]',
-      border: 'border-2 border-slate-200/60 dark:border-slate-800/60',
-      glow: 'shadow-[0_12px_24px_-6px_rgba(0,0,0,0.06)] dark:shadow-[0_12px_24px_-6px_rgba(0,0,0,0.5)]',
-    };
-  }
-
-  // Bold edges and prominent physical shadows for the focus card (close to edges)
-  if (isCenter) {
-    return {
-      bg: 'bg-gradient-to-br from-white via-[#fcfdfe] to-[#f8fafc] dark:from-[#182133] dark:via-[#131926] dark:to-[#0f1420]',
-      border: 'border-[1.5px] border-slate-300/90 dark:border-slate-700',
-      glow: 'shadow-[0_26px_55px_-12px_rgba(0,0,0,0.2),0_12px_24px_-6px_rgba(0,0,0,0.1),inset_0_1.5px_0_rgba(255,255,255,0.95),inset_0_-1px_0_rgba(0,0,0,0.05)] dark:shadow-[0_26px_55px_-12px_rgba(0,0,0,0.85),0_12px_24px_-6px_rgba(0,0,0,0.65)]',
-    };
-  }
-
-  // Neighbor cards at the back
-  return {
-    bg: 'bg-gradient-to-br from-white via-[#fcfdfe] to-[#f8fafc] dark:from-[#182133] dark:via-[#131926] dark:to-[#0f1420]',
-    border: 'border border-slate-200/80 dark:border-slate-800',
-    glow: 'shadow-[0_10px_22px_-6px_rgba(0,0,0,0.08)] dark:shadow-[0_10px_22px_-6px_rgba(0,0,0,0.5)]',
-  };
-};
-
 // Human-friendly date formatting for transactions (e.g. "Today, 09:30", "Yesterday, 18:42")
 const formatActivityDate = (dateStr?: string): string => {
   if (!dateStr) return '';
@@ -1524,7 +1495,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                 className="flex items-center justify-center relative"
                 style={{
                   perspective: '1200px',
-                  minHeight: mobileCategory === 'reserves' ? '180px' : '250px',
+                  minHeight: mobileCategory === 'reserves' ? '180px' : '266px',
                 }}
               >
                 {mobileAccounts.map((acc, idx) => {
@@ -1543,15 +1514,14 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                   if (!isVisible) return null;
 
                   // 3D positioning: natural clearance so back cards are never clipped by square borders
-                  const translateX = isCenter ? 0 : offset * (isReserve ? 95 : 44);
+                  const translateX = isCenter ? 0 : offset * (isReserve ? 95 : 38);
                   const translateZ = isCenter ? 20 : -35;
-                  const rotateY = isCenter ? 0 : offset * (isReserve ? 0 : -3);
-                  const scale = isCenter ? 1 : isReserve ? 0.78 : 0.88;
+                  const rotateY = isCenter ? 0 : offset * (isReserve ? 0 : -2.5);
+                  const scale = isCenter ? 1 : isReserve ? 0.78 : 0.89;
                   const zIndex = isCenter ? 20 : 10;
-                  const opacity = isCenter ? 1 : isReserve ? 0.45 : 0.65;
+                  const opacity = isCenter ? 1 : isReserve ? 0.45 : 0.55;
                   const isInactive = acc.is_active === false;
                   const theme = isReserve ? getAssetCardTheme(acc) : null;
-                  const cardTheme = isReserve ? null : getMobileBankCardTheme(acc, isCenter);
 
                   return (
                     <div
@@ -1562,6 +1532,8 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                         transform: `translateX(${translateX}px) translateZ(${translateZ}px) rotateY(${rotateY}deg) scale(${scale})`,
                         zIndex,
                         opacity,
+                        filter: isReserve ? 'none' : isCenter ? 'none' : 'blur(10px)',
+                        WebkitFilter: isReserve ? 'none' : isCenter ? 'none' : 'blur(10px)',
                         width: isReserve ? '130px' : 'calc(100vw - 32px)',
                         maxWidth: isReserve ? '130px' : '440px',
                         cursor: 'pointer',
@@ -1615,23 +1587,27 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                           )}
                         </div>
                       ) : (
-                        /* AUTHENTIC REALISTIC ATM / DEBIT CARD — MOBILE ONLY */
+                        /* AUTHENTIC REALISTIC ATM / DEBIT CARD — FROSTED GLASS (APPLE STYLE) */
                         <div
-                          className={`relative overflow-hidden rounded-[22px] transition-all duration-300 flex flex-col w-full select-none !bg-white/82 dark:!bg-slate-900/88 backdrop-blur-xl !border !border-white/90 dark:!border-white/10 ${cardTheme?.bg} ${cardTheme?.border} ${isInactive ? 'opacity-60' : ''}`}
+                          className={`relative overflow-hidden rounded-[24px] transition-all duration-300 flex flex-col w-full select-none ${
+                            isInactive ? 'opacity-60' : ''
+                          }`}
                           style={{
-                            height: '230px',
-                            WebkitBackdropFilter: 'blur(18px)',
-                            /* Deep floating card shadow — layered for physicality */
+                            height: '246px',
+                            backgroundColor: 'rgba(255, 255, 255, 0.55)',
+                            backdropFilter: 'blur(20px)',
+                            WebkitBackdropFilter: 'blur(20px)',
+                            border: '1px solid rgba(255, 255, 255, 0.75)',
                             boxShadow: isCenter
-                              ? '0 2px 4px rgba(15,23,42,0.025), 0 8px 20px -4px rgba(15,23,42,0.09), 0 24px 44px -12px rgba(15,23,42,0.13), inset 0 1.5px 0 rgba(255,255,255,0.96), inset 0 -1px 0 rgba(15,23,42,0.035)'
-                              : '0 4px 12px -4px rgba(0,0,0,0.08)',
+                              ? '0 10px 30px -4px rgba(0, 0, 0, 0.06), 0 4px 12px -2px rgba(0, 0, 0, 0.03), inset 0 1px 1px 0 rgba(255, 255, 255, 0.95)'
+                              : '0 4px 16px -2px rgba(0, 0, 0, 0.03)',
                           }}
                         >
                           {/* Specular plastic lamination gloss — top-left catch light */}
                           <div
-                            className="absolute inset-0 pointer-events-none rounded-[22px] z-[1]"
+                            className="absolute inset-0 pointer-events-none rounded-[24px] z-[1]"
                             style={{
-                              background: 'linear-gradient(130deg, rgba(255,255,255,0.62) 0%, rgba(255,255,255,0.12) 34%, transparent 54%, rgba(255,255,255,0.18) 100%)',
+                              background: 'linear-gradient(130deg, rgba(255,255,255,0.7) 0%, rgba(255,255,255,0.15) 34%, transparent 54%, rgba(255,255,255,0.2) 100%)',
                             }}
                           />
 
@@ -1641,14 +1617,14 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                             <div className="flex items-center gap-3 min-w-0">
                               <FramelessCardLogo account={acc} className="w-11 h-11 shrink-0" />
                               <div className="min-w-0">
-                                <div className="font-black text-slate-900 dark:text-white text-[15px] leading-tight tracking-tight truncate max-w-[160px]">
+                                <div className="font-black text-slate-900 text-[15px] leading-tight tracking-tight truncate max-w-[160px]">
                                   {acc.name}
                                 </div>
                                 {(() => {
                                   const cleanBank = getBankCleanName(acc);
                                   const subtitle = cleanBank && cleanBank.toLowerCase() !== acc.name.toLowerCase() ? cleanBank : null;
                                   return subtitle ? (
-                                    <div className="text-[11px] text-slate-600 dark:text-slate-400 font-semibold truncate max-w-[160px] mt-[1px] leading-none">
+                                    <div className="text-[11px] text-slate-600 font-semibold truncate max-w-[160px] mt-[1px] leading-none">
                                       {subtitle}
                                     </div>
                                   ) : null;
@@ -1658,10 +1634,10 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
 
                             {/* Right: contactless wave + EMV chip */}
                             <div className="shrink-0 flex items-center gap-2">
-                              <ContactlessWave className="w-5 h-5 text-slate-400 dark:text-slate-500 stroke-[2.2]" />
+                              <ContactlessWave className="w-5 h-5 text-slate-500 stroke-[2.2]" />
                               {isCash ? (
-                                <div className="w-9 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/70 dark:border-emerald-800/40 flex items-center justify-center shrink-0">
-                                  <Landmark className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                                <div className="w-9 h-7 rounded-lg bg-emerald-50 border border-emerald-200/70 flex items-center justify-center shrink-0">
+                                  <Landmark className="w-4 h-4 text-emerald-600" />
                                 </div>
                               ) : (
                                 <EmvChip className="w-9 h-7" />
@@ -1669,54 +1645,53 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                             </div>
                           </div>
 
-                          {/* ── MIDDLE: Balance + account number directly below logo with minimal gap ── */}
-                          <div className="relative z-10 px-5 pt-3">
-                            <span className="text-[9px] font-black uppercase tracking-[0.22em] text-slate-600 dark:text-slate-400 block mb-[3px]">
+                          {/* ── MIDDLE: Balance + account number directly below logo with comfortable gap ── */}
+                          <div className="relative z-10 px-5 pt-3.5">
+                            <span className="text-[9px] font-black uppercase tracking-[0.22em] text-slate-600 block mb-[3px]">
                               {isCash ? 'CASH IN SAFE' : 'TOTAL BALANCE'}
                             </span>
                             <div className="flex items-baseline gap-2 whitespace-nowrap">
-                              <div className="font-mono font-black text-[clamp(1.35rem,7.2vw,1.875rem)] leading-none tabular-nums text-slate-900 dark:text-white tracking-tight">
+                              <div className="font-mono font-black text-[clamp(1.4rem,7.5vw,1.95rem)] leading-none tabular-nums text-slate-900 tracking-tight">
                                 {!isBalancesHidden ? (
                                   <AnimatedNumber value={Number(acc.current_balance || 0)} decimals={2} />
                                 ) : (
                                   <span className="tracking-wider">******.**</span>
                                 )}
                               </div>
-                              <span className="text-sm font-black text-slate-600 dark:text-slate-400 font-sans">ETB</span>
+                              <span className="text-sm font-black text-slate-600 font-sans">ETB</span>
                             </div>
-                            <div className="font-mono text-[11px] font-bold text-slate-500 dark:text-slate-400 mt-[5px] tracking-wide">
+                            <div className="font-mono text-[11px] font-bold text-slate-600 mt-[6px] tracking-wide">
                               {isCash ? 'Physical Cash Safe' : formatUnhiddenAccountNumber(acc.account_number, acc.id)}
                             </div>
                           </div>
 
                           {/* ── BOTTOM FILL: Quiet etched line work gives the card a premium finish ── */}
-                          <div className="absolute bottom-0 left-0 right-0 h-[72px] pointer-events-none z-[2] overflow-hidden rounded-b-[22px]">
+                          <div className="absolute bottom-0 left-0 right-0 h-[72px] pointer-events-none z-[2] overflow-hidden rounded-b-[24px]">
                             <div
                               className="absolute inset-0"
                               style={{
-                                background: 'linear-gradient(180deg, transparent 0%, rgba(226,232,240,0.08) 45%, rgba(226,232,240,0.22) 100%)',
+                                background: 'linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.12) 45%, rgba(255,255,255,0.3) 100%)',
                               }}
                             />
                             <div
                               className="absolute top-0 left-5 right-5 h-[0.5px]"
-                              style={{ background: 'rgba(100,116,139,0.16)' }}
+                              style={{ background: 'rgba(255,255,255,0.7)' }}
                             />
-                            <svg aria-hidden="true" viewBox="0 0 180 80" className="absolute right-0 bottom-0 h-[72px] w-[162px] text-slate-500/25 dark:text-slate-300/20">
+                            <svg aria-hidden="true" viewBox="0 0 180 80" className="absolute right-0 bottom-0 h-[72px] w-[162px] text-slate-400/40">
                               <path d="M75 80C95 54 120 34 180 19M103 80C119 57 142 42 180 32M132 80C146 64 160 56 180 49" fill="none" stroke="currentColor" strokeWidth="0.8" />
-                              <path d="M121 80C140 57 159 41 180 29" fill="none" stroke="white" strokeOpacity="0.75" strokeWidth="0.8" />
+                              <path d="M121 80C140 57 159 41 180 29" fill="none" stroke="white" strokeOpacity="0.85" strokeWidth="0.8" />
                               <circle cx="153" cy="43" r="2" fill="currentColor" />
                               <circle cx="169" cy="31" r="1.2" fill="currentColor" />
                             </svg>
                             {/* Inactive badge pinned inside the fill zone */}
                             {acc.is_active === false && (
                               <div className="absolute bottom-3.5 right-4 flex items-center">
-                                <span className="text-[9px] font-bold text-rose-500 dark:text-rose-400 uppercase tracking-widest bg-rose-50 dark:bg-rose-950/40 px-2 py-0.5 rounded-full border border-rose-200/60 dark:border-rose-900/40">
+                                <span className="text-[9px] font-bold text-rose-600 uppercase tracking-widest bg-rose-50/90 px-2 py-0.5 rounded-full border border-rose-200/70">
                                   Inactive
                                 </span>
                               </div>
                             )}
                           </div>
-
                         </div>
                       )}
                     </div>
