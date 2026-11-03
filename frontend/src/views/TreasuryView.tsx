@@ -1477,7 +1477,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
         ) : (
           <>
             <div
-              className="relative -mx-4 px-4 pt-0 pb-1.5 overflow-hidden select-none cursor-grab active:cursor-grabbing"
+              className="relative -mx-4 px-4 pt-0 pb-0 overflow-hidden select-none cursor-grab active:cursor-grabbing"
               onTouchStart={(e) => handleGestureStart(e.targetTouches[0].clientX, e.targetTouches[0].clientY)}
               onTouchMove={(e) => handleGestureMove(e.targetTouches[0].clientX, e.targetTouches[0].clientY)}
               onTouchEnd={handleGestureEnd}
@@ -1798,9 +1798,9 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                 })}
               </div>
 
-              {/* Dot Indicators matching theme */}
+              {/* Dot Indicators — Vertically Centered Between Card and Action Buttons */}
               {mobileAccounts.length > 1 && (
-                <div className="flex items-center justify-center gap-1.5 mt-1.5">
+                <div className="flex items-center justify-center gap-1.5 py-3">
                   {mobileAccounts.map((_, idx) => (
                     <button
                       key={idx}
@@ -1817,7 +1817,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
             </div>
 
             {/* 4 Action Buttons: Emerald icons with dark theme background */}
-            <div className="grid grid-cols-4 gap-2.5 mt-2.5 mb-2 px-1">
+            <div className={`grid grid-cols-4 gap-2.5 mb-2 px-1 ${mobileAccounts.length > 1 ? 'mt-0' : 'mt-2'}`}>
               <button
                 type="button"
                 onClick={() => activeMobileAccount && handleOpenAddBalance(activeMobileAccount)}
