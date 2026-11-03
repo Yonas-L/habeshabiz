@@ -1535,7 +1535,13 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                   return (
                     <div
                       key={acc.id}
-                      onClick={() => handleSelectMobileCard(idx)}
+                      onClick={() => {
+                        if (isCenter) {
+                          setSelectedAccountForLedger(acc);
+                        } else {
+                          handleSelectMobileCard(idx);
+                        }
+                      }}
                       className="absolute transition-all duration-500 ease-out flex items-center justify-center"
                       style={{
                         transform: `translateX(${translateX}px) translateZ(${translateZ}px) rotateY(${rotateY}deg) scale(${scale})`,

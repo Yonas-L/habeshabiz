@@ -39,6 +39,22 @@ interface AccountLedgerDrawerProps {
 
 type DatePreset = 'all' | 'today' | 'this_month' | 'last_30_days' | 'custom';
 
+const formatActivityDate = (dateStr?: string): string => {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  const now = new Date();
+  const isToday = d.toDateString() === now.toDateString();
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday = d.toDateString() === yesterday.toDateString();
+
+  const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  if (isToday) return `Today, ${timeStr}`;
+  if (isYesterday) return `Yesterday, ${timeStr}`;
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
 export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
   account,
   isOpen,
@@ -323,6 +339,7 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
           ? `Acc: ${currentAccount.account_number} · ${currentAccount.type.replace(/_/g, ' ')}`
           : `${currentAccount.type.replace(/_/g, ' ').toUpperCase()} Account`
       }
+      contentClassName="p-3.5 sm:px-6 sm:py-5 space-y-3.5 sm:space-y-6"
       badge={
         <span
           className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
@@ -336,12 +353,12 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
         </span>
       }
       headerActions={
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1 sm:gap-1.5">
           <button
             onClick={exportToCSV}
             disabled={!data || data.activities.length === 0}
             title="Export filtered activities to CSV"
-            className="h-8 px-2.5 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 text-xs font-semibold transition-all flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 shadow-xs cursor-pointer"
+            className="h-8 px-2 sm:px-2.5 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 text-xs font-semibold transition-all flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 shadow-xs cursor-pointer"
           >
             <Download className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
             <span className="hidden sm:inline">Export CSV</span>
@@ -350,21 +367,22 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
           {onOpenTransfer && !isAsset && (
             <button
               onClick={() => onOpenTransfer(currentAccount.id)}
-              className="h-8 px-2.5 rounded-xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-200 text-xs font-semibold transition-all flex items-center gap-1.5 active:scale-95 shadow-xs cursor-pointer"
+              title="Transfer Funds"
+              className="h-8 px-2 sm:px-2.5 rounded-xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-200 text-xs font-semibold transition-all flex items-center gap-1.5 active:scale-95 shadow-xs cursor-pointer"
             >
               <ArrowRightLeft className="w-3.5 h-3.5" />
-              <span>Transfer</span>
+              <span className="hidden sm:inline">Transfer</span>
             </button>
           )}
 
           {onOpenAddBalance && (
             <button
               onClick={() => onOpenAddBalance(currentAccount)}
-              className="h-8 px-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-all flex items-center gap-1.5 active:scale-95 shadow-xs cursor-pointer"
+              className="h-8 px-2 sm:px-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-all flex items-center gap-1.5 active:scale-95 shadow-xs cursor-pointer"
               title="Add Balance"
             >
               <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span>Add Balance</span>
+              <span className="hidden sm:inline">Add Balance</span>
             </button>
           )}
 
@@ -377,7 +395,7 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
               }
             }}
             title={isEditingDetails ? "Close Edit" : "Edit Account Details"}
-            className={`h-8 px-2.5 rounded-xl border transition-all flex items-center gap-1.5 active:scale-95 shadow-xs cursor-pointer text-xs font-semibold ${
+            className={`h-8 px-2 sm:px-2.5 rounded-xl border transition-all flex items-center gap-1.5 active:scale-95 shadow-xs cursor-pointer text-xs font-semibold ${
               isEditingDetails
                 ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300'
                 : 'border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700'
@@ -624,7 +642,276 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
           </form>
         )}
 
-        {/* Account Identity Card */}
+        {/* ── MOBILE TRANSACTIONS VIEW (Frameless, exact same sized as TreasuryView mobile cards, full height) ── */}
+        <div className="sm:hidden space-y-3.5">
+          {/* Mobile Identity & Balance Header (Frameless) */}
+          <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-200/60 dark:border-slate-800/60">
+            <div className="flex items-center gap-3 min-w-0">
+              <AccountLogo account={currentAccount} size="lg" className="shrink-0" />
+              <div className="min-w-0">
+                <h3 className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white leading-tight tracking-tight truncate">
+                  {currentAccount.name}
+                </h3>
+                <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  {currentAccount.account_number ? (
+                    <button
+                      type="button"
+                      onClick={handleCopyAccountNum}
+                      className="inline-flex items-center gap-1 font-mono text-[11px] font-semibold text-slate-600 dark:text-slate-400 active:text-slate-900"
+                      title="Copy account number"
+                    >
+                      <span>{currentAccount.account_number}</span>
+                      {copiedAccountNum ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3 text-slate-400" />}
+                    </button>
+                  ) : (
+                    <span className="text-[11px] font-semibold">{currentAccount.type.replace(/_/g, ' ')}</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="text-right shrink-0">
+              <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 block leading-tight">
+                Total Balance
+              </span>
+              <div className="inline-flex items-baseline gap-1 font-mono text-base font-black text-slate-900 dark:text-white tabular-nums">
+                <AnimatedNumber value={summary.current_balance} decimals={2} />
+                <span className="text-[11px] font-bold text-slate-500 font-sans">ETB</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Mobile Quick Action Buttons */}
+          {(!isAsset || onOpenAddBalance) && (
+            <div className="grid grid-cols-2 gap-2">
+              {onOpenTransfer && !isAsset && (
+                <button
+                  type="button"
+                  onClick={() => onOpenTransfer(currentAccount.id)}
+                  className="h-9 px-3 rounded-xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-transform shadow-xs cursor-pointer"
+                >
+                  <ArrowRightLeft className="w-3.5 h-3.5" />
+                  <span>Transfer</span>
+                </button>
+              )}
+              {onOpenAddBalance && (
+                <button
+                  type="button"
+                  onClick={() => onOpenAddBalance(currentAccount)}
+                  className={`h-9 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-transform shadow-xs cursor-pointer ${
+                    !onOpenTransfer || isAsset ? 'col-span-2' : ''
+                  }`}
+                >
+                  <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Add Balance</span>
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Mobile Search & Filters */}
+          <div className="space-y-2 pt-1">
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search transactions..."
+                className="w-full pl-8.5 pr-7 py-2 text-xs rounded-xl bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-500/30"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none text-[11px]">
+              {[
+                { id: 'all', label: 'All' },
+                { id: 'inflow', label: 'Inflows' },
+                { id: 'outflow', label: 'Outflows' },
+                { id: 'transfer', label: 'Transfers' },
+                { id: 'sale', label: 'Sales' },
+                { id: 'supplier_payment', label: 'Payouts' },
+                { id: 'expense', label: 'Expenses' },
+              ].map((pill) => (
+                <button
+                  key={pill.id}
+                  type="button"
+                  onClick={() => setTypeFilter(pill.id)}
+                  className={`px-2.5 py-1 rounded-lg font-bold whitespace-nowrap transition-all ${
+                    typeFilter === pill.id
+                      ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  {pill.label}
+                </button>
+              ))}
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={handleResetFilters}
+                  className="text-[11px] font-bold text-amber-600 dark:text-amber-400 whitespace-nowrap pl-1 hover:underline cursor-pointer"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Mobile Transactions Count Header */}
+          <div className="flex items-center justify-between text-xs pt-1">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+              Transactions ({summary.filtered_count})
+            </span>
+            <button
+              type="button"
+              onClick={fetchActivities}
+              disabled={loading}
+              className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 flex items-center gap-1 text-[11px] font-semibold cursor-pointer"
+            >
+              <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin text-slate-600' : ''}`} />
+              <span>Refresh</span>
+            </button>
+          </div>
+
+          {/* Frameless Full-Height Transaction List (Without Card Container) */}
+          <div className="space-y-1">
+            {loading && !data ? (
+              <div className="space-y-3 py-1">
+                {[1, 2, 3, 4, 5, 6].map((n) => (
+                  <div key={n} className="flex items-center justify-between gap-3 animate-pulse py-1">
+                    <div className="w-11 h-11 rounded-2xl bg-slate-100 dark:bg-slate-800 shrink-0" />
+                    <div className="flex-1 space-y-1.5">
+                      <div className="h-3.5 bg-slate-100 dark:bg-slate-800 rounded w-1/2" />
+                      <div className="h-2.5 bg-slate-100 dark:bg-slate-800 rounded w-1/3" />
+                    </div>
+                    <div className="h-4 bg-slate-100 dark:bg-slate-800 rounded w-20" />
+                  </div>
+                ))}
+              </div>
+            ) : !data || data.activities.length === 0 ? (
+              <div className="flex flex-col items-center justify-center text-center py-12 px-4">
+                <Receipt className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+                <p className="text-sm font-bold text-slate-700 dark:text-slate-300">No transactions recorded</p>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {hasActiveFilters ? 'No transactions match the selected filters.' : 'Transactions will appear as payments occur.'}
+                </p>
+                {hasActiveFilters && (
+                  <button
+                    type="button"
+                    onClick={handleResetFilters}
+                    className="mt-3 text-xs font-bold text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
+                  >
+                    Reset filters
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {data.activities.map((act) => {
+                  const isExpanded = expandedId === act.id;
+                  const isInflow = act.direction === 'inflow';
+                  const title = act.counterparty || act.type_label || act.description || 'Transaction';
+                  const dateFormatted = formatActivityDate(act.date);
+                  const amountValue = act.amount || (isInflow ? act.inflow : act.outflow) || 0;
+
+                  return (
+                    <div
+                      key={act.id}
+                      onClick={() => setExpandedId(isExpanded ? null : act.id)}
+                      className="flex flex-col py-2.5 px-1.5 cursor-pointer group hover:bg-slate-100/60 dark:hover:bg-slate-800/40 active:bg-slate-100/80 dark:active:bg-slate-800/60 rounded-xl transition-colors border-b border-slate-200/60 dark:border-slate-800/60 last:border-0"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div
+                            className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${
+                              isInflow
+                                ? 'bg-emerald-100/70 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400'
+                                : 'bg-rose-100/70 dark:bg-rose-950/60 text-rose-500 dark:text-rose-400'
+                            }`}
+                          >
+                            {isInflow ? (
+                              <ArrowDownLeft className="w-5 h-5 stroke-[2.8]" />
+                            ) : (
+                              <ArrowUpRight className="w-5 h-5 stroke-[2.8]" />
+                            )}
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white leading-tight tracking-tight truncate">
+                              {title}
+                            </h4>
+                            <p className="text-xs font-medium text-slate-400 dark:text-slate-500 mt-1 leading-none truncate">
+                              {dateFormatted}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <span
+                            className={`font-mono font-black text-sm sm:text-base tabular-nums tracking-tight ${
+                              isInflow ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+                            }`}
+                          >
+                            {isInflow ? '+ ' : '- '}ETB {Math.abs(Number(amountValue)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Expandable details when tapped */}
+                      {isExpanded && (
+                        <div className="mt-2.5 pt-2 border-t border-slate-200/50 dark:border-slate-800/50 grid grid-cols-2 gap-2 text-[11px] animate-page-enter">
+                          <div>
+                            <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold block">Tx Number</span>
+                            <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{act.transaction_number || '—'}</span>
+                          </div>
+                          {act.reference_number && (
+                            <div>
+                              <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold block">Reference</span>
+                              <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{act.reference_number}</span>
+                            </div>
+                          )}
+                          <div>
+                            <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold block">Running Balance</span>
+                            <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
+                              ETB {Number(act.balance_after || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                          {act.fee > 0 && (
+                            <div>
+                              <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold block">Transfer Fee</span>
+                              <span className="font-mono font-bold text-rose-600 dark:text-rose-400">
+                                ETB {Number(act.fee).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                          )}
+                          {act.description && (
+                            <div className="col-span-2 pt-1">
+                              <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold block">Description</span>
+                              <p className="text-slate-700 dark:text-slate-300 text-xs mt-0.5">{act.description}</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── DESKTOP TRANSACTIONS VIEW (Untouched: Identity Hero, 4 KPI strip, desktop filter bar, 12-col ledger table) ── */}
+        <div className="hidden sm:block space-y-6">
+          {/* Account Identity Card */}
         <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-gradient-to-br from-white via-slate-50/50 to-slate-100/50 dark:from-[#131926] dark:via-[#111723] dark:to-[#0d121c] p-5 shadow-xs">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3.5">
@@ -1211,6 +1498,7 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
               })}
             </div>
           )}
+        </div>
         </div>
       </div>
     </SlideOverDrawer>
