@@ -1524,7 +1524,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                 className="flex items-center justify-center relative"
                 style={{
                   perspective: '1200px',
-                  minHeight: mobileCategory === 'reserves' ? '180px' : '230px',
+                  minHeight: mobileCategory === 'reserves' ? '180px' : '250px',
                 }}
               >
                 {mobileAccounts.map((acc, idx) => {
@@ -1550,7 +1550,6 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                   const zIndex = isCenter ? 20 : 10;
                   const opacity = isCenter ? 1 : isReserve ? 0.45 : 0.65;
                   const isInactive = acc.is_active === false;
-                  const globalIndex = idx;
                   const theme = isReserve ? getAssetCardTheme(acc) : null;
                   const cardTheme = isReserve ? null : getMobileBankCardTheme(acc, isCenter);
 
@@ -1616,95 +1615,108 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                           )}
                         </div>
                       ) : (
-                        /* AUTHENTIC REALISTIC ATM / DEBIT CARD */
+                        /* AUTHENTIC REALISTIC ATM / DEBIT CARD — MOBILE ONLY */
                         <div
-                          className={`relative overflow-hidden rounded-[24px] sm:rounded-[26px] transition-all duration-300 flex flex-col justify-between h-[208px] sm:h-[214px] w-full select-none ${cardTheme?.bg} ${cardTheme?.border} ${cardTheme?.glow} ${
-                            isInactive ? 'opacity-60' : ''
-                          }`}
+                          className={`relative overflow-hidden rounded-[22px] transition-all duration-300 flex flex-col w-full select-none !bg-white/82 dark:!bg-slate-900/88 backdrop-blur-xl !border !border-white/90 dark:!border-white/10 ${cardTheme?.bg} ${cardTheme?.border} ${isInactive ? 'opacity-60' : ''}`}
+                          style={{
+                            height: '230px',
+                            WebkitBackdropFilter: 'blur(18px)',
+                            /* Deep floating card shadow — layered for physicality */
+                            boxShadow: isCenter
+                              ? '0 2px 4px rgba(15,23,42,0.025), 0 8px 20px -4px rgba(15,23,42,0.09), 0 24px 44px -12px rgba(15,23,42,0.13), inset 0 1.5px 0 rgba(255,255,255,0.96), inset 0 -1px 0 rgba(15,23,42,0.035)'
+                              : '0 4px 12px -4px rgba(0,0,0,0.08)',
+                          }}
                         >
-                          {/* Specular Plastic Card Lamination Gloss Reflection */}
+                          {/* Specular plastic lamination gloss — top-left catch light */}
                           <div
-                            className="absolute inset-0 pointer-events-none rounded-[24px] sm:rounded-[26px] z-1"
+                            className="absolute inset-0 pointer-events-none rounded-[22px] z-[1]"
                             style={{
-                              background: 'linear-gradient(125deg, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.06) 40%, transparent 55%, rgba(255,255,255,0.12) 100%)',
+                              background: 'linear-gradient(130deg, rgba(255,255,255,0.62) 0%, rgba(255,255,255,0.12) 34%, transparent 54%, rgba(255,255,255,0.18) 100%)',
                             }}
                           />
 
-                          {/* Ambient wave/bar art in bottom right identical to desktop */}
-                          <DynamicCardAmbientArt acc={acc} index={globalIndex} />
-
-                          {/* Card Content Layer */}
-                          <div className="relative z-10 p-4.5 sm:p-5 flex flex-col justify-between h-full">
-                            {/* Top Row: Frameless Bank Logo + Bank Info (Left) and EMV Chip + Wave (Right) */}
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="flex items-center gap-3 min-w-0">
-                                <FramelessCardLogo account={acc} className="w-11 h-11 sm:w-12 sm:h-12" />
-                                <div className="min-w-0">
-                                  <div className="font-black text-slate-900 dark:text-white text-base sm:text-lg leading-tight tracking-tight truncate max-w-[180px]">
-                                    {acc.name}
-                                  </div>
-                                  {(() => {
-                                    const cleanBank = getBankCleanName(acc);
-                                    const subtitle = cleanBank && cleanBank.toLowerCase() !== acc.name.toLowerCase() ? cleanBank : null;
-                                    return subtitle ? (
-                                      <div className="text-[11px] text-slate-400 dark:text-slate-500 font-semibold truncate max-w-[180px] mt-0.5 leading-tight">
-                                        {subtitle}
-                                      </div>
-                                    ) : null;
-                                  })()}
+                          {/* ── TOP SECTION: Logo + bank name flush to top ── */}
+                          <div className="relative z-10 px-5 pt-5 flex items-center justify-between gap-3">
+                            {/* Left: logo + name stacked tight */}
+                            <div className="flex items-center gap-3 min-w-0">
+                              <FramelessCardLogo account={acc} className="w-11 h-11 shrink-0" />
+                              <div className="min-w-0">
+                                <div className="font-black text-slate-900 dark:text-white text-[15px] leading-tight tracking-tight truncate max-w-[160px]">
+                                  {acc.name}
                                 </div>
+                                {(() => {
+                                  const cleanBank = getBankCleanName(acc);
+                                  const subtitle = cleanBank && cleanBank.toLowerCase() !== acc.name.toLowerCase() ? cleanBank : null;
+                                  return subtitle ? (
+                                    <div className="text-[11px] text-slate-600 dark:text-slate-400 font-semibold truncate max-w-[160px] mt-[1px] leading-none">
+                                      {subtitle}
+                                    </div>
+                                  ) : null;
+                                })()}
                               </div>
+                            </div>
 
-                              {/* Chip on Top Right */}
-                              <div className="shrink-0 flex items-center gap-2 pt-0.5">
-                                <ContactlessWave className="w-5 h-5 text-slate-400 dark:text-slate-500 stroke-[2.2]" />
-                                {isCash ? (
-                                  <div className="w-9.5 h-7.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/70 dark:border-emerald-800/40 flex items-center justify-center shrink-0 shadow-xs">
-                                    <Landmark className="w-4.5 h-4.5 text-emerald-600 dark:text-emerald-400" />
-                                  </div>
+                            {/* Right: contactless wave + EMV chip */}
+                            <div className="shrink-0 flex items-center gap-2">
+                              <ContactlessWave className="w-5 h-5 text-slate-400 dark:text-slate-500 stroke-[2.2]" />
+                              {isCash ? (
+                                <div className="w-9 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/70 dark:border-emerald-800/40 flex items-center justify-center shrink-0">
+                                  <Landmark className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                                </div>
+                              ) : (
+                                <EmvChip className="w-9 h-7" />
+                              )}
+                            </div>
+                          </div>
+
+                          {/* ── MIDDLE: Balance + account number directly below logo with minimal gap ── */}
+                          <div className="relative z-10 px-5 pt-3">
+                            <span className="text-[9px] font-black uppercase tracking-[0.22em] text-slate-600 dark:text-slate-400 block mb-[3px]">
+                              {isCash ? 'CASH IN SAFE' : 'TOTAL BALANCE'}
+                            </span>
+                            <div className="flex items-baseline gap-2 whitespace-nowrap">
+                              <div className="font-mono font-black text-[clamp(1.35rem,7.2vw,1.875rem)] leading-none tabular-nums text-slate-900 dark:text-white tracking-tight">
+                                {!isBalancesHidden ? (
+                                  <AnimatedNumber value={Number(acc.current_balance || 0)} decimals={2} />
                                 ) : (
-                                  <EmvChip className="w-9.5 h-7.5 rounded-lg" />
+                                  <span className="tracking-wider">******.**</span>
                                 )}
                               </div>
+                              <span className="text-sm font-black text-slate-600 dark:text-slate-400 font-sans">ETB</span>
                             </div>
-
-                            {/* Middle Section: Bigger Bold Total Balance & Unhidden Account Number (No Gaps) */}
-                            <div className="pt-1.5 pb-0.5">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className="text-[9.5px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">
-                                  TOTAL BALANCE
-                                </span>
-                              </div>
-
-                              {/* Commanding Bigger Bold Total Balance */}
-                              <div className="flex items-baseline gap-2 whitespace-nowrap select-none">
-                                <div className="font-mono font-black text-3xl sm:text-[36px] text-slate-900 dark:text-white tracking-tight leading-none tabular-nums drop-shadow-xs">
-                                  {!isBalancesHidden ? (
-                                    <AnimatedNumber value={Number(acc.current_balance || 0)} decimals={2} />
-                                  ) : (
-                                    <span className="tracking-wider">******.**</span>
-                                  )}
-                                </div>
-                                <span className="text-sm sm:text-base font-black text-slate-400 dark:text-slate-500 font-sans tracking-tight">
-                                  ETB
-                                </span>
-                              </div>
-
-                              {/* Account Number Minimally Underneath and Unhidden (No Gaps) */}
-                              <div className="font-mono text-xs sm:text-[13px] font-bold text-slate-600 dark:text-slate-400 mt-1.5 select-none tracking-normal">
-                                {formatUnhiddenAccountNumber(acc.account_number, acc.id)}
-                              </div>
+                            <div className="font-mono text-[11px] font-bold text-slate-500 dark:text-slate-400 mt-[5px] tracking-wide">
+                              {isCash ? 'Physical Cash Safe' : formatUnhiddenAccountNumber(acc.account_number, acc.id)}
                             </div>
+                          </div>
 
-                            {/* Bottom Row: Status if inactive */}
+                          {/* ── BOTTOM FILL: Quiet etched line work gives the card a premium finish ── */}
+                          <div className="absolute bottom-0 left-0 right-0 h-[72px] pointer-events-none z-[2] overflow-hidden rounded-b-[22px]">
+                            <div
+                              className="absolute inset-0"
+                              style={{
+                                background: 'linear-gradient(180deg, transparent 0%, rgba(226,232,240,0.08) 45%, rgba(226,232,240,0.22) 100%)',
+                              }}
+                            />
+                            <div
+                              className="absolute top-0 left-5 right-5 h-[0.5px]"
+                              style={{ background: 'rgba(100,116,139,0.16)' }}
+                            />
+                            <svg aria-hidden="true" viewBox="0 0 180 80" className="absolute right-0 bottom-0 h-[72px] w-[162px] text-slate-500/25 dark:text-slate-300/20">
+                              <path d="M75 80C95 54 120 34 180 19M103 80C119 57 142 42 180 32M132 80C146 64 160 56 180 49" fill="none" stroke="currentColor" strokeWidth="0.8" />
+                              <path d="M121 80C140 57 159 41 180 29" fill="none" stroke="white" strokeOpacity="0.75" strokeWidth="0.8" />
+                              <circle cx="153" cy="43" r="2" fill="currentColor" />
+                              <circle cx="169" cy="31" r="1.2" fill="currentColor" />
+                            </svg>
+                            {/* Inactive badge pinned inside the fill zone */}
                             {acc.is_active === false && (
-                              <div className="flex items-center justify-end pt-0.5">
+                              <div className="absolute bottom-3.5 right-4 flex items-center">
                                 <span className="text-[9px] font-bold text-rose-500 dark:text-rose-400 uppercase tracking-widest bg-rose-50 dark:bg-rose-950/40 px-2 py-0.5 rounded-full border border-rose-200/60 dark:border-rose-900/40">
                                   Inactive
                                 </span>
                               </div>
                             )}
                           </div>
+
                         </div>
                       )}
                     </div>

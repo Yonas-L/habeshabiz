@@ -29,6 +29,15 @@
         "value": "cubic-bezier(0.34, 1.4, 0.64, 1)",
         "createdAt": "2026-10-04T06:51:21.651Z",
         "reason": "Agent: this easing is scoped to the intentional modal spring entrance, not a general-purpose transition."
+      },
+      {
+        "rule": "ai-color-palette",
+        "value": "*",
+        "files": [
+          "frontend/src/views/TreasuryView.tsx"
+        ],
+        "createdAt": "2026-11-03T12:59:38.015Z",
+        "reason": "The existing GBP reserve icon uses violet as a currency-specific identifier alongside distinct USD and EUR colors. The detector cannot target these individual values; suppress its palette heuristic only for TreasuryView."
       }
     ]
   }
