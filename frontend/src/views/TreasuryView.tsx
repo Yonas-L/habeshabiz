@@ -21,12 +21,14 @@ import {
   Globe,
   FileText,
   Inbox,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { AnimatedNumber } from '../components/AnimatedNumber';
 import { ManageAccountModal } from '../components/treasury/ManageAccountModal';
 import { AddBalanceModal } from '../components/treasury/AddBalanceModal';
 import { AccountLedgerDrawer } from '../components/drawers/AccountLedgerDrawer';
-import { AccountLogo, matchBankPreset } from '../utils/bankLogos';
+import { AccountLogo, matchBankPreset, getAccountLogoInfo } from '../utils/bankLogos';
 import { CustomPageLoader } from '../components/loading/CustomPageLoader';
 // Pagination import removed — desktop uses carousel slider, not pagination
 
@@ -278,6 +280,104 @@ const formatCardNumber = (accountNumber?: string | null, accountId?: string): st
   }
   const fallbackLast4 = (accountId || '0000').slice(-4).toUpperCase();
   return `••••  ••••  ••••  ${fallbackLast4}`;
+};
+
+// Format mobile card number matching exact screenshot styling: 1000 •••• •••• 3934
+const formatMobileCardNumber = (accountNumber?: string | null, accountId?: string): { p1: string; p2: string; p3: string; p4: string } => {
+  const raw = (accountNumber || '').trim().replace(/\s+/g, '');
+  if (raw.length >= 8) {
+    const p1 = raw.slice(0, 4);
+    const p4 = raw.slice(-4);
+    return { p1, p2: '••••', p3: '••••', p4 };
+  }
+  const fallbackDigits = (accountId || '3934').replace(/[^0-9]/g, '') || '3934';
+  const p4 = (fallbackDigits.slice(-4) || '3934').padStart(4, '0');
+  return { p1: '1000', p2: '••••', p3: '••••', p4 };
+};
+
+// Frameless Bank Logo component for Mobile ATM Cards (no container box, no border, no background rect)
+const FramelessCardLogo: React.FC<{ account: FinancialAccount; className?: string }> = ({
+  account,
+  className = 'w-10 h-10',
+}) => {
+  const isCash = isCashAccount(account);
+  if (isCash) {
+    return (
+      <div className={`${className} shrink-0 flex items-center justify-center text-emerald-600 dark:text-emerald-400`}>
+        <Landmark className="w-7 h-7 drop-shadow-xs stroke-[2]" />
+      </div>
+    );
+  }
+
+  const info = getAccountLogoInfo(account);
+
+  // If custom uploaded image
+  if (info.isCustom && info.src) {
+    return (
+      <div className={`${className} shrink-0 flex items-center justify-center`}>
+        <img
+          src={info.src}
+          alt={account.name}
+          className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal drop-shadow-xs"
+        />
+      </div>
+    );
+  }
+
+  // If preset SVG logo, strip the background <rect ... /> element so it is completely frameless
+  if (info.preset?.dataUri) {
+    try {
+      const decoded = decodeURIComponent(info.preset.dataUri.replace('data:image/svg+xml;utf8,', ''))
+        .replace(/<rect\s+width=["']80["'][^>]*\/>/i, '');
+      return (
+        <div
+          className={`${className} shrink-0 flex items-center justify-center drop-shadow-xs select-none`}
+          dangerouslySetInnerHTML={{ __html: decoded }}
+        />
+      );
+    } catch {
+      return (
+        <div className={`${className} shrink-0 flex items-center justify-center`}>
+          <img src={info.src} alt={account.name} className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal drop-shadow-xs" />
+        </div>
+      );
+    }
+  }
+
+  return (
+    <div className={`${className} shrink-0 flex items-center justify-center text-slate-700 dark:text-slate-200`}>
+      <Landmark className="w-6 h-6 stroke-[2]" />
+    </div>
+  );
+};
+
+// Desktop-Matching Bank Card Themes for Mobile ATM Cards (Bold edges and deep shadows on focus)
+const getMobileBankCardTheme = (acc: FinancialAccount, isCenter = true) => {
+  const isInactive = acc.is_active === false;
+
+  if (isInactive) {
+    return {
+      bg: 'bg-slate-50 dark:bg-[#131926]',
+      border: 'border-2 border-slate-200/60 dark:border-slate-800/60',
+      glow: 'shadow-[0_12px_24px_-6px_rgba(0,0,0,0.06)] dark:shadow-[0_12px_24px_-6px_rgba(0,0,0,0.5)]',
+    };
+  }
+
+  // Bold edges and prominent physical shadows for the focus card (close to edges)
+  if (isCenter) {
+    return {
+      bg: 'bg-gradient-to-br from-white via-[#fcfdfe] to-[#f8fafc] dark:from-[#182133] dark:via-[#131926] dark:to-[#0f1420]',
+      border: 'border-2 border-slate-300 dark:border-slate-600',
+      glow: 'shadow-[0_22px_45px_-8px_rgba(0,0,0,0.18),0_10px_22px_-5px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,1)] dark:shadow-[0_24px_50px_-10px_rgba(0,0,0,0.85),0_12px_24px_-4px_rgba(0,0,0,0.7)]',
+    };
+  }
+
+  // Neighbor cards at the back
+  return {
+    bg: 'bg-gradient-to-br from-white via-[#fcfdfe] to-[#f8fafc] dark:from-[#182133] dark:via-[#131926] dark:to-[#0f1420]',
+    border: 'border border-slate-200/80 dark:border-slate-800',
+    glow: 'shadow-[0_10px_22px_-6px_rgba(0,0,0,0.08)] dark:shadow-[0_10px_22px_-6px_rgba(0,0,0,0.5)]',
+  };
 };
 
 // Human-friendly date formatting for transactions (e.g. "Today, 09:30", "Yesterday, 18:42")
@@ -746,6 +846,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
   // Mobile ATM Cards and Transactions State (matches reference screenshot)
   const [mobileCategory, setMobileCategory] = useState<'banks' | 'reserves'>('banks');
   const [mobileActiveIndex, setMobileActiveIndex] = useState(0);
+  const [showMobileCardDetails, setShowMobileCardDetails] = useState(true);
   const [mobileActivities, setMobileActivities] = useState<Record<string, AccountActivity[]>>({});
   const [loadingMobileActivities, setLoadingMobileActivities] = useState(false);
   const mobileCardScrollRef = React.useRef<HTMLDivElement>(null);
@@ -1404,26 +1505,26 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
       {/* ========================================================================= */}
       {/* MOBILE VIEW (< sm): ATM-sized cards, touch-slidable, cardless reserves   */}
       {/* ========================================================================= */}
-      <div className="sm:hidden space-y-4">
-        {/* Centered Tab Switcher: Bank Accounts & Wallets vs Hedge Reserves */}
-        <div className="flex items-center justify-center pt-1">
-          <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800/90 rounded-2xl shadow-inner">
+      <div className="sm:hidden space-y-2.5">
+        {/* Centered Tab Switcher: Banks vs Reserves */}
+        <div className="flex items-center justify-center pt-0.5 pb-1">
+          <div className="flex items-center p-1 bg-[#e9eef5] dark:bg-slate-800 rounded-full">
             <button
               onClick={() => handleSwitchMobileCategory('banks')}
-              className={`py-1.5 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`py-2 px-6 rounded-full text-xs font-bold transition-all cursor-pointer ${
                 mobileCategory === 'banks'
-                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'
+                  ? 'bg-gradient-to-b from-[#094838] to-[#042d23] text-white shadow-sm border border-emerald-500/25'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
               }`}
             >
               Banks ({treasuryAccounts.length})
             </button>
             <button
               onClick={() => handleSwitchMobileCategory('reserves')}
-              className={`py-1.5 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`py-2 px-6 rounded-full text-xs font-bold transition-all cursor-pointer ${
                 mobileCategory === 'reserves'
-                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'
+                  ? 'bg-gradient-to-b from-[#094838] to-[#042d23] text-white shadow-sm border border-emerald-500/25'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
               }`}
             >
               Reserves ({assetAccounts.length})
@@ -1431,7 +1532,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
           </div>
         </div>
 
-        {/* 3D Carousel Display — Slidable, No Arrow Icons, Larger ATM Size */}
+        {/* 3D Carousel Display — Full Bleed (-mx-4), Frosted Blurry Soft Cards, No Edge Cutoff */}
         {mobileAccounts.length === 0 ? (
           <div className="bg-white dark:bg-[#131926] rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 p-8 text-center my-4">
             <p className="text-xs text-slate-400">No accounts in this category yet</p>
@@ -1439,7 +1540,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
         ) : (
           <>
             <div
-              className="relative py-3 overflow-hidden select-none cursor-grab active:cursor-grabbing"
+              className="relative -mx-4 px-4 py-3 overflow-hidden select-none cursor-grab active:cursor-grabbing"
               onTouchStart={(e) => handleGestureStart(e.targetTouches[0].clientX, e.targetTouches[0].clientY)}
               onTouchMove={(e) => handleGestureMove(e.targetTouches[0].clientX, e.targetTouches[0].clientY)}
               onTouchEnd={handleGestureEnd}
@@ -1452,12 +1553,12 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                 touchAction: 'pan-y',
               }}
             >
-              {/* 3D Stack Container */}
+              {/* 3D Stack Container — Increased Height & Clearance */}
               <div
                 className="flex items-center justify-center relative"
                 style={{
                   perspective: '1200px',
-                  minHeight: mobileCategory === 'reserves' ? '175px' : '215px',
+                  minHeight: mobileCategory === 'reserves' ? '180px' : '230px',
                 }}
               >
                 {mobileAccounts.map((acc, idx) => {
@@ -1475,16 +1576,18 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                   const isVisible = Math.abs(offset) <= 1;
                   if (!isVisible) return null;
 
-                  // 3D positioning: spacious separation for reserves, fanning for ATM cards
-                  const translateX = isCenter ? 0 : offset * (isReserve ? 105 : 75);
-                  const translateZ = isCenter ? 35 : -50;
-                  const rotateY = isCenter ? 0 : offset * (isReserve ? 0 : -5);
-                  const scale = isCenter ? 1 : isReserve ? 0.72 : 0.88;
-                  const zIndex = isCenter ? 25 : 10;
-                  const opacity = isCenter ? 1 : isReserve ? 0.4 : 0.65;
+                  // 3D positioning: natural clearance so back cards are never clipped by square borders
+                  const translateX = isCenter ? 0 : offset * (isReserve ? 95 : 44);
+                  const translateZ = isCenter ? 20 : -35;
+                  const rotateY = isCenter ? 0 : offset * (isReserve ? 0 : -3);
+                  const scale = isCenter ? 1 : isReserve ? 0.78 : 0.88;
+                  const zIndex = isCenter ? 20 : 10;
+                  const opacity = isCenter ? 1 : isReserve ? 0.45 : 0.65;
                   const isInactive = acc.is_active === false;
                   const globalIndex = idx;
                   const theme = isReserve ? getAssetCardTheme(acc) : null;
+                  const cardTheme = isReserve ? null : getMobileBankCardTheme(acc, isCenter);
+                  const cardNum = isReserve ? null : formatMobileCardNumber(acc.account_number, acc.id);
 
                   return (
                     <div
@@ -1495,7 +1598,8 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                         transform: `translateX(${translateX}px) translateZ(${translateZ}px) rotateY(${rotateY}deg) scale(${scale})`,
                         zIndex,
                         opacity,
-                        width: isReserve ? '130px' : 'min(88vw, 340px)',
+                        width: isReserve ? '130px' : 'calc(100vw - 32px)',
+                        maxWidth: isReserve ? '130px' : '440px',
                         cursor: 'pointer',
                       }}
                     >
@@ -1518,14 +1622,20 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                           </div>
                           {isCenter ? (
                             <>
-                              <h4 className="font-black text-slate-900 dark:text-white text-base tracking-tight truncate max-w-[130px] leading-tight">
+                              <h4 className="font-black text-slate-900 dark:text-white text-base tracking-tight truncate max-w-[150px] leading-tight">
                                 {acc.name}
                               </h4>
+                              <div className="flex items-center justify-center gap-1 mt-1">
+                                <span className="font-mono font-black text-lg text-slate-900 dark:text-white tabular-nums">
+                                  <AnimatedNumber value={Number(acc.current_balance || 0)} decimals={2} />
+                                </span>
+                                <span className="text-xs font-bold text-slate-500 font-sans">ETB</span>
+                              </div>
                               {acc.asset_details?.total_foreign_amount != null && (
                                 <div className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
                                   {Number(acc.asset_details.total_foreign_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{' '}
                                   <span className="text-[10px] font-sans font-bold text-slate-400 uppercase">
-                                    {acc.currency === 'GOLD' ? 'g' : (acc.currency || 'USD')}
+                                    {acc.currency === 'GOLD' ? 'g' : (acc.currency || 'USD')} Holdings
                                   </span>
                                 </div>
                               )}
@@ -1537,101 +1647,98 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                           )}
                         </div>
                       ) : (
-                        /* AUTHENTIC PHYSICAL ATM / DEBIT CARD (Realistic debit proportions, specular sheen, embossed number, EMV chip, contactless wave) */
+                        /* DESKTOP-MATCHING ATM / DEBIT CARD (Bold edges, deep shadows, close to edges) */
                         <div
-                          className={`relative overflow-hidden rounded-[22px] border transition-all duration-300 flex flex-col justify-between h-[202px] w-full select-none ${
-                            isInactive
-                              ? 'bg-slate-100/90 dark:bg-[#131926]/60 border-slate-200/60 dark:border-slate-800/60 opacity-60'
-                              : 'bg-gradient-to-br from-white via-[#fbfcfd] to-[#f1f5f9] dark:from-[#1c2436] dark:via-[#141b29] dark:to-[#0d121c] border-slate-200/90 dark:border-slate-700/80'
-                          } ${
-                            isCenter
-                              ? 'shadow-[0_22px_45px_-10px_rgba(0,0,0,0.2),0_8px_18px_-4px_rgba(0,0,0,0.08),0_0_0_1px_rgba(0,0,0,0.06),inset_0_1.5px_1px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.05)] dark:shadow-[0_24px_50px_-10px_rgba(0,0,0,0.8),0_0_0_1px_rgba(255,255,255,0.12),inset_0_1.5px_1px_rgba(255,255,255,0.1)]'
-                              : 'shadow-md opacity-60'
+                          className={`relative overflow-hidden rounded-[24px] transition-all duration-300 flex flex-col justify-between h-[212px] w-full select-none ${cardTheme?.bg} ${cardTheme?.border} ${cardTheme?.glow} ${
+                            isInactive ? 'opacity-60' : ''
                           }`}
                         >
-                          {/* Specular Diagonal Gloss Reflection Sheen */}
-                          <div
-                            className="absolute inset-0 pointer-events-none rounded-[22px] overflow-hidden z-0"
-                            style={{
-                              background:
-                                'linear-gradient(125deg, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.15) 22%, transparent 45%, rgba(255,255,255,0.06) 75%, transparent 100%)',
-                            }}
-                          />
-
                           {/* Ambient wave/bar art in bottom right identical to desktop */}
                           <DynamicCardAmbientArt acc={acc} index={globalIndex} />
 
                           {/* Card Content Layer */}
                           <div className="relative z-10 p-5 flex flex-col justify-between h-full">
-                            {/* Top Row: Bank Info & Contactless Wave */}
-                            <div className="flex items-start justify-between gap-3">
+                            {/* Top Row: Frameless Logo + Bank Info (Left) and EMV Chip + Wave (Right) */}
+                            <div className="flex items-start justify-between gap-2.5">
                               <div className="flex items-center gap-2.5 min-w-0">
-                                <AccountLogo account={acc} size="sm" className="w-8 h-8 rounded-lg shrink-0 shadow-xs" />
+                                <FramelessCardLogo account={acc} className="w-10 h-10" />
                                 <div className="min-w-0">
-                                  <div className="font-bold text-slate-900 dark:text-slate-100 text-[13px] leading-tight truncate">
+                                  <div className="font-extrabold text-slate-800 dark:text-slate-100 text-base leading-tight tracking-tight truncate max-w-[170px]">
                                     {acc.name}
                                   </div>
-                                  <div className="text-[10px] text-slate-400 dark:text-slate-500 font-medium truncate mt-0.5">
-                                    {getBankCleanName(acc)}
-                                  </div>
+                                  {(() => {
+                                    const cleanBank = getBankCleanName(acc);
+                                    const subtitle = cleanBank && cleanBank.toLowerCase() !== acc.name.toLowerCase() ? cleanBank : null;
+                                    return subtitle ? (
+                                      <div className="text-[11px] text-slate-400 dark:text-slate-500 font-medium truncate max-w-[170px] mt-0.5 leading-tight">
+                                        {subtitle}
+                                      </div>
+                                    ) : null;
+                                  })()}
                                 </div>
                               </div>
 
-                              <div className="shrink-0 flex items-center">
+                              {/* Chip on Top Right */}
+                              <div className="shrink-0 flex items-center gap-2 pt-0.5">
+                                <ContactlessWave className="w-5 h-5 text-slate-400 dark:text-slate-500 stroke-[2.2]" />
                                 {isCash ? (
-                                  <div className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/40">
-                                    <Landmark className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                                    <span className="text-[8.5px] font-black text-emerald-700 dark:text-emerald-300 uppercase tracking-widest">
-                                      SAFE
-                                    </span>
+                                  <div className="w-9 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/70 dark:border-emerald-800/40 flex items-center justify-center shrink-0 shadow-xs">
+                                    <Landmark className="w-4.5 h-4.5 text-emerald-600 dark:text-emerald-400" />
                                   </div>
                                 ) : (
-                                  <ContactlessWave className="w-5 h-5 text-slate-400 dark:text-slate-500" />
+                                  <EmvChip className="w-9 h-7" />
                                 )}
                               </div>
                             </div>
 
-                            {/* Middle Row: Golden EMV Chip & DEBIT Watermark */}
-                            <div className="flex items-center justify-between my-auto pt-1">
-                              {isCash ? (
-                                <div className="w-10 h-7.5 rounded-md bg-emerald-100/70 dark:bg-emerald-900/40 border border-emerald-300/50 dark:border-emerald-700/50 flex items-center justify-center">
-                                  <Landmark className="w-4 h-4 text-emerald-700 dark:text-emerald-300" />
+                            {/* Middle Section: Clean Bold Total Balance with Inline ETB & Eye Toggle */}
+                            <div className="my-auto py-1">
+                              <div className="flex items-center gap-1.5 mb-1.5">
+                                <span className="text-[9.5px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                                  TOTAL BALANCE
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowMobileCardDetails((prev) => !prev);
+                                  }}
+                                  className="p-1 -m-1 rounded-full text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 transition-colors cursor-pointer"
+                                  title={showMobileCardDetails ? 'Hide balance' : 'Show balance'}
+                                >
+                                  {showMobileCardDetails ? (
+                                    <Eye className="w-3.5 h-3.5 stroke-[2.2]" />
+                                  ) : (
+                                    <EyeOff className="w-3.5 h-3.5 stroke-[2.2]" />
+                                  )}
+                                </button>
+                              </div>
+
+                              {/* Total Balance Amount (Never wrapping ETB) */}
+                              <div className="flex items-baseline gap-2 whitespace-nowrap select-none">
+                                <div className="font-mono font-black text-2xl sm:text-[30px] text-slate-900 dark:text-white tracking-tight leading-none tabular-nums">
+                                  {showMobileCardDetails ? (
+                                    <AnimatedNumber value={Number(acc.current_balance || 0)} decimals={2} />
+                                  ) : (
+                                    <span className="tracking-widest">••••••••</span>
+                                  )}
                                 </div>
-                              ) : (
-                                <EmvChip className="w-10 h-7.5" />
+                                <span className="text-xs sm:text-sm font-bold text-slate-400 dark:text-slate-500 font-sans tracking-normal">
+                                  ETB
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Bottom Row: Account Number (Clean & Modern, No Fake Fillers) */}
+                            <div className="flex items-center justify-between pt-1">
+                              <div className="font-mono text-sm sm:text-[15px] font-bold text-slate-600 dark:text-slate-300 tracking-[0.2em] select-none">
+                                {cardNum?.p1} •••• •••• {cardNum?.p4}
+                              </div>
+                              {acc.is_active === false && (
+                                <span className="text-[9.5px] font-bold text-rose-500 dark:text-rose-400 uppercase tracking-widest bg-rose-50 dark:bg-rose-950/40 px-2 py-0.5 rounded-full border border-rose-200/60 dark:border-rose-900/40">
+                                  Inactive
+                                </span>
                               )}
-
-                              <span className="text-[9.5px] font-black tracking-[0.25em] uppercase text-slate-300 dark:text-slate-600 select-none">
-                                {isCash ? 'CASH SAFE' : 'DEBIT'}
-                              </span>
-                            </div>
-
-                            {/* Center / Embossed 16-Digit Card Number */}
-                            <div className="my-1">
-                              <div className="font-mono font-bold tracking-[0.22em] text-[15px] sm:text-[16px] text-slate-800 dark:text-slate-100 drop-shadow-[0_1px_1px_rgba(255,255,255,0.9)] dark:drop-shadow-[0_1px_1px_rgba(0,0,0,0.85)] truncate select-none">
-                                {isCash ? '••••  ••••  ••••  SAFE' : formatCardNumber(acc.account_number, acc.id)}
-                              </div>
-                            </div>
-
-                            {/* Bottom Row: Cardholder & Expiry Date */}
-                            <div className="flex items-end justify-between pt-2 border-t border-slate-100/70 dark:border-slate-800/70">
-                              <div className="min-w-0 pr-2">
-                                <span className="text-[7.5px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 block leading-none mb-0.5">
-                                  CARDHOLDER
-                                </span>
-                                <span className="font-mono text-[10.5px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-widest truncate block">
-                                  {acc.name ? acc.name.toUpperCase().slice(0, 18) : 'HALO MARKET'}
-                                </span>
-                              </div>
-
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <div className="text-[7px] leading-tight text-slate-400 dark:text-slate-500 font-sans uppercase font-bold text-right tracking-tighter">
-                                  VALID<br />THRU
-                                </div>
-                                <div className="font-mono text-[11px] font-bold text-slate-700 dark:text-slate-200 tracking-wider">
-                                  {acc.is_active === false ? 'EXPIRED' : '08/29'}
-                                </div>
-                              </div>
                             </div>
                           </div>
                         </div>
@@ -1641,17 +1748,17 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                 })}
               </div>
 
-              {/* Dot Indicators */}
+              {/* Dot Indicators matching theme */}
               {mobileAccounts.length > 1 && (
-                <div className="flex items-center justify-center gap-1.5 mt-3">
+                <div className="flex items-center justify-center gap-1.5 mt-2">
                   {mobileAccounts.map((_, idx) => (
                     <button
                       key={idx}
                       onClick={() => handleSelectMobileCard(idx)}
                       className={`rounded-full transition-all duration-300 cursor-pointer ${
                         idx === mobileActiveIndex
-                          ? 'w-5 h-1.5 bg-slate-900 dark:bg-white'
-                          : 'w-1.5 h-1.5 bg-slate-300 dark:bg-slate-600 hover:bg-slate-400'
+                          ? 'w-6 h-1.5 bg-gradient-to-r from-[#094838] to-[#042d23] dark:from-emerald-400 dark:to-emerald-500'
+                          : 'w-1.5 h-1.5 bg-slate-300 dark:bg-slate-700 hover:bg-slate-400'
                       }`}
                     />
                   ))}
@@ -1659,118 +1766,103 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
               )}
             </div>
 
-            {/* Total Balance for Selected Account — Bold Green & Amount First */}
-            <div className="flex flex-col items-center text-center my-2">
-              <span className="text-[11px] font-bold tracking-wider uppercase text-slate-400 dark:text-slate-500">
-                Total balance
-              </span>
-              <div className="mt-1 flex items-baseline justify-center gap-1.5">
-                <span className="font-mono font-black text-3xl sm:text-4xl text-emerald-600 dark:text-emerald-400 tracking-tight tabular-nums">
-                  <AnimatedNumber value={Number(activeMobileAccount?.current_balance || 0)} decimals={2} />
-                </span>
-                <span className="font-bold text-sm text-emerald-600/90 dark:text-emerald-400/90 font-sans">
-                  ETB
-                </span>
-              </div>
-              {activeMobileAccount?.asset_details?.total_foreign_amount != null && (
-                <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
-                  {Number(activeMobileAccount.asset_details.total_foreign_amount).toLocaleString()}{' '}
-                  {activeMobileAccount.currency === 'GOLD' ? 'g' : activeMobileAccount.currency} Holdings
-                </span>
-              )}
+            {/* 4 Action Buttons: Emerald icons with dark theme background */}
+            <div className="grid grid-cols-4 gap-2.5 my-4 px-1">
+              <button
+                type="button"
+                onClick={() => activeMobileAccount && handleOpenAddBalance(activeMobileAccount)}
+                className="flex flex-col items-center justify-center gap-1.5 py-1 group active:scale-95 transition-transform cursor-pointer"
+                title="Top Up / Deposit"
+              >
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-b from-[#094838] to-[#042d23] text-emerald-400 dark:text-emerald-300 flex items-center justify-center shadow-md shadow-emerald-950/25 border border-emerald-500/30 group-hover:scale-105 transition-transform">
+                  <Plus className="w-6 h-6 stroke-[2.6]" />
+                </div>
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">Top Up</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => activeMobileAccount && handleOpenTransfer(activeMobileAccount.id)}
+                className="flex flex-col items-center justify-center gap-1.5 py-1 group active:scale-95 transition-transform cursor-pointer"
+                title="Transfer"
+              >
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-b from-[#094838] to-[#042d23] text-emerald-400 dark:text-emerald-300 flex items-center justify-center shadow-md shadow-emerald-950/25 border border-emerald-500/30 group-hover:scale-105 transition-transform">
+                  <ArrowRightLeft className="w-5 h-5 stroke-[2.4]" />
+                </div>
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">Transfer</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => activeMobileAccount && setDeletingAccount(activeMobileAccount)}
+                className="flex flex-col items-center justify-center gap-1.5 py-1 group active:scale-95 transition-transform cursor-pointer"
+                title="Delete Account"
+              >
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-b from-[#380e14] to-[#20050a] text-rose-400 flex items-center justify-center shadow-md shadow-rose-950/25 border border-rose-500/30 group-hover:scale-105 transition-transform">
+                  <Trash2 className="w-5 h-5 stroke-[2.4]" />
+                </div>
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">Delete</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => activeMobileAccount && setSelectedAccountForLedger(activeMobileAccount)}
+                className="flex flex-col items-center justify-center gap-1.5 py-1 group active:scale-95 transition-transform cursor-pointer"
+                title="All Time Ledger"
+              >
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-b from-[#094838] to-[#042d23] text-emerald-400 dark:text-emerald-300 flex items-center justify-center shadow-md shadow-emerald-950/25 border border-emerald-500/30 group-hover:scale-105 transition-transform">
+                  <FileText className="w-5 h-5 stroke-[2.4]" />
+                </div>
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">All Time</span>
+              </button>
             </div>
 
-            {/* Action Buttons: Top Up, Transfer, Delete, Date Filter (All Time) */}
-            <div className="flex items-center justify-center gap-5 my-3">
-              <div className="flex flex-col items-center gap-1.5">
-                <button
-                  onClick={() => activeMobileAccount && handleOpenAddBalance(activeMobileAccount)}
-                  className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-200 transition-all active:scale-95 shadow-xs cursor-pointer"
-                  title="Top Up / Deposit"
-                >
-                  <Plus className="w-5 h-5 stroke-[2.5]" />
-                </button>
-                <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Top Up</span>
-              </div>
-
-              <div className="flex flex-col items-center gap-1.5">
-                <button
-                  onClick={() => activeMobileAccount && handleOpenTransfer(activeMobileAccount.id)}
-                  className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-200 transition-all active:scale-95 shadow-xs cursor-pointer"
-                  title="Transfer"
-                >
-                  <ArrowRightLeft className="w-5 h-5 stroke-[2]" />
-                </button>
-                <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Transfer</span>
-              </div>
-
-              <div className="flex flex-col items-center gap-1.5">
-                <button
-                  onClick={() => activeMobileAccount && setDeletingAccount(activeMobileAccount)}
-                  className="w-12 h-12 rounded-full bg-rose-50 dark:bg-rose-950/30 hover:bg-rose-100 dark:hover:bg-rose-950/50 flex items-center justify-center text-rose-600 dark:text-rose-400 transition-all active:scale-95 shadow-xs cursor-pointer"
-                  title="Delete Account"
-                >
-                  <Trash2 className="w-5 h-5 stroke-[2]" />
-                </button>
-                <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Delete</span>
-              </div>
-
-              <div className="flex flex-col items-center gap-1.5">
-                <button
-                  onClick={() => activeMobileAccount && setSelectedAccountForLedger(activeMobileAccount)}
-                  className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-200 transition-all active:scale-95 shadow-xs cursor-pointer"
-                  title="All Time Ledger"
-                >
-                  <FileText className="w-5 h-5 stroke-[2]" />
-                </button>
-                <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">All Time</span>
-              </div>
-            </div>
-
-            {/* Transactions Section — Fixed height container sized for at least 6 records */}
-            <div className="rounded-3xl bg-white dark:bg-[#131926] p-5 border border-slate-200/70 dark:border-slate-800/80 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.04)] mt-2">
-              <div className="flex items-center justify-between mb-3.5">
+            {/* Transactions Section — Spanning Left to Right Like the Cards */}
+            <div className="w-full rounded-2xl sm:rounded-3xl bg-white dark:bg-[#131926] p-4 sm:p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm mt-3">
+              <div className="flex items-center justify-between mb-3 px-1">
                 <div className="flex items-center gap-2">
-                  <h3 className="font-bold text-base text-slate-900 dark:text-white">
+                  <h3 className="font-extrabold text-lg sm:text-xl text-[#0f2347] dark:text-white tracking-tight">
                     Transactions
                   </h3>
-                  {activeMobileAccount && mobileActivities[activeMobileAccount.id]?.length > 0 && (
-                    <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded-full">
-                      {mobileActivities[activeMobileAccount.id].length}
+                  {activeMobileAccount && (
+                    <span className="text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-0.5 rounded-full">
+                      ({mobileActivities[activeMobileAccount.id]?.length || 0})
                     </span>
                   )}
                 </div>
                 <button
+                  type="button"
                   onClick={() => activeMobileAccount && setSelectedAccountForLedger(activeMobileAccount)}
-                  className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
+                  className="text-sm font-extrabold text-emerald-700 dark:text-emerald-400 flex items-center gap-1 hover:underline cursor-pointer"
                 >
-                  See all
+                  <span>See all</span>
+                  <span className="text-base leading-none">→</span>
                 </button>
               </div>
 
-              {/* Fixed-Height Scrollable Container (Sized for 6+ records) */}
-              <div className="h-[320px] overflow-y-auto overscroll-contain pr-1 scrollbar-thin">
+              {/* Fixed-Height Scrollable Container with Bigger, Bolder List Fonts */}
+              <div className="h-[235px] overflow-y-auto overscroll-contain pr-1 scrollbar-thin">
                 {loadingMobileActivities && !mobileActivities[activeMobileAccount?.id || ''] ? (
-                  <div className="space-y-3.5 py-2">
-                    {[1, 2, 3, 4, 5, 6].map((n) => (
-                      <div key={n} className="flex items-center justify-between gap-3 animate-pulse">
-                        <div className="w-10 h-10 rounded-2xl bg-slate-100 dark:bg-slate-800 shrink-0" />
+                  <div className="space-y-3 py-1">
+                    {[1, 2, 3, 4].map((n) => (
+                      <div key={n} className="flex items-center justify-between gap-3 animate-pulse py-1">
+                        <div className="w-11 h-11 rounded-2xl bg-slate-100 dark:bg-slate-800 shrink-0" />
                         <div className="flex-1 space-y-1.5">
                           <div className="h-3.5 bg-slate-100 dark:bg-slate-800 rounded w-1/2" />
                           <div className="h-2.5 bg-slate-100 dark:bg-slate-800 rounded w-1/3" />
                         </div>
-                        <div className="h-4 bg-slate-100 dark:bg-slate-800 rounded w-16" />
+                        <div className="h-4 bg-slate-100 dark:bg-slate-800 rounded w-20" />
                       </div>
                     ))}
                   </div>
                 ) : (!activeMobileAccount || !(mobileActivities[activeMobileAccount.id] && mobileActivities[activeMobileAccount.id].length > 0)) ? (
-                  <div className="h-full flex flex-col items-center justify-center text-center py-10">
+                  <div className="h-full flex flex-col items-center justify-center text-center py-6">
                     <Inbox className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
-                    <p className="text-xs font-medium text-slate-400">No transactions recorded yet</p>
-                    <p className="text-[11px] text-slate-400/80 mt-0.5">Transactions will appear as payments are processed</p>
+                    <p className="text-sm font-bold text-slate-500 dark:text-slate-400">No transactions recorded yet</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Transactions will appear as payments occur</p>
                   </div>
                 ) : (
-                  <div className="space-y-2.5">
+                  <div className="space-y-1">
                     {(mobileActivities[activeMobileAccount.id] || []).map((act) => {
                       const isInflow = act.direction === 'inflow';
                       const title = act.counterparty || act.type_label || act.description || 'Transaction';
@@ -1779,39 +1871,40 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                         <div
                           key={act.id}
                           onClick={() => activeMobileAccount && setSelectedAccountForLedger(activeMobileAccount)}
-                          className="flex items-center justify-between gap-3 py-1.5 cursor-pointer group hover:bg-slate-50/60 dark:hover:bg-slate-800/40 rounded-xl px-2 transition-colors"
+                          className="flex items-center justify-between gap-3 py-2.5 px-2 cursor-pointer group hover:bg-slate-50/80 dark:hover:bg-slate-800/40 rounded-xl transition-colors border-b border-slate-100/80 dark:border-slate-800/70 last:border-0"
                         >
-                          <div
-                            className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${
-                              isInflow
-                                ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'
-                                : 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400'
-                            }`}
-                          >
-                            {isInflow ? (
-                              <ArrowDownLeft className="w-4.5 h-4.5 stroke-[2.5]" />
-                            ) : (
-                              <ArrowUpRight className="w-4.5 h-4.5 stroke-[2.5]" />
-                            )}
-                          </div>
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div
+                              className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${
+                                isInflow
+                                  ? 'bg-emerald-100/70 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400'
+                                  : 'bg-rose-100/70 dark:bg-rose-950/60 text-rose-500 dark:text-rose-400'
+                              }`}
+                            >
+                              {isInflow ? (
+                                <ArrowDownLeft className="w-5 h-5 stroke-[2.8]" />
+                              ) : (
+                                <ArrowUpRight className="w-5 h-5 stroke-[2.8]" />
+                              )}
+                            </div>
 
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-bold text-sm text-slate-900 dark:text-white truncate">
-                              {title}
-                            </h4>
-                            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 truncate">
-                              {dateFormatted}
-                            </p>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white leading-tight tracking-tight truncate">
+                                {title}
+                              </h4>
+                              <p className="text-xs font-medium text-slate-400 dark:text-slate-500 mt-1 leading-none truncate">
+                                {dateFormatted}
+                              </p>
+                            </div>
                           </div>
 
                           <div className="text-right shrink-0">
                             <span
-                              className={`font-mono font-bold text-sm ${
+                              className={`font-mono font-black text-sm sm:text-base tabular-nums tracking-tight ${
                                 isInflow ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
                               }`}
                             >
-                              {isInflow ? '+ ' : '- '}
-                              ETB {Number(act.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              {isInflow ? '+ ' : '- '}ETB {Math.abs(Number(act.amount || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>
                           </div>
                         </div>
