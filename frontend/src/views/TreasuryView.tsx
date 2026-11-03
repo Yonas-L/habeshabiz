@@ -1498,6 +1498,15 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                   minHeight: mobileCategory === 'reserves' ? '180px' : '266px',
                 }}
               >
+                {mobileCategory === 'banks' && (
+                  <div
+                    aria-hidden="true"
+                    className="absolute inset-x-[10%] top-[14%] bottom-[14%] rounded-[40px] blur-2xl pointer-events-none"
+                    style={{
+                      background: 'radial-gradient(ellipse at center, rgba(15,23,42,0.18) 0%, rgba(16,80,68,0.11) 42%, rgba(15,23,42,0) 76%)',
+                    }}
+                  />
+                )}
                 {mobileAccounts.map((acc, idx) => {
                   const isCash = isCashAccount(acc);
                   const isReserve = mobileCategory === 'reserves';
@@ -1519,7 +1528,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                   const rotateY = isCenter ? 0 : offset * (isReserve ? 0 : -2.5);
                   const scale = isCenter ? 1 : isReserve ? 0.78 : 0.89;
                   const zIndex = isCenter ? 20 : 10;
-                  const opacity = isCenter ? 1 : isReserve ? 0.45 : 0.55;
+                  const opacity = isCenter ? 1 : isReserve ? 0.45 : 0.38;
                   const isInactive = acc.is_active === false;
                   const theme = isReserve ? getAssetCardTheme(acc) : null;
 
@@ -1588,12 +1597,19 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                         </div>
                       ) : (
                         /* AUTHENTIC REALISTIC ATM / DEBIT CARD — FROSTED GLASS (APPLE STYLE) */
+                        <>
+                        {isCenter && (
+                          <div
+                            aria-hidden="true"
+                            className="absolute bottom-[-10px] left-[12%] right-[12%] h-6 rounded-[50%] bg-slate-900/10 blur-xl pointer-events-none"
+                          />
+                        )}
                         <div
-                          className={`relative overflow-hidden rounded-[24px] transition-all duration-300 flex flex-col w-full select-none ${
+                          className={`relative z-10 overflow-hidden rounded-[24px] transition-all duration-300 flex flex-col w-full select-none ${
                             isInactive ? 'opacity-60' : ''
                           }`}
                           style={{
-                            height: '246px',
+                            height: '236px',
                             backgroundColor: 'rgba(255, 255, 255, 0.55)',
                             backdropFilter: 'blur(20px)',
                             WebkitBackdropFilter: 'blur(20px)',
@@ -1670,18 +1686,20 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                             <div
                               className="absolute inset-0"
                               style={{
-                                background: 'linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.12) 45%, rgba(255,255,255,0.3) 100%)',
+                                background: 'linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.12) 30%, rgba(16,185,129,0.035) 62%, rgba(16,185,129,0.10) 100%)',
                               }}
                             />
                             <div
                               className="absolute top-0 left-5 right-5 h-[0.5px]"
-                              style={{ background: 'rgba(255,255,255,0.7)' }}
+                              style={{ background: 'rgba(100,116,139,0.18)' }}
                             />
-                            <svg aria-hidden="true" viewBox="0 0 180 80" className="absolute right-0 bottom-0 h-[72px] w-[162px] text-slate-400/40">
+                            <svg aria-hidden="true" viewBox="0 0 180 80" className="absolute right-0 bottom-0 h-[72px] w-[162px] text-emerald-900/30">
                               <path d="M75 80C95 54 120 34 180 19M103 80C119 57 142 42 180 32M132 80C146 64 160 56 180 49" fill="none" stroke="currentColor" strokeWidth="0.8" />
                               <path d="M121 80C140 57 159 41 180 29" fill="none" stroke="white" strokeOpacity="0.85" strokeWidth="0.8" />
                               <circle cx="153" cy="43" r="2" fill="currentColor" />
                               <circle cx="169" cy="31" r="1.2" fill="currentColor" />
+                              <path d="M18 58h24M18 64h16M18 70h9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeOpacity="0.55" />
+                              <circle cx="47" cy="58" r="1.5" fill="currentColor" fillOpacity="0.55" />
                             </svg>
                             {/* Inactive badge pinned inside the fill zone */}
                             {acc.is_active === false && (
@@ -1692,7 +1710,13 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                               </div>
                             )}
                           </div>
+                          <div
+                            aria-hidden="true"
+                            className="absolute bottom-0 left-0 right-0 h-5 pointer-events-none z-[3] blur-md"
+                            style={{ background: 'linear-gradient(180deg, transparent, rgba(255,255,255,0.45))' }}
+                          />
                         </div>
+                        </>
                       )}
                     </div>
                   );
