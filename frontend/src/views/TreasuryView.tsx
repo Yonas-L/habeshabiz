@@ -1069,7 +1069,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
   const selectedDest = allAccounts.find((a) => a.id === destAccountId);
 
   return (
-    <div className="space-y-2 sm:space-y-5 animate-page-enter">
+    <div className="space-y-1 sm:space-y-5 animate-page-enter">
       {/* 1. Treasury Capital Strip — Desktop Only (hidden sm:grid) */}
       <div className="hidden sm:grid grid-cols-3 gap-px bg-slate-200/60 dark:bg-slate-800/50 rounded-xl overflow-hidden border border-slate-200/60 dark:border-slate-800/60 shadow-xs mb-4">
         {/* Metric 1: Liquid Cash & Banks */}
@@ -1442,9 +1442,9 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
       {/* ========================================================================= */}
       {/* MOBILE VIEW (< sm): ATM-sized cards, touch-slidable, cardless reserves   */}
       {/* ========================================================================= */}
-      <div className="sm:hidden space-y-1.5">
+      <div className="sm:hidden space-y-0">
         {/* Centered Tab Switcher: Banks vs Reserves */}
-        <div className="flex items-center justify-center pt-0 pb-0.5">
+        <div className="flex items-center justify-center py-0">
           <div className="flex items-center p-1 bg-[#e9eef5] dark:bg-slate-800 rounded-full">
             <button
               onClick={() => handleSwitchMobileCategory('banks')}
@@ -1477,7 +1477,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
         ) : (
           <>
             <div
-              className="relative -mx-4 px-4 pt-0 pb-0 overflow-hidden select-none cursor-grab active:cursor-grabbing"
+              className="relative -mx-4 px-4 pt-0 pb-0 -mt-2 overflow-hidden select-none cursor-grab active:cursor-grabbing"
               onTouchStart={(e) => handleGestureStart(e.targetTouches[0].clientX, e.targetTouches[0].clientY)}
               onTouchMove={(e) => handleGestureMove(e.targetTouches[0].clientX, e.targetTouches[0].clientY)}
               onTouchEnd={handleGestureEnd}
