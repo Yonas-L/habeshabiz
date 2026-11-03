@@ -1495,13 +1495,13 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                 className="flex items-center justify-center relative"
                 style={{
                   perspective: '1200px',
-                  minHeight: mobileCategory === 'reserves' ? '180px' : '266px',
+                  minHeight: mobileCategory === 'reserves' ? '180px' : '255px',
                 }}
               >
                 {mobileCategory === 'banks' && (
                   <div
                     aria-hidden="true"
-                    className="absolute inset-x-[10%] top-[14%] bottom-[14%] rounded-[40px] blur-2xl pointer-events-none"
+                    className="absolute inset-x-[12%] top-[14%] bottom-[14%] rounded-[40px] blur-2xl pointer-events-none"
                     style={{
                       background: 'radial-gradient(ellipse at center, rgba(15,23,42,0.18) 0%, rgba(16,80,68,0.11) 42%, rgba(15,23,42,0) 76%)',
                     }}
@@ -1523,7 +1523,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                   if (!isVisible) return null;
 
                   // 3D positioning: natural clearance so back cards are never clipped by square borders
-                  const translateX = isCenter ? 0 : offset * (isReserve ? 95 : 38);
+                  const translateX = isCenter ? 0 : offset * (isReserve ? 95 : 30);
                   const translateZ = isCenter ? 20 : -35;
                   const rotateY = isCenter ? 0 : offset * (isReserve ? 0 : -2.5);
                   const scale = isCenter ? 1 : isReserve ? 0.78 : 0.89;
@@ -1543,8 +1543,8 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                         opacity,
                         filter: isReserve ? 'none' : isCenter ? 'none' : 'blur(10px)',
                         WebkitFilter: isReserve ? 'none' : isCenter ? 'none' : 'blur(10px)',
-                        width: isReserve ? '130px' : 'calc(100vw - 32px)',
-                        maxWidth: isReserve ? '130px' : '440px',
+                        width: isReserve ? '130px' : 'min(calc(100vw - 32px), 356px)',
+                        maxWidth: isReserve ? '130px' : '356px',
                         cursor: 'pointer',
                       }}
                     >
@@ -1601,15 +1601,15 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                         {isCenter && (
                           <div
                             aria-hidden="true"
-                            className="absolute bottom-[-10px] left-[12%] right-[12%] h-6 rounded-[50%] bg-slate-900/10 blur-xl pointer-events-none"
+                            className="absolute bottom-[-10px] left-[10%] right-[10%] h-6 rounded-[50%] bg-slate-900/10 blur-xl pointer-events-none"
                           />
                         )}
                         <div
-                          className={`relative z-10 overflow-hidden rounded-[20px] transition-all duration-300 flex flex-col w-full select-none ${
+                          className={`relative z-10 overflow-hidden rounded-[20px] transition-all duration-300 flex flex-col justify-between w-full select-none ${
                             isInactive ? 'opacity-60' : ''
                           }`}
                           style={{
-                            height: '216px',
+                            aspectRatio: '1.586 / 1',
                             backgroundColor: 'rgba(255, 255, 255, 0.55)',
                             backdropFilter: 'blur(20px)',
                             WebkitBackdropFilter: 'blur(20px)',
@@ -1628,10 +1628,10 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                           />
 
                           {/* ── TOP SECTION: Logo + bank name flush to top ── */}
-                          <div className="relative z-10 px-5 pt-5 flex items-center justify-between gap-3">
+                          <div className="relative z-10 px-5 pt-4.5 flex items-center justify-between gap-3">
                             {/* Left: logo + name stacked tight */}
                             <div className="flex items-center gap-3 min-w-0">
-                              <FramelessCardLogo account={acc} className="w-11 h-11 shrink-0" />
+                              <FramelessCardLogo account={acc} className="w-10.5 h-10.5 shrink-0" />
                               <div className="min-w-0">
                                 <div className="font-black text-slate-900 text-[15px] leading-tight tracking-tight truncate max-w-[160px]">
                                   {acc.name}
@@ -1656,18 +1656,18 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                                   <Landmark className="w-4 h-4 text-emerald-600" />
                                 </div>
                               ) : (
-                              <EmvChip className="w-10 h-8" />
+                                <EmvChip className="w-9.5 h-7.5" />
                               )}
                             </div>
                           </div>
 
                           {/* ── MIDDLE: Balance + account number directly below logo with comfortable gap ── */}
-                          <div className="relative z-10 px-5 pt-3.5">
+                          <div className="relative z-10 px-5 py-1">
                             <span className="text-[9px] font-black uppercase tracking-[0.22em] text-slate-600 block mb-[3px]">
                               {isCash ? 'CASH IN SAFE' : 'TOTAL BALANCE'}
                             </span>
                             <div className="flex items-baseline gap-2 whitespace-nowrap">
-                              <div className="font-mono font-black text-[clamp(1.4rem,7.5vw,1.95rem)] leading-none tabular-nums text-slate-900 tracking-tight">
+                              <div className="font-mono font-black text-[clamp(1.35rem,6.8vw,1.8rem)] leading-none tabular-nums text-slate-900 tracking-tight">
                                 {!isBalancesHidden ? (
                                   <AnimatedNumber value={Number(acc.current_balance || 0)} decimals={2} />
                                 ) : (
@@ -1676,13 +1676,13 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                               </div>
                               <span className="text-sm font-black text-slate-600 font-sans">ETB</span>
                             </div>
-                            <div className="font-mono text-[11px] font-bold text-slate-600 mt-[6px] tracking-[0.14em]">
+                            <div className="font-mono text-[11px] font-bold text-slate-600 mt-[5px] tracking-[0.14em]">
                               {isCash ? 'Physical Cash Safe' : formatUnhiddenAccountNumber(acc.account_number, acc.id)}
                             </div>
                           </div>
 
                           {/* ── BOTTOM FILL: Quiet etched line work gives the card a premium finish ── */}
-                          <div className="absolute bottom-0 left-0 right-0 h-[58px] pointer-events-none z-[2] overflow-hidden rounded-b-[20px]">
+                          <div className="absolute bottom-0 left-0 right-0 h-[56px] pointer-events-none z-[2] overflow-hidden rounded-b-[20px]">
                             <div
                               className="absolute inset-0"
                               style={{
@@ -1693,7 +1693,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                               className="absolute top-0 left-5 right-5 h-[0.5px]"
                               style={{ background: 'rgba(100,116,139,0.18)' }}
                             />
-                            <svg aria-hidden="true" viewBox="0 0 180 80" className="absolute right-0 bottom-0 h-[58px] w-[145px] text-emerald-900/30">
+                            <svg aria-hidden="true" viewBox="0 0 180 80" className="absolute right-0 bottom-0 h-[56px] w-[140px] text-emerald-900/30">
                               <path d="M75 80C95 54 120 34 180 19M103 80C119 57 142 42 180 32M132 80C146 64 160 56 180 49" fill="none" stroke="currentColor" strokeWidth="0.8" />
                               <path d="M121 80C140 57 159 41 180 29" fill="none" stroke="white" strokeOpacity="0.85" strokeWidth="0.8" />
                               <circle cx="153" cy="43" r="2" fill="currentColor" />
@@ -1703,7 +1703,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                             </svg>
                             {/* Inactive badge pinned inside the fill zone */}
                             {acc.is_active === false && (
-                              <div className="absolute bottom-3.5 right-4 flex items-center">
+                              <div className="absolute bottom-3 right-4 flex items-center">
                                 <span className="text-[9px] font-bold text-rose-600 uppercase tracking-widest bg-rose-50/90 px-2 py-0.5 rounded-full border border-rose-200/70">
                                   Inactive
                                 </span>
