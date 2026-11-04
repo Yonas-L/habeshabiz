@@ -21,6 +21,8 @@ import { CustomPageLoader } from '../components/loading/CustomPageLoader';
 
 interface DebtsViewProps {
   accounts: FinancialAccount[];
+  initialDebtType?: 'receivable' | 'payable' | null;
+  onClearInitialContext?: () => void;
 }
 
 interface PartyDebtGroup {
@@ -61,11 +63,18 @@ const getOriginLabel = (refType?: string) => {
   }
 };
 
-export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
+export const DebtsView: React.FC<DebtsViewProps> = ({ accounts, initialDebtType, onClearInitialContext }) => {
   const [debts, setDebts] = useState<Debt[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
-  const [debtType, setDebtType] = useState<'receivable' | 'payable'>('receivable');
+  const [debtType, setDebtType] = useState<'receivable' | 'payable'>(() => {
+    if (initialDebtType) return initialDebtType;
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash.toLowerCase();
+      if (hash.includes('payable')) return 'payable';
+    }
+    return 'receivable';
+  });
   const [statusFilter, setStatusFilter] = useState<'active' | 'all' | 'settled'>('active');
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -88,6 +97,14 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts }) => {
   // Delete confirmation
   const [deletingDebt, setDeletingDebt] = useState<Debt | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    if (initialDebtType && (initialDebtType === 'receivable' || initialDebtType === 'payable')) {
+      setDebtType(initialDebtType);
+      setCurrentPage(1);
+      onClearInitialContext?.();
+    }
+  }, [initialDebtType, onClearInitialContext]);
 
   useEffect(() => {
     loadDebts();

@@ -105,7 +105,7 @@ export const SlideOverDrawer: React.FC<SlideOverDrawerProps> = ({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors active:scale-95 cursor-pointer"
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors active:scale-95 cursor-pointer"
                   aria-label="Close drawer"
                 >
                   <X className="w-4 h-4" />

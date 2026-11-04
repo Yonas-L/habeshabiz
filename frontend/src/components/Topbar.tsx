@@ -165,50 +165,51 @@ export const Topbar: React.FC<TopbarProps> = ({
           type="button"
           onClick={onOpenMobileSidebar}
           aria-label="Open Navigation Menu"
-          className="md:hidden w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 text-slate-700 dark:text-slate-200 hover:text-slate-900 flex items-center justify-center shadow-xs active:scale-95 shrink-0"
+          className="md:hidden w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-white dark:bg-slate-800 border-0 text-slate-700 dark:text-slate-200 hover:text-slate-900 flex items-center justify-center shadow-xs active:scale-95 shrink-0"
         >
           <Menu className="w-4 h-4" />
         </button>
 
         <div className="min-w-0">
-          <h1 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white tracking-tight leading-tight truncate">
-            {current.title}
+          <h1 className="text-base sm:text-lg 2xl:text-xl font-extrabold text-slate-900 dark:text-white tracking-tight leading-tight truncate">
+            {activeTab === 'overview' ? (
+              <span>
+                {timeGreeting}{' '}
+                <button
+                  type="button"
+                  onClick={onOpenProfile}
+                  title="Profile & Settings"
+                  className="text-emerald-700 dark:text-emerald-400 font-extrabold hover:underline cursor-pointer inline-flex items-center text-left"
+                >
+                  {user?.name ? user.name.trim() : 'Store Owner'}
+                </button>
+              </span>
+            ) : (
+              current.title
+            )}
           </h1>
-          <p className="text-[11px] text-slate-400 dark:text-slate-500 hidden sm:block mt-0.5 font-medium truncate">
-            {current.subtitle}
+          <p className="text-xs text-slate-500 dark:text-slate-400 hidden sm:block mt-0.5 font-medium truncate">
+            {activeTab === 'overview' ? (
+              <span>Store Performance & Working Capital Overview</span>
+            ) : (
+              current.subtitle
+            )}
           </p>
         </div>
       </div>
 
       {/* Right Header Area */}
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-        {/* User Persona Pill (Clickable for Account Settings) */}
-        {user && (
-          <button
-            type="button"
-            onClick={onOpenProfile}
-            title="Manage account details & password"
-            className="hidden md:flex items-center gap-2 px-3 h-10 sm:h-11 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/90 shadow-xs text-xs font-semibold text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700 transition-colors"
-          >
-            <span
-              className={`w-2 h-2 rounded-full ${
-                user.role === 'owner' ? 'bg-purple-500' : 'bg-emerald-500'
-              }`}
-            />
-            <span>{user.name} ({user.role === 'owner' ? 'Owner' : 'Sales'})</span>
-          </button>
-        )}
-
         {/* Interactive Month Selector Popover */}
         <div className="relative" ref={pickerRef}>
           <button
             type="button"
             onClick={() => setIsMonthPickerOpen((prev) => !prev)}
             title="Filter by month"
-            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 h-10 sm:h-11 rounded-xl bg-white dark:bg-[#131926] border text-xs sm:text-sm font-semibold shadow-xs transition-all cursor-pointer select-none ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 h-10 sm:h-11 rounded-xl bg-white dark:bg-[#131926] border-0 text-xs sm:text-sm font-semibold shadow-xs transition-all cursor-pointer select-none ${
               isMonthPickerOpen
-                ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400 ring-2 ring-emerald-500/20'
-                : 'border-slate-200/80 dark:border-slate-800/90 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700'
+                ? 'text-emerald-600 dark:text-emerald-400 ring-2 ring-emerald-500/20'
+                : 'text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             <Calendar className={`w-4 h-4 sm:w-4.5 sm:h-4.5 shrink-0 ${isMonthPickerOpen ? 'text-emerald-500' : 'text-slate-400'}`} />
@@ -295,10 +296,10 @@ export const Topbar: React.FC<TopbarProps> = ({
             onClick={toggleHideBalances}
             title={isBalancesHidden ? 'Reveal balances & financial numbers' : 'Hide balances & financial numbers'}
             aria-label={isBalancesHidden ? 'Reveal balances & financial numbers' : 'Hide balances & financial numbers'}
-            className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl border flex items-center justify-center transition-all shadow-xs active:scale-95 cursor-pointer shrink-0 ${
+            className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl border-0 flex items-center justify-center transition-all shadow-xs active:scale-95 cursor-pointer shrink-0 ${
               isBalancesHidden
-                ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-600 dark:text-amber-400'
-                : 'bg-white dark:bg-[#131926] border-slate-200/80 dark:border-slate-800/90 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400'
+                : 'bg-white dark:bg-[#131926] text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             {isBalancesHidden ? (
@@ -315,7 +316,7 @@ export const Topbar: React.FC<TopbarProps> = ({
             type="button"
             onClick={onToggleTheme}
             title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-            className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/90 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition-colors shadow-xs active:scale-95 cursor-pointer shrink-0"
+            className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white dark:bg-[#131926] border-0 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition-colors shadow-xs active:scale-95 cursor-pointer shrink-0"
           >
             {theme === 'dark' ? (
               <Sun className="w-5 h-5 text-amber-400" />

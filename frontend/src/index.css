@@ -133,6 +133,17 @@ html.dark body {
   font-feature-settings: "tnum";
 }
 
+/* Remove spin buttons from number inputs globally to prevent text and badge clipping */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 /* Subtle luxury scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
@@ -286,8 +297,43 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   animation: pageEnter 0.25s ease-out forwards;
 }
 
+@keyframes modalSmoothDesktop {
+  0% {
+    opacity: 0;
+    transform: scale(0.98) translateY(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes modalSmoothMobile {
+  0% {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-modal-smooth {
+  animation: modalSmoothMobile 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+@media (min-width: 640px) {
+  .animate-modal-smooth {
+    animation: modalSmoothDesktop 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+}
+
 .animate-modal-enter {
-  animation: modalEnter 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: modalSmoothDesktop 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   will-change: transform, opacity;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;

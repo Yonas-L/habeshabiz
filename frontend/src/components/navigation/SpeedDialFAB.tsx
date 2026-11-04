@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   Plus,
   ShoppingCart,
-  ArrowDownLeft,
+  ArrowUpRight,
   PackagePlus,
   X,
 } from 'lucide-react';
@@ -41,7 +41,7 @@ export const SpeedDialFAB: React.FC<SpeedDialFABProps> = ({
           {
             id: 'expense',
             label: 'Record Expense',
-            icon: ArrowDownLeft,
+            icon: ArrowUpRight,
             onClick: () => {
               handleClose();
               onRecordExpense();

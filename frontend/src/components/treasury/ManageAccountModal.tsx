@@ -14,10 +14,10 @@ import {
   Globe,
   ImagePlus,
   Trash2,
+  Loader2,
 } from 'lucide-react';
 import { PRESET_BANK_LOGOS, PRESET_RESERVE_LOGOS } from '../../utils/bankLogos';
 import { formatCurrencyInput, parseFormattedNumber } from '../../utils/numberUtils';
-import { LdrsSpinner } from '../loading/LdrsSpinner';
 
 interface ManageAccountModalProps {
   isOpen: boolean;
@@ -430,20 +430,20 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
 
   const modalContent = (
     <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-xs" onClick={onClose} />
+      <div className="fixed inset-0 bg-slate-950/50 dark:bg-black/70 backdrop-blur-xs animate-backdrop-enter" onClick={onClose} />
 
-      <div className="relative z-10 w-full max-w-xl mx-0 sm:mx-4 bg-white dark:bg-[#131926] rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-slate-200/80 dark:border-slate-800 overflow-hidden max-sm:animate-bottom-sheet sm:animate-modal-enter max-h-[90vh] sm:max-h-[88vh] flex flex-col my-0 sm:my-auto">
+      <div className="relative z-10 w-full max-w-xl bg-white dark:bg-[#131926] rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-slate-100 dark:border-slate-800 overflow-hidden animate-modal-smooth max-h-[88vh] sm:max-h-[85vh] flex flex-col my-0 sm:my-auto">
         {/* Mobile Drag Indicator */}
         <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mt-2.5 mb-1 sm:hidden shrink-0" />
 
         {/* Header */}
-        <div className="flex items-center justify-between p-5 sm:p-6 border-b border-slate-100 dark:border-slate-800 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-slate-900 dark:bg-slate-900 border border-slate-800 flex items-center justify-center text-emerald-400 shrink-0 shadow-inner">
+        <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-slate-800 shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center shrink-0">
               {isAssetType ? <Coins className="w-4 h-4" /> : <Landmark className="w-4 h-4" />}
             </div>
             <div>
-              <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
+              <h2 className="text-base font-bold text-slate-900 dark:text-white leading-none">
                 {isEditing
                   ? isAssetType
                     ? 'Add Reserve Balance'
@@ -452,7 +452,7 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
                   ? 'Add Reserve'
                   : 'Add Account'}
               </h2>
-              <p className="text-[11px] text-slate-400 mt-0.5">
+              <p className="text-xs text-slate-400 mt-1">
                 {isAssetType
                   ? 'Hedge asset with live ETB conversion'
                   : 'Bank, mobile wallet, or cash drawer'}
@@ -462,17 +462,17 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4 flex-1 overflow-y-auto custom-scrollbar">
+        <form id="manage-account-form" onSubmit={handleSubmit} className="p-5 space-y-4 flex-1 overflow-y-auto">
           {/* Account Category Selector */}
           {!isEditing && (
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
                 Category
               </label>
               <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
@@ -497,19 +497,19 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
                           setLogo(null);
                         }
                       }}
-                      className={`flex flex-col items-center gap-1.5 p-2 rounded-xl border transition-all text-center cursor-pointer ${
+                      className={`flex flex-col items-center gap-1.5 p-2.5 rounded-lg border transition-all text-center cursor-pointer ${
                         isSelected
                           ? colorMap[t.color] || 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30'
                           : inactiveStyle
                       }`}
                     >
                       <Icon
-                        className={`w-3.5 h-3.5 ${
+                        className={`w-4 h-4 ${
                           isSelected ? 'text-emerald-500 dark:text-emerald-400' : 'text-slate-400'
                         }`}
                       />
                       <span
-                        className={`text-[9px] font-bold leading-tight ${
+                        className={`text-[11px] font-semibold leading-tight ${
                           isSelected
                             ? 'text-slate-900 dark:text-white'
                             : 'text-slate-500 dark:text-slate-400'
@@ -601,7 +601,7 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
 
               {/* 2. RESERVE NAME */}
               <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
                   Name *
                 </label>
                 <input
@@ -615,14 +615,14 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
                       ? 'e.g. Bybit USDT, Binance Cold Wallet'
                       : 'e.g. USD Safe Vault, Commercial FX Reserve'
                   }
-                  className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20"
+                  className="w-full h-10 px-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-slate-900 dark:focus:border-white focus:ring-1 focus:ring-inset focus:ring-slate-900 dark:focus:ring-white"
                   required
                 />
               </div>
 
               {/* 3. CHOOSE CURRENCY */}
               <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
                   Currency
                 </label>
                 <div className="flex flex-wrap gap-1.5">
@@ -633,9 +633,9 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
                         key={c.code}
                         type="button"
                         onClick={() => handleSelectReserveCurrency(c.code)}
-                        className={`h-7 px-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
+                        className={`h-8 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
                           isSelected
-                            ? 'bg-slate-900 dark:bg-slate-900 text-emerald-400 border-slate-800 shadow-xs ring-1 ring-emerald-500/30'
+                            ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white shadow-xs'
                             : 'bg-slate-50 dark:bg-slate-900/60 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
                         }`}
                       >
@@ -646,9 +646,9 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
                   <button
                     type="button"
                     onClick={() => handleSelectReserveCurrency('CUSTOM')}
-                    className={`h-7 px-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
+                    className={`h-8 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
                       isCustomCurrency
-                        ? 'bg-slate-900 dark:bg-slate-900 text-emerald-400 border-slate-800 shadow-xs ring-1 ring-emerald-500/30'
+                        ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white shadow-xs'
                         : 'bg-slate-50 dark:bg-slate-900/60 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
                     }`}
                   >
@@ -664,9 +664,9 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
                       onChange={(e) => setCustomCurrencyCode(e.target.value.toUpperCase())}
                       placeholder="e.g. AUD, CHF, QAR, SAR"
                       maxLength={8}
-                      className="w-32 h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs font-mono font-bold uppercase text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20"
+                      className="w-32 h-9 px-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-mono font-bold uppercase text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900 dark:focus:ring-white"
                     />
-                    <span className="text-[10px] text-slate-400">
+                    <span className="text-xs text-slate-400">
                       Enter currency code
                     </span>
                   </div>
@@ -676,7 +676,7 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
               {/* 4. DYNAMIC HOLDINGS & LIVE CONVERSION */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-2">
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                     Holdings & Rate
                   </label>
                   <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 shrink-0 whitespace-nowrap">
@@ -685,7 +685,7 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
                 </div>
 
                 {/* Column header labels */}
-                <div className="grid grid-cols-[1fr_auto_1fr_auto_minmax(90px,1.2fr)_auto] gap-1.5 sm:gap-2 px-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                <div className="grid grid-cols-[1fr_auto_1fr_auto_minmax(90px,1.2fr)_auto] gap-1.5 sm:gap-2 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
                   <div>Amount ({effectiveCurrency})</div>
                   <div className="w-3 text-center invisible">×</div>
                   <div>ETB Price</div>
@@ -695,7 +695,7 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
                 </div>
 
                 {/* Scrollable list of entries */}
-                <div className="max-h-52 sm:max-h-56 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                <div className="max-h-52 sm:max-h-56 overflow-y-auto space-y-2 p-1 custom-scrollbar">
                   {holdings.map((row) => {
                     const rowAmt = parseFormattedNumber(row.amount) || 0;
                     const rowRate = parseFormattedNumber(row.rate) || 0;
@@ -721,9 +721,9 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
                             value={row.amount}
                             onChange={(e) => updateHoldingAmount(row.id, e.target.value)}
                             placeholder="0.00"
-                            className="w-full h-8.5 pl-2.5 pr-7 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs font-mono font-bold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition-all"
+                            className="w-full h-9 pl-2.5 pr-11 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-mono font-bold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-slate-900 dark:focus:border-white focus:ring-1 focus:ring-inset focus:ring-slate-900 dark:focus:ring-white transition-all"
                           />
-                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-400 pointer-events-none uppercase">
+                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 pointer-events-none uppercase">
                             {effectiveCurrency === 'GOLD' ? 'g' : effectiveCurrency}
                           </span>
                         </div>
@@ -741,9 +741,9 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
                             value={row.rate}
                             onChange={(e) => updateHoldingRate(row.id, e.target.value)}
                             placeholder="Rate"
-                            className="w-full h-8.5 pl-2.5 pr-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs font-mono font-bold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition-all"
+                            className="w-full h-9 pl-2.5 pr-11 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-mono font-bold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-slate-900 dark:focus:border-white focus:ring-1 focus:ring-inset focus:ring-slate-900 dark:focus:ring-white transition-all"
                           />
-                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-400 pointer-events-none">
+                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 pointer-events-none">
                             ETB
                           </span>
                         </div>
@@ -783,9 +783,9 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
                 <button
                   type="button"
                   onClick={addHoldingRow}
-                  className="h-8 px-3 rounded-xl border border-dashed border-slate-300 dark:border-slate-800 hover:border-emerald-500 text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all w-full cursor-pointer hover:bg-emerald-50/30 dark:hover:bg-emerald-950/10"
+                  className="h-9 px-3 rounded-lg border border-dashed border-slate-300 dark:border-slate-700 hover:border-slate-400 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all w-full cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-850"
                 >
-                  <Plus className="w-3.5 h-3.5 text-emerald-500" />
+                  <Plus className="w-3.5 h-3.5" />
                   <span>Add Entry</span>
                 </button>
               </div>
@@ -811,12 +811,12 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
                   <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">
                     Valuation
                   </span>
-                  <span className="text-sm sm:text-base font-black font-mono text-emerald-500 dark:text-emerald-400 tabular-nums">
+                  <span className="text-sm sm:text-base font-black font-mono text-emerald-600 dark:text-emerald-400 tabular-nums">
                     {totalEtbValue.toLocaleString(undefined, {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
                     })}{' '}
-                    <span className="text-[10px] font-sans font-bold text-emerald-500/70">
+                    <span className="text-[10px] font-sans font-bold text-emerald-600/70 dark:text-emerald-400/70">
                       ETB
                     </span>
                   </span>
@@ -831,7 +831,7 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
               {/* Account Name & Number */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
                     Account Name *
                   </label>
                   <input
@@ -845,13 +845,13 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
                         ? 'e.g. TeleBirr'
                         : 'e.g. Shop Cash Drawer'
                     }
-                    className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20"
+                    className="w-full h-10 px-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-slate-900 dark:focus:border-white focus:ring-1 focus:ring-inset focus:ring-slate-900 dark:focus:ring-white"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
                     Account Number
                   </label>
                   <input
@@ -859,14 +859,14 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
                     value={accountNumber}
                     onChange={(e) => setAccountNumber(e.target.value)}
                     placeholder="e.g. 1000xxxxxxxx"
-                    className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs font-mono font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20"
+                    className="w-full h-10 px-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm font-mono font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-slate-900 dark:focus:border-white focus:ring-1 focus:ring-inset focus:ring-slate-900 dark:focus:ring-white"
                   />
                 </div>
               </div>
 
               {/* Bank Logo Presets */}
               <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
                   Bank / Account Logo (optional)
                 </label>
 
@@ -881,7 +881,7 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
                         className={`flex flex-col items-center gap-1 p-1.5 rounded-lg border transition-all cursor-pointer ${
                           isSelected
                             ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/30 shadow-xs'
-                            : 'border-transparent hover:border-slate-200 dark:hover:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60'
+                            : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60'
                         }`}
                         title={preset.name}
                       >
@@ -891,7 +891,7 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
                           className="w-7 h-7 rounded-md object-cover"
                         />
                         <span
-                          className={`text-[8px] font-bold leading-tight ${
+                          className={`text-[9px] font-bold leading-tight ${
                             isSelected
                               ? 'text-emerald-600 dark:text-emerald-400'
                               : 'text-slate-400'
@@ -915,16 +915,16 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
                   <button
                     type="button"
                     onClick={() => logoInputRef.current?.click()}
-                    className="h-6 px-2 rounded-lg border border-slate-200 dark:border-slate-800 text-[10px] font-semibold text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer flex items-center gap-1"
+                    className="h-7 px-2.5 rounded-lg border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer flex items-center gap-1.5"
                   >
-                    <ImagePlus className="w-3 h-3 text-slate-400" />
+                    <ImagePlus className="w-3.5 h-3.5 text-slate-400" />
                     <span>Upload Custom</span>
                   </button>
                   {logo && (
                     <button
                       type="button"
                       onClick={() => setLogo(null)}
-                      className="text-[10px] text-rose-500 hover:text-rose-700 font-medium cursor-pointer"
+                      className="text-xs text-rose-500 hover:text-rose-700 font-semibold cursor-pointer"
                     >
                       Clear
                     </button>
@@ -935,13 +935,13 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
               {/* Currency & Opening Balance / Balance Adjustment */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
                     Currency
                   </label>
                   <select
                     value={currency}
                     onChange={(e) => setCurrency(e.target.value)}
-                    className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20"
+                    className="w-full h-10 px-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm font-medium text-slate-900 dark:text-white focus:outline-none focus:border-slate-900 dark:focus:border-white focus:ring-1 focus:ring-inset focus:ring-slate-900 dark:focus:ring-white cursor-pointer"
                   >
                     <option value="ETB">ETB — Ethiopian Birr</option>
                     <option value="USD">USD — US Dollar</option>
@@ -951,7 +951,7 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
                     {isEditing ? 'Current Balance' : 'Opening Balance'}
                   </label>
                   <input
@@ -967,22 +967,22 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
                       }
                     }}
                     placeholder="0.00"
-                    className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs font-mono font-bold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20"
+                    className="w-full h-10 px-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm font-mono font-bold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-slate-900 dark:focus:border-white focus:ring-1 focus:ring-inset focus:ring-slate-900 dark:focus:ring-white"
                   />
                   {isEditing && (
-                    <p className="text-[10px] text-slate-400 mt-1">Direct balance adjustment</p>
+                    <p className="text-[11px] text-slate-400 mt-1">Direct balance adjustment</p>
                   )}
                 </div>
               </div>
 
               {/* Outgoing Transaction Fee (Optional) */}
-              <div className="p-3 rounded-2xl bg-slate-50/70 dark:bg-slate-900/40 border border-slate-200/60 dark:border-slate-850 space-y-2">
+              <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800 space-y-2">
                 <div className="flex items-center justify-between">
                   <div>
-                    <span className="text-[11px] font-bold text-slate-800 dark:text-slate-200 block">
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
                       Outgoing Transaction Fee (Optional)
                     </span>
-                    <p className="text-[10px] text-slate-400 leading-relaxed">
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
                       Auto-deducted on transfers & payouts to match carrier/bank charges.
                     </p>
                   </div>
@@ -990,14 +990,14 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
 
                 <div className="grid grid-cols-12 gap-2">
                   {/* Fee Type Pill Selector */}
-                  <div className="col-span-12 sm:col-span-6 flex rounded-xl bg-white dark:bg-slate-800 p-0.5 border border-slate-200 dark:border-slate-700">
+                  <div className="col-span-12 sm:col-span-6 flex rounded-lg bg-white dark:bg-slate-800 p-0.5 border border-slate-200 dark:border-slate-700">
                     <button
                       type="button"
                       onClick={() => {
                         setFeeType('none');
                         setFeeAmount('');
                       }}
-                      className={`flex-1 py-1 text-[10px] font-bold rounded-lg transition-all cursor-pointer ${
+                      className={`flex-1 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer ${
                         feeType === 'none'
                           ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
                           : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
@@ -1008,7 +1008,7 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setFeeType('percentage')}
-                      className={`flex-1 py-1 text-[10px] font-bold rounded-lg transition-all cursor-pointer ${
+                      className={`flex-1 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer ${
                         feeType === 'percentage'
                           ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
                           : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
@@ -1019,7 +1019,7 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setFeeType('fixed')}
-                      className={`flex-1 py-1 text-[10px] font-bold rounded-lg transition-all cursor-pointer ${
+                      className={`flex-1 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer ${
                         feeType === 'fixed'
                           ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
                           : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
@@ -1039,14 +1039,14 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
                         value={feeAmount}
                         onChange={(e) => setFeeAmount(e.target.value)}
                         placeholder={feeType === 'percentage' ? 'e.g. 1.5' : 'e.g. 10'}
-                        className="w-full h-8 pl-2.5 pr-12 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono font-bold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20"
+                        className="w-full h-8 pl-2.5 pr-12 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono font-bold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-slate-900 dark:focus:border-white focus:ring-1 focus:ring-inset focus:ring-slate-900 dark:focus:ring-white"
                       />
                       <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 uppercase pointer-events-none">
                         {feeType === 'percentage' ? '%' : currency}
                       </span>
                     </div>
                   ) : (
-                    <div className="col-span-12 sm:col-span-6 flex items-center text-[10px] text-slate-400 px-2 italic">
+                    <div className="col-span-12 sm:col-span-6 flex items-center text-xs text-slate-400 px-2 italic">
                       0 fee per transaction
                     </div>
                   )}
@@ -1057,22 +1057,23 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
         </form>
 
         {/* Modal Footer */}
-        <div className="flex items-center justify-end gap-2.5 p-4 sm:p-5 border-t border-slate-100 dark:border-slate-800 shrink-0 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] sm:pb-5">
+        <div className="flex items-center justify-end gap-2.5 p-4 sm:p-5 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-[#131926] shrink-0 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] sm:pb-5">
           <button
             type="button"
             onClick={onClose}
-            className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            className="h-10 px-4 rounded-lg border border-slate-200 dark:border-slate-700 text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
           >
             Cancel
           </button>
           <button
-            onClick={handleSubmit}
+            type="submit"
+            form="manage-account-form"
             disabled={submitting}
-            className="h-9 px-5 rounded-xl bg-slate-900 dark:bg-slate-900 text-emerald-400 border border-slate-800 hover:bg-slate-800 hover:text-emerald-300 text-xs font-bold transition-all shadow-xs active:scale-[0.98] flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+            className="h-10 px-5 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs sm:text-sm font-bold hover:bg-slate-800 dark:hover:bg-slate-100 disabled:opacity-50 transition-all shadow-xs active:scale-[0.98] flex items-center gap-1.5 cursor-pointer"
           >
             {submitting ? (
               <>
-                <LdrsSpinner variant="ring2" size={14} color="#34d399" />
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 <span>Saving...</span>
               </>
             ) : (

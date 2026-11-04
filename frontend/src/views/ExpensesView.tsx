@@ -294,14 +294,14 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
         {/* 4. Owner Draws */}
         <div className="bg-white dark:bg-[#131926] rounded-xl border border-slate-200/70 dark:border-slate-800/80 p-4 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-purple-600/80 dark:text-purple-400/80">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Owner Draws
             </span>
-            <div className="w-7 h-7 rounded-lg bg-purple-50 dark:bg-purple-950/40 border border-purple-100 dark:border-purple-900/40 flex items-center justify-center">
-              <UserMinus className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+            <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60 flex items-center justify-center">
+              <UserMinus className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400" />
             </div>
           </div>
-          <div className="text-xl font-bold font-mono tracking-tight text-purple-600 dark:text-purple-400 mt-2">
+          <div className="text-xl font-bold font-mono tracking-tight text-slate-900 dark:text-white mt-2">
             <AnimatedNumber value={ownerDrawsTotal} decimals={2} />{' '}
             <span className="text-[11px] font-medium text-slate-400 font-sans">ETB</span>
           </div>
@@ -330,8 +330,8 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
           </div>
         </div>
         <div className="bg-white dark:bg-[#131926] rounded-xl border border-slate-200/80 dark:border-slate-800/80 p-3 shadow-xs">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-purple-500">Owner Draws</div>
-          <div className="text-sm font-bold font-mono text-purple-600 dark:text-purple-400 mt-1">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Owner Draws</div>
+          <div className="text-sm font-bold font-mono text-slate-900 dark:text-white mt-1">
             <AnimatedNumber value={ownerDrawsTotal} decimals={0} /> <span className="text-[9px] text-slate-400 font-sans">ETB</span>
           </div>
         </div>
@@ -485,7 +485,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
                           item.isFee
                             ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200/50 dark:border-blue-900/50'
                             : item.isOwnerDraw
-                            ? 'bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200/50 dark:border-purple-900/50'
+                            ? 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200/60 dark:border-slate-700/60'
                             : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
                         }`}
                       >
@@ -605,7 +605,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
                         item.isFee
                           ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300'
                           : item.isOwnerDraw
-                          ? 'bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300'
+                          ? 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200'
                           : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
                       }`}
                     >

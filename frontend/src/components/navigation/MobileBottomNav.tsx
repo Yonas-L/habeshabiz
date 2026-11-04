@@ -4,7 +4,7 @@ import {
   ShoppingCart,
   Package,
   CreditCard,
-  ArrowDownLeft,
+  ArrowUpRight,
   PackagePlus,
   ArrowLeftRight,
   Receipt,
@@ -127,7 +127,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                 className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800/80 active:scale-98 transition-all cursor-pointer text-left"
               >
                 <span className="w-8 h-8 rounded-lg bg-rose-500/15 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
-                  <ArrowDownLeft className="w-4 h-4 stroke-[2.2]" />
+                  <ArrowUpRight className="w-4 h-4 stroke-[2.2]" />
                 </span>
                 <span>Record Expense</span>
               </button>

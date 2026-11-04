@@ -119,11 +119,11 @@ export const PartySettleModal: React.FC<PartySettleModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg bg-white dark:bg-[#131926] rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150"
+        className="w-full max-w-lg bg-white dark:bg-[#131926] rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden animate-modal-smooth"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+        <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0">
           <div>
             <h3 className="text-base font-bold text-slate-900 dark:text-white">
               {isReceivable ? 'Collect Payment' : 'Record Payout'}
@@ -134,7 +134,7 @@ export const PartySettleModal: React.FC<PartySettleModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -151,7 +151,7 @@ export const PartySettleModal: React.FC<PartySettleModalProps> = ({
               <button
                 type="button"
                 onClick={() => setAmount(String(party.totalRemaining))}
-                className="text-[11px] font-medium text-slate-500 hover:text-slate-900 dark:hover:text-white underline cursor-pointer"
+                className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
               >
                 Pay Full ({party.totalRemaining.toLocaleString()} ETB)
               </button>
@@ -166,9 +166,9 @@ export const PartySettleModal: React.FC<PartySettleModalProps> = ({
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="0.00"
-                className="w-full h-11 px-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] font-mono text-base font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-white/10"
+                className="w-full h-10 pl-3 pr-14 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 font-mono text-base font-bold text-slate-900 dark:text-white focus:outline-none focus:border-slate-900 dark:focus:border-white focus:ring-1 focus:ring-inset focus:ring-slate-900 dark:focus:ring-white"
               />
-              <span className="absolute right-3.5 top-3 text-xs font-semibold text-slate-400">
+              <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-400 pointer-events-none">
                 ETB
               </span>
             </div>
@@ -201,7 +201,7 @@ export const PartySettleModal: React.FC<PartySettleModalProps> = ({
               value={referenceNumber}
               onChange={(e) => setReferenceNumber(e.target.value)}
               placeholder="e.g. TXN-12345, Cheque #, Bank slip"
-              className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-white/10 placeholder:text-slate-400"
+              className="w-full h-10 px-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-900 dark:focus:ring-white placeholder:text-slate-400"
             />
           </div>
 
@@ -215,24 +215,24 @@ export const PartySettleModal: React.FC<PartySettleModalProps> = ({
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Settlement remarks"
-              className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-white/10 placeholder:text-slate-400"
+              className="w-full h-10 px-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-900 dark:focus:ring-white placeholder:text-slate-400"
             />
           </div>
 
           {/* Footer Actions */}
-          <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
+          <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
             <button
               type="button"
               onClick={onClose}
               disabled={loading}
-              className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+              className="h-9 sm:h-10 px-4 rounded-lg border border-slate-200 dark:border-slate-700 text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className={`h-9 px-4 rounded-xl text-xs font-bold text-white transition-all shadow-xs flex items-center gap-1.5 ${
+              className={`h-9 sm:h-10 px-5 rounded-lg text-xs sm:text-sm font-bold text-white transition-all shadow-xs flex items-center gap-1.5 cursor-pointer ${
                 isReceivable
                   ? 'bg-emerald-600 hover:bg-emerald-700'
                   : 'bg-rose-600 hover:bg-rose-700'

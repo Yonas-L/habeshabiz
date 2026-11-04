@@ -36,7 +36,7 @@ interface MobileOverviewProps {
   user: User | null;
   accounts?: FinancialAccount[];
   selectedMonth?: string;
-  onNavigateTab: (tab: any) => void;
+  onNavigateTab: (tab: any, replace?: boolean, context?: any) => void;
   openVital: (vital: VitalType, contactId?: string | null) => void;
   onOpenExpenseModal: () => void;
   onOpenDebtModal: (type: 'receivable' | 'payable') => void;
@@ -100,55 +100,25 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
 
   return (
     <div className="space-y-4 px-0.5 select-none scroll-smooth">
-      {/* ── 1. WORKING CAPITAL HERO WIDGET (Exact Match to Premium Reference Deck) ── */}
+      {/* ── 1. WORKING CAPITAL HERO WIDGET (Curvature Silhouette with Solid High-Contrast Tone) ── */}
       <div className="relative w-full select-none -mx-1.5 px-0.5 py-0.5 animate-stagger-1">
-        <div className="relative w-full aspect-[420/270] min-[410px]:aspect-[420/256] overflow-visible">
-          {/* Unified SVG Deck (Congruent Stacked Cards + Main Card + Spline Chart) */}
+        <div className="relative w-full aspect-[420/260] min-[410px]:aspect-[420/250] overflow-visible">
+          {/* Curvature SVG with Solid Slate/Emerald Tone & Fluid Trend Line */}
           <svg
             viewBox="0 0 420 256"
             className="w-full h-full overflow-visible drop-shadow-sm"
             preserveAspectRatio="none"
           >
             <defs>
-              {/* Strong, deep, commanding drop shadow for main card */}
-              <filter id="heroShadow" x="-10%" y="-10%" width="125%" height="130%">
-                <feDropShadow dx="0" dy="14" stdDeviation="12" floodColor="#01060c" floodOpacity="0.58" />
-              </filter>
               <filter id="beadGlow" x="-50%" y="-50%" width="200%" height="200%">
                 <feDropShadow dx="0" dy="0" stdDeviation="4" floodColor="#34d399" floodOpacity="0.95" />
               </filter>
 
-              {/* Rich bold mesh gradient for the main focus card */}
-              <radialGradient id="heroMeshGrad" cx="82%" cy="18%" r="85%">
-                <stop offset="0%" stopColor="#183d36" />
-                <stop offset="28%" stopColor="#112630" />
-                <stop offset="62%" stopColor="#0c1a25" />
-                <stop offset="100%" stopColor="#071118" />
-              </radialGradient>
-
-              {/* Top-Right Stack: Single refined Sage green card */}
-              <linearGradient id="cardBackSage" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stopColor="#34594e" stopOpacity="0.55" />
-                <stop offset="50%" stopColor="#508575" stopOpacity="0.78" />
-                <stop offset="100%" stopColor="#79ad9c" stopOpacity="0.92" />
-              </linearGradient>
-
-              {/* Bottom-Left Stack: Single refined Midnight Navy card */}
-              <linearGradient id="cardBackNavy" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#122432" stopOpacity="0.96" />
-                <stop offset="100%" stopColor="#0a1820" stopOpacity="0.92" />
-              </linearGradient>
-
-              {/* Chart Wave Downward Radiant Beam Gradients (Under each line) */}
+              {/* Chart Wave Downward Radiant Beam Gradients */}
               <linearGradient id="frontChartGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#34d399" stopOpacity="0.45" />
-                <stop offset="50%" stopColor="#10b981" stopOpacity="0.15" />
-                <stop offset="100%" stopColor="#071118" stopOpacity="0.0" />
-              </linearGradient>
-              <linearGradient id="backChartGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#10b981" stopOpacity="0.26" />
-                <stop offset="60%" stopColor="#059669" stopOpacity="0.08" />
-                <stop offset="100%" stopColor="#071118" stopOpacity="0.0" />
+                <stop offset="0%" stopColor="#34d399" stopOpacity="0.35" />
+                <stop offset="50%" stopColor="#10b981" stopOpacity="0.10" />
+                <stop offset="100%" stopColor="#0f172a" stopOpacity="0.0" />
               </linearGradient>
 
               {/* Smooth Fade-In and Fade-Out Stroke Gradients */}
@@ -160,79 +130,23 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                 <stop offset="100%" stopColor="#34d399" stopOpacity="0.0" />
               </linearGradient>
 
-              <linearGradient id="backLineGrad" x1="165" y1="0" x2="408" y2="0" gradientUnits="userSpaceOnUse">
-                <stop offset="0%" stopColor="#10b981" stopOpacity="0.0" />
-                <stop offset="18%" stopColor="#10b981" stopOpacity="0.32" />
-                <stop offset="78%" stopColor="#10b981" stopOpacity="0.32" />
-                <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
-              </linearGradient>
-
               {/* Clip Path using the exact canonical Card Silhouette */}
               <clipPath id="mainCardClip">
                 <path d={HERO_CARD_PATH} />
               </clipPath>
             </defs>
 
-            {/* 1. Single Bottom-Left Stacked Card (Refined, offset -5px, +4px) */}
-            <g transform="translate(-5, 4)">
-              <path
-                d={HERO_CARD_PATH}
-                fill="url(#cardBackNavy)"
-                stroke="rgba(52,211,153,0.3)"
-                strokeWidth="1.2"
-              />
-            </g>
-
-            {/* 2. Single Top-Right Stacked Card (Refined, offset +5px, -4px) */}
-            <g transform="translate(5, -4)">
-              <path
-                d={HERO_CARD_PATH}
-                fill="url(#cardBackSage)"
-                stroke="rgba(168,203,182,0.65)"
-                strokeWidth="1.2"
-              />
-            </g>
-
-            {/* 3. Main Front Card (At 0, 0, MASSIVE, DOMINANT, BOLD FOCUS) */}
+            {/* Main Front Card with Persistent Curvature Silhouette & Solid Crisp Surface (No layered back cards) */}
             <path
               d={HERO_CARD_PATH}
-              fill="url(#heroMeshGrad)"
-              stroke="rgba(255,255,255,0.18)"
-              strokeWidth="1.4"
-              filter="url(#heroShadow)"
+              fill="#0f172a"
+              stroke="rgba(52,211,153,0.3)"
+              strokeWidth="1.2"
             />
 
-            {/* 4. Elements Clipped Inside Main Card */}
+            {/* Elements Clipped Inside Main Card */}
             <g clipPath="url(#mainCardClip)">
-              {/* Back wave radiant beam (downward gradient beam under the line) */}
-              <path
-                d="
-                  M 165 160
-                  C 190 156, 215 130, 240 132
-                  C 265 134, 288 112, 310 114
-                  C 332 116, 354 92, 374 94
-                  C 386 95, 398 82, 408 76
-                  L 408 160
-                  L 165 160
-                  Z"
-                fill="url(#backChartGrad)"
-                className="animate-beam-reveal"
-              />
-              <path
-                d="
-                  M 165 160
-                  C 190 156, 215 130, 240 132
-                  C 265 134, 288 112, 310 114
-                  C 332 116, 354 92, 374 94
-                  C 386 95, 398 82, 408 76"
-                fill="none"
-                stroke="url(#backLineGrad)"
-                strokeWidth="1.1"
-                strokeLinecap="round"
-                className="animate-chart-line-delayed"
-              />
-
-              {/* Front luminous wave shape (Minimal 1.5px stroke, smooth start/end fade) */}
+              {/* Front luminous wave shape */}
               <path
                 d="
                   M 175 160
@@ -257,176 +171,127 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                   C 394 86, 398 72, 405 58"
                 fill="none"
                 stroke="url(#frontLineGrad)"
-                strokeWidth="1.5"
+                strokeWidth="1.6"
                 strokeLinecap="round"
                 className="animate-chart-line"
               />
             </g>
 
-            {/* Glowing Endpoint Bead: Dual Concentric Sonar Radar Rings (100% Native WebKit & Blink Engine) */}
+            {/* Luminous Endpoint Bead */}
             <g>
               <circle cx="403" cy="60" r="3" fill="none" stroke="#34d399" strokeWidth="1.5">
-                <animate attributeName="r" values="3;18" dur="2.4s" repeatCount="indefinite" />
+                <animate attributeName="r" values="3;16" dur="2.4s" repeatCount="indefinite" />
                 <animate attributeName="opacity" values="0.85;0" dur="2.4s" repeatCount="indefinite" />
                 <animate attributeName="stroke-width" values="1.8;0.3" dur="2.4s" repeatCount="indefinite" />
               </circle>
-              <circle cx="403" cy="60" r="3" fill="none" stroke="#34d399" strokeWidth="1.5">
-                <animate attributeName="r" values="3;18" dur="2.4s" begin="1.2s" repeatCount="indefinite" />
-                <animate attributeName="opacity" values="0.85;0" dur="2.4s" begin="1.2s" repeatCount="indefinite" />
-                <animate attributeName="stroke-width" values="1.8;0.3" dur="2.4s" begin="1.2s" repeatCount="indefinite" />
-              </circle>
-              <circle cx="403" cy="60" r="5" fill="#ffffff" filter="url(#beadGlow)" opacity="0.95" />
-              <circle cx="403" cy="60" r="3" fill="#ffffff" stroke="#10b981" strokeWidth="0.8" />
+              <circle cx="403" cy="60" r="4.5" fill="#ffffff" filter="url(#beadGlow)" opacity="0.95" />
+              <circle cx="403" cy="60" r="2.5" fill="#ffffff" stroke="#10b981" strokeWidth="0.8" />
             </g>
           </svg>
 
-          {/* Holographic Aurora Ray (Iridescent luxury metallic sheen sweep across card face) */}
+          {/* ── Foreground Interactive Content (Cleaned up, un-congested, zero truncation) ── */}
           <div
-            className="absolute pointer-events-none overflow-hidden rounded-[24px] z-10"
+            className="absolute z-10 flex flex-col justify-between px-3.5 min-[390px]:px-4 py-3 min-[410px]:py-3.5"
             style={{
               left: '2.5%',
               width: '95%',
               top: '4%',
-              height: '90%',
+              height: '92%',
             }}
           >
-            <div className="absolute -inset-[100%] bg-gradient-to-r from-transparent via-emerald-400/15 via-white/30 to-transparent animate-holo-sweep pointer-events-none" />
-          </div>
+            {/* Top Row: Title + Strong Growth pill */}
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => openVital('inventory')}
+                className="flex items-center gap-1.5 group cursor-pointer active:scale-98 transition-transform"
+              >
+                <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
+                <span className="text-xs font-bold tracking-wider text-white">
+                  WORKING CAPITAL
+                </span>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-white transition-all stroke-[2.5]" />
+              </button>
 
-          {/* ── Foreground Interactive Content ── */}
-          <div
-            className="absolute z-10 flex flex-col justify-between px-3 min-[390px]:px-3.5 sm:px-4 py-2 min-[390px]:py-2.5 min-[410px]:py-3"
-            style={{
-              left: '2.5%',
-              width: '95%',
-              top: '4%',
-              height: '90%',
-            }}
-          >
-            {/* Header Block: Top Row + Working Capital Number + Growth (Grouped with responsive, dynamic vertical spacing) */}
-            <div className="flex flex-col pt-1 min-[390px]:pt-1.5 min-[410px]:pt-0.5">
-              {/* Top Row: WORKING CAPITAL > and Strong Growth */}
-              <div className="flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={() => openVital('inventory')}
-                  className="flex items-center gap-1.5 group cursor-pointer active:scale-98 transition-transform"
-                >
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#34d399] shadow-[0_0_8px_#34d399]" />
-                  <span className="text-[11px] min-[390px]:text-[11.5px] min-[410px]:text-[12px] font-bold tracking-wider text-white">
-                    WORKING CAPITAL
-                  </span>
-                  <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-white group-hover:translate-x-0.5 transition-all stroke-[2.5]" />
-                </button>
-
-                <div className="inline-flex items-center gap-1.5 px-2.5 min-[390px]:px-3 py-0.5 min-[390px]:py-1 rounded-full bg-[#082f23]/90 border border-[#34d399]/40 text-[#e6f7ef] text-[10px] min-[390px]:text-[10.5px] min-[410px]:text-[11px] font-semibold shadow-xs">
-                  <ArrowUpRight className="w-3 min-[390px]:w-3.5 h-3 min-[390px]:h-3.5 text-[#34d399] stroke-[2.5]" />
-                  <span>Strong Growth</span>
-                </div>
-              </div>
-
-              {/* Big Financial Number + Growth (Dynamic fluid sizing for iPhone while preserving exact 41px on Samsung/Pixel) */}
-              <div className="mt-1.5 min-[390px]:mt-2 min-[410px]:mt-2.5">
-                <div className="flex items-baseline gap-1.5 min-[390px]:gap-2">
-                  <span className="text-[clamp(31px,8.2vw,36px)] min-[410px]:text-[41px] sm:text-[47px] font-black tracking-tight text-white font-sans [font-feature-settings:'normal'] leading-none drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]">
-                    {isBalancesHidden ? '******' : <AnimatedNumber value={capital_overview.net_capital || 10293682} />}
-                  </span>
-                  <span className="text-[clamp(14px,3.8vw,16px)] min-[410px]:text-[17px] sm:text-[19px] font-bold text-slate-300 font-sans tracking-wide">
-                    ETB
-                  </span>
-                </div>
-
-                <div className="mt-1 min-[390px]:mt-1.5 flex items-center gap-1.5 text-[11px] min-[390px]:text-xs">
-                  <span className="flex items-center text-[#34d399] font-extrabold">
-                    <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />
-                    <span>+12.5%</span>
-                  </span>
-                  <span className="text-slate-400 font-normal">vs last month</span>
-                </div>
+              <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#082f23]/90 border border-[#34d399]/40 text-[#e6f7ef] text-xs font-semibold shadow-xs">
+                <ArrowUpRight className="w-3.5 h-3.5 text-[#34d399] stroke-[2.5]" />
+                <span>+12.5%</span>
               </div>
             </div>
 
-            {/* Inset Glassmorphic Breakdown Sub-Card (Balanced positioning and dynamic padding) */}
-            <div className="rounded-[14px] min-[390px]:rounded-[16px] bg-[#102434]/50 backdrop-blur-xl border border-white/16 shadow-[inset_0_1px_1px_rgba(255,255,255,0.18)] p-2 min-[390px]:p-2.5 min-[410px]:p-2.5 sm:p-3 mx-0.5 mb-1.5 min-[390px]:mb-2 min-[410px]:mb-2 sm:mb-2.5">
-              {/* Row 1: Stock, Liquid, Owed, Forex (Even, generous horizontal gaps) */}
-              <div className="grid grid-cols-4 gap-1.5 min-[390px]:gap-2 sm:gap-3 text-[9.5px] min-[390px]:text-[10px] min-[410px]:text-[10.5px] sm:text-[11.5px]">
+            {/* Big Financial Number */}
+            <div className="my-auto py-1">
+              <div className="flex items-baseline gap-2">
+                <span className="text-[clamp(28px,7.5vw,36px)] min-[410px]:text-[38px] font-black tracking-tight text-white font-mono leading-none drop-shadow-sm">
+                  {isBalancesHidden ? '******' : <AnimatedNumber value={capital_overview.net_capital || 10293682} />}
+                </span>
+                <span className="text-sm min-[410px]:text-base font-bold text-slate-300 font-sans tracking-wide">
+                  ETB
+                </span>
+              </div>
+              <div className="mt-1 flex items-center gap-2 text-xs text-slate-400">
+                <span className="text-emerald-400 font-bold">+12.5%</span>
+                <span>vs last month</span>
+              </div>
+            </div>
+
+            {/* Proportional Asset Breakdown Bar & Clean Legend (No truncation, generous breathing room) */}
+            <div className="rounded-xl bg-slate-900/90 backdrop-blur-md border border-white/10 p-2.5 space-y-2">
+              {/* Proportional distribution bar */}
+              <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden flex">
+                {stockPct > 0 && <div style={{ width: `${stockPct}%` }} className="h-full bg-emerald-400" title={`Stock ${stockPct}%`} />}
+                {cashPct > 0 && <div style={{ width: `${cashPct}%` }} className="h-full bg-sky-400" title={`Liquid ${cashPct}%`} />}
+                {recPct > 0 && <div style={{ width: `${recPct}%` }} className="h-full bg-amber-400" title={`Owed ${recPct}%`} />}
+                {forexPct > 0 && <div style={{ width: `${forexPct}%` }} className="h-full bg-purple-400" title={`Forex ${forexPct}%`} />}
+                {goldPct > 0 && <div style={{ width: `${goldPct}%` }} className="h-full bg-yellow-400" title={`Gold ${goldPct}%`} />}
+                {otherPct > 0 && <div style={{ width: `${otherPct}%` }} className="h-full bg-slate-400" title={`Other ${otherPct}%`} />}
+              </div>
+
+              {/* Clean Legend Chips with Zero Truncation */}
+              <div className="flex items-center justify-between text-xs text-slate-300 font-medium">
                 <button
                   type="button"
                   onClick={() => openVital('inventory')}
-                  className="flex items-center gap-1.5 text-slate-300 hover:text-white transition-colors cursor-pointer text-left truncate active:scale-98"
+                  className="flex items-center gap-1 hover:text-white transition-colors cursor-pointer active:scale-95"
                 >
-                  <span className="w-2 h-2 rounded-full bg-[#34d399] shrink-0" />
-                  <span className="truncate">Stock <strong className="text-white font-bold">{stockPct || 37}%</strong></span>
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                  <span>Stock <strong className="text-white font-bold">{stockPct || 37}%</strong></span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => openVital('cash')}
-                  className="flex items-center gap-1.5 text-slate-300 hover:text-white transition-colors cursor-pointer text-left truncate active:scale-98"
+                  className="flex items-center gap-1 hover:text-white transition-colors cursor-pointer active:scale-95"
                 >
-                  <span className="w-2 h-2 rounded-full bg-[#3b82f6] shrink-0" />
-                  <span className="truncate">Liquid <strong className="text-white font-bold">{cashPct || 5}%</strong></span>
+                  <span className="w-2 h-2 rounded-full bg-sky-400 shrink-0" />
+                  <span>Liquid <strong className="text-white font-bold">{cashPct || 5}%</strong></span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => openVital('receivables')}
-                  className="flex items-center gap-1.5 text-slate-300 hover:text-white transition-colors cursor-pointer text-left truncate active:scale-98"
+                  className="flex items-center gap-1 hover:text-white transition-colors cursor-pointer active:scale-95"
                 >
-                  <span className="w-2 h-2 rounded-full bg-[#f59e0b] shrink-0" />
-                  <span className="truncate">Owed <strong className="text-white font-bold">{recPct || 20}%</strong></span>
+                  <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                  <span>Owed <strong className="text-white font-bold">{recPct || 20}%</strong></span>
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => openVital('reserves')}
-                  className="flex items-center gap-1.5 text-slate-300 hover:text-white transition-colors cursor-pointer text-left truncate active:scale-98"
+                  onClick={() => openVital('payables')}
+                  className="flex items-center gap-1 text-rose-400 hover:text-rose-300 transition-colors cursor-pointer active:scale-95"
                 >
-                  <span className="w-2 h-2 rounded-full bg-[#a855f7] shrink-0" />
-                  <span className="truncate">Forex <strong className="text-white font-bold">{forexPct || 25}%</strong></span>
+                  <span className="w-2 h-2 rounded-full bg-rose-400 shrink-0" />
+                  <span>Owe <strong className="font-mono font-bold">{isBalancesHidden ? '***' : ((capital_overview.payables || 0) > 0 ? `−${capital_overview.payables.toLocaleString()}` : '0')}</strong></span>
                 </button>
-              </div>
-
-              {/* Row 2: Gold, Other, and Owe */}
-              <div className="grid grid-cols-4 gap-1.5 min-[390px]:gap-2 sm:gap-3 text-[9.5px] min-[390px]:text-[10px] min-[410px]:text-[10.5px] sm:text-[11.5px] mt-1 min-[390px]:mt-1.5 pt-1 min-[390px]:pt-1.5 border-t border-white/8 items-center">
-                <button
-                  type="button"
-                  onClick={() => openVital('reserves')}
-                  className="flex items-center gap-1.5 text-slate-300 hover:text-white transition-colors cursor-pointer text-left truncate active:scale-98"
-                >
-                  <span className="w-2 h-2 rounded-full bg-[#eab308] shrink-0" />
-                  <span className="truncate">Gold <strong className="text-white font-bold">{goldPct || 7}%</strong></span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => openVital('reserves')}
-                  className="flex items-center gap-1.5 text-slate-300 hover:text-white transition-colors cursor-pointer text-left truncate active:scale-98"
-                >
-                  <span className="w-2 h-2 rounded-full bg-[#94a3b8] shrink-0" />
-                  <span className="truncate">Other <strong className="text-white font-bold">{otherPct || 6}%</strong></span>
-                </button>
-
-                <div className="col-span-2 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => openVital('payables')}
-                    className="flex items-center gap-1.5 text-rose-400 hover:text-rose-300 transition-colors cursor-pointer active:scale-98"
-                  >
-                    <span className="w-2 h-2 rounded-full bg-[#f87171] shrink-0" />
-                    <span>Owe <strong className="text-rose-400 font-bold font-mono">
-                      {isBalancesHidden ? '−******' : (capital_overview.payables && capital_overview.payables > 0 ? `−${capital_overview.payables.toLocaleString()}` : '−315,700')}
-                    </strong></span>
-                  </button>
-                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ── 2. QUICK FINANCIAL METRICS & VITAL STATS (Minimal Floating Card with Squircle Holders) ── */}
-      <div className="w-full rounded-[24px] sm:rounded-[28px] bg-white dark:bg-[#111C2D] border border-slate-200/80 dark:border-slate-800/80 shadow-[0_4px_24px_-4px_rgba(0,0,0,0.06)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] p-2.5 min-[390px]:p-3.5 sm:p-4 select-none animate-stagger-2">
+      {/* ── 2. QUICK FINANCIAL METRICS & VITAL STATS ── */}
+      <div className="w-full rounded-[24px] sm:rounded-[28px] bg-white dark:bg-[#111C2D] border-0 shadow-xs p-2.5 min-[390px]:p-3.5 sm:p-4 select-none animate-stagger-2">
         <div className="grid grid-cols-5 gap-1 min-[390px]:gap-2 sm:gap-3">
           {/* 1. Stock */}
           <button
@@ -468,12 +333,12 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
             </span>
           </button>
 
-          {/* 3. Owed to You */}
+          {/* 3. Receivables */}
           <button
             type="button"
             onClick={() => openVital('receivables')}
             className="flex flex-col items-center text-center group cursor-pointer haptic-press"
-            title={`Owed to You: ${isBalancesHidden ? '******' : capital_overview.receivables.toLocaleString()} ETB`}
+            title={`Receivables: ${isBalancesHidden ? '******' : capital_overview.receivables.toLocaleString()} ETB`}
           >
             <div className="size-12 min-[390px]:size-[52px] rounded-[18px] min-[390px]:rounded-[20px] p-1 bg-slate-100/80 dark:bg-slate-800/50 border border-slate-200/60 dark:border-white/5 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 transition-all duration-200">
               <div className="w-full h-full rounded-[14px] min-[390px]:rounded-[16px] bg-gradient-to-b from-[#eef9f2] to-[#ddf4e6] dark:from-[#0b2b1d] dark:to-[#071f15] flex items-center justify-center shadow-xs">
@@ -481,19 +346,19 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               </div>
             </div>
             <span className="text-[11px] min-[390px]:text-xs font-semibold text-slate-800 dark:text-slate-200 mt-1.5 min-[390px]:mt-2 truncate max-w-full block">
-              Owed
+              Receivables
             </span>
             <span className="text-[10px] min-[390px]:text-[11.5px] font-semibold font-mono tracking-tight text-emerald-600 dark:text-emerald-400 mt-0.5 truncate max-w-full block transition-opacity duration-200">
               {isBalancesHidden ? '******' : <AnimatedNumber value={capital_overview.receivables} compact prefix="+" />}
             </span>
           </button>
 
-          {/* 4. You Owe */}
+          {/* 4. Payables */}
           <button
             type="button"
             onClick={() => openVital('payables')}
             className="flex flex-col items-center text-center group cursor-pointer haptic-press"
-            title={`You Owe: ${isBalancesHidden ? '******' : capital_overview.payables.toLocaleString()} ETB`}
+            title={`Payables: ${isBalancesHidden ? '******' : capital_overview.payables.toLocaleString()} ETB`}
           >
             <div className="size-12 min-[390px]:size-[52px] rounded-[18px] min-[390px]:rounded-[20px] p-1 bg-slate-100/80 dark:bg-slate-800/50 border border-slate-200/60 dark:border-white/5 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 transition-all duration-200">
               <div className="w-full h-full rounded-[14px] min-[390px]:rounded-[16px] bg-gradient-to-b from-[#eef9f2] to-[#ddf4e6] dark:from-[#0b2b1d] dark:to-[#071f15] flex items-center justify-center shadow-xs">
@@ -501,7 +366,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               </div>
             </div>
             <span className="text-[11px] min-[390px]:text-xs font-semibold text-slate-800 dark:text-slate-200 mt-1.5 min-[390px]:mt-2 truncate max-w-full block">
-              You Owe
+              Payables
             </span>
             <span className="text-[10px] min-[390px]:text-[11.5px] font-semibold font-mono tracking-tight text-rose-500 dark:text-rose-400 mt-0.5 truncate max-w-full block transition-opacity duration-200">
               {isBalancesHidden ? '******' : <AnimatedNumber value={capital_overview.payables} compact prefix={(capital_overview.payables || 0) > 0 ? '-' : ''} />}
@@ -530,8 +395,8 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
         </div>
       </div>
 
-      {/* ── 3. MONTHLY PERFORMANCE SECTION (2x2 Grid with Pinched Organic Cards & Exact Beams) ── */}
-      <div className="rounded-[28px] bg-white dark:bg-[#111C2D] border border-slate-200/80 dark:border-slate-800/80 p-3 min-[390px]:p-3.5 shadow-[0_4px_24px_-4px_rgba(0,0,0,0.05)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] space-y-3 select-none animate-stagger-3">
+      {/* ── 3. MONTHLY PERFORMANCE SECTION ── */}
+      <div className="rounded-[28px] bg-white dark:bg-[#111C2D] border-0 p-3 min-[390px]:p-3.5 shadow-xs space-y-3 select-none animate-stagger-3">
         {/* Section Heading */}
         <div className="flex items-center justify-between px-0.5">
           <div className="flex items-center gap-2.5">
@@ -900,21 +765,21 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
 
         {/* Owner Draws (if present and user can view costs) */}
         {canViewCost && (monthly_performance.owner_draws || 0) > 0 && (
-          <div className="rounded-[20px] bg-purple-50/70 dark:bg-purple-950/30 p-3.5 border border-purple-200/70 dark:border-purple-900/50 flex items-center justify-between">
+          <div className="rounded-2xl bg-white dark:bg-[#131926] p-3.5 border-0 shadow-xs flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-purple-500" />
+              <span className="w-2 h-2 rounded-full bg-slate-400 dark:bg-slate-500" />
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700 dark:text-purple-300 block">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
                   Owner Draws
                 </span>
-                <span className="text-[10px] text-purple-600/80 dark:text-purple-400/80 block">
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 block">
                   Personal drawings this month
                 </span>
               </div>
             </div>
-            <div className="text-base font-bold font-mono tracking-tight text-purple-700 dark:text-purple-300">
+            <div className="text-base font-bold font-mono tracking-tight text-slate-900 dark:text-white">
               −<AnimatedNumber value={Math.abs(monthly_performance.owner_draws)} />
-              <span className="text-[10px] font-medium text-purple-400 ml-1 font-sans">ETB</span>
+              <span className="text-[10px] font-medium text-slate-400 ml-1 font-sans">ETB</span>
             </div>
           </div>
         )}
@@ -922,11 +787,11 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
 
       {/* ── 4. DEBT LEDGERS (Refined Mobile Lists) ── */}
       <div className="space-y-3 pt-1 animate-stagger-4">
-        {/* Receivables: Owed to You */}
-        <div className="bg-white dark:bg-[#131926] rounded-[24px] border border-slate-200/80 dark:border-slate-800/80 p-4 shadow-xs">
+        {/* Receivables */}
+        <div className="bg-white dark:bg-[#131926] rounded-[24px] border-0 p-4 shadow-xs">
           <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-slate-800/60 mb-2">
-            <span className="text-xs font-bold text-slate-900 dark:text-white">
-              Owed to You
+            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+              Receivables
             </span>
             <div className="flex items-center gap-2">
               <button
@@ -940,7 +805,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               <span className="text-slate-300 dark:text-slate-700">·</span>
               <button
                 type="button"
-                onClick={() => onNavigateTab('debts')}
+                onClick={() => onNavigateTab('debts', false, { debtType: 'receivable' })}
                 className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 hover:text-emerald-600 transition-colors cursor-pointer active:scale-95"
               >
                 View all · {counts.open_receivables} →
@@ -1001,11 +866,11 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
           )}
         </div>
 
-        {/* Payables: You Owe */}
-        <div className="bg-white dark:bg-[#131926] rounded-[24px] border border-slate-200/80 dark:border-slate-800/80 p-4 shadow-xs">
+        {/* Payables */}
+        <div className="bg-white dark:bg-[#131926] rounded-[24px] border-0 p-4 shadow-xs">
           <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-slate-800/60 mb-2">
-            <span className="text-xs font-bold text-slate-900 dark:text-white">
-              You Owe
+            <span className="text-xs font-bold text-rose-600 dark:text-rose-400">
+              Payables
             </span>
             <div className="flex items-center gap-2">
               <button
@@ -1019,7 +884,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               <span className="text-slate-300 dark:text-slate-700">·</span>
               <button
                 type="button"
-                onClick={() => onNavigateTab('debts')}
+                onClick={() => onNavigateTab('debts', false, { debtType: 'payable' })}
                 className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 hover:text-rose-600 transition-colors cursor-pointer active:scale-95"
               >
                 View all · {counts.open_payables} →

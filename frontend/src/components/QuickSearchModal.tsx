@@ -31,6 +31,7 @@ export interface NavigationPayload {
   partnerId?: string;
   account?: FinancialAccount;
   action?: 'new_sale' | 'stock_intake' | 'new_expense';
+  debtType?: 'receivable' | 'payable';
 }
 
 interface QuickSearchModalProps {

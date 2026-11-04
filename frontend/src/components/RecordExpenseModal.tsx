@@ -11,6 +11,7 @@ import {
   Loader2,
   Handshake,
   Users,
+  ArrowUpRight,
 } from 'lucide-react';
 import { SplitPaymentSelector, type PaymentSplitItem } from './common/SplitPaymentSelector';
 
@@ -293,20 +294,20 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
   if (!isOpen) return null;
 
   const modalContent = (
-    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center sm:p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
       <div
         className="fixed inset-0 bg-slate-950/50 dark:bg-black/70 backdrop-blur-xs animate-backdrop-enter"
         onClick={onClose}
       />
 
-      <div className="relative z-10 bg-white dark:bg-[#131926] rounded-t-3xl sm:rounded-2xl border-t sm:border border-slate-100 dark:border-slate-800 shadow-2xl ring-1 ring-black/5 max-w-lg w-full max-h-[88vh] sm:max-h-[85vh] flex flex-col p-5 sm:p-6 space-y-4 animate-bottom-sheet sm:animate-modal-enter my-0 sm:my-auto">
+      <div className="relative z-10 w-full max-w-lg bg-white dark:bg-[#131926] rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-slate-100 dark:border-slate-800 overflow-hidden animate-modal-smooth flex flex-col max-h-[88vh] sm:max-h-[85vh] my-0 sm:my-auto">
         {/* Mobile Drag Indicator */}
-        <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto -mt-1 mb-1 sm:hidden shrink-0" />
+        <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mt-2.5 mb-1 sm:hidden shrink-0" />
 
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 sm:pb-4 border-b border-slate-100 dark:border-slate-800 shrink-0">
+        <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-slate-800 shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center">
               <Receipt className="w-4 h-4" />
             </div>
             <div>
@@ -320,13 +321,13 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <form id="record-expense-form" onSubmit={handleSubmit} className="space-y-4 overflow-y-auto overscroll-contain flex-1 pr-1">
+        <form id="record-expense-form" onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto flex-1">
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
               Expense Category
@@ -343,7 +344,7 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
                   setDescription('Staff bonus payout');
                 }
               }}
-              className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 focus:border-slate-900 dark:focus:border-slate-600 cursor-pointer"
+              className="w-full h-10 px-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm font-medium text-slate-900 dark:text-white focus:outline-none focus:border-slate-900 dark:focus:border-white focus:ring-1 focus:ring-inset focus:ring-slate-900 dark:focus:ring-white cursor-pointer"
             >
               <option value="vendor_payout">Vendor Settlement / Transfer</option>
               <option value="ride">RIDE / Transportation & Delivery</option>
@@ -358,13 +359,13 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
 
           {/* Vendor Payout Selection (Visible when category is vendor_payout) */}
           {category === 'vendor_payout' && (
-            <div className="p-3.5 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/20 border border-indigo-200/70 dark:border-indigo-900/50 space-y-2 animate-page-enter">
+            <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800 space-y-2 animate-page-enter">
               <label className="block text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center justify-between">
                 <span className="flex items-center gap-1.5">
                   <Handshake className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
                   <span>Select Partner / Peer Vendor *</span>
                 </span>
-                <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold">Auto-settles debt</span>
+                <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wider font-mono">Auto-settles debt</span>
               </label>
 
               <select
@@ -378,7 +379,7 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
                   }
                 }}
                 required
-                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 cursor-pointer"
+                className="w-full h-10 px-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm font-medium text-slate-900 dark:text-white focus:outline-none focus:border-slate-900 dark:focus:border-white focus:ring-1 focus:ring-inset focus:ring-slate-900 dark:focus:ring-white cursor-pointer"
               >
                 <option value="">-- Choose Vendor / Partner --</option>
                 {contacts.map((c) => (
@@ -396,7 +397,7 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
 
           {/* Staff Member Selection (Visible when category is salary) */}
           {category === 'salary' && (
-            <div className="p-3.5 rounded-xl bg-violet-50/70 dark:bg-violet-950/20 border border-violet-200/70 dark:border-violet-900/50 space-y-2.5 animate-page-enter">
+            <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800 space-y-2.5 animate-page-enter">
               <div className="flex items-center justify-between">
                 <label className="block text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                   <Users className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400" />
@@ -410,7 +411,7 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
               </div>
 
               {staffWithBonus.length === 0 ? (
-                <div className="p-3 rounded-lg bg-white/70 dark:bg-slate-900/60 border border-violet-100 dark:border-violet-900/40 text-center py-3">
+                <div className="p-3 rounded-lg bg-white/70 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 text-center py-3">
                   <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                     No uncollected staff bonuses
                   </p>
@@ -437,7 +438,7 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
                         }
                       }}
                       disabled={loadingStaff}
-                      className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 cursor-pointer"
+                      className="w-full h-10 px-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm font-medium text-slate-900 dark:text-white focus:outline-none focus:border-slate-900 dark:focus:border-white focus:ring-1 focus:ring-inset focus:ring-slate-900 dark:focus:ring-white cursor-pointer"
                     >
                       <option value="">-- Choose Staff Member ({staffWithBonus.length} with open bonus) --</option>
                       {staffWithBonus.map((s: StaffMember) => (
@@ -463,7 +464,7 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
 
           {/* Maintenance Device Dropdown (Visible when category is maintenance) */}
           {category === 'maintenance' && (
-            <div className="p-3.5 rounded-xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/70 dark:border-amber-900/50 space-y-2 animate-page-enter">
+            <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800 space-y-2 animate-page-enter">
               <div className="flex items-center justify-between">
                 <label className="block text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                   <Wrench className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
@@ -488,7 +489,7 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
                     }
                   }}
                   disabled={loadingUnits}
-                  className="w-full h-10 pl-3 pr-8 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 appearance-none cursor-pointer"
+                  className="w-full h-10 pl-3 pr-8 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-900 dark:focus:ring-white appearance-none cursor-pointer"
                 >
                   <option value="">-- General Maintenance / Tooling (No Specific Device) --</option>
                   {maintenanceUnits.map((u) => {
@@ -534,11 +535,11 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
                         : 'Vendor will reimburse (creates receivable)'}
                     </span>
                   </div>
-                  <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl text-xs font-semibold">
+                  <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-lg text-xs font-semibold">
                     <button
                       type="button"
                       onClick={() => setVendorBilling('shop')}
-                      className={`py-1.5 px-2 rounded-lg transition-all cursor-pointer text-center ${
+                      className={`py-1.5 px-2 rounded-md transition-all cursor-pointer text-center ${
                         vendorBilling === 'shop'
                           ? 'bg-white dark:bg-[#131926] text-slate-900 dark:text-white shadow-xs font-bold'
                           : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -549,7 +550,7 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setVendorBilling('vendor_deduct')}
-                      className={`py-1.5 px-2 rounded-lg transition-all cursor-pointer text-center ${
+                      className={`py-1.5 px-2 rounded-md transition-all cursor-pointer text-center ${
                         vendorBilling === 'vendor_deduct'
                           ? 'bg-white dark:bg-[#131926] text-emerald-600 dark:text-emerald-400 shadow-xs font-bold'
                           : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -561,7 +562,7 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setVendorBilling('vendor_reimburse')}
-                      className={`py-1.5 px-2 rounded-lg transition-all cursor-pointer text-center ${
+                      className={`py-1.5 px-2 rounded-md transition-all cursor-pointer text-center ${
                         vendorBilling === 'vendor_reimburse'
                           ? 'bg-white dark:bg-[#131926] text-blue-600 dark:text-blue-400 shadow-xs font-bold'
                           : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -591,9 +592,8 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="e.g. 350"
-              className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono tabular-nums font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 focus:border-slate-900 dark:focus:border-slate-600"
+              className="w-full h-10 px-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-base font-mono tabular-nums font-bold text-slate-900 dark:text-white focus:outline-none focus:border-slate-900 dark:focus:border-white focus:ring-1 focus:ring-inset focus:ring-slate-900 dark:focus:ring-white"
               required
-              autoFocus
             />
           </div>
 
@@ -639,18 +639,18 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
               placeholder="e.g. Screen replacement, customer delivery ride..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 focus:border-slate-900 dark:focus:border-slate-600"
+              className="w-full h-10 px-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm font-medium text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-slate-900 dark:focus:border-white focus:ring-1 focus:ring-inset focus:ring-slate-900 dark:focus:ring-white"
               required
             />
           </div>
 
-          <div className="flex items-center gap-3 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800">
+          <div className="flex items-center gap-3 p-3.5 rounded-lg bg-slate-50 dark:bg-slate-900/40 border border-slate-200/70 dark:border-slate-800">
             <input
               type="checkbox"
               id="recordExpenseIsOwnerDraw"
               checked={isOwnerDraw}
               onChange={(e) => setIsOwnerDraw(e.target.checked)}
-              className="w-4 h-4 rounded text-purple-600 focus:ring-purple-500 border-slate-300 dark:border-slate-700 dark:bg-slate-800 cursor-pointer"
+              className="w-4 h-4 rounded text-slate-900 focus:ring-slate-900 border-slate-300 dark:border-slate-700 dark:bg-slate-800 cursor-pointer"
             />
             <label
               htmlFor="recordExpenseIsOwnerDraw"
@@ -662,11 +662,11 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
         </form>
 
         {/* Footer Actions */}
-        <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800 shrink-0 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] sm:pb-0">
+        <div className="flex items-center justify-end gap-2.5 p-4 sm:p-5 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-[#131926] shrink-0 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] sm:pb-5">
           <button
             type="button"
             onClick={onClose}
-            className="h-10 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0 whitespace-nowrap"
+            className="h-10 px-4 rounded-lg border border-slate-200 dark:border-slate-700 text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0 whitespace-nowrap"
           >
             Cancel
           </button>
@@ -674,9 +674,14 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
             type="submit"
             form="record-expense-form"
             disabled={submitting}
-            className="h-10 px-5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 disabled:opacity-50 transition-colors shadow-xs active:scale-[0.98] cursor-pointer shrink-0 whitespace-nowrap"
+            className="h-10 px-5 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs sm:text-sm font-bold hover:bg-slate-800 dark:hover:bg-slate-100 disabled:opacity-50 transition-all shadow-xs active:scale-[0.98] cursor-pointer shrink-0 whitespace-nowrap inline-flex items-center gap-1.5"
           >
-            {submitting ? 'Recording...' : 'Record Outflow'}
+            {submitting ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <ArrowUpRight className="w-3.5 h-3.5 text-rose-400 dark:text-rose-600" />
+            )}
+            <span>Record Outflow</span>
           </button>
         </div>
       </div>

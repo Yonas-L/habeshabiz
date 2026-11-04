@@ -125,13 +125,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   const sidebarInner = (
-    <aside className="w-64 h-full bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-[0_4px_24px_-4px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_24px_-4px_rgba(0,0,0,0.4)] flex flex-col justify-between select-none p-3.5 transition-colors">
-      <div>
+    <aside className="w-full h-full bg-white dark:bg-[#131926] rounded-2xl border-0 shadow-[0_4px_24px_-4px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_24px_-4px_rgba(0,0,0,0.4)] flex flex-col justify-between select-none p-3.5 transition-colors overflow-hidden">
+      {/* Top Header: Branding & Search */}
+      <div className="shrink-0">
         {/* Brand Header */}
-        <div className="px-2 py-2.5 flex items-center justify-between gap-2.5 border-b border-slate-100 dark:border-slate-800/80">
+        <div className="px-2 py-2 flex items-center justify-between gap-2.5 border-b border-slate-100 dark:border-slate-800/80">
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
             <div
-              className={`w-10 h-10 aspect-square rounded-full shrink-0 flex items-center justify-center overflow-hidden border shadow-xs transition-colors ${
+              className={`w-9 h-9 aspect-square rounded-full shrink-0 flex items-center justify-center overflow-hidden border shadow-xs transition-colors ${
                 resolvedLogoUrl && !logoLoadFailed
                   ? 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700/80 p-0.5'
                   : 'bg-gradient-to-br from-slate-900 to-slate-800 dark:from-slate-800 dark:to-slate-700 border-slate-700/30 text-white font-bold text-xs tracking-tight'
@@ -168,22 +169,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Quick Search Trigger */}
-        <div className="my-3 px-1">
+        <div className="my-2.5 px-0.5">
           <button
             type="button"
             onClick={onOpenQuickSearch}
-            className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/50 dark:hover:bg-slate-800 border border-slate-200/60 dark:border-slate-800 text-xs text-slate-400 dark:text-slate-500 transition-colors cursor-pointer group select-none text-left"
+            className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/50 dark:hover:bg-slate-800 border-0 text-xs text-slate-400 dark:text-slate-500 transition-colors cursor-pointer group select-none text-left"
           >
             <div className="flex items-center gap-2">
               <Search className="size-3.5 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors" />
-              <span className="text-[11px] group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors">Quick search...</span>
+              <span className="text-xs group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors">Quick search...</span>
             </div>
             <kbd className="px-1.5 py-0.5 rounded bg-white dark:bg-slate-900 text-[10px] font-mono border border-slate-200 dark:border-slate-700 text-slate-500 shadow-xs">
               ⌘K
             </kbd>
           </button>
         </div>
+      </div>
 
+      {/* Flexible Scrollable Navigation (never pushes bottom out) */}
+      <div className="flex-1 overflow-y-auto overscroll-contain pr-1 py-1 space-y-1 min-h-0">
         {/* Navigation Group 1: MAIN MENU */}
         <div className="space-y-0.5">
           <div className="px-2.5 py-1 text-[10px] font-bold tracking-wider uppercase text-slate-400 dark:text-slate-500">
@@ -219,7 +223,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Navigation Group 2: FINANCE & LEDGERS (Owner only) */}
         {isOwner && (
-          <div className="space-y-0.5 mt-3 pt-3 border-t border-slate-100/80 dark:border-slate-800/80">
+          <div className="space-y-0.5 mt-2.5 pt-2 border-t border-slate-100/80 dark:border-slate-800/80">
             <div className="px-2.5 py-1 text-[10px] font-bold tracking-wider uppercase text-slate-400 dark:text-slate-500">
               Treasury & Ledger
             </div>
@@ -239,12 +243,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800/50'
                   }`}
                 >
-                  <div className="flex items-center gap-2.5">
-                    <Icon className={`w-4 h-4 ${isActive ? 'text-emerald-400 dark:text-emerald-600' : 'text-slate-400 dark:text-slate-500'}`} />
-                    <span>{item.label}</span>
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-emerald-400 dark:text-emerald-600' : 'text-slate-400 dark:text-slate-500'}`} />
+                    <span className="truncate">{item.label}</span>
                   </div>
 
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 shrink-0 pl-1">
                     {item.badge !== undefined && item.badge > 0 && (
                       <span
                         className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold leading-none ${
@@ -268,7 +272,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Navigation Group 3: SECURITY & AUDIT (Owner only) */}
         {isOwner && (
-          <div className="space-y-0.5 mt-3 pt-3 border-t border-slate-100/80 dark:border-slate-800/80">
+          <div className="space-y-0.5 mt-2.5 pt-2 border-t border-slate-100/80 dark:border-slate-800/80">
             <div className="px-2.5 py-1 text-[10px] font-bold tracking-wider uppercase text-slate-400 dark:text-slate-500">
               System & Security
             </div>
@@ -313,7 +317,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Bottom User Profile */}
-      <div className="pt-3 border-t border-slate-100/80 dark:border-slate-800/80">
+      <div className="pt-2.5 border-t border-slate-100/80 dark:border-slate-800/80 shrink-0">
         {/* Current User Card */}
         <div className="flex items-center justify-between px-1">
           <div
@@ -710,8 +714,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <>
-      {/* Desktop Persistent Sidebar - completely intact */}
-      <div className="hidden md:block shrink-0 w-64 h-[calc(100vh-2rem)] sticky top-4 my-4 ml-4 animate-fluid-sidebar">
+      {/* Desktop Persistent Sidebar - spacious & un-outlined */}
+      <div className="hidden md:block shrink-0 w-72 2xl:w-80 h-[calc(100vh-2rem)] sticky top-4 my-4 ml-4 animate-fluid-sidebar">
         {sidebarInner}
       </div>
 

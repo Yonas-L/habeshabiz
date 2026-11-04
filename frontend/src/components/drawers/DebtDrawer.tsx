@@ -216,17 +216,17 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
       badge={
         <div className="flex items-center gap-1.5">
           {debt.reference_type === 'salesperson_bonus' && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800/80">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-purple-100 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800/80">
               Sales Bonus
             </span>
           )}
           {debt.reference_type === 'handover_holding' && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/80">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/80">
               Handover Stock
             </span>
           )}
           <span
-            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold ${
               debt.status === 'settled'
                 ? 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
                 : isReceivable
@@ -250,7 +250,7 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0 whitespace-nowrap"
+              className="h-9 px-4 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0 whitespace-nowrap"
             >
               Close
             </button>
@@ -262,7 +262,7 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
                   type="button"
                   onClick={handleDrawerDelete}
                   disabled={deletingDrawer}
-                  className="h-9 px-3 rounded-xl border border-rose-200 dark:border-rose-800/60 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors flex items-center gap-1.5 disabled:opacity-50 shrink-0 whitespace-nowrap"
+                  className="h-9 px-3 rounded-lg border border-rose-200 dark:border-rose-800/60 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors flex items-center gap-1.5 disabled:opacity-50 shrink-0 whitespace-nowrap cursor-pointer"
                 >
                   {deletingDrawer ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                   <span>Delete</span>
@@ -273,7 +273,7 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowPayForm(true)}
-                  className="h-9 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs active:scale-95 flex items-center gap-1.5 shrink-0 whitespace-nowrap"
+                  className="h-9 px-4 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs active:scale-95 flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer"
                 >
                   <DollarSign className="w-3.5 h-3.5" />
                   <span>
@@ -294,7 +294,7 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
               <button
                 type="button"
                 onClick={() => setShowPayForm(true)}
-                className="w-full h-10 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs active:scale-95 flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer"
+                className="w-full h-10 px-4 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs active:scale-95 flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer"
               >
                 <DollarSign className="w-3.5 h-3.5 shrink-0" />
                 <span>
@@ -311,7 +311,7 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer flex items-center justify-center whitespace-nowrap"
+                className="flex-1 h-9 px-4 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer flex items-center justify-center whitespace-nowrap"
               >
                 Close
               </button>
@@ -321,7 +321,7 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
                   type="button"
                   onClick={handleDrawerDelete}
                   disabled={deletingDrawer}
-                  className="flex-1 h-9 px-3 rounded-xl border border-rose-200 dark:border-rose-800/60 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50 whitespace-nowrap cursor-pointer"
+                  className="flex-1 h-9 px-3 rounded-lg border border-rose-200 dark:border-rose-800/60 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50 whitespace-nowrap cursor-pointer"
                 >
                   {deletingDrawer ? <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" /> : <Trash2 className="w-3.5 h-3.5 shrink-0" />}
                   <span>Delete</span>
@@ -333,12 +333,12 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
       }
     >
       {/* Hero Remaining Obligation Card */}
-      <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 space-y-3">
+      <div className="p-5 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800 space-y-3">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+          <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
             Remaining Obligation
           </span>
-          <span className="text-xs font-semibold text-slate-400">{percentPaid}% Settled</span>
+          <span className="text-xs font-mono font-semibold text-slate-400">{percentPaid}% Settled</span>
         </div>
 
         <div
@@ -357,7 +357,7 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
         )}
 
         {/* Progress bar */}
-        <div className="w-full h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+        <div className="w-full h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
           <div
             className={`h-full transition-all duration-500 rounded-full ${
               isReceivable ? 'bg-emerald-500' : 'bg-rose-500'
@@ -366,7 +366,7 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
           />
         </div>
 
-        <div className="flex justify-between text-[11px] text-slate-500 dark:text-slate-400 font-mono pt-1">
+        <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 font-mono pt-1">
           <span>Already Paid: {paid.toLocaleString()} ETB</span>
           <span>Original: {original.toLocaleString()} ETB</span>
         </div>
@@ -525,13 +525,13 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
               }
               value={paymentAmount}
               onChange={(e) => setPaymentAmount(e.target.value)}
-              className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs font-mono font-bold text-slate-900 dark:text-white"
+              className="w-full h-10 px-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:border-slate-900 dark:focus:border-white focus:ring-1 focus:ring-inset focus:ring-slate-900 dark:focus:ring-white"
               required
             />
           </div>
 
           <div>
-            <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
               Transaction Reference
             </label>
             <input
@@ -539,12 +539,12 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
               placeholder={isReceivable && settleMethod === 'staff_bonus' ? 'e.g. BONUS-OFFSET or memo' : 'e.g. CBE-FT-82914 or TeleBirr TxID'}
               value={referenceNumber}
               onChange={(e) => setReferenceNumber(e.target.value)}
-              className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs font-mono text-slate-900 dark:text-white"
+              className="w-full h-10 px-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm font-mono text-slate-900 dark:text-white focus:outline-none focus:border-slate-900 dark:focus:border-white focus:ring-1 focus:ring-inset focus:ring-slate-900 dark:focus:ring-white"
             />
           </div>
 
           <div>
-            <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
               Notes
             </label>
             <input
@@ -552,7 +552,7 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
               placeholder="Optional memo..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs text-slate-900 dark:text-white"
+              className="w-full h-10 px-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-slate-900 dark:focus:border-white focus:ring-1 focus:ring-inset focus:ring-slate-900 dark:focus:ring-white"
             />
           </div>
 
@@ -560,14 +560,14 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
             <button
               type="button"
               onClick={() => setShowPayForm(false)}
-              className="h-8 px-3 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300"
+              className="h-9 px-3 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={settling}
-              className="h-8 px-4 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 disabled:opacity-50 flex items-center gap-1.5"
+              className="h-9 px-4 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 disabled:opacity-50 flex items-center gap-1.5 cursor-pointer shadow-xs"
             >
               {settling ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
               <span>
@@ -589,19 +589,19 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
         defaultOpen={true}
       >
         <div className="space-y-2 text-xs">
-          <div className="p-3 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/70 dark:border-slate-800/90 flex items-center justify-between">
+          <div className="p-3 rounded-lg bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800 flex items-center justify-between">
             <span className="text-slate-400">Full Name</span>
             <span className="font-bold text-slate-900 dark:text-white">{debt.contact?.name}</span>
           </div>
 
-          <div className="p-3 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/70 dark:border-slate-800/90 flex items-center justify-between">
+          <div className="p-3 rounded-lg bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800 flex items-center justify-between">
             <span className="text-slate-400">Phone Number</span>
             <span className="font-mono font-bold text-slate-900 dark:text-white">
               {debt.contact?.phone || 'No phone recorded'}
             </span>
           </div>
 
-          <div className="p-3 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/70 dark:border-slate-800/90 flex items-center justify-between">
+          <div className="p-3 rounded-lg bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800 flex items-center justify-between">
             <span className="text-slate-400">Ledger Role</span>
             <span className="capitalize font-semibold text-slate-700 dark:text-slate-300">
               {debt.contact?.roles?.join(', ') || 'Customer'}
@@ -609,7 +609,7 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
           </div>
 
           {debt.contact && ((debt.contact.open_payable ?? 0) > 0 || (debt.contact.open_receivable ?? 0) > 0) && (
-            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-800/90 flex items-center justify-between">
+            <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between">
               <div>
                 <span className="text-slate-400 block text-[10px] font-bold uppercase tracking-wider">Overall Net Position</span>
                 <span className="text-[11px] text-slate-500 mt-0.5">
@@ -639,7 +639,7 @@ export const DebtDrawer: React.FC<DebtDrawerProps> = ({
         icon={<Calendar className="w-4 h-4" />}
         defaultOpen={true}
       >
-        <div className="p-3.5 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/70 dark:border-slate-800/90 space-y-2 text-xs">
+        <div className="p-3.5 rounded-lg bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800 space-y-2 text-xs">
           <div>
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
               Originating Note

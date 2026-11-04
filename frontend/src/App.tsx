@@ -110,6 +110,7 @@ export default function App() {
     account?: FinancialAccount | null;
     showIntake?: boolean;
     showRecordExpense?: boolean;
+    debtType?: 'receivable' | 'payable' | null;
   }>({});
 
   const resolveCurrentPath = () => {
@@ -131,31 +132,53 @@ export default function App() {
     return false;
   });
 
-  const handleNavigateTab = useCallback((tab: NavTab, replace = false) => {
-    setIsMobileSidebarOpen(false);
-    setIsQuickSearchOpen(false);
-    setIsProfileModalOpen(false);
+  const handleNavigateTab = useCallback(
+    (
+      tab: NavTab,
+      replace = false,
+      context?: {
+        unit?: InventoryUnit | null;
+        order?: SalesOrder | null;
+        partnerId?: string | null;
+        account?: FinancialAccount | null;
+        showIntake?: boolean;
+        showRecordExpense?: boolean;
+        debtType?: 'receivable' | 'payable' | null;
+      }
+    ) => {
+      setIsMobileSidebarOpen(false);
+      setIsQuickSearchOpen(false);
+      setIsProfileModalOpen(false);
 
-    if (tab === activeTab) return;
-    setIsPageLoading(true);
-    setActiveTab(tab);
+      if (context) {
+        setNavContext((prev) => ({ ...prev, ...context }));
+      }
 
-    if (typeof window !== 'undefined') {
-      const targetHash = getHashForTab(tab);
-      const isModalInState = Boolean(window.history.state?.modal);
-      if (window.location.hash !== targetHash || isModalInState) {
-        if (replace || isModalInState) {
-          window.history.replaceState({ tab }, '', targetHash);
-        } else {
-          window.history.pushState({ tab }, '', targetHash);
+      if (tab === activeTab) {
+        setIsPageLoading(false);
+        return;
+      }
+      setIsPageLoading(true);
+      setActiveTab(tab);
+
+      if (typeof window !== 'undefined') {
+        const targetHash = getHashForTab(tab);
+        const isModalInState = Boolean(window.history.state?.modal);
+        if (window.location.hash !== targetHash || isModalInState) {
+          if (replace || isModalInState) {
+            window.history.replaceState({ tab }, '', targetHash);
+          } else {
+            window.history.pushState({ tab }, '', targetHash);
+          }
         }
       }
-    }
 
-    setTimeout(() => {
-      setIsPageLoading(false);
-    }, 220);
-  }, [activeTab]);
+      setTimeout(() => {
+        setIsPageLoading(false);
+      }, 220);
+    },
+    [activeTab]
+  );
 
   const handleOpenMobileSidebar = useCallback(() => {
     setIsMobileSidebarOpen(true);
@@ -254,6 +277,7 @@ export default function App() {
       account: payload.account || null,
       showIntake: payload.action === 'stock_intake',
       showRecordExpense: payload.action === 'new_expense',
+      debtType: payload.debtType || null,
     });
     handleNavigateTab(payload.tab);
     setIsQuickSearchOpen(false);
@@ -696,7 +720,7 @@ export default function App() {
         />
 
         {/* View Surface */}
-        <main className="flex-1 p-4 lg:p-8 max-w-7xl w-full mx-auto pb-28 md:pb-8 flex flex-col">
+        <main className="flex-1 p-4 lg:p-6 2xl:p-8 w-full max-w-7xl 2xl:max-w-[1680px] mx-auto pb-28 md:pb-8 flex flex-col">
           {isPageLoading ? (
             <CustomPageLoader mode="app" fullScreen={false} />
           ) : (
@@ -767,7 +791,11 @@ export default function App() {
                 />
               )}
               {activeTab === 'debts' && user?.role === 'owner' && (
-                <DebtsView accounts={accounts} />
+                <DebtsView
+                  accounts={accounts}
+                  initialDebtType={navContext.debtType}
+                  onClearInitialContext={handleClearNavContext}
+                />
               )}
 
               {activeTab === 'treasury' && user?.role === 'owner' && (

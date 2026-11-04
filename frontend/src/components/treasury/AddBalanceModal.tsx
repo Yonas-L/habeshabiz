@@ -8,10 +8,10 @@ import {
   Plus,
   Sliders,
   Trash2,
+  Loader2,
 } from 'lucide-react';
 import { AccountLogo } from '../../utils/bankLogos';
 import { formatCurrencyInput, parseFormattedNumber } from '../../utils/numberUtils';
-import { LdrsSpinner } from '../loading/LdrsSpinner';
 
 interface AddBalanceModalProps {
   isOpen: boolean;
@@ -275,23 +275,23 @@ export const AddBalanceModal: React.FC<AddBalanceModalProps> = ({
 
   const modalContent = (
     <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-xs" onClick={onClose} />
+      <div className="fixed inset-0 bg-slate-950/50 dark:bg-black/70 backdrop-blur-xs animate-backdrop-enter" onClick={onClose} />
 
-      <div className="relative z-10 w-full max-w-lg mx-0 sm:mx-4 bg-white dark:bg-[#131926] rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-slate-200/80 dark:border-slate-800 overflow-hidden max-sm:animate-bottom-sheet sm:animate-modal-enter flex flex-col my-0 sm:my-auto max-h-[92vh]">
+      <div className="relative z-10 w-full max-w-lg bg-white dark:bg-[#131926] rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-slate-100 dark:border-slate-800 overflow-hidden animate-modal-smooth flex flex-col max-h-[88vh] sm:max-h-[85vh] my-0 sm:my-auto">
         {/* Mobile Drag Handle */}
         <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mt-2.5 mb-1 sm:hidden shrink-0" />
 
         {/* Modal Header */}
-        <div className="flex items-center justify-between p-5 sm:p-6 border-b border-slate-100 dark:border-slate-800 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/60 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0 shadow-inner">
-              <Plus className="w-5 h-5 stroke-[2.5]" />
+        <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-slate-800 shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center shrink-0">
+              <Plus className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-900 dark:text-white">
+              <h2 className="text-base font-bold text-slate-900 dark:text-white leading-none">
                 {isAsset ? 'Add Reserve Balance' : 'Add Balance'}
               </h2>
-              <p className="text-[11px] text-slate-400 mt-0.5">
+              <p className="text-xs text-slate-400 mt-1">
                 {isAsset
                   ? `Add foreign currency or gold holdings to ${account.name}`
                   : `Add money value or adjust balance for ${account.name}`}
@@ -301,16 +301,16 @@ export const AddBalanceModal: React.FC<AddBalanceModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Modal Form */}
-        <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
+        <form id="add-balance-form" onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto flex-1">
           {/* Account Identity & Current Balance Banner */}
-          <div className="p-4 rounded-2xl bg-slate-50/80 dark:bg-slate-900/50 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between gap-3">
+          <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
               <AccountLogo account={account} size="md" />
               <div className="min-w-0">
@@ -356,11 +356,11 @@ export const AddBalanceModal: React.FC<AddBalanceModalProps> = ({
           {!isAsset && (
             <div className="space-y-4">
               {/* Mode Selector */}
-              <div className="flex rounded-xl bg-slate-100 dark:bg-slate-850 p-1 border border-slate-200/80 dark:border-slate-800">
+              <div className="flex rounded-lg bg-slate-100 dark:bg-slate-800 p-0.5 border border-slate-200/80 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => setBalanceMode('add')}
-                  className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                     balanceMode === 'add'
                       ? 'bg-white dark:bg-[#131926] text-emerald-600 dark:text-emerald-400 shadow-xs'
                       : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
@@ -372,7 +372,7 @@ export const AddBalanceModal: React.FC<AddBalanceModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setBalanceMode('set')}
-                  className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                     balanceMode === 'set'
                       ? 'bg-white dark:bg-[#131926] text-slate-900 dark:text-white shadow-xs'
                       : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
@@ -386,7 +386,7 @@ export const AddBalanceModal: React.FC<AddBalanceModalProps> = ({
               {balanceMode === 'add' ? (
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
                       Amount to Add (ETB)
                     </label>
                     <div className="relative">
@@ -400,7 +400,7 @@ export const AddBalanceModal: React.FC<AddBalanceModalProps> = ({
                         value={amountToAdd}
                         onChange={(e) => setAmountToAdd(formatCurrencyInput(e.target.value))}
                         placeholder="0.00"
-                        className="w-full h-11 pl-8 pr-12 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-base font-mono font-bold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                        className="w-full h-10 pl-8 pr-12 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm font-mono font-bold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-slate-900 dark:focus:border-white focus:ring-1 focus:ring-inset focus:ring-slate-900 dark:focus:ring-white"
                       />
                       <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
                         <span className="text-xs font-bold text-slate-400">ETB</span>
@@ -448,7 +448,7 @@ export const AddBalanceModal: React.FC<AddBalanceModalProps> = ({
               ) : (
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
                       New Total Balance (ETB)
                     </label>
                     <div className="relative">
@@ -458,7 +458,7 @@ export const AddBalanceModal: React.FC<AddBalanceModalProps> = ({
                         value={directBalance}
                         onChange={(e) => setDirectBalance(formatCurrencyInput(e.target.value))}
                         placeholder="0.00"
-                        className="w-full h-11 px-3 pr-12 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-base font-mono font-bold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                        className="w-full h-10 px-3 pr-12 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm font-mono font-bold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-slate-900 dark:focus:border-white focus:ring-1 focus:ring-inset focus:ring-slate-900 dark:focus:ring-white"
                       />
                       <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
                         <span className="text-xs font-bold text-slate-400">ETB</span>
@@ -467,7 +467,7 @@ export const AddBalanceModal: React.FC<AddBalanceModalProps> = ({
                   </div>
 
                   {netChange !== 0 && (
-                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/70 dark:border-slate-800 text-xs flex items-center justify-between font-mono">
+                    <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800 text-xs flex items-center justify-between font-mono">
                       <span className="text-slate-500">Adjustment:</span>
                       <span className={netChange > 0 ? 'text-emerald-600 font-bold' : 'text-rose-600 font-bold'}>
                         {netChange > 0 ? `+${netChange.toLocaleString()} ETB` : `−${Math.abs(netChange).toLocaleString()} ETB`}
@@ -483,11 +483,11 @@ export const AddBalanceModal: React.FC<AddBalanceModalProps> = ({
           {isAsset && (
             <div className="space-y-4">
               {/* Reserve Mode Selector */}
-              <div className="flex rounded-xl bg-slate-100 dark:bg-slate-850 p-1 border border-slate-200/80 dark:border-slate-800">
+              <div className="flex rounded-lg bg-slate-100 dark:bg-slate-800 p-0.5 border border-slate-200/80 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => setReserveMode('add_lot')}
-                  className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                     reserveMode === 'add_lot'
                       ? 'bg-white dark:bg-[#131926] text-emerald-600 dark:text-emerald-400 shadow-xs'
                       : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
@@ -499,7 +499,7 @@ export const AddBalanceModal: React.FC<AddBalanceModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setReserveMode('all_lots')}
-                  className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                     reserveMode === 'all_lots'
                       ? 'bg-white dark:bg-[#131926] text-slate-900 dark:text-white shadow-xs'
                       : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
@@ -514,7 +514,7 @@ export const AddBalanceModal: React.FC<AddBalanceModalProps> = ({
                 <div className="space-y-3">
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
                         Amount to Add ({assetCurrency})
                       </label>
                       <input
@@ -524,12 +524,12 @@ export const AddBalanceModal: React.FC<AddBalanceModalProps> = ({
                         value={newLotAmount}
                         onChange={(e) => setNewLotAmount(formatCurrencyInput(e.target.value))}
                         placeholder="e.g. 1,000"
-                        className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm font-mono font-bold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20"
+                        className="w-full h-10 px-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm font-mono font-bold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-slate-900 dark:focus:border-white focus:ring-1 focus:ring-inset focus:ring-slate-900 dark:focus:ring-white"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
                         Exchange Rate (ETB / {assetCurrency})
                       </label>
                       <input
@@ -538,14 +538,14 @@ export const AddBalanceModal: React.FC<AddBalanceModalProps> = ({
                         value={newLotRate}
                         onChange={(e) => setNewLotRate(formatCurrencyInput(e.target.value))}
                         placeholder="e.g. 135"
-                        className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm font-mono font-bold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20"
+                        className="w-full h-10 px-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm font-mono font-bold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-slate-900 dark:focus:border-white focus:ring-1 focus:ring-inset focus:ring-slate-900 dark:focus:ring-white"
                       />
                     </div>
                   </div>
 
                   {/* Live ETB value for new lot */}
                   {parsedNewLotAmt > 0 && parsedNewLotRate > 0 && (
-                    <div className="p-3.5 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-900/40 space-y-1.5 animate-page-enter">
+                    <div className="p-3.5 rounded-lg bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-900/40 space-y-1.5 animate-page-enter">
                       <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
                         <span>New Lot Value:</span>
                         <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
@@ -580,7 +580,7 @@ export const AddBalanceModal: React.FC<AddBalanceModalProps> = ({
                           value={h.amount}
                           onChange={(e) => handleUpdateHoldingRow(h.id, 'amount', e.target.value)}
                           placeholder={`Amount (${assetCurrency})`}
-                          className="flex-1 h-9 px-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500"
+                          className="flex-1 h-9 px-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:border-slate-900 dark:focus:border-white focus:ring-1 focus:ring-inset focus:ring-slate-900 dark:focus:ring-white"
                         />
                         <input
                           type="text"
@@ -588,12 +588,12 @@ export const AddBalanceModal: React.FC<AddBalanceModalProps> = ({
                           value={h.rate}
                           onChange={(e) => handleUpdateHoldingRow(h.id, 'rate', e.target.value)}
                           placeholder="Rate (ETB)"
-                          className="w-24 sm:w-28 h-9 px-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500"
+                          className="w-24 sm:w-28 h-9 px-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:border-slate-900 dark:focus:border-white focus:ring-1 focus:ring-inset focus:ring-slate-900 dark:focus:ring-white"
                         />
                         <button
                           type="button"
                           onClick={() => handleRemoveHoldingRow(h.id)}
-                          className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -604,15 +604,15 @@ export const AddBalanceModal: React.FC<AddBalanceModalProps> = ({
                   <button
                     type="button"
                     onClick={handleAddHoldingRow}
-                    className="w-full py-2 rounded-xl border border-dashed border-slate-200 dark:border-slate-750 text-slate-500 hover:text-emerald-600 hover:border-emerald-500 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    className="w-full h-9 rounded-lg border border-dashed border-slate-300 dark:border-slate-700 hover:border-slate-400 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-850"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    Add Another Lot
+                    <span>Add Another Lot</span>
                   </button>
 
-                  <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between text-xs font-bold">
+                  <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between text-xs font-semibold">
                     <span className="text-slate-500">Total Reserve:</span>
-                    <span className="font-mono text-emerald-600 dark:text-emerald-400">
+                    <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">
                       {allLotsForeignTotal.toLocaleString()} {assetCurrency} = {allLotsEtbTotal.toLocaleString()} ETB
                     </span>
                   </div>
@@ -621,35 +621,37 @@ export const AddBalanceModal: React.FC<AddBalanceModalProps> = ({
             </div>
           )}
 
-          {/* Modal Footer Actions */}
-          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={submitting}
-              className="h-10 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-all cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="h-10 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer active:scale-95 disabled:opacity-50"
-            >
-              {submitting ? (
-                <>
-                  <LdrsSpinner size="14" color="#ffffff" />
-                  <span>Updating...</span>
-                </>
-              ) : (
-                <>
-                  <Plus className="w-4 h-4 stroke-[2.5]" />
-                  <span>{isAsset ? 'Confirm & Add Holdings' : 'Add to Balance'}</span>
-                </>
-              )}
-            </button>
-          </div>
         </form>
+
+        {/* Modal Footer Actions */}
+        <div className="flex items-center justify-end gap-2.5 p-4 sm:p-5 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-[#131926] shrink-0 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] sm:pb-5">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={submitting}
+            className="h-10 px-4 rounded-lg border border-slate-200 dark:border-slate-700 text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            form="add-balance-form"
+            disabled={submitting}
+            className="h-10 px-5 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs sm:text-sm font-bold hover:bg-slate-800 dark:hover:bg-slate-100 disabled:opacity-50 transition-all shadow-xs active:scale-[0.98] flex items-center gap-1.5 cursor-pointer"
+          >
+            {submitting ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>Updating...</span>
+              </>
+            ) : (
+              <>
+                <Plus className="w-3.5 h-3.5" />
+                <span>{isAsset ? 'Confirm & Add Holdings' : 'Add to Balance'}</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -217,7 +217,7 @@ export const InteractiveSalesWaveChart: React.FC<{
         onTouchEnd={handleTouchEnd}
         onMouseMove={(e) => handlePointerInteraction(e.clientX)}
         onMouseLeave={() => setHoverIndex(null)}
-        className={`relative w-full ${heightClass} bg-gradient-to-b from-slate-50/50 to-transparent dark:from-slate-800/20 dark:to-transparent rounded-xl border border-slate-100/90 dark:border-slate-800/80 touch-none select-none cursor-crosshair`}
+        className={`relative w-full ${heightClass} touch-none select-none cursor-crosshair`}
       >
         {points.length === 0 && (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-xs text-slate-400 font-medium z-10">
@@ -547,6 +547,12 @@ export const DonutCapitalChart: React.FC<{
   showLegend = true,
 }) => {
   const [isLoaded, setIsLoaded] = useState(false);
+  const [hoveredSegment, setHoveredSegment] = useState<{
+    label: string;
+    amount: number;
+    pct: number;
+    color: string;
+  } | null>(null);
   const { isBalancesHidden } = useBalancePrivacy();
   const hasMountedRef = useRef(false);
 
@@ -574,8 +580,9 @@ export const DonutCapitalChart: React.FC<{
     ? stock + receivables + liquidVal + forexVal + goldVal + otherVal
     : stock + receivables + treasury + assets;
   const total = grossAssets + payables;
-  const radius = 58;
-  const stroke = 15;
+  const center = 95;
+  const radius = 80;
+  const stroke = 22;
   const circum = 2 * Math.PI * radius;
 
   const stockPct = total > 0 ? stock / total : 0;
@@ -595,14 +602,14 @@ export const DonutCapitalChart: React.FC<{
   const otherOffset = currentOffset; currentOffset += circum * otherPct;
   const payableOffset = currentOffset;
 
-  const segmentTransition = 'stroke-dasharray 900ms cubic-bezier(0.16, 1, 0.3, 1), stroke-dashoffset 900ms cubic-bezier(0.16, 1, 0.3, 1)';
+  const segmentTransition = 'stroke-dasharray 900ms cubic-bezier(0.16, 1, 0.3, 1), stroke-dashoffset 900ms cubic-bezier(0.16, 1, 0.3, 1), stroke-width 200ms ease, opacity 200ms ease';
 
   return (
-    <div className={showLegend ? "flex flex-col sm:flex-row lg:flex-col xl:flex-row items-center justify-center gap-5 sm:gap-6" : "flex items-center justify-center"}>
-      {/* SVG Ring (Enlarged) */}
-      <div className={`relative ${showLegend ? 'w-44 h-44 sm:w-48 sm:h-48' : 'w-40 h-40 sm:w-44 sm:h-44'} shrink-0`}>
+    <div className={showLegend ? "flex flex-col sm:flex-row lg:flex-col xl:flex-row items-center justify-center gap-5 sm:gap-6" : "flex items-center justify-between gap-5 sm:gap-6 w-full h-[180px] 2xl:h-[195px] py-0.5"}>
+      {/* SVG Ring (Fatted & Expanded Diameter) */}
+      <div className={`relative ${showLegend ? 'w-44 h-44 sm:w-48 sm:h-48' : 'w-[174px] h-[174px] sm:w-[178px] sm:h-[178px] 2xl:w-[190px] 2xl:h-[190px]'} shrink-0 mx-auto sm:mx-0`}>
         <svg
-          viewBox="0 0 160 160"
+          viewBox="0 0 190 190"
           className="w-full h-full transition-all duration-700 ease-out"
           style={{
             transform: isLoaded ? 'rotate(-90deg) scale(1)' : 'rotate(-90deg) scale(0.95)',
@@ -611,8 +618,8 @@ export const DonutCapitalChart: React.FC<{
           }}
         >
           <circle
-            cx="80"
-            cy="80"
+            cx={center}
+            cy={center}
             r={radius}
             fill="none"
             stroke="currentColor"
@@ -620,116 +627,232 @@ export const DonutCapitalChart: React.FC<{
             strokeWidth={stroke}
           />
           {/* Stock segment */}
-          <circle
-            cx="80"
-            cy="80"
-            r={radius}
-            fill="none"
-            stroke="#64748b"
-            strokeWidth={stroke}
-            strokeDasharray={isLoaded ? `${circum * stockPct} ${circum}` : `0 ${circum}`}
-            strokeDashoffset={isLoaded ? -stockOffset : 0}
-            style={{ transition: segmentTransition }}
-          />
+          {stockPct > 0 && (
+            <circle
+              cx={center}
+              cy={center}
+              r={radius}
+              fill="none"
+              stroke="#64748b"
+              strokeWidth={hoveredSegment?.label === 'Stock' ? stroke + 4 : stroke}
+              strokeDasharray={isLoaded ? `${circum * stockPct} ${circum}` : `0 ${circum}`}
+              strokeDashoffset={isLoaded ? -stockOffset : 0}
+              className="cursor-pointer transition-all hover:opacity-90"
+              style={{ transition: segmentTransition }}
+              onMouseEnter={() => setHoveredSegment({ label: 'Stock', amount: stock, pct: Math.round(stockPct * 100), color: '#64748b' })}
+              onMouseLeave={() => setHoveredSegment(null)}
+            >
+              <title>{`Stock: ${stock.toLocaleString()} ETB (${(stockPct * 100).toFixed(0)}%)`}</title>
+            </circle>
+          )}
+
           {/* Receivables segment */}
-          <circle
-            cx="80"
-            cy="80"
-            r={radius}
-            fill="none"
-            stroke="#10b981"
-            strokeWidth={stroke}
-            strokeDasharray={isLoaded ? `${circum * recPct} ${circum}` : `0 ${circum}`}
-            strokeDashoffset={isLoaded ? -recOffset : 0}
-            style={{ transition: segmentTransition }}
-          />
+          {recPct > 0 && (
+            <circle
+              cx={center}
+              cy={center}
+              r={radius}
+              fill="none"
+              stroke="#10b981"
+              strokeWidth={hoveredSegment?.label === 'Receivables' ? stroke + 4 : stroke}
+              strokeDasharray={isLoaded ? `${circum * recPct} ${circum}` : `0 ${circum}`}
+              strokeDashoffset={isLoaded ? -recOffset : 0}
+              className="cursor-pointer transition-all hover:opacity-90"
+              style={{ transition: segmentTransition }}
+              onMouseEnter={() => setHoveredSegment({ label: 'Receivables', amount: receivables, pct: Math.round(recPct * 100), color: '#10b981' })}
+              onMouseLeave={() => setHoveredSegment(null)}
+            >
+              <title>{`Receivables: ${receivables.toLocaleString()} ETB (${(recPct * 100).toFixed(0)}%)`}</title>
+            </circle>
+          )}
+
           {/* Treasury / Liquid segment */}
-          <circle
-            cx="80"
-            cy="80"
-            r={radius}
-            fill="none"
-            stroke="#0d9488"
-            strokeWidth={stroke}
-            strokeDasharray={isLoaded ? `${circum * treasPct} ${circum}` : `0 ${circum}`}
-            strokeDashoffset={isLoaded ? -treasOffset : 0}
-            style={{ transition: segmentTransition }}
-          />
+          {treasPct > 0 && (
+            <circle
+              cx={center}
+              cy={center}
+              r={radius}
+              fill="none"
+              stroke="#0d9488"
+              strokeWidth={hoveredSegment?.label === (hasGranularAssets ? 'Liquid Finance' : 'Cash') ? stroke + 4 : stroke}
+              strokeDasharray={isLoaded ? `${circum * treasPct} ${circum}` : `0 ${circum}`}
+              strokeDashoffset={isLoaded ? -treasOffset : 0}
+              className="cursor-pointer transition-all hover:opacity-90"
+              style={{ transition: segmentTransition }}
+              onMouseEnter={() => setHoveredSegment({ label: hasGranularAssets ? 'Liquid Finance' : 'Cash', amount: liquidVal, pct: Math.round(treasPct * 100), color: '#0d9488' })}
+              onMouseLeave={() => setHoveredSegment(null)}
+            >
+              <title>{`${hasGranularAssets ? 'Liquid Finance' : 'Cash'}: ${liquidVal.toLocaleString()} ETB (${(treasPct * 100).toFixed(0)}%)`}</title>
+            </circle>
+          )}
+
           {/* Forex segment (if granular and > 0) */}
           {hasGranularAssets && forexPct > 0 && (
             <circle
-              cx="80"
-              cy="80"
+              cx={center}
+              cy={center}
               r={radius}
               fill="none"
               stroke="#047857"
-              strokeWidth={stroke}
+              strokeWidth={hoveredSegment?.label === 'Forex Reserves' ? stroke + 4 : stroke}
               strokeDasharray={isLoaded ? `${circum * forexPct} ${circum}` : `0 ${circum}`}
               strokeDashoffset={isLoaded ? -forexOffset : 0}
+              className="cursor-pointer transition-all hover:opacity-90"
               style={{ transition: segmentTransition }}
-            />
+              onMouseEnter={() => setHoveredSegment({ label: 'Forex Reserves', amount: forexVal, pct: Math.round(forexPct * 100), color: '#047857' })}
+              onMouseLeave={() => setHoveredSegment(null)}
+            >
+              <title>{`Forex Reserves: ${forexVal.toLocaleString()} ETB (${(forexPct * 100).toFixed(0)}%)`}</title>
+            </circle>
           )}
+
           {/* Gold segment (if granular and > 0) */}
           {hasGranularAssets && goldPct > 0 && (
             <circle
-              cx="80"
-              cy="80"
+              cx={center}
+              cy={center}
               r={radius}
               fill="none"
               stroke="#eab308"
-              strokeWidth={stroke}
+              strokeWidth={hoveredSegment?.label === 'Gold Assets' ? stroke + 4 : stroke}
               strokeDasharray={isLoaded ? `${circum * goldPct} ${circum}` : `0 ${circum}`}
               strokeDashoffset={isLoaded ? -goldOffset : 0}
+              className="cursor-pointer transition-all hover:opacity-90"
               style={{ transition: segmentTransition }}
-            />
+              onMouseEnter={() => setHoveredSegment({ label: 'Gold Assets', amount: goldVal, pct: Math.round(goldPct * 100), color: '#eab308' })}
+              onMouseLeave={() => setHoveredSegment(null)}
+            >
+              <title>{`Gold Assets: ${goldVal.toLocaleString()} ETB (${(goldPct * 100).toFixed(0)}%)`}</title>
+            </circle>
           )}
+
           {/* Assets / Other segment */}
           {otherPct > 0 && (
             <circle
-              cx="80"
-              cy="80"
+              cx={center}
+              cy={center}
               r={radius}
               fill="none"
               stroke={hasGranularAssets ? "#f97316" : "#f59e0b"}
-              strokeWidth={stroke}
+              strokeWidth={hoveredSegment?.label === 'Other Assets' ? stroke + 4 : stroke}
               strokeDasharray={isLoaded ? `${circum * otherPct} ${circum}` : `0 ${circum}`}
               strokeDashoffset={isLoaded ? -otherOffset : 0}
+              className="cursor-pointer transition-all hover:opacity-90"
               style={{ transition: segmentTransition }}
-            />
+              onMouseEnter={() => setHoveredSegment({ label: 'Other Assets', amount: hasGranularAssets ? otherVal : assets, pct: Math.round(otherPct * 100), color: hasGranularAssets ? '#f97316' : '#f59e0b' })}
+              onMouseLeave={() => setHoveredSegment(null)}
+            >
+              <title>{`Other Assets: ${(hasGranularAssets ? otherVal : assets).toLocaleString()} ETB (${(otherPct * 100).toFixed(0)}%)`}</title>
+            </circle>
           )}
+
           {/* Payables segment */}
           {payables > 0 && (
             <circle
-              cx="80"
-              cy="80"
+              cx={center}
+              cy={center}
               r={radius}
               fill="none"
               stroke="#f43f5e"
-              strokeWidth={stroke}
+              strokeWidth={hoveredSegment?.label === 'Payables' ? stroke + 4 : stroke}
               strokeDasharray={isLoaded ? `${circum * payablePct} ${circum}` : `0 ${circum}`}
               strokeDashoffset={isLoaded ? -payableOffset : 0}
+              className="cursor-pointer transition-all hover:opacity-90"
               style={{ transition: segmentTransition }}
-            />
+              onMouseEnter={() => setHoveredSegment({ label: 'Payables', amount: payables, pct: Math.round(payablePct * 100), color: '#f43f5e' })}
+              onMouseLeave={() => setHoveredSegment(null)}
+            >
+              <title>{`Payables: -${payables.toLocaleString()} ETB (${(payablePct * 100).toFixed(0)}%)`}</title>
+            </circle>
           )}
         </svg>
 
-        {/* Center Readout: Net Capital */}
+        {/* Center Readout: Spacious & Crisp Display */}
         <div
-          className={`absolute inset-0 flex flex-col items-center justify-center text-center select-none pointer-events-none transition-all duration-700 delay-300 ${
+          className={`absolute inset-0 flex flex-col items-center justify-center text-center select-none pointer-events-none transition-all duration-300 ${
             isLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-90'
           }`}
         >
-          <span className="text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500 font-semibold">
-            Net Capital
-          </span>
-          <span className="text-lg sm:text-xl font-bold font-mono text-slate-900 dark:text-white tracking-tight mt-0.5">
-            {isBalancesHidden ? '******' : `${(netCapital / 1000000).toFixed(2)}M`}
-          </span>
-          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
-            ETB
-          </span>
+          {hoveredSegment ? (
+            <div className="animate-in fade-in zoom-in-95 duration-150 px-2 max-w-[112px]">
+              <span
+                className="text-[10px] uppercase tracking-wider font-bold block truncate"
+                style={{ color: hoveredSegment.color }}
+              >
+                {hoveredSegment.label}
+              </span>
+              <span className="text-xl sm:text-2xl font-bold font-mono text-slate-900 dark:text-white tracking-tight block mt-0.5">
+                {hoveredSegment.pct}%
+              </span>
+              <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400 block truncate mt-0.5">
+                {isBalancesHidden ? '******' : `${hoveredSegment.amount.toLocaleString()} ETB`}
+              </span>
+            </div>
+          ) : (
+            <div>
+              <span className="text-[10px] 2xl:text-[11px] uppercase tracking-wider text-slate-400 dark:text-slate-500 font-semibold">
+                Net Capital
+              </span>
+              <span className="text-xl sm:text-2xl font-bold font-mono text-slate-900 dark:text-white tracking-tight mt-0.5 block">
+                {isBalancesHidden ? '******' : `${(netCapital / 1000000).toFixed(2)}M`}
+              </span>
+              <span className="text-[10px] 2xl:text-[11px] text-slate-400 dark:text-slate-500 font-medium">
+                ETB
+              </span>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Right Column: Gross Assets, Debt Ratio, Liquid Share placed on the side of the chart perfectly */}
+      {!showLegend && (
+        <div className="flex-1 flex flex-col justify-between h-full min-w-0 pl-3.5 sm:pl-5 border-l border-slate-100 dark:border-slate-800/80">
+          {/* Active Hover / Inspection Pill */}
+          <div className="h-6 flex items-center">
+            {hoveredSegment ? (
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900 text-[10.5px] font-semibold shadow-xs animate-in fade-in duration-150 max-w-full">
+                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: hoveredSegment.color }} />
+                <span className="truncate">{hoveredSegment.label}:</span>
+                <span className="font-mono font-bold whitespace-nowrap">{isBalancesHidden ? '******' : `${hoveredSegment.amount.toLocaleString()} ETB`}</span>
+              </div>
+            ) : (
+              <span className="text-[10.5px] text-slate-400 dark:text-slate-500 font-medium truncate">
+                Hover ring to inspect
+              </span>
+            )}
+          </div>
+
+          {/* 3 Executive Health Metrics stacked vertically on the side of the chart */}
+          <div className="space-y-2 pt-0.5">
+            <div>
+              <div className="text-[10px] 2xl:text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                Gross Assets
+              </div>
+              <div className="text-sm sm:text-[15px] font-bold font-mono text-slate-900 dark:text-white tracking-tight mt-0.5">
+                {isBalancesHidden ? '******' : `${(grossAssets / 1000000).toFixed(2)}M`} <span className="text-[10px] font-sans font-normal text-slate-400">ETB</span>
+              </div>
+            </div>
+
+            <div>
+              <div className="text-[10px] 2xl:text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                Debt Ratio
+              </div>
+              <div className="text-sm sm:text-[15px] font-bold font-mono text-rose-600 dark:text-rose-400 tracking-tight mt-0.5">
+                {grossAssets > 0 ? ((payables / grossAssets) * 100).toFixed(1) : '0'}%
+              </div>
+            </div>
+
+            <div>
+              <div className="text-[10px] 2xl:text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                Liquid Share
+              </div>
+              <div className="text-sm sm:text-[15px] font-bold font-mono text-emerald-600 dark:text-emerald-400 tracking-tight mt-0.5">
+                {grossAssets > 0 ? (((liquidVal + forexVal) / grossAssets) * 100).toFixed(0) : '0'}%
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Legend Grid */}
       {showLegend && (

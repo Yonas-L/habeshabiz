@@ -34,7 +34,7 @@ interface VitalBreakdownDrawerProps {
   data: DashboardData | null;
   accounts: FinancialAccount[];
   selectedMonth?: string;
-  onNavigateTab: (tab: any) => void;
+  onNavigateTab: (tab: any, replace?: boolean, context?: any) => void;
   onSelectDebt?: (debt: Debt) => void;
   onRefreshData?: () => void;
 }
@@ -83,16 +83,16 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
       actionLabel: 'Open Bank Accounts',
     },
     receivables: {
-      title: 'Money Owed to You',
-      subtitle: 'Customer Credit and Vendor Handover Holdings',
+      title: 'Receivables',
+      subtitle: 'Customer credit and partner holdings',
       amount: capital_overview.receivables,
       icon: CreditCard,
       targetTab: 'debts',
       actionLabel: 'Open Debt Ledger',
     },
     payables: {
-      title: 'Money You Owe',
-      subtitle: 'Supplier Debts and Consignment Payouts',
+      title: 'Payables',
+      subtitle: 'Supplier debts and consignment payouts',
       amount: capital_overview.payables,
       icon: Clock,
       targetTab: 'debts',
@@ -362,7 +362,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
 
   const drawerBadge = focusedGroup ? (
     <div className="flex items-center gap-1.5">
-      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+      <span className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${
         vitalType === 'receivables'
           ? 'bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/60'
           : (focusedGroup as any).isStaffBonus
@@ -370,24 +370,24 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
             : 'bg-rose-100 dark:bg-rose-900/60 text-rose-800 dark:text-rose-300 border border-rose-200/60 dark:border-rose-800/60'
       }`}>
         {vitalType === 'receivables'
-          ? 'Party Receivable'
+          ? 'Receivable'
           : (focusedGroup as any).isStaffBonus
             ? 'Staff Bonus'
-            : 'Party Payable'}
+            : 'Payable'}
       </span>
       {selectedMonth && (
-        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
+        <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
           {formatMonthLabel(selectedMonth)}
         </span>
       )}
     </div>
   ) : (
     <div className="flex items-center gap-1.5">
-      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+      <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
         Store Asset
       </span>
       {selectedMonth && (
-        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60 font-mono">
+        <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60 font-mono">
           {formatMonthLabel(selectedMonth)}
         </span>
       )}
@@ -454,7 +454,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            className="h-9 px-4 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
           >
             Close
           </button>
@@ -463,9 +463,13 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
             type="button"
             onClick={() => {
               onClose();
-              onNavigateTab(current.targetTab);
+              if (vitalType === 'receivables' || vitalType === 'payables') {
+                onNavigateTab('debts', false, { debtType: vitalType === 'payables' ? 'payable' : 'receivable' });
+              } else {
+                onNavigateTab(current.targetTab);
+              }
             }}
-            className="h-9 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs flex items-center gap-1.5 active:scale-95 cursor-pointer"
+            className="h-9 px-4 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs flex items-center gap-1.5 active:scale-95 cursor-pointer"
           >
             <span>{focusedGroup ? `Open ${focusedGroup.name} in Debts` : current.actionLabel}</span>
             <ArrowRight className="w-3.5 h-3.5" />
@@ -474,10 +478,10 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
       }
     >
       {/* Hero Metric Card */}
-      <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 space-y-3">
+      <div className="p-5 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800 space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
               {valuationLabel}
             </span>
             <div className="text-3xl font-black text-slate-900 dark:text-white font-mono tabular-nums tracking-tight mt-1">
@@ -485,7 +489,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
               <span className="text-sm font-bold text-slate-400 font-sans">ETB</span>
             </div>
             {focusedGroup && focusedGroup.offsetAmount > 0.01 && (
-              <div className="text-[11px] text-amber-600 dark:text-amber-400 font-medium mt-1">
+              <div className="text-xs text-amber-600 dark:text-amber-400 font-medium mt-1">
                 Gross {focusedGroup.totalRemaining.toLocaleString()} ETB · Offset −{focusedGroup.offsetAmount.toLocaleString()} ETB
               </div>
             )}
@@ -502,12 +506,12 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                   totalRemaining: focusedGroup.netRemaining,
                   debtCount: focusedGroup.openCount,
                 })}
-                className="h-9 px-3 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                className="h-9 px-3 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs active:scale-95 flex items-center gap-1.5 cursor-pointer"
               >
                 <span>{vitalType === 'receivables' ? 'Collect All' : 'Pay All'}</span>
               </button>
             )}
-            <div className="w-11 h-11 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-300 shadow-xs">
+            <div className="w-10 h-10 rounded-lg bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-300 shadow-xs">
               <Icon className="w-5 h-5" />
             </div>
           </div>
@@ -521,12 +525,12 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                 setInternalFocusedContactId(null);
                 if (onClearFocusedContact) onClearFocusedContact();
               }}
-              className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
+              className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
             >
               <span>← View all {vitalType === 'receivables' ? 'store receivables' : 'store payables'}</span>
             </button>
             {focusedGroup.phone && (
-              <span className="text-[11px] text-slate-400 font-mono">{focusedGroup.phone}</span>
+              <span className="text-xs text-slate-400 font-mono">{focusedGroup.phone}</span>
             )}
           </div>
         )}
@@ -618,7 +622,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
         >
           <div className="space-y-2">
             {(focusedGroup ? [focusedGroup] : groupedReceivables).length === 0 ? (
-              <div className="p-6 text-center text-xs text-slate-400 bg-white dark:bg-[#131926] rounded-xl border border-slate-200/70 dark:border-slate-800/90">
+              <div className="p-6 text-center text-xs text-slate-400 bg-white dark:bg-[#131926] rounded-lg border border-slate-200/80 dark:border-slate-800">
                 <div className="font-semibold text-slate-700 dark:text-slate-300 mb-0.5">No Open Receivables</div>
                 <div className="text-[11px]">All customer and partner receivables are settled.</div>
               </div>
@@ -628,7 +632,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                 return (
                   <div
                     key={group.contactId}
-                    className="rounded-xl bg-white dark:bg-[#131926] border border-slate-200/70 dark:border-slate-800/90 overflow-hidden transition-all text-xs"
+                    className="rounded-lg bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800 overflow-hidden transition-all text-xs"
                   >
                     {/* Collapsed Header */}
                     <div
@@ -659,7 +663,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                                   setInternalFocusedContactId(group.contactId);
                                 }}
                                 title={`Focus on ${group.name}'s drawer`}
-                                className="text-[10px] text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+                                className="text-[11px] text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors cursor-pointer"
                               >
                                 Focus →
                               </button>
@@ -698,7 +702,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                               totalRemaining: group.netRemaining,
                               debtCount: group.openCount,
                             })}
-                            className="h-7 px-2.5 rounded-lg text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs active:scale-95 cursor-pointer ml-1 whitespace-nowrap"
+                            className="h-7 px-2.5 rounded-md text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs active:scale-95 cursor-pointer ml-1 whitespace-nowrap"
                           >
                             Collect
                           </button>
@@ -730,7 +734,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                                   onSelectDebt(debt);
                                 }
                               }}
-                              className={`p-2.5 rounded-lg border flex items-center justify-between text-xs cursor-pointer transition-all ${
+                              className={`p-2.5 rounded-md border flex items-center justify-between text-xs cursor-pointer transition-all ${
                                 isSettled
                                   ? 'bg-slate-100/50 dark:bg-slate-900/20 border-slate-200/40 dark:border-slate-800/40 opacity-60'
                                   : 'bg-white dark:bg-[#131926] border-slate-200/60 dark:border-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700'
@@ -751,11 +755,11 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                                     </span>
                                   )}
                                   {isSettled ? (
-                                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-200/60 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-200/60 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
                                       Covered
                                     </span>
                                   ) : isPartial ? (
-                                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400">
+                                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400">
                                       Partial
                                     </span>
                                   ) : null}
@@ -784,7 +788,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                                         debtCount: 1,
                                       });
                                     }}
-                                    className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs active:scale-95 cursor-pointer"
+                                    className="px-2 py-0.5 rounded-md text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs active:scale-95 cursor-pointer"
                                   >
                                     Collect
                                   </button>
@@ -835,7 +839,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
         >
           <div className="space-y-2">
             {(focusedGroup ? [focusedGroup] : groupedPayables).length === 0 ? (
-              <div className="p-6 text-center text-xs text-slate-400 bg-white dark:bg-[#131926] rounded-xl border border-slate-200/70 dark:border-slate-800/90">
+              <div className="p-6 text-center text-xs text-slate-400 bg-white dark:bg-[#131926] rounded-lg border border-slate-200/80 dark:border-slate-800">
                 <div className="font-semibold text-slate-700 dark:text-slate-300 mb-0.5">No Outstanding Payables Due</div>
                 <div className="text-[11px]">All vendor debts are fully settled or offset by handovers & receivables.</div>
               </div>
@@ -845,7 +849,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                 return (
                   <div
                     key={group.contactId}
-                    className="rounded-xl bg-white dark:bg-[#131926] border border-slate-200/70 dark:border-slate-800/90 overflow-hidden transition-all text-xs"
+                    className="rounded-lg bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800 overflow-hidden transition-all text-xs"
                   >
                     {/* Collapsed Header */}
                     <div
@@ -869,7 +873,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                               {group.name}
                             </span>
                             {(group as any).isStaffBonus && (
-                              <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/60 shrink-0">
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/60 shrink-0">
                                 Staff Bonus
                               </span>
                             )}
@@ -881,7 +885,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                                   setInternalFocusedContactId(group.contactId);
                                 }}
                                 title={`Focus on ${group.name}'s drawer`}
-                                className="text-[10px] text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"
+                                className="text-[11px] text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors cursor-pointer"
                               >
                                 Focus →
                               </button>
@@ -920,7 +924,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                               totalRemaining: group.netRemaining,
                               debtCount: group.openCount,
                             })}
-                            className="h-7 px-2.5 rounded-lg text-[11px] font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-2xs active:scale-95 cursor-pointer ml-1 whitespace-nowrap"
+                            className="h-7 px-2.5 rounded-md text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-2xs active:scale-95 cursor-pointer ml-1 whitespace-nowrap"
                           >
                             Pay
                           </button>
@@ -952,7 +956,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                                   onSelectDebt(debt);
                                 }
                               }}
-                              className={`p-2.5 rounded-lg border flex items-center justify-between text-xs cursor-pointer transition-all ${
+                              className={`p-2.5 rounded-md border flex items-center justify-between text-xs cursor-pointer transition-all ${
                                 isSettled
                                   ? 'bg-slate-100/50 dark:bg-slate-900/20 border-slate-200/40 dark:border-slate-800/40 opacity-60'
                                   : 'bg-white dark:bg-[#131926] border-slate-200/60 dark:border-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700'
@@ -973,11 +977,11 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                                     </span>
                                   )}
                                   {isSettled ? (
-                                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-200/60 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-200/60 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
                                       Covered
                                     </span>
                                   ) : isPartial ? (
-                                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400">
+                                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400">
                                       Partial
                                     </span>
                                   ) : null}
@@ -1006,7 +1010,7 @@ export const VitalBreakdownDrawer: React.FC<VitalBreakdownDrawerProps> = ({
                                         debtCount: 1,
                                       });
                                     }}
-                                    className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-2xs active:scale-95 cursor-pointer"
+                                    className="px-2 py-0.5 rounded-md text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-2xs active:scale-95 cursor-pointer"
                                   >
                                     Pay
                                   </button>
