@@ -751,25 +751,53 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             </div>
           </div>
 
-          {/* Card B: Quick Actions — frosted dark glass, white buttons, emerald labels */}
-          <div className="hidden lg:flex lg:col-span-3 2xl:col-span-3 bg-slate-800/80 dark:bg-slate-900/70 backdrop-blur-xl rounded-3xl p-4 sm:p-5 2xl:p-6 shadow-lg flex-col h-[285px] 2xl:h-[340px] overflow-hidden ring-1 ring-white/10">
+          {/* Card B: Quick Actions — Frosted liquid glass matching mobile treasury bank cards, emerald frame */}
+          <div
+            className="hidden lg:flex lg:col-span-3 2xl:col-span-3 relative rounded-3xl p-4 sm:p-5 2xl:p-6 bg-white/60 dark:bg-slate-900/60 backdrop-blur-[20px] shadow-[0_16px_36px_-10px_rgba(16,185,129,0.18),0_6px_16px_-4px_rgba(15,23,42,0.06)] dark:shadow-[0_16px_36px_-10px_rgba(16,185,129,0.25),0_6px_16px_-4px_rgba(0,0,0,0.5)] flex-col h-[285px] 2xl:h-[340px] overflow-hidden border border-emerald-500/40 dark:border-emerald-400/40 transition-all duration-300"
+            style={{
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
+            }}
+          >
+            {/* Top Specular Rim Glint */}
+            <div
+              aria-hidden="true"
+              className="absolute inset-x-5 top-0 h-[1.5px] rounded-full pointer-events-none z-10"
+              style={{
+                background: 'linear-gradient(90deg, transparent 0%, rgba(52, 211, 153, 0.5) 25%, rgba(255, 255, 255, 0.95) 50%, rgba(52, 211, 153, 0.5) 75%, transparent 100%)',
+              }}
+            />
+
+            {/* Horizontal Blurry Ambient Emerald Haze (matching mobile treasury card art) */}
+            <div
+              aria-hidden="true"
+              className="absolute inset-x-0 top-[20%] bottom-[20%] pointer-events-none z-0 select-none overflow-hidden"
+              style={{ filter: 'blur(24px)', opacity: 0.35 }}
+            >
+              <svg viewBox="0 0 300 100" fill="none" className="w-full h-full" preserveAspectRatio="none">
+                <rect x="20" y="20" width="80" height="50" rx="16" fill="#10b981" fillOpacity="0.30" />
+                <rect x="120" y="30" width="70" height="40" rx="16" fill="#059669" fillOpacity="0.25" />
+                <rect x="210" y="15" width="80" height="50" rx="16" fill="#34d399" fillOpacity="0.25" />
+              </svg>
+            </div>
+
             {/* Header */}
-            <div className="flex items-center justify-between pb-2.5 mb-0 shrink-0">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+            <div className="relative z-10 flex items-center justify-between pb-2.5 mb-0 shrink-0">
+              <span className="text-xs font-semibold uppercase tracking-wider text-emerald-800/80 dark:text-emerald-400/90">
                 Quick Actions
               </span>
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex-1 flex flex-col justify-center gap-2.5 2xl:gap-3 min-h-0">
+            {/* Action Buttons List: 3 minimal, functional buttons that open in-page modals */}
+            <div className="relative z-10 flex-1 flex flex-col justify-center gap-2.5 2xl:gap-3 min-h-0">
               {/* 1. Record Expense */}
               <button
                 type="button"
                 onClick={() => setIsExpenseModalOpen(true)}
-                className="w-full flex items-center justify-between py-2.5 2xl:py-3.5 px-4 rounded-xl bg-white/95 dark:bg-white/90 hover:bg-white dark:hover:bg-white shadow-sm text-emerald-700 dark:text-emerald-600 text-xs 2xl:text-sm font-semibold transition-all cursor-pointer group text-left"
+                className="w-full flex items-center justify-between py-2.5 2xl:py-3.5 px-4 rounded-xl bg-white dark:bg-slate-800/95 hover:bg-emerald-50/60 dark:hover:bg-slate-800 shadow-xs hover:shadow-sm border border-emerald-100/80 dark:border-emerald-900/40 text-emerald-700 dark:text-emerald-400 text-xs 2xl:text-sm font-semibold transition-all cursor-pointer group text-left"
               >
                 <span className="truncate">Record Expense</span>
-                <ChevronRight className="w-3.5 h-3.5 text-emerald-400 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition-all shrink-0" />
+                <ChevronRight className="w-3.5 h-3.5 text-emerald-500/70 dark:text-emerald-400/70 group-hover:text-emerald-600 dark:group-hover:text-emerald-300 group-hover:translate-x-0.5 transition-all shrink-0" />
               </button>
 
               {/* 2. Record Debt */}
@@ -779,10 +807,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   setDebtModalDefaultType('receivable');
                   setIsDebtModalOpen(true);
                 }}
-                className="w-full flex items-center justify-between py-2.5 2xl:py-3.5 px-4 rounded-xl bg-white/95 dark:bg-white/90 hover:bg-white dark:hover:bg-white shadow-sm text-emerald-700 dark:text-emerald-600 text-xs 2xl:text-sm font-semibold transition-all cursor-pointer group text-left"
+                className="w-full flex items-center justify-between py-2.5 2xl:py-3.5 px-4 rounded-xl bg-white dark:bg-slate-800/95 hover:bg-emerald-50/60 dark:hover:bg-slate-800 shadow-xs hover:shadow-sm border border-emerald-100/80 dark:border-emerald-900/40 text-emerald-700 dark:text-emerald-400 text-xs 2xl:text-sm font-semibold transition-all cursor-pointer group text-left"
               >
                 <span className="truncate">Record Debt</span>
-                <ChevronRight className="w-3.5 h-3.5 text-emerald-400 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition-all shrink-0" />
+                <ChevronRight className="w-3.5 h-3.5 text-emerald-500/70 dark:text-emerald-400/70 group-hover:text-emerald-600 dark:group-hover:text-emerald-300 group-hover:translate-x-0.5 transition-all shrink-0" />
               </button>
 
               {/* 3. Add Stock */}
@@ -790,13 +818,13 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 type="button"
                 onClick={handleOpenStockIntake}
                 disabled={isLoadingStockMeta}
-                className="w-full flex items-center justify-between py-2.5 2xl:py-3.5 px-4 rounded-xl bg-white/95 dark:bg-white/90 hover:bg-white dark:hover:bg-white shadow-sm text-emerald-700 dark:text-emerald-600 text-xs 2xl:text-sm font-semibold transition-all cursor-pointer group text-left disabled:opacity-70"
+                className="w-full flex items-center justify-between py-2.5 2xl:py-3.5 px-4 rounded-xl bg-white dark:bg-slate-800/95 hover:bg-emerald-50/60 dark:hover:bg-slate-800 shadow-xs hover:shadow-sm border border-emerald-100/80 dark:border-emerald-900/40 text-emerald-700 dark:text-emerald-400 text-xs 2xl:text-sm font-semibold transition-all cursor-pointer group text-left disabled:opacity-70"
               >
                 <span className="truncate">{isLoadingStockMeta ? 'Loading...' : 'Add Stock'}</span>
                 {isLoadingStockMeta ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400 shrink-0" />
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-500 shrink-0" />
                 ) : (
-                  <ChevronRight className="w-3.5 h-3.5 text-emerald-400 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition-all shrink-0" />
+                  <ChevronRight className="w-3.5 h-3.5 text-emerald-500/70 dark:text-emerald-400/70 group-hover:text-emerald-600 dark:group-hover:text-emerald-300 group-hover:translate-x-0.5 transition-all shrink-0" />
                 )}
               </button>
             </div>
