@@ -752,16 +752,16 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           </div>
 
           {/* Card B: Quick Actions Widget (minimal width, clean, zero nested borders, no icons on labels) */}
-          <div className="hidden lg:flex lg:col-span-3 2xl:col-span-3 bg-white dark:bg-[#131926] rounded-2xl p-4 sm:p-5 2xl:p-6 shadow-xs flex-col justify-between h-[285px] 2xl:h-[340px] overflow-hidden">
+          <div className="hidden lg:flex lg:col-span-3 2xl:col-span-3 bg-white dark:bg-[#131926] rounded-2xl p-4 sm:p-5 2xl:p-6 shadow-xs flex-col h-[285px] 2xl:h-[340px] overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100 dark:border-slate-800/80 shrink-0">
+            <div className="flex items-center justify-between pb-2.5 mb-0 shrink-0">
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 Quick Actions
               </span>
             </div>
 
             {/* Action Buttons List: 3 minimal, functional buttons that open in-page modals */}
-            <div className="flex-1 flex flex-col justify-between py-1 2xl:py-2 min-h-0">
+            <div className="flex-1 flex flex-col justify-center gap-2.5 2xl:gap-3 min-h-0">
               {/* 1. Record Expense */}
               <button
                 type="button"
