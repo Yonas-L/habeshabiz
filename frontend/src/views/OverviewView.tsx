@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { DashboardData, User, FinancialAccount, Debt, LeaderboardItem, SalesTrend, DashboardSalesChartPoint } from '../api/client';
 import { api } from '../api/client';
 import {
@@ -58,18 +58,41 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   } | null>(null);
   const [isLoadingRange, setIsLoadingRange] = useState(false);
   const [hoveredPointVal, setHoveredPointVal] = useState<number | null>(null);
+  const rangeCacheRef = useRef<Record<string, {
+    revenue: number;
+    gross_profit: number;
+    net_profit: number;
+    operating_expenses: number;
+    owner_draws: number;
+    sales_trend?: SalesTrend;
+    sales_chart?: DashboardSalesChartPoint[];
+  }>>({});
+  const activeReqRef = useRef<string>('');
 
   const handleRangeChange = (range: '1M' | '3M' | '6M' | '1Y') => {
     setSalesRange(range);
     setHoveredPointVal(null);
     if (range === '1M') {
       setRangePerformance(null);
+      setIsLoadingRange(false);
       return;
     }
+
+    const cacheKey = `${selectedMonth}_${range}`;
+    if (rangeCacheRef.current[cacheKey]) {
+      setRangePerformance(rangeCacheRef.current[cacheKey]);
+      setIsLoadingRange(false);
+      return;
+    }
+
     setIsLoadingRange(true);
+    const reqId = `${selectedMonth}_${range}_${Date.now()}`;
+    activeReqRef.current = reqId;
+
     api.getDashboardSummary(selectedMonth, range.toLowerCase())
       .then((res) => {
-        setRangePerformance({
+        if (activeReqRef.current !== reqId) return;
+        const perf = {
           revenue: res.monthly_performance.revenue,
           gross_profit: res.monthly_performance.gross_profit,
           net_profit: res.monthly_performance.net_profit,
@@ -77,17 +100,22 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           owner_draws: res.monthly_performance.owner_draws,
           sales_trend: res.sales_trend,
           sales_chart: res.sales_chart,
-        });
+        };
+        rangeCacheRef.current[cacheKey] = perf;
+        setRangePerformance(perf);
       })
       .catch((err) => {
         console.error('Failed to load range performance:', err);
       })
       .finally(() => {
-        setIsLoadingRange(false);
+        if (activeReqRef.current === reqId) {
+          setIsLoadingRange(false);
+        }
       });
   };
 
   useEffect(() => {
+    rangeCacheRef.current = {};
     if (salesRange !== '1M') {
       handleRangeChange(salesRange);
     } else {
@@ -441,7 +469,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               </div>
 
               {/* Chart Canvas */}
-              <div className="mt-1.5">
+              <div className={`mt-1.5 transition-opacity duration-200 ${isLoadingRange ? 'opacity-60' : 'opacity-100'}`}>
                 <InteractiveSalesWaveChart
                   data={activeSalesChart}
                   totalRevenue={activeRevenue}

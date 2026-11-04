@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { AnimatedNumber } from './AnimatedNumber';
 import { useBalancePrivacy } from '../context/BalancePrivacyContext';
 import { BarChart3, LineChart } from 'lucide-react';
@@ -37,22 +37,26 @@ export const InteractiveSalesWaveChart: React.FC<{
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const [metric, setMetric] = useState<'revenue' | 'profit'>('revenue');
   const [chartType, setChartType] = useState<'wave' | 'bar'>('wave');
-  const [isLoaded, setIsLoaded] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const touchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const hasMountedRef = useRef(false);
 
-  useEffect(() => {
-    setIsLoaded(false);
-    const raf = requestAnimationFrame(() => {
-      const t = setTimeout(() => {
-        setIsLoaded(true);
-        hasMountedRef.current = true;
-      }, 40);
-      return () => clearTimeout(t);
-    });
-    return () => cancelAnimationFrame(raf);
+  // Derive unique animation sequence ID matching DonutCapitalChart's smooth reveal
+  const animCounterRef = useRef(1);
+  const prevSignatureRef = useRef('');
+
+  const signature = useMemo(() => {
+    if (!data || data.length === 0) return 'empty';
+    const first = data[0];
+    const last = data[data.length - 1];
+    return `${data.length}_${first.day}_${last.day}_${first.revenue}_${last.revenue}_${metric}_${chartType}`;
   }, [data, metric, chartType]);
+
+  if (prevSignatureRef.current !== signature) {
+    prevSignatureRef.current = signature;
+    animCounterRef.current += 1;
+  }
+
+  const animId = `wave_anim_${animCounterRef.current}`;
 
   const width = 640;
   const height = 180;
@@ -239,6 +243,71 @@ export const InteractiveSalesWaveChart: React.FC<{
           </div>
         )}
 
+        {/* Scoped CSS animations matching DonutCapitalChart's exact easing curve */}
+        <style>{`
+          @keyframes salesWaveWipe_${animId} {
+            0% {
+              width: 0px;
+            }
+            100% {
+              width: ${width}px;
+            }
+          }
+          @keyframes salesWaveDraw_${animId} {
+            0% {
+              stroke-dashoffset: 1000;
+            }
+            100% {
+              stroke-dashoffset: 0;
+            }
+          }
+          @keyframes salesAreaFade_${animId} {
+            0% {
+              opacity: 0;
+            }
+            30% {
+              opacity: 0.35;
+            }
+            100% {
+              opacity: 1;
+            }
+          }
+          @keyframes salesDotEntrance_${animId} {
+            0% {
+              opacity: 0;
+              transform: scale(0);
+            }
+            60% {
+              opacity: 1;
+              transform: scale(1.22);
+            }
+            100% {
+              opacity: 1;
+              transform: scale(1);
+            }
+          }
+          @keyframes salesBarGrow_${animId} {
+            0% {
+              transform: scaleY(0);
+              opacity: 0.2;
+            }
+            100% {
+              transform: scaleY(1);
+              opacity: 1;
+            }
+          }
+          @keyframes salesLabelsFade_${animId} {
+            0% {
+              opacity: 0;
+              transform: translateY(2px);
+            }
+            100% {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+        `}</style>
+
         <svg
           viewBox={`0 0 ${width} ${height}`}
           className="w-full h-full overflow-hidden rounded-xl"
@@ -253,14 +322,14 @@ export const InteractiveSalesWaveChart: React.FC<{
               <stop offset="0%" stopColor="#0d9488" stopOpacity="0.25" />
               <stop offset="100%" stopColor="#0d9488" stopOpacity="0.00" />
             </linearGradient>
-            <clipPath id="salesWaveReveal">
+            <clipPath id={animId}>
               <rect
                 x="0"
                 y="0"
-                width={isLoaded ? width : 0}
+                width={width}
                 height={height}
                 style={{
-                  transition: 'width 650ms cubic-bezier(0.16, 1, 0.3, 1)',
+                  animation: `salesWaveWipe_${animId} 900ms cubic-bezier(0.16, 1, 0.3, 1) forwards`,
                 }}
               />
             </clipPath>
@@ -303,12 +372,14 @@ export const InteractiveSalesWaveChart: React.FC<{
 
           {/* Wave Mode: Synchronously Clipped Area & Bezier Curve */}
           {chartType === 'wave' && (
-            <g clipPath="url(#salesWaveReveal)">
+            <g clipPath={`url(#${animId})`}>
               {areaPath && (
                 <path
                   d={areaPath}
                   fill={metric === 'revenue' ? 'url(#emeraldWave)' : 'url(#tealWave)'}
-                  className="transition-opacity duration-300"
+                  style={{
+                    animation: `salesAreaFade_${animId} 900ms cubic-bezier(0.16, 1, 0.3, 1) forwards`,
+                  }}
                 />
               )}
               {curvePath && (
@@ -319,7 +390,12 @@ export const InteractiveSalesWaveChart: React.FC<{
                   strokeWidth="2.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  className="transition-opacity duration-300"
+                  pathLength={1000}
+                  strokeDasharray="1000"
+                  strokeDashoffset="1000"
+                  style={{
+                    animation: `salesWaveDraw_${animId} 900ms cubic-bezier(0.16, 1, 0.3, 1) forwards`,
+                  }}
                 />
               )}
             </g>
@@ -368,15 +444,18 @@ export const InteractiveSalesWaveChart: React.FC<{
                   />
                 )}
                 <rect
+                  key={`bar_${animId}_${i}`}
                   x={barX}
-                  y={isLoaded ? barY : height - padY}
+                  y={barY}
                   width={barW}
-                  height={isLoaded ? barH : 0}
+                  height={barH}
                   rx={Math.min(barW / 2.5, 4)}
                   fill={isHovered ? (isRev ? '#10b981' : '#0d9488') : (isRev ? '#34d399' : '#2dd4bf')}
                   opacity={hoverIndex === null ? 0.85 : isHovered ? 1 : 0.35}
                   style={{
-                    transition: 'all 280ms cubic-bezier(0.16, 1, 0.3, 1)',
+                    transformOrigin: `${pt.x}px ${height - padY}px`,
+                    animation: `salesBarGrow_${animId} 650ms cubic-bezier(0.16, 1, 0.3, 1) ${Math.round((i / points.length) * 200)}ms both`,
+                    transition: 'fill 150ms ease, opacity 150ms ease',
                   }}
                   className="cursor-pointer"
                   onMouseEnter={() => setHoverIndex(i)}
@@ -387,7 +466,7 @@ export const InteractiveSalesWaveChart: React.FC<{
           })}
         </svg>
 
-        {/* Milestone and Active Dots (Rendered in HTML DOM to ensure 100% circular 1:1 geometry, never flattened by SVG non-uniform scaling) */}
+        {/* Milestone and Active Dots (Rendered in HTML DOM to ensure 100% circular 1:1 geometry, cascading with wave sweep) */}
         {chartType === 'wave' && points.map((pt, i) => {
           const isMilestone = points.length <= 8 ||
             i === 0 ||
@@ -400,21 +479,31 @@ export const InteractiveSalesWaveChart: React.FC<{
 
           const pctX = (pt.x / width) * 100;
           const pctY = (pt.y / height) * 100;
+          const delayMs = Math.round((pt.x / width) * 550);
 
           return (
             <div
-              key={i}
-              className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full pointer-events-none ${
-                isHovered
-                  ? 'w-3.5 h-3.5 bg-emerald-600 dark:bg-emerald-400 ring-4 ring-emerald-500/25 z-20 scale-110 shadow-md'
-                  : 'w-2 h-2 sm:w-2.5 sm:h-2.5 bg-white dark:bg-[#131926] border-2 border-emerald-500 dark:border-emerald-400 z-10 shadow-xs'
-              } ${isLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-0'}`}
+              key={`dot_pos_${animId}_${i}`}
+              className="absolute pointer-events-none -translate-x-1/2 -translate-y-1/2 z-10"
               style={{
                 left: `${pctX}%`,
                 top: `${pctY}%`,
-                transition: 'left 500ms cubic-bezier(0.16, 1, 0.3, 1), top 500ms cubic-bezier(0.16, 1, 0.3, 1), transform 250ms ease, opacity 300ms ease',
               }}
-            />
+            >
+              <div
+                style={{
+                  animation: `salesDotEntrance_${animId} 450ms cubic-bezier(0.16, 1, 0.3, 1) ${delayMs}ms both`,
+                }}
+              >
+                <div
+                  className={`rounded-full transition-all duration-200 ${
+                    isHovered
+                      ? 'w-3.5 h-3.5 bg-emerald-600 dark:bg-emerald-400 ring-4 ring-emerald-500/25 z-20 scale-125 shadow-md'
+                      : 'w-2 h-2 sm:w-2.5 sm:h-2.5 bg-white dark:bg-[#131926] border-2 border-emerald-500 dark:border-emerald-400 shadow-xs'
+                  }`}
+                />
+              </div>
+            </div>
           );
         })}
 
@@ -452,7 +541,13 @@ export const InteractiveSalesWaveChart: React.FC<{
 
       {/* Axis Labels */}
       {data.length > 0 ? (
-        <div className="flex justify-between text-[11px] 2xl:text-xs text-slate-400 dark:text-slate-500 mt-1 px-3 2xl:px-4 font-medium select-none">
+        <div
+          key={`axis_${animId}`}
+          className="flex justify-between text-[11px] 2xl:text-xs text-slate-400 dark:text-slate-500 mt-1 px-3 2xl:px-4 font-medium select-none"
+          style={{
+            animation: `salesLabelsFade_${animId} 450ms cubic-bezier(0.16, 1, 0.3, 1) forwards`,
+          }}
+        >
           {data.length <= 8 ? (
             data.map((d, i) => <span key={i}>{d.day}</span>)
           ) : (
