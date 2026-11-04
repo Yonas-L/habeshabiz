@@ -525,14 +525,14 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   title="Click to record an expense or personal draw"
                   className={`px-3.5 2xl:px-5 text-left group cursor-pointer focus:outline-none transition-colors ${canViewCost ? 'border-r border-slate-100 dark:border-slate-800/80' : 'border-r-0'}`}
                 >
-                  <div className="text-[10.5px] 2xl:text-xs font-semibold text-slate-500 dark:text-slate-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors truncate">
+                  <div className="text-[10.5px] 2xl:text-xs font-semibold text-slate-500 dark:text-slate-400 group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors truncate">
                     Expenses
                   </div>
-                  <div className="text-sm sm:text-base 2xl:text-lg font-bold font-mono tracking-tight text-slate-900 dark:text-white mt-1 2xl:mt-1.5 truncate">
+                  <div className="text-sm sm:text-base 2xl:text-lg font-bold font-mono tracking-tight text-rose-600 dark:text-rose-400 mt-1 2xl:mt-1.5 truncate">
                     {isBalancesHidden ? '******' : (
                       <>
                         <AnimatedNumber value={activeExpenses} />
-                        <span className="text-[10px] 2xl:text-xs font-sans font-medium text-slate-400 dark:text-slate-500 ml-1">ETB</span>
+                        <span className="text-[10px] 2xl:text-xs font-sans font-medium text-rose-600/70 dark:text-rose-400/70 ml-1">ETB</span>
                       </>
                     )}
                   </div>
