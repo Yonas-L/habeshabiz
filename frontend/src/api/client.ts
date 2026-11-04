@@ -580,6 +580,16 @@ export interface PartnerSettlementsOverview {
   partners: PartnerSettlementItem[];
 }
 
+export interface SalesTrend {
+  percentage: number;
+  raw_percentage?: number;
+  is_up: boolean;
+  prior_revenue: number;
+  current_revenue?: number;
+  comparison_label: string;
+  range?: string;
+}
+
 export interface DashboardData {
   capital_overview: {
     net_capital: number;
@@ -606,6 +616,7 @@ export interface DashboardData {
     transaction_fees?: number;
     owner_draws: number;
     net_profit: number;
+    sales_trend?: SalesTrend;
   };
   counts: {
     in_stock_phones: number;
@@ -625,6 +636,8 @@ export interface DashboardData {
   top_receivables: Debt[];
   top_payables: Debt[];
   sales_chart?: DashboardSalesChartPoint[];
+  sales_trend?: SalesTrend;
+  range?: string;
 }
 
 export interface BusinessReportData {
@@ -1208,8 +1221,13 @@ export const api = {
   getMe: () => request<{ user: User; tenant: Tenant }>('/auth/me'),
   logout: () => request<void>('/auth/logout', { method: 'POST' }),
 
-  getDashboardSummary: (month?: string) =>
-    request<DashboardData>(month ? `/dashboard/summary?month=${month}` : '/dashboard/summary'),
+  getDashboardSummary: (month?: string, range?: string) => {
+    const params = new URLSearchParams();
+    if (month) params.append('month', month);
+    if (range) params.append('range', range);
+    const qs = params.toString();
+    return request<DashboardData>(qs ? `/dashboard/summary?${qs}` : '/dashboard/summary');
+  },
 
   getBusinessReport: (from: string, to: string) =>
     request<BusinessReportData>(`/reports/summary?${new URLSearchParams({ from, to }).toString()}`),

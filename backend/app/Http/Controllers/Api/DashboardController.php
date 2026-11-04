@@ -31,6 +31,33 @@ class DashboardController extends Controller
             $endOfMonth = now()->endOfMonth();
         }
 
+        $range = strtolower((string) $request->query('range', '1m'));
+        if (! in_array($range, ['1m', '3m', '6m', '1y'])) {
+            $range = '1m';
+        }
+
+        if ($range === '3m') {
+            $startOfPerformance = $endOfMonth->copy()->subMonths(3)->addDay()->startOfDay();
+            $priorEnd = $startOfPerformance->copy()->subDay()->endOfDay();
+            $priorStart = $priorEnd->copy()->subMonths(3)->addDay()->startOfDay();
+            $comparisonLabel = 'vs prior 3 months';
+        } elseif ($range === '6m') {
+            $startOfPerformance = $endOfMonth->copy()->subMonths(6)->addDay()->startOfDay();
+            $priorEnd = $startOfPerformance->copy()->subDay()->endOfDay();
+            $priorStart = $priorEnd->copy()->subMonths(6)->addDay()->startOfDay();
+            $comparisonLabel = 'vs prior 6 months';
+        } elseif ($range === '1y') {
+            $startOfPerformance = $endOfMonth->copy()->subYear()->addDay()->startOfDay();
+            $priorEnd = $startOfPerformance->copy()->subDay()->endOfDay();
+            $priorStart = $priorEnd->copy()->subYear()->addDay()->startOfDay();
+            $comparisonLabel = 'vs prior year';
+        } else {
+            $startOfPerformance = $startOfMonth->copy();
+            $priorStart = $startOfMonth->copy()->subMonthNoOverflow()->startOfMonth();
+            $priorEnd = $startOfMonth->copy()->subMonthNoOverflow()->endOfMonth();
+            $comparisonLabel = 'vs last month';
+        }
+
         // 1. Inventory Valuation (up to end of selected period)
         // Shop-owned serialized stock (purchased with shop capital or customer trade-ins)
         $shopOwnedSerializedStockValue = (float) InventoryUnit::where('created_at', '<=', $endOfMonth)
@@ -146,19 +173,19 @@ class DashboardController extends Controller
         // Net Capital = Owned Stock + Consignment Stock (covering consignment debt) + Receivables + Cash/Banks + Assets - Payables
         $netCapital = $totalStockValue + $vendorConsignmentStockValue + $totalReceivablesNetted + $cashAndBankBalance + $customAssetsBalance - $totalPayablesNetted;
 
-        // 5. Monthly Performance (selected month or current calendar month)
+        // 5. Monthly / Period Performance (selected range: 1m, 3m, 6m, 1y)
 
-        $monthlyRevenue = (float) SalesOrder::whereBetween('order_date', [$startOfMonth, $endOfMonth])
+        $monthlyRevenue = (float) SalesOrder::whereBetween('order_date', [$startOfPerformance, $endOfMonth])
             ->whereNotIn('payment_status', ['refunded', 'cancelled'])
             ->sum('total_amount');
-        $monthlyDiscounts = (float) SalesOrder::whereBetween('order_date', [$startOfMonth, $endOfMonth])
+        $monthlyDiscounts = (float) SalesOrder::whereBetween('order_date', [$startOfPerformance, $endOfMonth])
             ->whereNotIn('payment_status', ['refunded', 'cancelled'])
             ->sum('discount_amount');
-        $monthlyWriteOffs = (float) SalesOrder::whereBetween('order_date', [$startOfMonth, $endOfMonth])
+        $monthlyWriteOffs = (float) SalesOrder::whereBetween('order_date', [$startOfPerformance, $endOfMonth])
             ->whereNotIn('payment_status', ['refunded', 'cancelled'])
             ->sum('write_off_amount');
-        $monthlyItems = SalesOrderItem::whereHas('salesOrder', function ($q) use ($startOfMonth, $endOfMonth) {
-            $q->whereBetween('order_date', [$startOfMonth, $endOfMonth])
+        $monthlyItems = SalesOrderItem::whereHas('salesOrder', function ($q) use ($startOfPerformance, $endOfMonth) {
+            $q->whereBetween('order_date', [$startOfPerformance, $endOfMonth])
                 ->whereNotIn('payment_status', ['refunded', 'cancelled']);
         })->get(['unit_price', 'unit_cost', 'quantity', 'bonus_amount']);
         // Preserve below-cost sales as losses. Historical rows may have been
@@ -166,12 +193,12 @@ class DashboardController extends Controller
         $itemProfits = $monthlyItems->sum(fn (SalesOrderItem $item): float => $this->realizedItemProfit($item));
         $monthlyGrossProfit = $itemProfits - $monthlyDiscounts - $monthlyWriteOffs;
 
-        $monthlyManualExpenses = (float) Expense::whereBetween('date', [$startOfMonth, $endOfMonth])
+        $monthlyManualExpenses = (float) Expense::whereBetween('date', [$startOfPerformance, $endOfMonth])
             ->where('is_owner_draw', false)
             ->where('category', '!=', 'vendor_payout')
             ->sum('amount');
 
-        $monthlyTransactionFees = (float) FinancialTransaction::whereBetween('date', [$startOfMonth, $endOfMonth])
+        $monthlyTransactionFees = (float) FinancialTransaction::whereBetween('date', [$startOfPerformance, $endOfMonth])
             ->sum('fee');
 
         $monthlyExpenses = $monthlyManualExpenses + $monthlyTransactionFees;
@@ -179,11 +206,40 @@ class DashboardController extends Controller
         // Owner withdrawals are cash/equity movements, not operating
         // expenses. The financial transaction ledger is authoritative here
         // and also covers owner draws recorded outside the expense form.
-        $monthlyOwnerDraws = (float) FinancialTransaction::whereBetween('date', [$startOfMonth, $endOfMonth])
+        $monthlyOwnerDraws = (float) FinancialTransaction::whereBetween('date', [$startOfPerformance, $endOfMonth])
             ->where('type', 'owner_draw')
             ->sum('amount');
 
         $monthlyNetProfit = $monthlyGrossProfit - $monthlyExpenses;
+
+        // Prior period revenue for trend calculation
+        $priorRevenue = (float) SalesOrder::whereBetween('order_date', [$priorStart, $priorEnd])
+            ->whereNotIn('payment_status', ['refunded', 'cancelled'])
+            ->sum('total_amount');
+
+        $trendPercentage = 0.0;
+        $trendIsUp = true;
+        if ($priorRevenue > 0) {
+            $diff = $monthlyRevenue - $priorRevenue;
+            $trendPercentage = round(($diff / $priorRevenue) * 100, 1);
+            $trendIsUp = $trendPercentage >= 0;
+        } elseif ($monthlyRevenue > 0) {
+            $trendPercentage = 100.0;
+            $trendIsUp = true;
+        } else {
+            $trendPercentage = 0.0;
+            $trendIsUp = true;
+        }
+
+        $salesTrend = [
+            'percentage' => abs($trendPercentage),
+            'raw_percentage' => $trendPercentage,
+            'is_up' => $trendIsUp,
+            'prior_revenue' => round($priorRevenue, 2),
+            'current_revenue' => round($monthlyRevenue, 2),
+            'comparison_label' => $comparisonLabel,
+            'range' => $range,
+        ];
 
         // 6. Recent Sales Orders (filtered by selected month)
         $recentSales = SalesOrder::with(['customer', 'salesperson', 'items.variant.product'])
@@ -245,14 +301,24 @@ class DashboardController extends Controller
 
         $topPayables = $topTradePayables->concat($topBonusPayables);
 
-        // 9. Daily sales chart points for the selected month
-        $monthOrders = SalesOrder::with('items')
-            ->whereBetween('order_date', [$startOfMonth, $endOfMonth])
+        // 9. Sales chart points for the selected range
+        $periodOrders = SalesOrder::with('items')
+            ->whereBetween('order_date', [$startOfPerformance, $endOfMonth])
             ->whereNotIn('payment_status', ['refunded', 'cancelled'])
             ->orderBy('order_date')
             ->get();
 
-        $groupedOrders = $monthOrders->groupBy(fn ($o) => Carbon::parse($o->order_date)->format('Y-m-d'));
+        if ($range === '1y') {
+            $groupedOrders = $periodOrders->groupBy(fn ($o) => Carbon::parse($o->order_date)->format('Y-m'));
+            $formatDay = fn ($key) => Carbon::parse($key.'-01')->format('M Y');
+        } elseif ($range === '3m' || $range === '6m') {
+            $groupedOrders = $periodOrders->groupBy(fn ($o) => Carbon::parse($o->order_date)->startOfWeek()->format('Y-m-d'));
+            $formatDay = fn ($key) => Carbon::parse($key)->format('M d');
+        } else {
+            $groupedOrders = $periodOrders->groupBy(fn ($o) => Carbon::parse($o->order_date)->format('Y-m-d'));
+            $formatDay = fn ($key) => Carbon::parse($key)->format('M d');
+        }
+
         $salesChart = [];
         foreach ($groupedOrders as $date => $dayOrders) {
             $dayRev = (float) $dayOrders->sum('total_amount');
@@ -263,7 +329,7 @@ class DashboardController extends Controller
 
             $salesChart[] = [
                 'date' => $date,
-                'day' => Carbon::parse($date)->format('M d'),
+                'day' => $formatDay($date),
                 'revenue' => round($dayRev, 2),
                 'profit' => round($dayProfit, 2),
                 'write_offs' => round($dayWriteOff, 2),
@@ -392,6 +458,7 @@ class DashboardController extends Controller
                     'transaction_fees' => $monthlyTransactionFees,
                     'owner_draws' => $monthlyOwnerDraws,
                     'net_profit' => $monthlyNetProfit,
+                    'sales_trend' => $salesTrend,
                 ],
                 'counts' => [
                     'in_stock_phones' => InventoryUnit::where('created_at', '<=', $endOfMonth)
@@ -428,6 +495,8 @@ class DashboardController extends Controller
                 'top_receivables' => $topReceivables,
                 'top_payables' => $topPayables,
                 'sales_chart' => $salesChart,
+                'sales_trend' => $salesTrend,
+                'range' => $range,
             ],
         ]);
     }

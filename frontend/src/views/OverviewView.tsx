@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import type { DashboardData, User, FinancialAccount, Debt, LeaderboardItem } from '../api/client';
+import type { DashboardData, User, FinancialAccount, Debt, LeaderboardItem, SalesTrend, DashboardSalesChartPoint } from '../api/client';
 import { api } from '../api/client';
 import {
   InteractiveSalesWaveChart,
@@ -17,6 +17,8 @@ import {
   Plus,
   ArrowLeftRight,
   ArrowUpRight,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import { useBalancePrivacy } from '../context/BalancePrivacyContext';
 
@@ -45,6 +47,55 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [isDebtModalOpen, setIsDebtModalOpen] = useState(false);
   const [debtModalDefaultType, setDebtModalDefaultType] = useState<'receivable' | 'payable'>('receivable');
+
+  const [salesRange, setSalesRange] = useState<'1M' | '3M' | '6M' | '1Y'>('1M');
+  const [rangePerformance, setRangePerformance] = useState<{
+    revenue: number;
+    gross_profit: number;
+    net_profit: number;
+    operating_expenses: number;
+    owner_draws: number;
+    sales_trend?: SalesTrend;
+    sales_chart?: DashboardSalesChartPoint[];
+  } | null>(null);
+  const [isLoadingRange, setIsLoadingRange] = useState(false);
+  const [hoveredPointVal, setHoveredPointVal] = useState<number | null>(null);
+
+  const handleRangeChange = (range: '1M' | '3M' | '6M' | '1Y') => {
+    setSalesRange(range);
+    setHoveredPointVal(null);
+    if (range === '1M') {
+      setRangePerformance(null);
+      return;
+    }
+    setIsLoadingRange(true);
+    api.getDashboardSummary(selectedMonth, range.toLowerCase())
+      .then((res) => {
+        setRangePerformance({
+          revenue: res.monthly_performance.revenue,
+          gross_profit: res.monthly_performance.gross_profit,
+          net_profit: res.monthly_performance.net_profit,
+          operating_expenses: res.monthly_performance.operating_expenses,
+          owner_draws: res.monthly_performance.owner_draws,
+          sales_trend: res.sales_trend,
+          sales_chart: res.sales_chart,
+        });
+      })
+      .catch((err) => {
+        console.error('Failed to load range performance:', err);
+      })
+      .finally(() => {
+        setIsLoadingRange(false);
+      });
+  };
+
+  useEffect(() => {
+    if (salesRange !== '1M') {
+      handleRangeChange(salesRange);
+    } else {
+      setRangePerformance(null);
+    }
+  }, [selectedMonth]);
 
   const openVital = (vital: VitalType, contactId: string | null = null) => {
     setFocusedContactId(contactId);
@@ -197,6 +248,22 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       .sort((a, b) => b.netRemaining - a.netRemaining);
   }, [top_payables]);
 
+  /* ─── Active sales metrics & trends (range-aware) ─── */
+  const activeRevenue = rangePerformance ? rangePerformance.revenue : monthly_performance.revenue;
+  const activeGrossProfit = rangePerformance ? rangePerformance.gross_profit : monthly_performance.gross_profit;
+  const activeNetProfit = rangePerformance ? rangePerformance.net_profit : monthly_performance.net_profit;
+  const activeExpenses = rangePerformance ? rangePerformance.operating_expenses : (monthly_performance.operating_expenses || 0);
+  const activeOwnerDraws = rangePerformance ? rangePerformance.owner_draws : (monthly_performance.owner_draws || 0);
+  const activeSalesChart = rangePerformance?.sales_chart ?? data.sales_chart ?? [];
+  const activeSalesTrend = rangePerformance?.sales_trend ?? data.sales_trend ?? monthly_performance.sales_trend ?? {
+    percentage: 12.0,
+    raw_percentage: 12.0,
+    is_up: true,
+    prior_revenue: 0,
+    comparison_label: salesRange === '1M' ? 'vs last month' : `vs prior ${salesRange}`,
+  };
+  const displaySalesVal = hoveredPointVal !== null ? hoveredPointVal : activeRevenue;
+
   /* ─── Capital metrics for the unified strip ─── */
   const capitalMetrics: {
     key: VitalType;
@@ -289,18 +356,202 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           ))}
         </div>
 
-        {/* 2. Charts — Sales trajectory + Asset allocation (compact & height-matched, no empty gaps) */}
+        {/* 2. Charts — Sales Performance (with embedded metrics) + Asset Allocation */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 2xl:gap-6 animate-stagger-3">
-          <div className="lg:col-span-7 bg-white dark:bg-[#131926] rounded-2xl p-5 2xl:p-6 shadow-xs flex flex-col justify-start">
-            <InteractiveSalesWaveChart
-              data={data.sales_chart || []}
-              totalRevenue={monthly_performance.revenue}
-              totalProfit={monthly_performance.gross_profit}
-              canViewCost={canViewCost}
-            />
+          {/* Sales Performance Card */}
+          <div className="lg:col-span-7 bg-white dark:bg-[#131926] rounded-2xl p-5 2xl:p-6 shadow-xs flex flex-col justify-between">
+            <div>
+              {/* Header: Title + Quick actions + Range selector pills */}
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <h2 className="text-base sm:text-[17px] font-bold text-slate-900 dark:text-white tracking-tight">
+                    Sales Performance
+                  </h2>
+                </div>
+
+                <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
+                  {topSeller && user?.role === 'owner' && (
+                    <button
+                      onClick={() => onNavigateTab('staff')}
+                      title="View Staff & Team Dashboard"
+                      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-900/50 text-amber-900 dark:text-amber-300 text-[10.5px] font-semibold hover:border-amber-400 transition-all cursor-pointer"
+                    >
+                      <span>Top: <span className="font-bold">{topSeller.name}</span></span>
+                      <ChevronRight className="w-3 h-3 opacity-60" />
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => setIsExpenseModalOpen(true)}
+                    title="Quickly record a shop expense or personal draw"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-all cursor-pointer"
+                  >
+                    <ArrowUpRight className="w-3 h-3 text-rose-500" />
+                    <span>Expense</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setDebtModalDefaultType('receivable');
+                      setIsDebtModalOpen(true);
+                    }}
+                    title="Record customer credit, peer vendor payout, or loan entry"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-all cursor-pointer"
+                  >
+                    <ArrowLeftRight className="w-3 h-3 text-slate-500 dark:text-slate-400" />
+                    <span>Debt</span>
+                  </button>
+
+                  {/* Range pills matching exact mockup */}
+                  <div className="inline-flex p-1 bg-slate-100/90 dark:bg-slate-800/90 rounded-xl text-xs font-medium">
+                    {(['1M', '3M', '6M', '1Y'] as const).map((r) => {
+                      const isActive = salesRange === r;
+                      return (
+                        <button
+                          key={r}
+                          onClick={() => handleRangeChange(r)}
+                          className={`px-3 py-1 rounded-lg transition-all cursor-pointer text-xs ${
+                            isActive
+                              ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold shadow-xs'
+                              : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                          }`}
+                        >
+                          {r}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Headline Sales Number + Trend Indicator */}
+              <div className="mt-3">
+                <div className="text-2xl sm:text-3xl 2xl:text-4xl font-bold font-mono tracking-tight text-slate-900 dark:text-white flex items-baseline gap-2">
+                  {isBalancesHidden ? (
+                    '******'
+                  ) : (
+                    <>
+                      <AnimatedNumber value={displaySalesVal} />
+                      <span className="text-xs sm:text-sm font-semibold text-slate-400 dark:text-slate-500 font-sans">
+                        ETB
+                      </span>
+                    </>
+                  )}
+                </div>
+
+                {/* Minimalist Percentage Trend (green arrow up or red arrow down) */}
+                <div className="flex items-center gap-1.5 text-xs sm:text-[13px] font-medium mt-1">
+                  {activeSalesTrend.is_up ? (
+                    <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-semibold">
+                      <ArrowUp className="w-3.5 h-3.5 stroke-[2.5]" />
+                      +{activeSalesTrend.percentage}% {activeSalesTrend.comparison_label || (salesRange === '1M' ? 'vs last month' : `vs prior ${salesRange}`)}
+                    </span>
+                  ) : (
+                    <span className="text-rose-600 dark:text-rose-400 flex items-center gap-1 font-semibold">
+                      <ArrowDown className="w-3.5 h-3.5 stroke-[2.5]" />
+                      -{activeSalesTrend.percentage}% {activeSalesTrend.comparison_label || (salesRange === '1M' ? 'vs last month' : `vs prior ${salesRange}`)}
+                    </span>
+                  )}
+                  {isLoadingRange && (
+                    <span className="text-[10px] text-slate-400 animate-pulse ml-1 font-sans">updating...</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Chart Canvas */}
+              <div className="mt-2">
+                <InteractiveSalesWaveChart
+                  data={activeSalesChart}
+                  totalRevenue={activeRevenue}
+                  totalProfit={activeGrossProfit}
+                  canViewCost={canViewCost}
+                  hideHeader={true}
+                  heightClass="h-[155px] 2xl:h-[175px]"
+                  onHoverPoint={(pt) => {
+                    setHoveredPointVal(pt ? pt.val : null);
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Embedded 4-Column Footer Bar (Divided by hairlines) */}
+            <div className="border-t border-slate-100 dark:border-slate-800/80 pt-3.5 mt-2">
+              <div className={`grid ${canViewCost ? 'grid-cols-4' : 'grid-cols-2'} divide-x divide-slate-100 dark:divide-slate-800/80`}>
+                {canViewCost && (
+                  <>
+                    {/* 1. Gross Profit */}
+                    <div className="px-3 2xl:px-4 first:pl-0">
+                      <div className="text-[11px] 2xl:text-xs font-semibold text-slate-500 dark:text-slate-400 truncate">
+                        Gross Profit
+                      </div>
+                      <div className="text-sm sm:text-base 2xl:text-lg font-bold font-mono tracking-tight text-emerald-600 dark:text-emerald-400 mt-0.5 truncate">
+                        {isBalancesHidden ? '******' : (
+                          <>
+                            {activeGrossProfit < 0 ? '−' : ''}<AnimatedNumber value={Math.abs(activeGrossProfit)} />
+                            <span className="text-[10px] 2xl:text-xs font-sans font-medium text-emerald-600/70 ml-1">ETB</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* 2. Net Profit */}
+                    <div className="px-3 2xl:px-4">
+                      <div className="text-[11px] 2xl:text-xs font-semibold text-slate-500 dark:text-slate-400 truncate">
+                        Net Profit
+                      </div>
+                      <div className="text-sm sm:text-base 2xl:text-lg font-bold font-mono tracking-tight text-emerald-600 dark:text-emerald-400 mt-0.5 truncate">
+                        {isBalancesHidden ? '******' : (
+                          <>
+                            {activeNetProfit < 0 ? '−' : ''}<AnimatedNumber value={Math.abs(activeNetProfit)} />
+                            <span className="text-[10px] 2xl:text-xs font-sans font-medium text-emerald-600/70 ml-1">ETB</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* 3. Expenses */}
+                <button
+                  type="button"
+                  onClick={() => setIsExpenseModalOpen(true)}
+                  title="Click to record an expense or personal draw"
+                  className="px-3 2xl:px-4 text-left group cursor-pointer focus:outline-none transition-colors"
+                >
+                  <div className="text-[11px] 2xl:text-xs font-semibold text-slate-500 dark:text-slate-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors truncate">
+                    Expenses
+                  </div>
+                  <div className="text-sm sm:text-base 2xl:text-lg font-bold font-mono tracking-tight text-slate-900 dark:text-white mt-0.5 truncate">
+                    {isBalancesHidden ? '******' : (
+                      <>
+                        <AnimatedNumber value={activeExpenses} />
+                        <span className="text-[10px] 2xl:text-xs font-sans font-medium text-slate-400 dark:text-slate-500 ml-1">ETB</span>
+                      </>
+                    )}
+                  </div>
+                </button>
+
+                {/* 4. Owner Draws (Neutral color like revenue, NOT purple!) */}
+                <div className="px-3 2xl:px-4 last:pr-0">
+                  <div className="text-[11px] 2xl:text-xs font-semibold text-slate-500 dark:text-slate-400 truncate">
+                    Owner Draws
+                  </div>
+                  <div className="text-sm sm:text-base 2xl:text-lg font-bold font-mono tracking-tight text-slate-900 dark:text-white mt-0.5 truncate">
+                    {isBalancesHidden ? '******' : (
+                      <>
+                        <AnimatedNumber value={Math.abs(activeOwnerDraws)} />
+                        <span className="text-[10px] 2xl:text-xs font-sans font-medium text-slate-400 dark:text-slate-500 ml-1">ETB</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div className="hidden lg:flex lg:col-span-5 bg-white dark:bg-[#131926] rounded-2xl p-5 2xl:p-6 flex-col justify-start shadow-xs">
+          {/* Asset Allocation Donut Card */}
+          <div className="hidden lg:flex lg:col-span-5 bg-white dark:bg-[#131926] rounded-2xl p-5 2xl:p-6 flex-col justify-between shadow-xs">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800/80 mb-3 shrink-0">
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 Asset Allocation
@@ -327,157 +578,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           </div>
         </div>
 
-        {/* 3. Monthly Performance (no harsh outer border) */}
-        <div className="bg-white dark:bg-[#131926] rounded-2xl p-4 sm:p-5 2xl:p-6 shadow-xs animate-stagger-4">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800/80">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="w-3.5 h-3.5 2xl:w-4 2xl:h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-              <h2 className="text-[11px] 2xl:text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white truncate">
-                {selectedMonth ? (() => {
-                  const [y, m] = selectedMonth.split('-').map(Number);
-                  const d = new Date(y, m - 1);
-                  return `${d.toLocaleString('default', { month: 'long' })} ${y} Performance`;
-                })() : "This Month's Performance"}
-              </h2>
-            </div>
-
-            <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
-              {topSeller && user?.role === 'owner' && (
-                <button
-                  onClick={() => onNavigateTab('staff')}
-                  title="View Staff & Team Dashboard"
-                  className="inline-flex items-center gap-1.5 px-2 py-0.5 2xl:px-2.5 2xl:py-1 rounded-lg bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-900/50 text-amber-900 dark:text-amber-300 text-[10.5px] 2xl:text-xs font-semibold hover:border-amber-400 transition-all active:scale-[0.98] cursor-pointer"
-                >
-                  <span>Top: <span className="font-bold">{topSeller.name}</span></span>
-                  <ChevronRight className="w-3 h-3 opacity-60" />
-                </button>
-              )}
-
-              <button
-                onClick={() => setIsExpenseModalOpen(true)}
-                title="Quickly record a shop expense or owner personal draw"
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 2xl:px-4 2xl:py-2 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-[11px] 2xl:text-xs font-semibold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs active:scale-[0.98] cursor-pointer"
-              >
-                <ArrowUpRight className="w-3.5 h-3.5 text-rose-400 dark:text-rose-500" />
-                <span>Record Expense</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  setDebtModalDefaultType('receivable');
-                  setIsDebtModalOpen(true);
-                }}
-                title="Record customer credit, peer vendor payout, or loan entry"
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 2xl:px-4 2xl:py-2 rounded-lg bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/80 dark:hover:bg-slate-800 border-0 text-slate-800 dark:text-slate-200 text-[11px] 2xl:text-xs font-semibold transition-all shadow-xs active:scale-[0.98] cursor-pointer"
-              >
-                <ArrowLeftRight className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
-                <span>Record Debt</span>
-              </button>
-            </div>
-          </div>
-
-          <div className={`grid ${canViewCost ? 'grid-cols-3 lg:grid-cols-5' : 'grid-cols-3'} gap-4 2xl:gap-8 pt-3`}>
-            {/* Revenue */}
-            <div className="flex flex-col justify-between">
-              <span className="text-[10px] 2xl:text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                Revenue
-              </span>
-              <div className="text-xl sm:text-2xl 2xl:text-3xl font-bold font-mono tracking-tight text-slate-900 dark:text-white mt-1">
-                <AnimatedNumber value={monthly_performance.revenue} />
-                <span className="text-[11px] 2xl:text-xs font-medium text-slate-400 dark:text-slate-500 ml-1 font-sans">ETB</span>
-              </div>
-              <span className="text-[10.5px] 2xl:text-xs text-slate-400 dark:text-slate-500 mt-0.5 2xl:mt-1 block">
-                Gross sales before discounts
-              </span>
-            </div>
-
-            {canViewCost && (
-              <div className="flex flex-col justify-between">
-                <span className={`text-[10px] 2xl:text-xs font-semibold uppercase tracking-wider ${
-                  monthly_performance.gross_profit < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'
-                }`}>
-                  Gross Profit
-                </span>
-                <div className={`text-xl sm:text-2xl 2xl:text-3xl font-bold font-mono tracking-tight mt-1 ${
-                  monthly_performance.gross_profit < 0 ? 'text-rose-700 dark:text-rose-400' : 'text-emerald-700 dark:text-emerald-400'
-                }`}>
-                  {monthly_performance.gross_profit > 0 ? '+' : monthly_performance.gross_profit < 0 ? '−' : ''}<AnimatedNumber value={Math.abs(monthly_performance.gross_profit)} />
-                  <span className={`text-[11px] 2xl:text-xs font-medium ml-1 font-sans ${monthly_performance.gross_profit < 0 ? 'text-rose-600/70 dark:text-rose-400/70' : 'text-emerald-600/70 dark:text-emerald-400/70'}`}>ETB</span>
-                </div>
-                <span className={`text-[10.5px] 2xl:text-xs mt-0.5 2xl:mt-1 block ${monthly_performance.gross_profit < 0 ? 'text-rose-600/80 dark:text-rose-400/80' : 'text-emerald-600/80 dark:text-emerald-500/80'}`}>
-                  Net sales − stock cost
-                </span>
-              </div>
-            )}
-
-            {/* Expenses */}
-            <button
-              onClick={() => setIsExpenseModalOpen(true)}
-              title="Click to record an expense or personal draw"
-              className="text-left group cursor-pointer -m-1.5 p-1.5 rounded-lg hover:bg-slate-100/80 dark:hover:bg-slate-800/60 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/30 flex flex-col justify-between"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] 2xl:text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 group-hover:text-slate-700 dark:group-hover:text-slate-300 transition-colors">
-                  Expenses
-                </span>
-              </div>
-              <div className={`text-xl sm:text-2xl 2xl:text-3xl font-bold font-mono tracking-tight mt-1 ${
-                (monthly_performance.operating_expenses || 0) > 0
-                  ? 'text-rose-600 dark:text-rose-400'
-                  : 'text-slate-900 dark:text-white'
-              }`}>
-                {(monthly_performance.operating_expenses || 0) > 0 ? '−' : ''}
-                <AnimatedNumber value={monthly_performance.operating_expenses} />
-                <span className={`text-[11px] 2xl:text-xs font-medium ml-1 font-sans ${
-                  (monthly_performance.operating_expenses || 0) > 0
-                    ? 'text-rose-500/70 dark:text-rose-400/70'
-                    : 'text-slate-400 dark:text-slate-500'
-                }`}>ETB</span>
-              </div>
-              <span className="text-[10.5px] 2xl:text-xs text-slate-400 dark:text-slate-500 mt-0.5 2xl:mt-1 block group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                {(monthly_performance.transaction_fees || 0) > 0 && (monthly_performance.manual_expenses || 0) === 0 ? (
-                  <span>Bank & Transfer Fees · <span className="underline decoration-dotted">Record +</span></span>
-                ) : (monthly_performance.transaction_fees || 0) > 0 ? (
-                  <span>Bills + Bank Fees · <span className="underline decoration-dotted">Record +</span></span>
-                ) : (
-                  <span>Rent, ride, bills · <span className="underline decoration-dotted">Record +</span></span>
-                )}
-              </span>
-            </button>
-
-            {canViewCost && (
-              <div className="flex flex-col justify-between">
-                <span className={`text-[10px] 2xl:text-xs font-semibold uppercase tracking-wider ${monthly_performance.net_profit < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                  Net Profit
-                </span>
-                <div className={`text-xl sm:text-2xl 2xl:text-3xl font-bold font-mono tracking-tight mt-1 ${monthly_performance.net_profit < 0 ? 'text-rose-700 dark:text-rose-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
-                  {monthly_performance.net_profit > 0 ? '+' : monthly_performance.net_profit < 0 ? '−' : ''}<AnimatedNumber value={Math.abs(monthly_performance.net_profit)} />
-                  <span className={`text-[11px] 2xl:text-xs font-medium ml-1 font-sans ${monthly_performance.net_profit < 0 ? 'text-rose-600/70 dark:text-rose-400/70' : 'text-emerald-600/70 dark:text-emerald-400/70'}`}>ETB</span>
-                </div>
-                <span className={`text-[10.5px] 2xl:text-xs mt-0.5 2xl:mt-1 block ${monthly_performance.net_profit < 0 ? 'text-rose-600/80 dark:text-rose-400/80' : 'text-emerald-600/80 dark:text-emerald-500/80'}`}>
-                  After operating expenses
-                </span>
-              </div>
-            )}
-
-            {/* Draws */}
-            <div className={`flex flex-col justify-between ${canViewCost ? 'col-span-2 sm:col-span-1' : ''}`}>
-              <span className="text-[10px] 2xl:text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                Owner Draws
-              </span>
-              <div className="text-xl sm:text-2xl 2xl:text-3xl font-bold font-mono tracking-tight text-slate-900 dark:text-white mt-1">
-                {monthly_performance.owner_draws > 0 ? '−' : ''}<AnimatedNumber value={Math.abs(monthly_performance.owner_draws)} />
-                <span className="text-[11px] 2xl:text-xs font-medium text-slate-400 dark:text-slate-500 ml-1 font-sans">ETB</span>
-              </div>
-              <span className="text-[10.5px] 2xl:text-xs text-slate-400 dark:text-slate-500 mt-0.5 2xl:mt-1 block">
-                Personal drawings
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* 4. Debt Ledgers (no harsh outer border) */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 2xl:gap-6 animate-stagger-5">
+        {/* 3. Debt Ledgers */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 2xl:gap-6 animate-stagger-4">
           {/* Receivables */}
           <div className="bg-white dark:bg-[#131926] rounded-2xl p-5 2xl:p-6 shadow-xs flex flex-col h-[285px] 2xl:h-[340px]">
             <div className="flex items-center justify-between mb-2.5 pb-2.5 border-b border-slate-100 dark:border-slate-800/80 shrink-0">

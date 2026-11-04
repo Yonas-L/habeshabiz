@@ -19,6 +19,8 @@ export const InteractiveSalesWaveChart: React.FC<{
   totalRevenue?: number;
   totalProfit?: number;
   heightClass?: string;
+  hideHeader?: boolean;
+  onHoverPoint?: (pt: { val: number; day: string; orders: number } | null) => void;
 }> = ({
   data = [],
   currency = 'ETB',
@@ -26,6 +28,8 @@ export const InteractiveSalesWaveChart: React.FC<{
   totalRevenue,
   totalProfit,
   heightClass = 'h-[170px] sm:h-[180px]',
+  hideHeader = false,
+  onHoverPoint,
 }) => {
   const { isBalancesHidden } = useBalancePrivacy();
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
@@ -110,6 +114,9 @@ export const InteractiveSalesWaveChart: React.FC<{
     const targetIdx = Math.round(pct * (points.length - 1));
     if (targetIdx >= 0 && targetIdx < points.length) {
       setHoverIndex(targetIdx);
+      if (onHoverPoint && points[targetIdx]) {
+        onHoverPoint({ val: points[targetIdx].val, day: points[targetIdx].day, orders: points[targetIdx].orders });
+      }
     }
   };
 
@@ -117,93 +124,96 @@ export const InteractiveSalesWaveChart: React.FC<{
     if (touchTimerRef.current) clearTimeout(touchTimerRef.current);
     touchTimerRef.current = setTimeout(() => {
       setHoverIndex(null);
+      onHoverPoint?.(null);
     }, 2200);
   };
 
   return (
     <div className="w-full">
       {/* Top Bar of Chart */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-              {activePoint !== null
-                ? `${activePoint.day} ${metric === 'revenue' ? 'Sales' : 'Margin'}`
-                : (metric === 'revenue' ? 'Sales Trajectory' : 'Gross Margin Trend')}
-            </span>
-            {activePoint !== null && (
-              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium">
-                {activePoint.orders} {activePoint.orders === 1 ? 'order' : 'orders'}
+      {!hideHeader && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                {activePoint !== null
+                  ? `${activePoint.day} ${metric === 'revenue' ? 'Sales' : 'Margin'}`
+                  : (metric === 'revenue' ? 'Sales Trajectory' : 'Gross Margin Trend')}
               </span>
-            )}
-          </div>
-          <div className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white font-mono tracking-tight mt-0.5">
-            <AnimatedNumber value={displayVal} />{' '}
-            <span className="text-xs font-medium text-slate-400 dark:text-slate-500 font-sans">{currency}</span>
-          </div>
-        </div>
-
-        {/* View Switcher: Bar vs Wave & Metric Selector Pills */}
-        <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
-          {/* Chart View Toggle: Bar vs Wave */}
-          <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl text-xs shadow-2xs">
-            <button
-              onClick={() => setChartType('bar')}
-              title="Bar Chart Histogram"
-              className={`p-1.5 rounded-lg transition-all cursor-pointer ${
-                chartType === 'bar'
-                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
-              }`}
-            >
-              <BarChart3 className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() => setChartType('wave')}
-              title="Wave Area Curve"
-              className={`p-1.5 rounded-lg transition-all cursor-pointer ${
-                chartType === 'wave'
-                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
-              }`}
-            >
-              <LineChart className="w-3.5 h-3.5" />
-            </button>
+              {activePoint !== null && (
+                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium">
+                  {activePoint.orders} {activePoint.orders === 1 ? 'order' : 'orders'}
+                </span>
+              )}
+            </div>
+            <div className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white font-mono tracking-tight mt-0.5">
+              <AnimatedNumber value={displayVal} />{' '}
+              <span className="text-xs font-medium text-slate-400 dark:text-slate-500 font-sans">{currency}</span>
+            </div>
           </div>
 
-          {/* Metric Selector Pills */}
-          {canViewCost && (
-            <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl text-xs font-medium shadow-2xs">
+          {/* View Switcher: Bar vs Wave & Metric Selector Pills */}
+          <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+            {/* Chart View Toggle: Bar vs Wave */}
+            <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl text-xs shadow-2xs">
               <button
-                onClick={() => {
-                  setMetric('revenue');
-                  setHoverIndex(null);
-                }}
-                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                  metric === 'revenue'
-                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs font-bold'
-                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                onClick={() => setChartType('bar')}
+                title="Bar Chart Histogram"
+                className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                  chartType === 'bar'
+                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                    : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
                 }`}
               >
-                Sales
+                <BarChart3 className="w-3.5 h-3.5" />
               </button>
               <button
-                onClick={() => {
-                  setMetric('profit');
-                  setHoverIndex(null);
-                }}
-                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                  metric === 'profit'
-                    ? 'bg-white dark:bg-slate-700 text-emerald-700 dark:text-emerald-400 shadow-xs font-bold'
-                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                onClick={() => setChartType('wave')}
+                title="Wave Area Curve"
+                className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                  chartType === 'wave'
+                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                    : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
                 }`}
               >
-                Margin
+                <LineChart className="w-3.5 h-3.5" />
               </button>
             </div>
-          )}
+
+            {/* Metric Selector Pills */}
+            {canViewCost && (
+              <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl text-xs font-medium shadow-2xs">
+                <button
+                  onClick={() => {
+                    setMetric('revenue');
+                    setHoverIndex(null);
+                  }}
+                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                    metric === 'revenue'
+                      ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs font-bold'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  Sales
+                </button>
+                <button
+                  onClick={() => {
+                    setMetric('profit');
+                    setHoverIndex(null);
+                  }}
+                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                    metric === 'profit'
+                      ? 'bg-white dark:bg-slate-700 text-emerald-700 dark:text-emerald-400 shadow-xs font-bold'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  Margin
+                </button>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* SVG Canvas Container */}
       <div
@@ -216,7 +226,10 @@ export const InteractiveSalesWaveChart: React.FC<{
         }}
         onTouchEnd={handleTouchEnd}
         onMouseMove={(e) => handlePointerInteraction(e.clientX)}
-        onMouseLeave={() => setHoverIndex(null)}
+        onMouseLeave={() => {
+          setHoverIndex(null);
+          onHoverPoint?.(null);
+        }}
         className={`relative w-full ${heightClass} touch-none select-none cursor-crosshair`}
       >
         {points.length === 0 && (
@@ -418,9 +431,17 @@ export const InteractiveSalesWaveChart: React.FC<{
       {/* Axis Labels */}
       {data.length > 0 ? (
         <div className="flex justify-between text-[11px] text-slate-400 dark:text-slate-500 mt-2 px-1 font-mono font-medium">
-          <span>{data[0]?.day}</span>
-          {data.length > 2 && <span>{data[Math.floor(data.length / 2)]?.day}</span>}
-          {data.length > 1 && <span>{data[data.length - 1]?.day}</span>}
+          {data.length >= 5 ? (
+            <>
+              <span>{data[0]?.day}</span>
+              <span>{data[Math.round((data.length - 1) * 0.25)]?.day}</span>
+              <span>{data[Math.round((data.length - 1) * 0.5)]?.day}</span>
+              <span>{data[Math.round((data.length - 1) * 0.75)]?.day}</span>
+              <span>{data[data.length - 1]?.day}</span>
+            </>
+          ) : (
+            data.map((d, i) => <span key={i}>{d.day}</span>)
+          )}
         </div>
       ) : (
         <div className="text-center text-[10px] text-slate-400 dark:text-slate-500 mt-2 font-mono">
