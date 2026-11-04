@@ -672,10 +672,11 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                                 </span>
                               )}
                             </div>
-                            <div className="text-[11px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
-                              {group.openCount} {group.openCount === 1 ? 'obligation' : 'obligations'}
-                              {group.offsetAmount > 0.01 && ` · Offset −${isBalancesHidden ? '******' : group.offsetAmount.toLocaleString()} ETB`}
-                            </div>
+                            {group.offsetAmount > 0.01 && (
+                              <div className="text-[11px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
+                                Offset −{isBalancesHidden ? '******' : group.offsetAmount.toLocaleString()} ETB
+                              </div>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center gap-1 shrink-0 pl-1">
@@ -731,10 +732,11 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                                 </span>
                               )}
                             </div>
-                            <div className="text-[11px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
-                              {group.openCount} {group.openCount === 1 ? 'obligation' : 'obligations'}
-                              {group.offsetAmount > 0.01 && ` · Offset −${isBalancesHidden ? '******' : group.offsetAmount.toLocaleString()} ETB`}
-                            </div>
+                            {group.offsetAmount > 0.01 && (
+                              <div className="text-[11px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
+                                Offset −{isBalancesHidden ? '******' : group.offsetAmount.toLocaleString()} ETB
+                              </div>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center gap-1 shrink-0 pl-1">
@@ -751,7 +753,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             </div>
           </div>
 
-          {/* Card B: Quick Actions — Frosted liquid glass matching mobile treasury bank cards, emerald frame */}
+          {/* Card B: Quick Actions — Frosted liquid glass with animated thin dark outline & emerald frame */}
           <div
             className="hidden lg:flex lg:col-span-3 2xl:col-span-3 relative rounded-3xl p-4 sm:p-5 2xl:p-6 bg-white/60 dark:bg-slate-900/60 backdrop-blur-[20px] shadow-[0_16px_36px_-10px_rgba(16,185,129,0.18),0_6px_16px_-4px_rgba(15,23,42,0.06)] dark:shadow-[0_16px_36px_-10px_rgba(16,185,129,0.25),0_6px_16px_-4px_rgba(0,0,0,0.5)] flex-col h-[285px] 2xl:h-[340px] overflow-hidden border border-emerald-500/40 dark:border-emerald-400/40 transition-all duration-300"
             style={{
@@ -759,6 +761,31 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               WebkitBackdropFilter: 'blur(20px)',
             }}
           >
+            {/* 1. Static crisp thin dark outline */}
+            <div
+              aria-hidden="true"
+              className="absolute inset-0 rounded-3xl pointer-events-none ring-1 ring-inset ring-slate-900/35 dark:ring-slate-600/70 z-20"
+            />
+
+            {/* 2. Traveling animated border beam strictly along the 1.5px perimeter */}
+            <div
+              aria-hidden="true"
+              className="absolute -inset-[1px] rounded-3xl pointer-events-none z-20 overflow-hidden"
+              style={{
+                padding: '1.5px',
+                mask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+                WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+                maskComposite: 'exclude',
+                WebkitMaskComposite: 'xor',
+              }}
+            >
+              <div
+                className="absolute -inset-[150%] animate-[spin_5s_linear_infinite]"
+                style={{
+                  background: 'conic-gradient(from 0deg, transparent 0deg, transparent 260deg, rgba(15, 23, 42, 0.95) 295deg, #059669 325deg, #34d399 345deg, rgba(15, 23, 42, 0.95) 355deg, transparent 360deg)',
+                }}
+              />
+            </div>
             {/* Top Specular Rim Glint */}
             <div
               aria-hidden="true"
