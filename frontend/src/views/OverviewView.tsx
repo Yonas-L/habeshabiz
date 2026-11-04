@@ -13,7 +13,6 @@ import { RecordDebtModal } from '../components/debts/RecordDebtModal';
 import { MobileOverview } from '../components/dashboard/MobileOverview';
 import {
   ChevronRight,
-  TrendingUp,
   Plus,
   ArrowUp,
   ArrowDown,
@@ -391,12 +390,9 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               <div className="flex items-center justify-between gap-3 shrink-0">
                 {/* Left: Title + Optional subtle Top Seller pill */}
                 <div className="flex items-center gap-2 min-w-0">
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                    <h2 className="text-sm 2xl:text-base font-bold text-slate-900 dark:text-white tracking-tight whitespace-nowrap">
-                      Sales Performance
-                    </h2>
-                  </div>
+                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                    Sales Performance
+                  </span>
 
                   {topSeller && user?.role === 'owner' && (
                     <button
