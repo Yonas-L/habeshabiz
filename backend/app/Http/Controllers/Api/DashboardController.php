@@ -37,19 +37,19 @@ class DashboardController extends Controller
         }
 
         if ($range === '3m') {
-            $startOfPerformance = $endOfMonth->copy()->subMonths(3)->addDay()->startOfDay();
+            $startOfPerformance = $startOfMonth->copy()->subMonths(2)->startOfMonth();
             $priorEnd = $startOfPerformance->copy()->subDay()->endOfDay();
-            $priorStart = $priorEnd->copy()->subMonths(3)->addDay()->startOfDay();
+            $priorStart = $startOfPerformance->copy()->subMonths(3)->startOfMonth();
             $comparisonLabel = 'vs prior 3 months';
         } elseif ($range === '6m') {
-            $startOfPerformance = $endOfMonth->copy()->subMonths(6)->addDay()->startOfDay();
+            $startOfPerformance = $startOfMonth->copy()->subMonths(5)->startOfMonth();
             $priorEnd = $startOfPerformance->copy()->subDay()->endOfDay();
-            $priorStart = $priorEnd->copy()->subMonths(6)->addDay()->startOfDay();
+            $priorStart = $startOfPerformance->copy()->subMonths(6)->startOfMonth();
             $comparisonLabel = 'vs prior 6 months';
         } elseif ($range === '1y') {
-            $startOfPerformance = $endOfMonth->copy()->subYear()->addDay()->startOfDay();
+            $startOfPerformance = $startOfMonth->copy()->subMonths(11)->startOfMonth();
             $priorEnd = $startOfPerformance->copy()->subDay()->endOfDay();
-            $priorStart = $priorEnd->copy()->subYear()->addDay()->startOfDay();
+            $priorStart = $startOfPerformance->copy()->subYear()->startOfMonth();
             $comparisonLabel = 'vs prior year';
         } else {
             $startOfPerformance = $startOfMonth->copy();
@@ -308,33 +308,64 @@ class DashboardController extends Controller
             ->orderBy('order_date')
             ->get();
 
-        if ($range === '1y') {
-            $groupedOrders = $periodOrders->groupBy(fn ($o) => Carbon::parse($o->order_date)->format('Y-m'));
-            $formatDay = fn ($key) => Carbon::parse($key.'-01')->format('M Y');
-        } elseif ($range === '3m' || $range === '6m') {
-            $groupedOrders = $periodOrders->groupBy(fn ($o) => Carbon::parse($o->order_date)->startOfWeek()->format('Y-m-d'));
-            $formatDay = fn ($key) => Carbon::parse($key)->format('M d');
+        if ($range === '3m' || $range === '6m' || $range === '1y') {
+            $buckets = [];
+            $curr = $startOfPerformance->copy()->startOfMonth();
+            while ($curr <= $endOfMonth) {
+                $mKey = $curr->format('Y-m');
+                $buckets[$mKey] = [
+                    'date' => $mKey,
+                    'day' => $range === '1y' ? $curr->format('M Y') : $curr->format('M'),
+                    'revenue' => 0.0,
+                    'profit' => 0.0,
+                    'write_offs' => 0.0,
+                    'orders' => 0,
+                ];
+                $curr->addMonth();
+            }
+
+            foreach ($periodOrders as $o) {
+                $mKey = Carbon::parse($o->order_date)->format('Y-m');
+                if (isset($buckets[$mKey])) {
+                    $buckets[$mKey]['revenue'] += (float) $o->total_amount;
+                    $itemProfit = (float) $o->items->sum(fn (SalesOrderItem $item): float => $this->realizedItemProfit($item));
+                    $disc = (float) $o->discount_amount;
+                    $writeOff = (float) $o->write_off_amount;
+                    $buckets[$mKey]['profit'] += ($itemProfit - $disc - $writeOff);
+                    $buckets[$mKey]['write_offs'] += $writeOff;
+                    $buckets[$mKey]['orders'] += 1;
+                }
+            }
+
+            $salesChart = array_values(array_map(fn ($b) => [
+                'date' => $b['date'],
+                'day' => $b['day'],
+                'revenue' => round($b['revenue'], 2),
+                'profit' => round($b['profit'], 2),
+                'write_offs' => round($b['write_offs'], 2),
+                'orders' => $b['orders'],
+            ], $buckets));
         } else {
             $groupedOrders = $periodOrders->groupBy(fn ($o) => Carbon::parse($o->order_date)->format('Y-m-d'));
             $formatDay = fn ($key) => Carbon::parse($key)->format('M d');
-        }
 
-        $salesChart = [];
-        foreach ($groupedOrders as $date => $dayOrders) {
-            $dayRev = (float) $dayOrders->sum('total_amount');
-            $dayDisc = (float) $dayOrders->sum('discount_amount');
-            $dayItemProfit = (float) $dayOrders->flatMap->items->sum(fn (SalesOrderItem $item): float => $this->realizedItemProfit($item));
-            $dayWriteOff = (float) $dayOrders->sum('write_off_amount');
-            $dayProfit = $dayItemProfit - $dayDisc - $dayWriteOff;
+            $salesChart = [];
+            foreach ($groupedOrders as $date => $dayOrders) {
+                $dayRev = (float) $dayOrders->sum('total_amount');
+                $dayDisc = (float) $dayOrders->sum('discount_amount');
+                $dayItemProfit = (float) $dayOrders->flatMap->items->sum(fn (SalesOrderItem $item): float => $this->realizedItemProfit($item));
+                $dayWriteOff = (float) $dayOrders->sum('write_off_amount');
+                $dayProfit = $dayItemProfit - $dayDisc - $dayWriteOff;
 
-            $salesChart[] = [
-                'date' => $date,
-                'day' => $formatDay($date),
-                'revenue' => round($dayRev, 2),
-                'profit' => round($dayProfit, 2),
-                'write_offs' => round($dayWriteOff, 2),
-                'orders' => count($dayOrders),
-            ];
+                $salesChart[] = [
+                    'date' => $date,
+                    'day' => $formatDay($date),
+                    'revenue' => round($dayRev, 2),
+                    'profit' => round($dayProfit, 2),
+                    'write_offs' => round($dayWriteOff, 2),
+                    'orders' => count($dayOrders),
+                ];
+            }
         }
 
         // 10. Partner & Peer Vendor Net Balances (Bilateral Netting)

@@ -447,8 +447,10 @@ export const InteractiveSalesWaveChart: React.FC<{
 
       {/* Axis Labels */}
       {data.length > 0 ? (
-        <div className="flex justify-between text-[11px] 2xl:text-xs text-slate-400 dark:text-slate-500 mt-2 px-1 font-medium select-none">
-          {data.length >= 5 ? (
+        <div className="flex justify-between text-[11px] 2xl:text-xs text-slate-400 dark:text-slate-500 mt-1 px-3 2xl:px-4 font-medium select-none">
+          {data.length <= 8 ? (
+            data.map((d, i) => <span key={i}>{d.day}</span>)
+          ) : (
             <>
               <span>{data[0]?.day}</span>
               <span>{data[Math.round((data.length - 1) * 0.25)]?.day}</span>
@@ -456,8 +458,6 @@ export const InteractiveSalesWaveChart: React.FC<{
               <span>{data[Math.round((data.length - 1) * 0.75)]?.day}</span>
               <span>{data[data.length - 1]?.day}</span>
             </>
-          ) : (
-            data.map((d, i) => <span key={i}>{d.day}</span>)
           )}
         </div>
       ) : (
