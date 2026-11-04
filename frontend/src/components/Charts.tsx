@@ -43,17 +43,15 @@ export const InteractiveSalesWaveChart: React.FC<{
   const hasMountedRef = useRef(false);
 
   useEffect(() => {
-    if (!hasMountedRef.current) {
-      const raf = requestAnimationFrame(() => {
-        const t = setTimeout(() => {
-          setIsLoaded(true);
-          hasMountedRef.current = true;
-        }, 50);
-        return () => clearTimeout(t);
-      });
-      return () => cancelAnimationFrame(raf);
-    }
-    setIsLoaded(true);
+    setIsLoaded(false);
+    const raf = requestAnimationFrame(() => {
+      const t = setTimeout(() => {
+        setIsLoaded(true);
+        hasMountedRef.current = true;
+      }, 40);
+      return () => clearTimeout(t);
+    });
+    return () => cancelAnimationFrame(raf);
   }, [data, metric, chartType]);
 
   const width = 640;
@@ -262,7 +260,7 @@ export const InteractiveSalesWaveChart: React.FC<{
                 width={isLoaded ? width : 0}
                 height={height}
                 style={{
-                  transition: 'width 1000ms cubic-bezier(0.16, 1, 0.3, 1)',
+                  transition: 'width 650ms cubic-bezier(0.16, 1, 0.3, 1)',
                 }}
               />
             </clipPath>
@@ -327,49 +325,19 @@ export const InteractiveSalesWaveChart: React.FC<{
             </g>
           )}
 
-          {/* Wave Mode: Interactive Guides & Milestone Points */}
-          {chartType === 'wave' && points.map((pt, i) => {
-            const isMilestone = points.length <= 8 ||
-              i === 0 ||
-              i === points.length - 1 ||
-              i === Math.round((points.length - 1) * 0.25) ||
-              i === Math.round((points.length - 1) * 0.5) ||
-              i === Math.round((points.length - 1) * 0.75);
-            const isHovered = hoverIndex === i;
-            if (!isMilestone && !isHovered) return null;
-
-            return (
-              <g key={i}>
-                {isHovered && (
-                  <line
-                    x1={pt.x}
-                    y1={padY}
-                    x2={pt.x}
-                    y2={height - padY}
-                    stroke="#10b981"
-                    strokeWidth="1.2"
-                    strokeDasharray="3 3"
-                    className="opacity-70"
-                  />
-                )}
-                <circle
-                  cx={pt.x}
-                  cy={pt.y}
-                  r={isHovered ? 6 : 4}
-                  fill={isHovered ? (metric === 'revenue' ? '#10b981' : '#0d9488') : '#ffffff'}
-                  stroke={metric === 'revenue' ? '#10b981' : '#0d9488'}
-                  strokeWidth="2"
-                  style={{
-                    transformOrigin: `${pt.x}px ${pt.y}px`,
-                    transition: 'transform 300ms ease-out, opacity 400ms ease-out',
-                  }}
-                  className={`cursor-pointer ${isLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-0'}`}
-                  onMouseEnter={() => setHoverIndex(i)}
-                  onMouseLeave={() => setHoverIndex(null)}
-                />
-              </g>
-            );
-          })}
+          {/* Wave Mode: Interactive Hover Vertical Guide Line */}
+          {chartType === 'wave' && hoverIndex !== null && points[hoverIndex] && (
+            <line
+              x1={points[hoverIndex].x}
+              y1={padY}
+              x2={points[hoverIndex].x}
+              y2={height - padY}
+              stroke="#10b981"
+              strokeWidth="1.2"
+              strokeDasharray="3 3"
+              className="opacity-70 pointer-events-none"
+            />
+          )}
 
           {/* Bar Mode: Interactive Modern Rounded Bar Columns */}
           {chartType === 'bar' && points.map((pt, i) => {
@@ -414,6 +382,37 @@ export const InteractiveSalesWaveChart: React.FC<{
             );
           })}
         </svg>
+
+        {/* Milestone and Active Dots (Rendered in HTML DOM to ensure 100% circular 1:1 geometry, never flattened by SVG non-uniform scaling) */}
+        {chartType === 'wave' && points.map((pt, i) => {
+          const isMilestone = points.length <= 8 ||
+            i === 0 ||
+            i === points.length - 1 ||
+            i === Math.round((points.length - 1) * 0.25) ||
+            i === Math.round((points.length - 1) * 0.5) ||
+            i === Math.round((points.length - 1) * 0.75);
+          const isHovered = hoverIndex === i;
+          if (!isMilestone && !isHovered) return null;
+
+          const pctX = (pt.x / width) * 100;
+          const pctY = (pt.y / height) * 100;
+
+          return (
+            <div
+              key={i}
+              className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full pointer-events-none ${
+                isHovered
+                  ? 'w-3.5 h-3.5 bg-emerald-600 dark:bg-emerald-400 ring-4 ring-emerald-500/25 z-20 scale-110 shadow-md'
+                  : 'w-2 h-2 sm:w-2.5 sm:h-2.5 bg-white dark:bg-[#131926] border-2 border-emerald-500 dark:border-emerald-400 z-10 shadow-xs'
+              } ${isLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-0'}`}
+              style={{
+                left: `${pctX}%`,
+                top: `${pctY}%`,
+                transition: 'left 500ms cubic-bezier(0.16, 1, 0.3, 1), top 500ms cubic-bezier(0.16, 1, 0.3, 1), transform 250ms ease, opacity 300ms ease',
+              }}
+            />
+          );
+        })}
 
         {/* Floating Tooltip Pill with Smart Flip Positioning */}
         {hoverIndex !== null && points[hoverIndex] && (() => {

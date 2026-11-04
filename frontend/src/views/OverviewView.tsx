@@ -356,8 +356,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
         {/* 2. Charts — Sales Performance (with embedded metrics) + Asset Allocation */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 2xl:gap-6 animate-stagger-3">
-          {/* Sales Performance Card (Clean, locked to commit dccd04f height so bottom cards fit without scroll) */}
-          <div className="lg:col-span-7 bg-white dark:bg-[#131926] rounded-2xl p-4 sm:p-5 2xl:p-6 shadow-xs flex flex-col justify-between h-[285px] 2xl:h-[340px] overflow-hidden">
+          {/* Sales Performance Card (Clean, locked with comfortable breathing room) */}
+          <div className="lg:col-span-7 bg-white dark:bg-[#131926] rounded-2xl p-4 sm:p-5 2xl:p-6 shadow-xs flex flex-col justify-between h-[296px] 2xl:h-[350px] overflow-hidden">
             <div>
               {/* Header: Title on Left, Range selector pills on Right matching mockup */}
               <div className="flex items-center justify-between gap-3 shrink-0">
@@ -457,17 +457,17 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               </div>
             </div>
 
-            {/* Embedded 4-Column Footer Bar (Divided by crisp vertical borders) */}
-            <div className="border-t border-slate-100 dark:border-slate-800/80 pt-2 2xl:pt-2.5 mt-auto shrink-0">
+            {/* Embedded 4-Column Footer Bar (Divided by crisp vertical borders with ample breathing room) */}
+            <div className="border-t border-slate-100 dark:border-slate-800/80 pt-2.5 2xl:pt-3 pb-0.5 mt-auto shrink-0">
               <div className={`grid ${canViewCost ? 'grid-cols-4' : 'grid-cols-2'}`}>
                 {canViewCost && (
                   <>
                     {/* 1. Gross Profit */}
-                    <div className="pr-3 2xl:pr-4 border-r border-slate-100 dark:border-slate-800/80">
+                    <div className="pr-3.5 2xl:pr-5 border-r border-slate-100 dark:border-slate-800/80">
                       <div className="text-[10.5px] 2xl:text-xs font-semibold text-slate-500 dark:text-slate-400 truncate">
                         Gross Profit
                       </div>
-                      <div className="text-sm sm:text-base 2xl:text-lg font-bold font-mono tracking-tight text-emerald-600 dark:text-emerald-400 mt-0.5 truncate">
+                      <div className="text-sm sm:text-base 2xl:text-lg font-bold font-mono tracking-tight text-emerald-600 dark:text-emerald-400 mt-1 2xl:mt-1.5 truncate">
                         {isBalancesHidden ? '******' : (
                           <>
                             {activeGrossProfit < 0 ? '−' : ''}<AnimatedNumber value={Math.abs(activeGrossProfit)} />
@@ -478,11 +478,11 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                     </div>
 
                     {/* 2. Net Profit */}
-                    <div className="px-3 2xl:px-4 border-r border-slate-100 dark:border-slate-800/80">
+                    <div className="px-3.5 2xl:px-5 border-r border-slate-100 dark:border-slate-800/80">
                       <div className="text-[10.5px] 2xl:text-xs font-semibold text-slate-500 dark:text-slate-400 truncate">
                         Net Profit
                       </div>
-                      <div className="text-sm sm:text-base 2xl:text-lg font-bold font-mono tracking-tight text-emerald-600 dark:text-emerald-400 mt-0.5 truncate">
+                      <div className="text-sm sm:text-base 2xl:text-lg font-bold font-mono tracking-tight text-emerald-600 dark:text-emerald-400 mt-1 2xl:mt-1.5 truncate">
                         {isBalancesHidden ? '******' : (
                           <>
                             {activeNetProfit < 0 ? '−' : ''}<AnimatedNumber value={Math.abs(activeNetProfit)} />
@@ -499,12 +499,12 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   type="button"
                   onClick={() => setIsExpenseModalOpen(true)}
                   title="Click to record an expense or personal draw"
-                  className={`px-3 2xl:px-4 text-left group cursor-pointer focus:outline-none transition-colors ${canViewCost ? 'border-r border-slate-100 dark:border-slate-800/80' : 'border-r-0'}`}
+                  className={`px-3.5 2xl:px-5 text-left group cursor-pointer focus:outline-none transition-colors ${canViewCost ? 'border-r border-slate-100 dark:border-slate-800/80' : 'border-r-0'}`}
                 >
                   <div className="text-[10.5px] 2xl:text-xs font-semibold text-slate-500 dark:text-slate-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors truncate">
                     Expenses
                   </div>
-                  <div className="text-sm sm:text-base 2xl:text-lg font-bold font-mono tracking-tight text-slate-900 dark:text-white mt-0.5 truncate">
+                  <div className="text-sm sm:text-base 2xl:text-lg font-bold font-mono tracking-tight text-slate-900 dark:text-white mt-1 2xl:mt-1.5 truncate">
                     {isBalancesHidden ? '******' : (
                       <>
                         <AnimatedNumber value={activeExpenses} />
@@ -515,11 +515,11 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 </button>
 
                 {/* 4. Owner Draws (Neutral color like revenue, NOT purple!) */}
-                <div className="pl-3 2xl:pl-4">
+                <div className="pl-3.5 2xl:pl-5">
                   <div className="text-[10.5px] 2xl:text-xs font-semibold text-slate-500 dark:text-slate-400 truncate">
                     Owner Draws
                   </div>
-                  <div className="text-sm sm:text-base 2xl:text-lg font-bold font-mono tracking-tight text-slate-900 dark:text-white mt-0.5 truncate">
+                  <div className="text-sm sm:text-base 2xl:text-lg font-bold font-mono tracking-tight text-slate-900 dark:text-white mt-1 2xl:mt-1.5 truncate">
                     {isBalancesHidden ? '******' : (
                       <>
                         <AnimatedNumber value={Math.abs(activeOwnerDraws)} />
@@ -532,8 +532,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             </div>
           </div>
 
-          {/* Asset Allocation Donut Card (Locked to commit dccd04f height) */}
-          <div className="hidden lg:flex lg:col-span-5 bg-white dark:bg-[#131926] rounded-2xl p-4 sm:p-5 2xl:p-6 flex-col justify-between shadow-xs h-[285px] 2xl:h-[340px] overflow-hidden">
+          {/* Asset Allocation Donut Card (Locked with matching height) */}
+          <div className="hidden lg:flex lg:col-span-5 bg-white dark:bg-[#131926] rounded-2xl p-4 sm:p-5 2xl:p-6 flex-col justify-between shadow-xs h-[296px] 2xl:h-[350px] overflow-hidden">
             <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-slate-800/80 mb-2 shrink-0">
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 Asset Allocation
