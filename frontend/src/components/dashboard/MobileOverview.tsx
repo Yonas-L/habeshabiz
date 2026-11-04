@@ -15,7 +15,6 @@ import {
   Sprout,
   Plus,
   ChevronRight,
-  ArrowUpRight,
 } from 'lucide-react';
 
 interface GroupedDebtContact {
@@ -110,14 +109,10 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
             preserveAspectRatio="none"
           >
             <defs>
-              <filter id="beadGlow" x="-50%" y="-50%" width="200%" height="200%">
-                <feDropShadow dx="0" dy="0" stdDeviation="4" floodColor="#34d399" floodOpacity="0.95" />
-              </filter>
-
               {/* Chart Wave Downward Radiant Beam Gradients */}
               <linearGradient id="frontChartGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#34d399" stopOpacity="0.35" />
-                <stop offset="50%" stopColor="#10b981" stopOpacity="0.10" />
+                <stop offset="0%" stopColor="#34d399" stopOpacity="0.28" />
+                <stop offset="50%" stopColor="#10b981" stopOpacity="0.08" />
                 <stop offset="100%" stopColor="#0f172a" stopOpacity="0.0" />
               </linearGradient>
 
@@ -159,7 +154,6 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                   L 175 160
                   Z"
                 fill="url(#frontChartGrad)"
-                className="animate-beam-reveal"
               />
               <path
                 d="
@@ -173,20 +167,11 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                 stroke="url(#frontLineGrad)"
                 strokeWidth="1.6"
                 strokeLinecap="round"
-                className="animate-chart-line"
               />
             </g>
 
-            {/* Luminous Endpoint Bead */}
-            <g>
-              <circle cx="403" cy="60" r="3" fill="none" stroke="#34d399" strokeWidth="1.5">
-                <animate attributeName="r" values="3;16" dur="2.4s" repeatCount="indefinite" />
-                <animate attributeName="opacity" values="0.85;0" dur="2.4s" repeatCount="indefinite" />
-                <animate attributeName="stroke-width" values="1.8;0.3" dur="2.4s" repeatCount="indefinite" />
-              </circle>
-              <circle cx="403" cy="60" r="4.5" fill="#ffffff" filter="url(#beadGlow)" opacity="0.95" />
-              <circle cx="403" cy="60" r="2.5" fill="#ffffff" stroke="#10b981" strokeWidth="0.8" />
-            </g>
+            {/* Clean Static Endpoint Dot (No radial animation, no slop) */}
+            <circle cx="403" cy="60" r="2.5" fill="#34d399" />
           </svg>
 
           {/* ── Foreground Interactive Content (Cleaned up, un-congested, zero truncation) ── */}
@@ -199,50 +184,41 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               height: '92%',
             }}
           >
-            {/* Top Row: Title + Strong Growth pill */}
+            {/* Top Row: Clean, Un-nested Header (No glowing dot, no chevron, no nested +12% pill) */}
             <div className="flex items-center justify-between">
               <button
                 type="button"
                 onClick={() => openVital('inventory')}
-                className="flex items-center gap-1.5 group cursor-pointer active:scale-98 transition-transform"
+                className="text-xs font-semibold uppercase tracking-wider text-slate-400 hover:text-white transition-colors cursor-pointer text-left"
               >
-                <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
-                <span className="text-xs font-bold tracking-wider text-white">
-                  WORKING CAPITAL
-                </span>
-                <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-white transition-all stroke-[2.5]" />
+                Working Capital
               </button>
-
-              <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#082f23]/90 border border-[#34d399]/40 text-[#e6f7ef] text-xs font-semibold shadow-xs">
-                <ArrowUpRight className="w-3.5 h-3.5 text-[#34d399] stroke-[2.5]" />
-                <span>+12.5%</span>
-              </div>
             </div>
 
             {/* Big Financial Number */}
             <div className="my-auto py-1">
               <div className="flex items-baseline gap-2">
-                <span className="text-[clamp(28px,7.5vw,36px)] min-[410px]:text-[38px] font-black tracking-tight text-white font-mono leading-none drop-shadow-sm">
+                <span className="text-[clamp(28px,7.5vw,36px)] min-[410px]:text-[38px] font-black tracking-tight text-white font-mono leading-none">
                   {isBalancesHidden ? '******' : <AnimatedNumber value={capital_overview.net_capital || 10293682} />}
                 </span>
-                <span className="text-sm min-[410px]:text-base font-bold text-slate-300 font-sans tracking-wide">
+                <span className="text-sm min-[410px]:text-base font-bold text-slate-400 font-sans tracking-wide">
                   ETB
                 </span>
               </div>
               <div className="mt-1 flex items-center gap-2 text-xs text-slate-400">
-                <span className="text-emerald-400 font-bold">+12.5%</span>
+                <span className="text-emerald-400 font-semibold font-mono">+12.5%</span>
                 <span>vs last month</span>
               </div>
             </div>
 
-            {/* Proportional Asset Breakdown Bar & Clean Legend (No truncation, generous breathing room) */}
-            <div className="rounded-xl bg-slate-900/90 backdrop-blur-md border border-white/10 p-2.5 space-y-2">
-              {/* Proportional distribution bar */}
+            {/* Proportional Asset Breakdown Bar & Clean Legend (Un-nested, generous breathing room) */}
+            <div className="space-y-2 pt-1">
+              {/* Proportional distribution bar (Teal for forex, zero purple) */}
               <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden flex">
                 {stockPct > 0 && <div style={{ width: `${stockPct}%` }} className="h-full bg-emerald-400" title={`Stock ${stockPct}%`} />}
                 {cashPct > 0 && <div style={{ width: `${cashPct}%` }} className="h-full bg-sky-400" title={`Liquid ${cashPct}%`} />}
                 {recPct > 0 && <div style={{ width: `${recPct}%` }} className="h-full bg-amber-400" title={`Owed ${recPct}%`} />}
-                {forexPct > 0 && <div style={{ width: `${forexPct}%` }} className="h-full bg-purple-400" title={`Forex ${forexPct}%`} />}
+                {forexPct > 0 && <div style={{ width: `${forexPct}%` }} className="h-full bg-teal-400" title={`Forex ${forexPct}%`} />}
                 {goldPct > 0 && <div style={{ width: `${goldPct}%` }} className="h-full bg-yellow-400" title={`Gold ${goldPct}%`} />}
                 {otherPct > 0 && <div style={{ width: `${otherPct}%` }} className="h-full bg-slate-400" title={`Other ${otherPct}%`} />}
               </div>
