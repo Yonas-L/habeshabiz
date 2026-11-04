@@ -326,18 +326,22 @@ export const InteractiveSalesWaveChart: React.FC<{
           )}
 
           {/* Wave Mode: Interactive Hover Vertical Guide Line */}
-          {chartType === 'wave' && hoverIndex !== null && points[hoverIndex] && (
-            <line
-              x1={points[hoverIndex].x}
-              y1={padY}
-              x2={points[hoverIndex].x}
-              y2={height - padY}
-              stroke="#10b981"
-              strokeWidth="1.2"
-              strokeDasharray="3 3"
-              className="opacity-70 pointer-events-none"
-            />
-          )}
+          {chartType === 'wave' && hoverIndex !== null && points[hoverIndex] && (() => {
+            const pt = points[hoverIndex];
+            const isNearTop = (pt.y / height) < 0.42;
+            return (
+              <line
+                x1={pt.x}
+                y1={isNearTop ? pt.y : padY}
+                x2={pt.x}
+                y2={isNearTop ? height - padY : pt.y}
+                stroke="#10b981"
+                strokeWidth="1.2"
+                strokeDasharray="3 3"
+                className="opacity-70 pointer-events-none"
+              />
+            );
+          })()}
 
           {/* Bar Mode: Interactive Modern Rounded Bar Columns */}
           {chartType === 'bar' && points.map((pt, i) => {
@@ -417,15 +421,17 @@ export const InteractiveSalesWaveChart: React.FC<{
         {/* Floating Tooltip Pill with Smart Flip Positioning */}
         {hoverIndex !== null && points[hoverIndex] && (() => {
           const pt = points[hoverIndex];
-          const isTopHalf = pt.y < 58;
+          const isNearTop = (pt.y / height) < 0.42;
+          const leftPct = Math.max(14, Math.min(86, (pt.x / width) * 100));
+
           return (
             <div
-              className={`absolute z-30 pointer-events-none -translate-x-1/2 bg-slate-900/95 dark:bg-slate-800/95 backdrop-blur-xs text-white px-3 py-1.5 rounded-xl shadow-2xl text-xs font-mono whitespace-nowrap border border-slate-700/70 transition-transform duration-75 ease-out ${
-                isTopHalf ? 'translate-y-3' : '-translate-y-full -translate-y-2.5'
+              className={`absolute z-30 pointer-events-none -translate-x-1/2 bg-slate-900/95 dark:bg-slate-800/95 backdrop-blur-xs text-white px-3 py-1.5 rounded-xl shadow-2xl text-xs font-mono whitespace-nowrap border border-slate-700/70 transition-all duration-150 ease-out ${
+                isNearTop ? 'translate-y-3' : '-translate-y-1'
               }`}
               style={{
-                left: `${Math.max(14, Math.min(86, (pt.x / width) * 100))}%`,
-                top: `${pt.y}px`,
+                left: `${leftPct}%`,
+                top: isNearTop ? `${(pt.y / height) * 100}%` : '2px',
               }}
             >
               <div className="font-bold text-emerald-400 font-mono">
