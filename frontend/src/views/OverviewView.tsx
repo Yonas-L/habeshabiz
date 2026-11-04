@@ -358,13 +358,13 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
         {/* 2. Charts — Sales Performance (with embedded metrics) + Asset Allocation */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 2xl:gap-6 animate-stagger-3">
-          {/* Sales Performance Card (Fixed height matching commit dccd04f) */}
-          <div className="lg:col-span-7 bg-white dark:bg-[#131926] rounded-2xl p-4 sm:p-5 2xl:p-6 shadow-xs flex flex-col justify-between h-[285px] 2xl:h-[340px] overflow-hidden">
+          {/* Sales Performance Card (Spacious & un-congested fixed height) */}
+          <div className="lg:col-span-7 bg-white dark:bg-[#131926] rounded-2xl p-5 2xl:p-6 shadow-xs flex flex-col justify-between h-[325px] 2xl:h-[370px] overflow-hidden">
             <div>
               {/* Header: Title + Inline Action Buttons + Range selector pills */}
-              <div className="flex items-center justify-between gap-2 shrink-0">
+              <div className="flex items-center justify-between gap-3 shrink-0">
                 {/* Left: Title + Inline Action Buttons to the right of 'Sales Performance' text */}
-                <div className="flex items-center gap-2 2xl:gap-2.5 min-w-0 flex-wrap">
+                <div className="flex items-center gap-2.5 2xl:gap-3 min-w-0 flex-wrap">
                   <div className="flex items-center gap-1.5 shrink-0">
                     <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                     <h2 className="text-sm 2xl:text-base font-bold text-slate-900 dark:text-white tracking-tight whitespace-nowrap">
@@ -378,7 +378,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                       <button
                         onClick={() => onNavigateTab('staff')}
                         title="View Staff & Team Dashboard"
-                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-900/50 text-amber-900 dark:text-amber-300 text-[10px] 2xl:text-[11px] font-semibold hover:border-amber-400 transition-all cursor-pointer"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-900/50 text-amber-900 dark:text-amber-300 text-[10.5px] 2xl:text-xs font-semibold hover:border-amber-400 transition-all cursor-pointer"
                       >
                         <span>Top: <span className="font-bold">{topSeller.name}</span></span>
                         <ChevronRight className="w-3 h-3 opacity-60" />
@@ -388,7 +388,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                     <button
                       onClick={() => setIsExpenseModalOpen(true)}
                       title="Quickly record a shop expense or personal draw"
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-[10.5px] 2xl:text-xs font-semibold transition-all cursor-pointer"
+                      className="inline-flex items-center gap-1 px-2.5 py-0.5 2xl:py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-[11px] 2xl:text-xs font-semibold transition-all cursor-pointer"
                     >
                       <ArrowUpRight className="w-3 h-3 text-rose-500" />
                       <span>Expense</span>
@@ -400,7 +400,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                         setIsDebtModalOpen(true);
                       }}
                       title="Record customer credit, peer vendor payout, or loan entry"
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-[10.5px] 2xl:text-xs font-semibold transition-all cursor-pointer"
+                      className="inline-flex items-center gap-1 px-2.5 py-0.5 2xl:py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-[11px] 2xl:text-xs font-semibold transition-all cursor-pointer"
                     >
                       <ArrowLeftRight className="w-3 h-3 text-slate-500 dark:text-slate-400" />
                       <span>Debt</span>
@@ -409,14 +409,14 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 </div>
 
                 {/* Right: Range pills matching exact mockup */}
-                <div className="inline-flex p-0.5 bg-slate-100/90 dark:bg-slate-800/90 rounded-xl text-xs font-medium shrink-0">
+                <div className="inline-flex p-1 bg-slate-100/90 dark:bg-slate-800/90 rounded-xl text-xs font-medium shrink-0">
                   {(['1M', '3M', '6M', '1Y'] as const).map((r) => {
                     const isActive = salesRange === r;
                     return (
                       <button
                         key={r}
                         onClick={() => handleRangeChange(r)}
-                        className={`px-2.5 py-0.5 2xl:px-3 2xl:py-1 rounded-lg transition-all cursor-pointer text-xs ${
+                        className={`px-3 py-1 rounded-lg transition-all cursor-pointer text-xs ${
                           isActive
                             ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold shadow-xs'
                             : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -430,7 +430,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               </div>
 
               {/* Headline Sales Number + Trend Indicator */}
-              <div className="mt-1.5 sm:mt-2">
+              <div className="mt-2.5 2xl:mt-3">
                 <div className="text-xl sm:text-2xl 2xl:text-3xl font-bold font-mono tracking-tight text-slate-900 dark:text-white flex items-baseline gap-1.5">
                   {isBalancesHidden ? (
                     '******'
@@ -467,14 +467,14 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               </div>
 
               {/* Chart Canvas */}
-              <div className="mt-1">
+              <div className="mt-2">
                 <InteractiveSalesWaveChart
                   data={activeSalesChart}
                   totalRevenue={activeRevenue}
                   totalProfit={activeGrossProfit}
                   canViewCost={canViewCost}
                   hideHeader={true}
-                  heightClass="h-[95px] sm:h-[105px] 2xl:h-[135px]"
+                  heightClass="h-[120px] sm:h-[130px] 2xl:h-[155px]"
                   onHoverPoint={(pt) => {
                     setHoveredPointVal(pt ? pt.val : null);
                   }}
@@ -483,35 +483,35 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             </div>
 
             {/* Embedded 4-Column Footer Bar (Divided by hairlines) */}
-            <div className="border-t border-slate-100 dark:border-slate-800/80 pt-2 mt-auto shrink-0">
+            <div className="border-t border-slate-100 dark:border-slate-800/80 pt-2.5 2xl:pt-3 mt-auto shrink-0">
               <div className={`grid ${canViewCost ? 'grid-cols-4' : 'grid-cols-2'} divide-x divide-slate-100 dark:divide-slate-800/80`}>
                 {canViewCost && (
                   <>
                     {/* 1. Gross Profit */}
-                    <div className="px-2.5 2xl:px-3 first:pl-0">
-                      <div className="text-[10.5px] 2xl:text-xs font-semibold text-slate-500 dark:text-slate-400 truncate">
+                    <div className="px-3 2xl:px-4 first:pl-0">
+                      <div className="text-[11px] 2xl:text-xs font-semibold text-slate-500 dark:text-slate-400 truncate">
                         Gross Profit
                       </div>
-                      <div className="text-sm 2xl:text-base font-bold font-mono tracking-tight text-emerald-600 dark:text-emerald-400 mt-0.5 truncate">
+                      <div className="text-sm sm:text-base 2xl:text-lg font-bold font-mono tracking-tight text-emerald-600 dark:text-emerald-400 mt-0.5 truncate">
                         {isBalancesHidden ? '******' : (
                           <>
                             {activeGrossProfit < 0 ? '−' : ''}<AnimatedNumber value={Math.abs(activeGrossProfit)} />
-                            <span className="text-[10px] font-sans font-medium text-emerald-600/70 ml-1">ETB</span>
+                            <span className="text-[10px] 2xl:text-xs font-sans font-medium text-emerald-600/70 ml-1">ETB</span>
                           </>
                         )}
                       </div>
                     </div>
 
                     {/* 2. Net Profit */}
-                    <div className="px-2.5 2xl:px-3">
-                      <div className="text-[10.5px] 2xl:text-xs font-semibold text-slate-500 dark:text-slate-400 truncate">
+                    <div className="px-3 2xl:px-4">
+                      <div className="text-[11px] 2xl:text-xs font-semibold text-slate-500 dark:text-slate-400 truncate">
                         Net Profit
                       </div>
-                      <div className="text-sm 2xl:text-base font-bold font-mono tracking-tight text-emerald-600 dark:text-emerald-400 mt-0.5 truncate">
+                      <div className="text-sm sm:text-base 2xl:text-lg font-bold font-mono tracking-tight text-emerald-600 dark:text-emerald-400 mt-0.5 truncate">
                         {isBalancesHidden ? '******' : (
                           <>
                             {activeNetProfit < 0 ? '−' : ''}<AnimatedNumber value={Math.abs(activeNetProfit)} />
-                            <span className="text-[10px] font-sans font-medium text-emerald-600/70 ml-1">ETB</span>
+                            <span className="text-[10px] 2xl:text-xs font-sans font-medium text-emerald-600/70 ml-1">ETB</span>
                           </>
                         )}
                       </div>
@@ -524,31 +524,31 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   type="button"
                   onClick={() => setIsExpenseModalOpen(true)}
                   title="Click to record an expense or personal draw"
-                  className="px-2.5 2xl:px-3 text-left group cursor-pointer focus:outline-none transition-colors"
+                  className="px-3 2xl:px-4 text-left group cursor-pointer focus:outline-none transition-colors"
                 >
-                  <div className="text-[10.5px] 2xl:text-xs font-semibold text-slate-500 dark:text-slate-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors truncate">
+                  <div className="text-[11px] 2xl:text-xs font-semibold text-slate-500 dark:text-slate-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors truncate">
                     Expenses
                   </div>
-                  <div className="text-sm 2xl:text-base font-bold font-mono tracking-tight text-slate-900 dark:text-white mt-0.5 truncate">
+                  <div className="text-sm sm:text-base 2xl:text-lg font-bold font-mono tracking-tight text-slate-900 dark:text-white mt-0.5 truncate">
                     {isBalancesHidden ? '******' : (
                       <>
                         <AnimatedNumber value={activeExpenses} />
-                        <span className="text-[10px] font-sans font-medium text-slate-400 dark:text-slate-500 ml-1">ETB</span>
+                        <span className="text-[10px] 2xl:text-xs font-sans font-medium text-slate-400 dark:text-slate-500 ml-1">ETB</span>
                       </>
                     )}
                   </div>
                 </button>
 
                 {/* 4. Owner Draws (Neutral color like revenue, NOT purple!) */}
-                <div className="px-2.5 2xl:px-3 last:pr-0">
-                  <div className="text-[10.5px] 2xl:text-xs font-semibold text-slate-500 dark:text-slate-400 truncate">
+                <div className="px-3 2xl:px-4 last:pr-0">
+                  <div className="text-[11px] 2xl:text-xs font-semibold text-slate-500 dark:text-slate-400 truncate">
                     Owner Draws
                   </div>
-                  <div className="text-sm 2xl:text-base font-bold font-mono tracking-tight text-slate-900 dark:text-white mt-0.5 truncate">
+                  <div className="text-sm sm:text-base 2xl:text-lg font-bold font-mono tracking-tight text-slate-900 dark:text-white mt-0.5 truncate">
                     {isBalancesHidden ? '******' : (
                       <>
                         <AnimatedNumber value={Math.abs(activeOwnerDraws)} />
-                        <span className="text-[10px] font-sans font-medium text-slate-400 dark:text-slate-500 ml-1">ETB</span>
+                        <span className="text-[10px] 2xl:text-xs font-sans font-medium text-slate-400 dark:text-slate-500 ml-1">ETB</span>
                       </>
                     )}
                   </div>
@@ -557,9 +557,9 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             </div>
           </div>
 
-          {/* Asset Allocation Donut Card (Fixed height matching commit dccd04f) */}
-          <div className="hidden lg:flex lg:col-span-5 bg-white dark:bg-[#131926] rounded-2xl p-4 sm:p-5 2xl:p-6 flex-col justify-between shadow-xs h-[285px] 2xl:h-[340px] overflow-hidden">
-            <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-slate-800/80 mb-2 shrink-0">
+          {/* Asset Allocation Donut Card (Spacious & un-congested fixed height) */}
+          <div className="hidden lg:flex lg:col-span-5 bg-white dark:bg-[#131926] rounded-2xl p-5 2xl:p-6 flex-col justify-between shadow-xs h-[325px] 2xl:h-[370px] overflow-hidden">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800/80 mb-3 shrink-0">
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 Asset Allocation
               </span>

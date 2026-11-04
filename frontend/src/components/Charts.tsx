@@ -20,6 +20,7 @@ export const InteractiveSalesWaveChart: React.FC<{
   totalProfit?: number;
   heightClass?: string;
   hideHeader?: boolean;
+  hideGridLines?: boolean;
   onHoverPoint?: (pt: { val: number; day: string; orders: number } | null) => void;
 }> = ({
   data = [],
@@ -29,6 +30,7 @@ export const InteractiveSalesWaveChart: React.FC<{
   totalProfit,
   heightClass = 'h-[170px] sm:h-[180px]',
   hideHeader = false,
+  hideGridLines = false,
   onHoverPoint,
 }) => {
   const { isBalancesHidden } = useBalancePrivacy();
@@ -266,36 +268,40 @@ export const InteractiveSalesWaveChart: React.FC<{
             </clipPath>
           </defs>
 
-          {/* Dotted Horizontal Guide Lines */}
-          <line
-            x1={padX}
-            y1={padY}
-            x2={width - padX}
-            y2={padY}
-            stroke="currentColor"
-            className="text-slate-200 dark:text-slate-800"
-            strokeWidth="0.8"
-            strokeDasharray="4 4"
-          />
-          <line
-            x1={padX}
-            y1={height / 2}
-            x2={width - padX}
-            y2={height / 2}
-            stroke="currentColor"
-            className="text-slate-200 dark:text-slate-800"
-            strokeWidth="0.8"
-            strokeDasharray="4 4"
-          />
-          <line
-            x1={padX}
-            y1={height - padY}
-            x2={width - padX}
-            y2={height - padY}
-            stroke="currentColor"
-            className="text-slate-300 dark:text-slate-700"
-            strokeWidth="1"
-          />
+          {/* Dotted Horizontal Guide Lines (Omitted in clean/embedded mode) */}
+          {!hideGridLines && !hideHeader && (
+            <>
+              <line
+                x1={padX}
+                y1={padY}
+                x2={width - padX}
+                y2={padY}
+                stroke="currentColor"
+                className="text-slate-200 dark:text-slate-800"
+                strokeWidth="0.8"
+                strokeDasharray="4 4"
+              />
+              <line
+                x1={padX}
+                y1={height / 2}
+                x2={width - padX}
+                y2={height / 2}
+                stroke="currentColor"
+                className="text-slate-200 dark:text-slate-800"
+                strokeWidth="0.8"
+                strokeDasharray="4 4"
+              />
+              <line
+                x1={padX}
+                y1={height - padY}
+                x2={width - padX}
+                y2={height - padY}
+                stroke="currentColor"
+                className="text-slate-300 dark:text-slate-700"
+                strokeWidth="1"
+              />
+            </>
+          )}
 
           {/* Wave Mode: Synchronously Clipped Area & Bezier Curve */}
           {chartType === 'wave' && (
@@ -312,7 +318,7 @@ export const InteractiveSalesWaveChart: React.FC<{
                   d={curvePath}
                   fill="none"
                   stroke={metric === 'revenue' ? '#10b981' : '#0d9488'}
-                  strokeWidth="2.75"
+                  strokeWidth="2.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   className="transition-opacity duration-300"
@@ -321,38 +327,49 @@ export const InteractiveSalesWaveChart: React.FC<{
             </g>
           )}
 
-          {/* Wave Mode: Interactive Guides & Points */}
-          {chartType === 'wave' && points.map((pt, i) => (
-            <g key={i}>
-              {hoverIndex === i && (
-                <line
-                  x1={pt.x}
-                  y1={padY}
-                  x2={pt.x}
-                  y2={height - padY}
-                  stroke="#10b981"
-                  strokeWidth="1.2"
-                  strokeDasharray="3 3"
-                  className="opacity-70"
+          {/* Wave Mode: Interactive Guides & Milestone Points */}
+          {chartType === 'wave' && points.map((pt, i) => {
+            const isMilestone = points.length <= 8 ||
+              i === 0 ||
+              i === points.length - 1 ||
+              i === Math.round((points.length - 1) * 0.25) ||
+              i === Math.round((points.length - 1) * 0.5) ||
+              i === Math.round((points.length - 1) * 0.75);
+            const isHovered = hoverIndex === i;
+            if (!isMilestone && !isHovered) return null;
+
+            return (
+              <g key={i}>
+                {isHovered && (
+                  <line
+                    x1={pt.x}
+                    y1={padY}
+                    x2={pt.x}
+                    y2={height - padY}
+                    stroke="#10b981"
+                    strokeWidth="1.2"
+                    strokeDasharray="3 3"
+                    className="opacity-70"
+                  />
+                )}
+                <circle
+                  cx={pt.x}
+                  cy={pt.y}
+                  r={isHovered ? 6 : 4}
+                  fill={isHovered ? (metric === 'revenue' ? '#10b981' : '#0d9488') : '#ffffff'}
+                  stroke={metric === 'revenue' ? '#10b981' : '#0d9488'}
+                  strokeWidth="2"
+                  style={{
+                    transformOrigin: `${pt.x}px ${pt.y}px`,
+                    transition: 'transform 300ms ease-out, opacity 400ms ease-out',
+                  }}
+                  className={`cursor-pointer ${isLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-0'}`}
+                  onMouseEnter={() => setHoverIndex(i)}
+                  onMouseLeave={() => setHoverIndex(null)}
                 />
-              )}
-              <circle
-                cx={pt.x}
-                cy={pt.y}
-                r={hoverIndex === i ? 6 : 3.5}
-                fill={hoverIndex === i ? (metric === 'revenue' ? '#10b981' : '#0d9488') : '#ffffff'}
-                stroke={metric === 'revenue' ? '#10b981' : '#0d9488'}
-                strokeWidth="2"
-                style={{
-                  transformOrigin: `${pt.x}px ${pt.y}px`,
-                  transition: 'transform 300ms ease-out, opacity 400ms ease-out',
-                }}
-                className={`cursor-pointer ${isLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-0'}`}
-                onMouseEnter={() => setHoverIndex(i)}
-                onMouseLeave={() => setHoverIndex(null)}
-              />
-            </g>
-          ))}
+              </g>
+            );
+          })}
 
           {/* Bar Mode: Interactive Modern Rounded Bar Columns */}
           {chartType === 'bar' && points.map((pt, i) => {
@@ -430,7 +447,7 @@ export const InteractiveSalesWaveChart: React.FC<{
 
       {/* Axis Labels */}
       {data.length > 0 ? (
-        <div className="flex justify-between text-[11px] text-slate-400 dark:text-slate-500 mt-2 px-1 font-mono font-medium">
+        <div className="flex justify-between text-[11px] 2xl:text-xs text-slate-400 dark:text-slate-500 mt-2 px-1 font-medium select-none">
           {data.length >= 5 ? (
             <>
               <span>{data[0]?.day}</span>
