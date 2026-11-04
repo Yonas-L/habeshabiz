@@ -454,8 +454,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                         onClick={() => handleRangeChange(r)}
                         className={`px-3 py-1 rounded-lg transition-all cursor-pointer text-xs ${
                           isActive
-                            ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold shadow-xs'
-                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                            ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 font-bold shadow-xs border border-emerald-100/80 dark:border-emerald-900/30'
+                            : 'text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400'
                         }`}
                       >
                         {r}
