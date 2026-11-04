@@ -751,25 +751,25 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             </div>
           </div>
 
-          {/* Card B: Quick Actions Widget (minimal width, clean, zero nested borders, no icons on labels) */}
-          <div className="hidden lg:flex lg:col-span-3 2xl:col-span-3 bg-white dark:bg-[#131926] rounded-2xl p-4 sm:p-5 2xl:p-6 shadow-xs flex-col h-[285px] 2xl:h-[340px] overflow-hidden">
+          {/* Card B: Quick Actions — frosted dark glass, white buttons, emerald labels */}
+          <div className="hidden lg:flex lg:col-span-3 2xl:col-span-3 bg-slate-800/80 dark:bg-slate-900/70 backdrop-blur-xl rounded-3xl p-4 sm:p-5 2xl:p-6 shadow-lg flex-col h-[285px] 2xl:h-[340px] overflow-hidden ring-1 ring-white/10">
             {/* Header */}
             <div className="flex items-center justify-between pb-2.5 mb-0 shrink-0">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
                 Quick Actions
               </span>
             </div>
 
-            {/* Action Buttons List: 3 minimal, functional buttons that open in-page modals */}
+            {/* Action Buttons */}
             <div className="flex-1 flex flex-col justify-center gap-2.5 2xl:gap-3 min-h-0">
               {/* 1. Record Expense */}
               <button
                 type="button"
                 onClick={() => setIsExpenseModalOpen(true)}
-                className="w-full flex items-center justify-between py-2.5 2xl:py-3.5 px-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs 2xl:text-sm font-semibold transition-colors cursor-pointer group text-left"
+                className="w-full flex items-center justify-between py-2.5 2xl:py-3.5 px-4 rounded-xl bg-white/95 dark:bg-white/90 hover:bg-white dark:hover:bg-white shadow-sm text-emerald-700 dark:text-emerald-600 text-xs 2xl:text-sm font-semibold transition-all cursor-pointer group text-left"
               >
                 <span className="truncate">Record Expense</span>
-                <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0" />
+                <ChevronRight className="w-3.5 h-3.5 text-emerald-400 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition-all shrink-0" />
               </button>
 
               {/* 2. Record Debt */}
@@ -779,10 +779,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   setDebtModalDefaultType('receivable');
                   setIsDebtModalOpen(true);
                 }}
-                className="w-full flex items-center justify-between py-2.5 2xl:py-3.5 px-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs 2xl:text-sm font-semibold transition-colors cursor-pointer group text-left"
+                className="w-full flex items-center justify-between py-2.5 2xl:py-3.5 px-4 rounded-xl bg-white/95 dark:bg-white/90 hover:bg-white dark:hover:bg-white shadow-sm text-emerald-700 dark:text-emerald-600 text-xs 2xl:text-sm font-semibold transition-all cursor-pointer group text-left"
               >
                 <span className="truncate">Record Debt</span>
-                <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0" />
+                <ChevronRight className="w-3.5 h-3.5 text-emerald-400 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition-all shrink-0" />
               </button>
 
               {/* 3. Add Stock */}
@@ -790,13 +790,13 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 type="button"
                 onClick={handleOpenStockIntake}
                 disabled={isLoadingStockMeta}
-                className="w-full flex items-center justify-between py-2.5 2xl:py-3.5 px-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs 2xl:text-sm font-semibold transition-colors cursor-pointer group text-left disabled:opacity-70"
+                className="w-full flex items-center justify-between py-2.5 2xl:py-3.5 px-4 rounded-xl bg-white/95 dark:bg-white/90 hover:bg-white dark:hover:bg-white shadow-sm text-emerald-700 dark:text-emerald-600 text-xs 2xl:text-sm font-semibold transition-all cursor-pointer group text-left disabled:opacity-70"
               >
                 <span className="truncate">{isLoadingStockMeta ? 'Loading...' : 'Add Stock'}</span>
                 {isLoadingStockMeta ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400 shrink-0" />
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400 shrink-0" />
                 ) : (
-                  <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0" />
+                  <ChevronRight className="w-3.5 h-3.5 text-emerald-400 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition-all shrink-0" />
                 )}
               </button>
             </div>
