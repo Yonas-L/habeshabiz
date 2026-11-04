@@ -1,5 +1,16 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import type { DashboardData, User, FinancialAccount, Debt, LeaderboardItem, SalesTrend, DashboardSalesChartPoint } from '../api/client';
+import type {
+  DashboardData,
+  User,
+  FinancialAccount,
+  Debt,
+  LeaderboardItem,
+  SalesTrend,
+  DashboardSalesChartPoint,
+  ProductCategory,
+  Product,
+  Contact,
+} from '../api/client';
 import { api } from '../api/client';
 import {
   InteractiveSalesWaveChart,
@@ -10,12 +21,20 @@ import { VitalBreakdownDrawer, type VitalType } from '../components/drawers/Vita
 import { DebtDrawer } from '../components/drawers/DebtDrawer';
 import { RecordExpenseModal } from '../components/RecordExpenseModal';
 import { RecordDebtModal } from '../components/debts/RecordDebtModal';
+import { StockIntakeModal } from '../components/inventory/StockIntakeModal';
 import { MobileOverview } from '../components/dashboard/MobileOverview';
 import {
   ChevronRight,
   Plus,
   ArrowUp,
   ArrowDown,
+  Zap,
+  Receipt,
+  Handshake,
+  PackagePlus,
+  FileText,
+  ArrowRight,
+  Loader2,
 } from 'lucide-react';
 import { useBalancePrivacy } from '../context/BalancePrivacyContext';
 
@@ -44,6 +63,32 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [isDebtModalOpen, setIsDebtModalOpen] = useState(false);
   const [debtModalDefaultType, setDebtModalDefaultType] = useState<'receivable' | 'payable'>('receivable');
+  const [isStockIntakeOpen, setIsStockIntakeOpen] = useState(false);
+  const [stockCategories, setStockCategories] = useState<ProductCategory[]>([]);
+  const [stockProducts, setStockProducts] = useState<Product[]>([]);
+  const [stockContacts, setStockContacts] = useState<Contact[]>([]);
+  const [isLoadingStockMeta, setIsLoadingStockMeta] = useState(false);
+
+  const handleOpenStockIntake = async () => {
+    setIsStockIntakeOpen(true);
+    if (stockCategories.length === 0 || stockProducts.length === 0) {
+      setIsLoadingStockMeta(true);
+      try {
+        const [cats, prods, cnts] = await Promise.all([
+          api.getCategories(),
+          api.getProducts(),
+          api.getContacts(),
+        ]);
+        setStockCategories(cats || []);
+        setStockProducts(prods || []);
+        setStockContacts(cnts || []);
+      } catch (err) {
+        console.error('Failed to load stock intake metadata:', err);
+      } finally {
+        setIsLoadingStockMeta(false);
+      }
+    }
+  };
 
   const [salesRange, setSalesRange] = useState<'1M' | '3M' | '6M' | '1Y'>('1M');
   const [rangePerformance, setRangePerformance] = useState<{
@@ -584,152 +629,239 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           </div>
         </div>
 
-        {/* 3. Debt Ledgers */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 2xl:gap-6 animate-stagger-4">
-          {/* Receivables */}
-          <div className="bg-white dark:bg-[#131926] rounded-2xl p-5 2xl:p-6 shadow-xs flex flex-col h-[285px] 2xl:h-[340px]">
-            <div className="flex items-center justify-between mb-2.5 pb-2.5 border-b border-slate-100 dark:border-slate-800/80 shrink-0">
-              <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">Receivables</span>
-              <div className="flex items-center gap-2">
+        {/* 3. Operational Row: Combined Receivables & Payables (7 cols) + Quick Actions Widget (5 cols) */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 2xl:gap-6 animate-stagger-4">
+          {/* Card A: Combined Receivables & Payables (with thin central divider, each independently scrollable) */}
+          <div className="lg:col-span-7 bg-white dark:bg-[#131926] rounded-2xl shadow-xs h-[285px] 2xl:h-[340px] overflow-hidden flex flex-col">
+            <div className="grid grid-cols-2 divide-x divide-slate-100 dark:divide-slate-800/80 h-full">
+              {/* Left Column: Receivables */}
+              <div className="flex flex-col h-full p-4 sm:p-5 2xl:p-6 min-w-0 overflow-hidden">
+                <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100 dark:border-slate-800/80 shrink-0">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 truncate">
+                    Receivables
+                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0 text-xs">
+                    <button
+                      onClick={() => {
+                        setDebtModalDefaultType('receivable');
+                        setIsDebtModalOpen(true);
+                      }}
+                      title="Record new customer credit or receivable"
+                      className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 transition-colors flex items-center gap-0.5 cursor-pointer py-0.5 px-1.5 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+                    >
+                      <Plus className="w-3.5 h-3.5 stroke-[2.2]" />
+                      <span>Record</span>
+                    </button>
+                    <span className="text-slate-300 dark:text-slate-700">·</span>
+                    <button
+                      onClick={() => onNavigateTab('debts', false, { debtType: 'receivable' })}
+                      className="text-xs font-medium text-slate-400 dark:text-slate-500 hover:text-emerald-600 transition-colors cursor-pointer py-0.5 px-1 rounded-lg"
+                    >
+                      View all · {counts.open_receivables} →
+                    </button>
+                  </div>
+                </div>
+
+                {groupedReceivables.length === 0 ? (
+                  <div className="flex-1 flex items-center justify-center text-center text-xs text-slate-400 dark:text-slate-500 rounded-xl">
+                    No outstanding receivables
+                  </div>
+                ) : (
+                  <div className="flex-1 overflow-y-auto space-y-1 pr-1 min-h-0">
+                    {groupedReceivables.map((group) => (
+                      <button
+                        key={group.contactId}
+                        onClick={() => openVital('receivables', group.contactId)}
+                        className="w-full flex items-center justify-between py-1.5 px-2 rounded-xl text-xs hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-all group text-left cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className={`w-7 h-7 rounded-lg font-bold flex items-center justify-center text-[10px] uppercase shrink-0 border ${
+                            group.hasHandover
+                              ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border-amber-200/60 dark:border-amber-800/50'
+                              : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-200/60 dark:border-emerald-800/50'
+                          }`}>
+                            {group.name.slice(0, 2).toUpperCase()}
+                          </div>
+                          <div className="truncate">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-semibold text-slate-900 dark:text-white truncate">
+                                {group.name}
+                              </span>
+                              {group.hasHandover && (
+                                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300">
+                                  Handover
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[10.5px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
+                              {group.openCount} {group.openCount === 1 ? 'obligation' : 'obligations'}
+                              {group.offsetAmount > 0.01 && ` · Offset −${isBalancesHidden ? '******' : group.offsetAmount.toLocaleString()} ETB`}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0 pl-1">
+                          <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono tracking-tight text-xs">
+                            {isBalancesHidden ? '+******' : `+${group.netRemaining.toLocaleString()}`}
+                          </span>
+                          <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0" />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Right Column: Payables */}
+              <div className="flex flex-col h-full p-4 sm:p-5 2xl:p-6 min-w-0 overflow-hidden">
+                <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100 dark:border-slate-800/80 shrink-0">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-rose-600 dark:text-rose-400 truncate">
+                    Payables
+                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0 text-xs">
+                    <button
+                      onClick={() => {
+                        setDebtModalDefaultType('payable');
+                        setIsDebtModalOpen(true);
+                      }}
+                      title="Record new vendor payable or debt"
+                      className="text-xs font-semibold text-rose-600 dark:text-rose-400 hover:text-rose-700 transition-colors flex items-center gap-0.5 cursor-pointer py-0.5 px-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                    >
+                      <Plus className="w-3.5 h-3.5 stroke-[2.2]" />
+                      <span>Record</span>
+                    </button>
+                    <span className="text-slate-300 dark:text-slate-700">·</span>
+                    <button
+                      onClick={() => onNavigateTab('debts', false, { debtType: 'payable' })}
+                      className="text-xs font-medium text-slate-400 dark:text-slate-500 hover:text-rose-600 transition-colors cursor-pointer py-0.5 px-1 rounded-lg"
+                    >
+                      View all · {counts.open_payables} →
+                    </button>
+                  </div>
+                </div>
+
+                {groupedPayables.length === 0 ? (
+                  <div className="flex-1 flex items-center justify-center text-center text-xs text-slate-400 dark:text-slate-500 rounded-xl">
+                    No outstanding payables
+                  </div>
+                ) : (
+                  <div className="flex-1 overflow-y-auto space-y-1 pr-1 min-h-0">
+                    {groupedPayables.map((group) => (
+                      <button
+                        key={group.contactId}
+                        onClick={() => openVital('payables', group.contactId)}
+                        className="w-full flex items-center justify-between py-1.5 px-2 rounded-xl text-xs hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-all group text-left cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="w-7 h-7 rounded-lg bg-rose-500/10 text-rose-700 dark:text-rose-400 font-bold flex items-center justify-center text-[10px] uppercase shrink-0 border border-rose-200/60 dark:border-rose-800/50">
+                            {group.name.slice(0, 2).toUpperCase()}
+                          </div>
+                          <div className="truncate">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-semibold text-slate-900 dark:text-white truncate block">
+                                {group.name}
+                              </span>
+                              {group.isStaffBonus && (
+                                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/60 shrink-0">
+                                  Staff Bonus
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[10.5px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
+                              {group.openCount} {group.openCount === 1 ? 'obligation' : 'obligations'}
+                              {group.offsetAmount > 0.01 && ` · Offset −${isBalancesHidden ? '******' : group.offsetAmount.toLocaleString()} ETB`}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0 pl-1">
+                          <span className="font-bold text-rose-600 dark:text-rose-400 font-mono tracking-tight text-xs">
+                            {isBalancesHidden ? '−******' : `−${group.netRemaining.toLocaleString()}`}
+                          </span>
+                          <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0" />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Card B: Quick Actions Widget (5 cols, exact height match, modal openers) */}
+          <div className="hidden lg:flex lg:col-span-5 bg-white dark:bg-[#131926] rounded-2xl p-4 sm:p-5 2xl:p-6 shadow-xs flex-col justify-between h-[285px] 2xl:h-[340px] overflow-hidden">
+            <div>
+              {/* Header */}
+              <div className="flex items-center gap-2 mb-2.5 pb-2 border-b border-slate-100 dark:border-slate-800/80 shrink-0">
+                <Zap className="w-4 h-4 text-slate-800 dark:text-slate-200 stroke-[2.2]" />
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white tracking-tight">
+                  Quick Actions
+                </h3>
+              </div>
+
+              {/* Action Buttons List */}
+              <div className="space-y-2 2xl:space-y-2.5">
+                {/* 1. Record Expense */}
                 <button
+                  type="button"
+                  onClick={() => setIsExpenseModalOpen(true)}
+                  className="w-full flex items-center justify-center gap-2.5 py-2 sm:py-2.5 px-4 rounded-xl bg-slate-50/90 dark:bg-slate-800/50 hover:bg-slate-100/90 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-100/90 dark:border-slate-800/80 hover:border-slate-200 dark:hover:border-slate-700 shadow-2xs font-semibold text-xs 2xl:text-sm transition-all cursor-pointer group"
+                >
+                  <Receipt className="w-4 h-4 text-slate-600 dark:text-slate-400 group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors" />
+                  <span>Record Expense</span>
+                </button>
+
+                {/* 2. Record Debt */}
+                <button
+                  type="button"
                   onClick={() => {
                     setDebtModalDefaultType('receivable');
                     setIsDebtModalOpen(true);
                   }}
-                  title="Record new customer credit or receivable"
-                  className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 transition-colors flex items-center gap-1 cursor-pointer py-0.5 px-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+                  className="w-full flex items-center justify-center gap-2.5 py-2 sm:py-2.5 px-4 rounded-xl bg-slate-50/90 dark:bg-slate-800/50 hover:bg-slate-100/90 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-100/90 dark:border-slate-800/80 hover:border-slate-200 dark:hover:border-slate-700 shadow-2xs font-semibold text-xs 2xl:text-sm transition-all cursor-pointer group"
                 >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Record</span>
+                  <Handshake className="w-4 h-4 text-slate-600 dark:text-slate-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors" />
+                  <span>Record Debt</span>
                 </button>
-                <span className="text-slate-300 dark:text-slate-700">·</span>
+
+                {/* 3. Add Stock */}
                 <button
-                  onClick={() => onNavigateTab('debts', false, { debtType: 'receivable' })}
-                  className="text-xs font-semibold text-slate-400 dark:text-slate-500 hover:text-emerald-600 transition-colors cursor-pointer py-0.5 px-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                  type="button"
+                  onClick={handleOpenStockIntake}
+                  disabled={isLoadingStockMeta}
+                  className="w-full flex items-center justify-center gap-2.5 py-2 sm:py-2.5 px-4 rounded-xl bg-slate-50/90 dark:bg-slate-800/50 hover:bg-slate-100/90 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-100/90 dark:border-slate-800/80 hover:border-slate-200 dark:hover:border-slate-700 shadow-2xs font-semibold text-xs 2xl:text-sm transition-all cursor-pointer group disabled:opacity-70"
                 >
-                  View all · {counts.open_receivables} →
+                  {isLoadingStockMeta ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-blue-600 dark:text-blue-400" />
+                  ) : (
+                    <PackagePlus className="w-4 h-4 text-slate-600 dark:text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
+                  )}
+                  <span>{isLoadingStockMeta ? 'Loading...' : 'Add Stock'}</span>
                 </button>
               </div>
             </div>
 
-            {groupedReceivables.length === 0 ? (
-              <div className="flex-1 flex items-center justify-center text-center text-xs text-slate-400 dark:text-slate-500 rounded-xl">
-                No outstanding receivables
+            {/* Bottom Insight Banner (Matches User Reference Image Pixel-for-Pixel) */}
+            <button
+              type="button"
+              onClick={() => onNavigateTab('reports')}
+              className="mt-2 text-left w-full bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-100/90 dark:border-emerald-900/40 rounded-xl p-2.5 2xl:p-3 flex items-center justify-between gap-3 group hover:border-emerald-300 dark:hover:border-emerald-700 transition-all cursor-pointer"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-9 h-9 2xl:w-10 2xl:h-10 rounded-lg bg-white dark:bg-[#131926] shadow-2xs border border-emerald-200/60 dark:border-emerald-800/50 flex items-center justify-center shrink-0">
+                  <FileText className="w-4.5 h-4.5 text-emerald-600 dark:text-emerald-400 stroke-[1.8]" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-xs 2xl:text-[13px] font-bold text-slate-900 dark:text-white leading-tight truncate">
+                    Keep your business on track
+                  </div>
+                  <div className="text-[10px] 2xl:text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                    Get detailed insights and grow smarter.
+                  </div>
+                </div>
               </div>
-            ) : (
-              <div className="flex-1 overflow-y-auto space-y-1 pr-1">
-                {groupedReceivables.map((group) => (
-                  <button
-                    key={group.contactId}
-                    onClick={() => openVital('receivables', group.contactId)}
-                    className="w-full flex items-center justify-between py-2 px-2.5 rounded-xl text-xs hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-all group text-left cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className={`w-8 h-8 rounded-lg font-bold flex items-center justify-center text-xs uppercase shrink-0 border ${
-                        group.hasHandover
-                          ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border-amber-200/60 dark:border-amber-800/50'
-                          : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-200/60 dark:border-emerald-800/50'
-                      }`}>
-                        {group.name.slice(0, 2).toUpperCase()}
-                      </div>
-                      <div className="truncate">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-semibold text-slate-900 dark:text-white truncate">
-                            {group.name}
-                          </span>
-                          {group.hasHandover && (
-                            <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300">
-                              Handover
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-[11px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
-                          {group.openCount} {group.openCount === 1 ? 'obligation' : 'obligations'}
-                          {group.offsetAmount > 0.01 && ` · Offset −${isBalancesHidden ? '******' : group.offsetAmount.toLocaleString()} ETB`}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0 pl-2">
-                      <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono tracking-tight text-xs">
-                        {isBalancesHidden ? '+******' : `+${group.netRemaining.toLocaleString()}`}
-                      </span>
-                      <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0" />
-                    </div>
-                  </button>
-                ))}
+              <div className="w-7 h-7 rounded-full bg-emerald-200/70 dark:bg-emerald-900/60 text-emerald-900 dark:text-emerald-200 flex items-center justify-center shrink-0 group-hover:bg-emerald-300 dark:group-hover:bg-emerald-800 transition-colors">
+                <ArrowRight className="w-3.5 h-3.5 stroke-[2.2]" />
               </div>
-            )}
-          </div>
-
-          {/* Payables */}
-          <div className="bg-white dark:bg-[#131926] rounded-2xl p-5 2xl:p-6 shadow-xs flex flex-col h-[285px] 2xl:h-[340px]">
-            <div className="flex items-center justify-between mb-2.5 pb-2.5 border-b border-slate-100 dark:border-slate-800/80 shrink-0">
-              <span className="text-sm font-bold text-rose-600 dark:text-rose-400">Payables</span>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    setDebtModalDefaultType('payable');
-                    setIsDebtModalOpen(true);
-                  }}
-                  title="Record new vendor payable or debt"
-                  className="text-xs font-semibold text-rose-600 dark:text-rose-400 hover:text-rose-700 transition-colors flex items-center gap-1 cursor-pointer py-0.5 px-2 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Record</span>
-                </button>
-                <span className="text-slate-300 dark:text-slate-700">·</span>
-                <button
-                  onClick={() => onNavigateTab('debts', false, { debtType: 'payable' })}
-                  className="text-xs font-semibold text-slate-400 dark:text-slate-500 hover:text-rose-600 transition-colors cursor-pointer py-0.5 px-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/40"
-                >
-                  View all · {counts.open_payables} →
-                </button>
-              </div>
-            </div>
-
-            {groupedPayables.length === 0 ? (
-              <div className="flex-1 flex items-center justify-center text-center text-xs text-slate-400 dark:text-slate-500 rounded-xl">
-                No outstanding payables
-              </div>
-            ) : (
-              <div className="flex-1 overflow-y-auto space-y-1 pr-1">
-                {groupedPayables.map((group) => (
-                  <button
-                    key={group.contactId}
-                    onClick={() => openVital('payables', group.contactId)}
-                    className="w-full flex items-center justify-between py-2 px-2.5 rounded-xl text-xs hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-all group text-left cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-700 dark:text-rose-400 font-bold flex items-center justify-center text-xs uppercase shrink-0 border border-rose-200/60 dark:border-rose-800/50">
-                        {group.name.slice(0, 2).toUpperCase()}
-                      </div>
-                      <div className="truncate">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-semibold text-slate-900 dark:text-white truncate block">
-                            {group.name}
-                          </span>
-                          {group.isStaffBonus && (
-                            <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/60 shrink-0">
-                              Staff Bonus
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-[11px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
-                          {group.openCount} {group.openCount === 1 ? 'obligation' : 'obligations'}
-                          {group.offsetAmount > 0.01 && ` · Offset −${isBalancesHidden ? '******' : group.offsetAmount.toLocaleString()} ETB`}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0 pl-2">
-                      <span className="font-bold text-rose-600 dark:text-rose-400 font-mono tracking-tight text-xs">
-                        {isBalancesHidden ? '−******' : `−${group.netRemaining.toLocaleString()}`}
-                      </span>
-                      <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0" />
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
+            </button>
           </div>
         </div>
       </div>
@@ -786,6 +918,23 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           if (onRefreshData) onRefreshData();
         }}
       />
+
+      {/* ── Quick Action: Stock Intake Modal ── */}
+      {isStockIntakeOpen && (
+        <StockIntakeModal
+          isOpen={isStockIntakeOpen}
+          onClose={() => setIsStockIntakeOpen(false)}
+          categories={stockCategories}
+          products={stockProducts}
+          contacts={stockContacts}
+          accounts={accounts}
+          isOwner={user?.role === 'owner'}
+          onIntakeSuccess={() => {
+            setIsStockIntakeOpen(false);
+            if (onRefreshData) onRefreshData();
+          }}
+        />
+      )}
     </div>
   );
 };
