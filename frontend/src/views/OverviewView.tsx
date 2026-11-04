@@ -28,9 +28,8 @@ import {
   ArrowUp,
   ArrowDown,
   Receipt,
+  Handshake,
   PackagePlus,
-  ArrowDownLeft,
-  ArrowUpRight,
   Loader2,
 } from 'lucide-react';
 import { useBalancePrivacy } from '../context/BalancePrivacyContext';
@@ -764,85 +763,65 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               </span>
             </div>
 
-            {/* Action Buttons List: 4 clean, minimal, functional buttons that open in-page modals */}
-            <div className="flex-1 flex flex-col justify-between gap-2 2xl:gap-2.5 py-0.5 min-h-0">
+            {/* Action Buttons List: 3 minimal, functional buttons that open in-page modals */}
+            <div className="flex-1 flex flex-col justify-between py-1 2xl:py-2 min-h-0">
               {/* 1. Record Expense */}
               <button
                 type="button"
                 onClick={() => setIsExpenseModalOpen(true)}
-                className="w-full flex items-center justify-between px-3 py-2 2xl:py-2.5 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 hover:bg-slate-100/90 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-100 dark:border-slate-800 hover:border-slate-200 dark:hover:border-slate-700 transition-all cursor-pointer group text-left"
+                className="w-full flex items-center justify-between px-3.5 py-2.5 2xl:py-3.5 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 hover:bg-slate-100/90 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-100 dark:border-slate-800 hover:border-slate-200 dark:hover:border-slate-700 transition-all cursor-pointer group text-left"
               >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-7 h-7 2xl:w-8 2xl:h-8 rounded-lg bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0 border border-rose-100/80 dark:border-rose-900/50 group-hover:scale-105 transition-transform">
-                    <Receipt className="w-3.5 h-3.5 2xl:w-4 2xl:h-4 stroke-[2]" />
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-8 h-8 2xl:w-9 2xl:h-9 rounded-lg bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0 border border-rose-100/80 dark:border-rose-900/50 group-hover:scale-105 transition-transform">
+                    <Receipt className="w-4 h-4 stroke-[2]" />
                   </div>
-                  <span className="text-xs 2xl:text-[13px] font-semibold text-slate-900 dark:text-white truncate">
+                  <span className="text-xs 2xl:text-sm font-semibold text-slate-900 dark:text-white truncate">
                     Record Expense
                   </span>
                 </div>
-                <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0" />
+                <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0" />
               </button>
 
-              {/* 2. Record Receivable */}
+              {/* 2. Record Debt */}
               <button
                 type="button"
                 onClick={() => {
                   setDebtModalDefaultType('receivable');
                   setIsDebtModalOpen(true);
                 }}
-                className="w-full flex items-center justify-between px-3 py-2 2xl:py-2.5 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 hover:bg-slate-100/90 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-100 dark:border-slate-800 hover:border-slate-200 dark:hover:border-slate-700 transition-all cursor-pointer group text-left"
+                className="w-full flex items-center justify-between px-3.5 py-2.5 2xl:py-3.5 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 hover:bg-slate-100/90 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-100 dark:border-slate-800 hover:border-slate-200 dark:hover:border-slate-700 transition-all cursor-pointer group text-left"
               >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-7 h-7 2xl:w-8 2xl:h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-100/80 dark:border-emerald-900/50 group-hover:scale-105 transition-transform">
-                    <ArrowDownLeft className="w-3.5 h-3.5 2xl:w-4 2xl:h-4 stroke-[2]" />
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-8 h-8 2xl:w-9 2xl:h-9 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-100/80 dark:border-emerald-900/50 group-hover:scale-105 transition-transform">
+                    <Handshake className="w-4 h-4 stroke-[2]" />
                   </div>
-                  <span className="text-xs 2xl:text-[13px] font-semibold text-slate-900 dark:text-white truncate">
-                    Record Receivable
+                  <span className="text-xs 2xl:text-sm font-semibold text-slate-900 dark:text-white truncate">
+                    Record Debt
                   </span>
                 </div>
-                <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0" />
+                <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0" />
               </button>
 
-              {/* 3. Record Payable */}
-              <button
-                type="button"
-                onClick={() => {
-                  setDebtModalDefaultType('payable');
-                  setIsDebtModalOpen(true);
-                }}
-                className="w-full flex items-center justify-between px-3 py-2 2xl:py-2.5 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 hover:bg-slate-100/90 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-100 dark:border-slate-800 hover:border-slate-200 dark:hover:border-slate-700 transition-all cursor-pointer group text-left"
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-7 h-7 2xl:w-8 2xl:h-8 rounded-lg bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0 border border-rose-100/80 dark:border-rose-900/50 group-hover:scale-105 transition-transform">
-                    <ArrowUpRight className="w-3.5 h-3.5 2xl:w-4 2xl:h-4 stroke-[2]" />
-                  </div>
-                  <span className="text-xs 2xl:text-[13px] font-semibold text-slate-900 dark:text-white truncate">
-                    Record Payable
-                  </span>
-                </div>
-                <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0" />
-              </button>
-
-              {/* 4. Add Stock */}
+              {/* 3. Add Stock */}
               <button
                 type="button"
                 onClick={handleOpenStockIntake}
                 disabled={isLoadingStockMeta}
-                className="w-full flex items-center justify-between px-3 py-2 2xl:py-2.5 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 hover:bg-slate-100/90 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-100 dark:border-slate-800 hover:border-slate-200 dark:hover:border-slate-700 transition-all cursor-pointer group text-left disabled:opacity-70"
+                className="w-full flex items-center justify-between px-3.5 py-2.5 2xl:py-3.5 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 hover:bg-slate-100/90 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-100 dark:border-slate-800 hover:border-slate-200 dark:hover:border-slate-700 transition-all cursor-pointer group text-left disabled:opacity-70"
               >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-7 h-7 2xl:w-8 2xl:h-8 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-100/80 dark:border-blue-900/50 group-hover:scale-105 transition-transform">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-8 h-8 2xl:w-9 2xl:h-9 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-100/80 dark:border-blue-900/50 group-hover:scale-105 transition-transform">
                     {isLoadingStockMeta ? (
-                      <Loader2 className="w-3.5 h-3.5 2xl:w-4 2xl:h-4 animate-spin text-blue-600 dark:text-blue-400" />
+                      <Loader2 className="w-4 h-4 animate-spin text-blue-600 dark:text-blue-400" />
                     ) : (
-                      <PackagePlus className="w-3.5 h-3.5 2xl:w-4 2xl:h-4 stroke-[2]" />
+                      <PackagePlus className="w-4 h-4 stroke-[2]" />
                     )}
                   </div>
-                  <span className="text-xs 2xl:text-[13px] font-semibold text-slate-900 dark:text-white truncate">
+                  <span className="text-xs 2xl:text-sm font-semibold text-slate-900 dark:text-white truncate">
                     {isLoadingStockMeta ? 'Loading Stock...' : 'Add Stock'}
                   </span>
                 </div>
-                <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0" />
+                <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0" />
               </button>
             </div>
           </div>
