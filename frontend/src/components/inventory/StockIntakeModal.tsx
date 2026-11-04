@@ -1092,7 +1092,7 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
             };
           }),
           source_type: sourceType,
-          supplier_contact_id: supplierId || undefined,
+          supplier_contact_id: supplierId || (fundingSource === 'debtor_offset' ? (selectedDebtorContactId || undefined) : undefined),
           return_deadline: calculatedReturnDeadline,
           funding_source: sourceType === 'purchase' ? (fundingSource === 'shop_account' ? 'account' : fundingSource === 'unpaid' ? 'none' : fundingSource) : 'none',
           payment_account_id: (sourceType === 'purchase' && (fundingSource === 'shop_account' || fundingSource === 'split')) ? (isAccountSplit ? undefined : (paymentAccountId || undefined)) : undefined,
@@ -1111,7 +1111,7 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
           location: location || 'Shop Counter',
           notes: notes.trim() || null,
           source_type: sourceType,
-          supplier_contact_id: supplierId || null,
+          supplier_contact_id: supplierId || (fundingSource === 'debtor_offset' ? (selectedDebtorContactId || null) : null),
           return_deadline: calculatedReturnDeadline,
           funding_source: sourceType === 'purchase' ? (fundingSource === 'shop_account' ? 'account' : fundingSource === 'unpaid' ? 'none' : fundingSource) : 'none',
           payment_account_id: (sourceType === 'purchase' && (fundingSource === 'shop_account' || fundingSource === 'split')) ? (isAccountSplit ? undefined : (paymentAccountId || undefined)) : undefined,
@@ -3265,6 +3265,11 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                           </option>
                         ))}
                       </select>
+                    )}
+                    {selectedDebtorContactId && (
+                      <div className="text-[11px] text-emerald-600 dark:text-emerald-400 bg-emerald-50/60 dark:bg-emerald-950/40 border border-emerald-200/50 dark:border-emerald-800/40 rounded-lg p-2 leading-relaxed">
+                        Device will be added to shop stock. Up to {totalInvestmentCost.toLocaleString()} ETB will be credited to reduce this contact's debt as <strong>Paid by Device</strong>.
+                      </div>
                     )}
                   </div>
                 )}

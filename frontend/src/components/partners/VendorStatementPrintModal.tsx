@@ -390,7 +390,7 @@ export const VendorStatementPrintModal: React.FC<VendorStatementPrintModalProps>
                                 ? 'bg-purple-50 dark:bg-purple-950/60 print:bg-purple-50 text-purple-700 dark:text-purple-300 print:text-purple-800'
                                 : row.type === 'payout_advance'
                                 ? 'bg-indigo-50 dark:bg-indigo-950/60 print:bg-indigo-50 text-indigo-700 dark:text-indigo-400 print:text-indigo-800'
-                                : row.type === 'payment_received'
+                                : row.type === 'payment_received' || row.type === 'paid_by_device' || row.type === 'device_offset' || row.type === 'bilateral_offset'
                                 ? 'bg-emerald-50 dark:bg-emerald-950/60 print:bg-emerald-50 text-emerald-700 dark:text-emerald-400 print:text-emerald-800'
                                 : 'bg-slate-100 dark:bg-slate-800 print:bg-slate-100 text-slate-600 dark:text-slate-300 print:text-slate-700'
                             }`}

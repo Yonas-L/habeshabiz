@@ -571,7 +571,7 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
                               className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${
                                 row.type === 'consignment_sale' || row.type === 'brokered_sourcing' || row.type === 'manual_payable'
                                   ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50'
-                                  : row.type === 'device_offset' || row.type === 'bilateral_offset'
+                                  : row.type === 'paid_by_device' || row.type === 'device_offset' || row.type === 'bilateral_offset'
                                   ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50'
                                   : row.type === 'payment_sent'
                                   ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 border border-blue-200/50'
@@ -658,7 +658,7 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
                       className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${
                         row.type === 'consignment_sale' || row.type === 'brokered_sourcing' || row.type === 'manual_payable'
                           ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50'
-                          : row.type === 'device_offset' || row.type === 'bilateral_offset'
+                          : row.type === 'paid_by_device' || row.type === 'device_offset' || row.type === 'bilateral_offset'
                           ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50'
                           : row.type === 'payment_sent'
                           ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 border border-blue-200/50'
@@ -769,19 +769,26 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
                           {unit.selling_price > 0 ? `${unit.selling_price.toLocaleString()} ETB` : '—'}
                         </td>
                         <td className="py-2.5 px-3.5 text-center font-sans">
-                          <span
-                            className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                              unit.status === 'in_stock'
-                                ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400'
-                                : unit.status === 'sold'
-                                ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400'
-                                : unit.status === 'returned_to_vendor'
-                                ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400'
-                                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-                            }`}
-                          >
-                            {unit.status.replace(/_/g, ' ')}
-                          </span>
+                          <div className="flex flex-col items-center gap-0.5">
+                            <span
+                              className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                                unit.status === 'in_stock'
+                                  ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400'
+                                  : unit.status === 'sold'
+                                  ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400'
+                                  : unit.status === 'returned_to_vendor'
+                                  ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400'
+                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                              }`}
+                            >
+                              {unit.status.replace(/_/g, ' ')}
+                            </span>
+                            {(unit.source_type === 'paid_by_device' || unit.funding_source === 'debtor_offset') && (
+                              <span className="text-[9px] font-semibold text-emerald-600 dark:text-emerald-400">
+                                Paid by Device
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="py-2.5 px-3.5 whitespace-nowrap text-slate-500 font-sans text-[11px]">
                           {unit.order_number ? (
@@ -830,19 +837,26 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
                         </p>
                       )}
                     </div>
-                    <span
-                      className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold shrink-0 ${
-                        unit.status === 'in_stock'
-                          ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400'
-                          : unit.status === 'sold'
-                          ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400'
-                          : unit.status === 'returned_to_vendor'
-                          ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400'
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-                      }`}
-                    >
-                      {unit.status.replace(/_/g, ' ')}
-                    </span>
+                    <div className="flex flex-col items-end gap-0.5 shrink-0">
+                      <span
+                        className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold shrink-0 ${
+                          unit.status === 'in_stock'
+                            ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400'
+                            : unit.status === 'sold'
+                            ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400'
+                            : unit.status === 'returned_to_vendor'
+                            ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                        }`}
+                      >
+                        {unit.status.replace(/_/g, ' ')}
+                      </span>
+                      {(unit.source_type === 'paid_by_device' || unit.funding_source === 'debtor_offset') && (
+                        <span className="text-[9px] font-semibold text-emerald-600 dark:text-emerald-400">
+                          Paid by Device
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs">
@@ -1033,15 +1047,23 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
                         <td className="py-2.5 px-3.5 text-center font-sans">
                           <span
                             className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                              unit.status === 'fixed'
+                              unit.is_reacquired
+                                ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50'
+                                : unit.status === 'fixed'
                                 ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 border border-blue-200/50'
+                                : unit.status === 'returned_to_vendor'
+                                ? 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700'
                                 : unit.status === 'returned' || unit.is_returned
                                 ? 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700'
                                 : 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50'
                             }`}
                           >
-                            {unit.status === 'fixed'
+                            {unit.is_reacquired
+                              ? 'Restocked in Shop'
+                              : unit.status === 'fixed'
                               ? 'Fixed'
+                              : unit.status === 'returned_to_vendor'
+                              ? 'Returned to Vendor'
                               : unit.status === 'returned' || unit.is_returned
                               ? 'Returned to Shop'
                               : 'With Vendor'}
@@ -1083,15 +1105,23 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
                     </div>
                     <span
                       className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold shrink-0 ${
-                        unit.status === 'fixed'
+                        unit.is_reacquired
+                          ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50'
+                          : unit.status === 'fixed'
                           ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 border border-blue-200/50'
+                          : unit.status === 'returned_to_vendor'
+                          ? 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700'
                           : unit.status === 'returned' || unit.is_returned
                           ? 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700'
                           : 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50'
                       }`}
                     >
-                      {unit.status === 'fixed'
+                      {unit.is_reacquired
+                        ? 'Restocked in Shop'
+                        : unit.status === 'fixed'
                         ? 'Fixed'
+                        : unit.status === 'returned_to_vendor'
+                        ? 'Returned to Vendor'
                         : unit.status === 'returned' || unit.is_returned
                         ? 'Returned to Shop'
                         : 'With Vendor'}

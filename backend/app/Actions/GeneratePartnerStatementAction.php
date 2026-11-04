@@ -100,6 +100,18 @@ class GeneratePartnerStatementAction
             ->get()
             ->keyBy('id');
 
+        // Preload any inventory units funded by debtor offset from this contact
+        $offsetUnits = InventoryUnit::where(function ($q) use ($contact) {
+            $q->where('receivable_contact_id', $contact->id)
+                ->orWhere('supplier_contact_id', $contact->id);
+        })
+            ->where(function ($q) {
+                $q->where('funding_source', 'debtor_offset')
+                    ->orWhere('receivable_offset_amount', '>', 0);
+            })
+            ->with(['variant.product'])
+            ->get();
+
         $debtIds = $debts->pluck('id')->all();
         $debtRefs = array_merge(
             array_map(fn ($id) => "DEBT-{$id}", $debtIds),
@@ -645,16 +657,57 @@ class GeneratePartnerStatementAction
                         'reference_number' => 'RECEIVE-FROM-VENDOR',
                     ];
                 } elseif ($payment->reference_number === 'OFFSET-INTAKE') {
+                    $context = null;
+                    $rawNote = trim($payment->notes ?? '');
+
+                    // 1. If note already has explicit device details
+                    if (! empty($rawNote) && $rawNote !== 'Agreed credit balance settlement') {
+                        $cleanNote = preg_replace('/^(?:Paid\s+by\s+device:\s*|Device\s+received\s+as\s+settlement:\s*)/i', '', $rawNote);
+                        $context = $this->sanitizeContext($cleanNote);
+                    }
+
+                    // 2. Resolve matching inventory unit for legacy generic notes
+                    if (! $context && $offsetUnits->isNotEmpty()) {
+                        $payDateObj = Carbon::parse($payment->payment_date ?? $payment->created_at);
+                        $matchedUnit = $offsetUnits->first(function ($u) use ($payment, $payDateObj) {
+                            $unitDate = Carbon::parse($u->created_at);
+                            $amountMatches = abs((float) $u->receivable_offset_amount - (float) $payment->amount) < 0.01
+                                || abs((float) $u->cost_basis - (float) $payment->amount) < 0.01;
+
+                            return $amountMatches && abs($unitDate->diffInHours($payDateObj)) <= 48;
+                        });
+
+                        if (! $matchedUnit) {
+                            $candidates = $offsetUnits->filter(function ($u) use ($payment) {
+                                return abs((float) $u->receivable_offset_amount - (float) $payment->amount) < 0.01
+                                    || abs((float) $u->cost_basis - (float) $payment->amount) < 0.01;
+                            });
+                            if ($candidates->count() === 1) {
+                                $matchedUnit = $candidates->first();
+                            }
+                        }
+
+                        if ($matchedUnit) {
+                            $pName = $matchedUnit->variant?->product?->name ?? 'Device';
+                            $sn = $matchedUnit->imei_or_serial ? " (SN: {$matchedUnit->imei_or_serial})" : '';
+                            $context = "{$pName}{$sn}";
+                        }
+                    }
+
+                    if (! $context) {
+                        $context = 'Agreed credit balance settlement';
+                    }
+
                     $rawEntries[] = [
                         'id' => "pay-{$payment->id}",
                         'date' => $payDate,
-                        'type' => 'debt_offset',
-                        'type_label' => 'Agreed Settlement',
-                        'context' => 'Agreed credit balance settlement',
+                        'type' => 'paid_by_device',
+                        'type_label' => 'Paid by Device',
+                        'context' => $context,
                         'payable' => $debt->type === 'payable' ? -(float) $payment->amount : 0.0,
                         'receivable' => $debt->type === 'receivable' ? -(float) $payment->amount : 0.0,
                         'balance_effect' => $debt->type === 'payable' ? (float) $payment->amount : -(float) $payment->amount,
-                        'reference_number' => 'OFFSET-SETTLEMENT',
+                        'reference_number' => 'PAID-BY-DEVICE',
                     ];
                 } elseif ($payment->reference_number === 'DEVICE-OFFSET' || str_contains(strtolower($payment->notes ?? ''), 'device') || str_contains(strtolower($payment->notes ?? ''), 'handover') || str_contains($payment->notes ?? '', 'Paid by device')) {
                     $rawEntries[] = [
@@ -1129,7 +1182,10 @@ class GeneratePartnerStatementAction
         $currentNetBalance = $currentOpenReceivable - $currentOpenPayable;
 
         // Inventory Breakdown for Tabs
-        $suppliedUnits = InventoryUnit::where('supplier_contact_id', $contact->id)
+        $suppliedUnits = InventoryUnit::where(function ($q) use ($contact) {
+            $q->where('supplier_contact_id', $contact->id)
+                ->orWhere('receivable_contact_id', $contact->id);
+        })
             ->where(function ($q) {
                 $q->whereNull('notes')
                     ->orWhere('notes', 'not ilike', '%exclude_statement%');
@@ -1147,7 +1203,8 @@ class GeneratePartnerStatementAction
                     'location' => $u->location,
                     'cost_basis' => (float) $u->cost_basis,
                     'selling_price' => (float) $u->selling_price,
-                    'source_type' => $u->source_type,
+                    'source_type' => $u->funding_source === 'debtor_offset' ? 'paid_by_device' : $u->source_type,
+                    'funding_source' => $u->funding_source,
                     'created_at' => $u->created_at->toIso8601String(),
                     'sold_at' => $u->sold_at?->toIso8601String(),
                     'order_number' => null,
@@ -1193,7 +1250,7 @@ class GeneratePartnerStatementAction
             });
 
         // Units with vendor for repair/warranty or returned by partner
-        $vendorReturnUnits = InventoryUnit::where(function ($q) use ($contact, $handoverUnitIds) {
+        $vendorReturnUnitsRaw = InventoryUnit::where(function ($q) use ($contact, $handoverUnitIds) {
             $q->where(function ($sub) use ($contact) {
                 $sub->where('supplier_contact_id', $contact->id)
                     ->where(function ($s) {
@@ -1221,22 +1278,34 @@ class GeneratePartnerStatementAction
                     ->orWhere('notes', 'not ilike', '%exclude_statement%');
             })
             ->with(['variant.product', 'maintenanceRecords'])
-            ->get()
-            ->map(function ($u) {
-                $isReturned = in_array($u->status, ['returned', 'returned_to_vendor'], true) || ! empty($u->returned_at);
+            ->get();
 
-                return [
-                    'id' => $u->id,
-                    'model' => $u->variant?->product?->name ?? 'Device',
-                    'specs' => array_filter([$u->variant?->storage, $u->variant?->color]),
-                    'imei_or_serial' => $u->imei_or_serial,
-                    'status' => $u->is_repaired ? 'fixed' : $u->status,
-                    'is_returned' => $isReturned,
-                    'return_reason' => $u->return_reason,
-                    'returned_at' => $u->returned_at?->toIso8601String(),
-                    'maintenance_cost' => (float) $u->maintenanceRecords->sum('cost'),
-                ];
-            });
+        $returnedImeis = $vendorReturnUnitsRaw->pluck('imei_or_serial')->filter()->unique()->values();
+        $reacquiredUnits = $returnedImeis->isNotEmpty()
+            ? InventoryUnit::whereIn('imei_or_serial', $returnedImeis)
+                ->whereIn('status', ['in_stock', 'sold'])
+                ->get()
+                ->keyBy('imei_or_serial')
+            : collect();
+
+        $vendorReturnUnits = $vendorReturnUnitsRaw->map(function ($u) use ($reacquiredUnits) {
+            $isReturned = in_array($u->status, ['returned', 'returned_to_vendor'], true) || ! empty($u->returned_at);
+            $isReacquired = ! empty($u->imei_or_serial) && $reacquiredUnits->has($u->imei_or_serial) && $reacquiredUnits->get($u->imei_or_serial)->id !== $u->id;
+
+            return [
+                'id' => $u->id,
+                'model' => $u->variant?->product?->name ?? 'Device',
+                'specs' => array_filter([$u->variant?->storage, $u->variant?->color]),
+                'imei_or_serial' => $u->imei_or_serial,
+                'status' => $u->is_repaired ? 'fixed' : $u->status,
+                'is_returned' => $isReturned,
+                'is_reacquired' => $isReacquired,
+                'reacquired_status' => $isReacquired ? $reacquiredUnits->get($u->imei_or_serial)->status : null,
+                'return_reason' => $u->return_reason,
+                'returned_at' => $u->returned_at?->toIso8601String(),
+                'maintenance_cost' => (float) $u->maintenanceRecords->sum('cost'),
+            ];
+        });
 
         return [
             'contact' => [

@@ -580,7 +580,7 @@ class InventoryController extends Controller
                     ], $preparedBankSplits) : null,
                     'receivable_contact_id' => $receivableContactId,
                     'receivable_offset_amount' => $unitOffset,
-                    'supplier_contact_id' => $validated['supplier_contact_id'] ?? null,
+                    'supplier_contact_id' => $validated['supplier_contact_id'] ?? (! empty($receivableContactId) ? $receivableContactId : null),
                     'return_deadline' => $validated['return_deadline'] ?? null,
                     'location' => $item['location'] ?? 'Shop Counter',
                     'notes' => $item['notes'] ?? null,
@@ -636,7 +636,7 @@ class InventoryController extends Controller
                         'amount' => $applied,
                         'payment_date' => now(),
                         'reference_number' => 'OFFSET-INTAKE',
-                        'notes' => 'Agreed credit balance settlement',
+                        'notes' => $deviceSummary ? "Paid by device: {$deviceSummary}" : 'Agreed credit balance settlement',
                         'created_by' => $user->id,
                     ]);
 

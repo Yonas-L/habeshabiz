@@ -352,7 +352,7 @@ export const PublicStatementView: React.FC<PublicStatementViewProps> = ({ token 
                             className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${
                               row.type === 'consignment_sale' || row.type === 'brokered_sourcing' || row.type === 'manual_payable'
                                 ? 'bg-amber-50 text-amber-800 border border-amber-200/60'
-                                : row.type === 'device_offset' || row.type === 'bilateral_offset'
+                                : row.type === 'paid_by_device' || row.type === 'device_offset' || row.type === 'bilateral_offset'
                                 ? 'bg-emerald-50 text-emerald-800 border border-emerald-200/60'
                                 : row.type === 'payment_sent'
                                 ? 'bg-blue-50 text-blue-800 border border-blue-200/60'

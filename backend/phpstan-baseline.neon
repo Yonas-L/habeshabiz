@@ -129,7 +129,7 @@ parameters:
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$product\.$#'
 			identifier: property.notFound
-			count: 24
+			count: 25
 			path: app/Actions/GeneratePartnerStatementAction.php
 
 		-
@@ -183,7 +183,7 @@ parameters:
 		-
 			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
 			identifier: nullsafe.neverNull
-			count: 28
+			count: 29
 			path: app/Actions/GeneratePartnerStatementAction.php
 
 		-

@@ -200,6 +200,7 @@ export interface StatementSuppliedUnit {
   cost_basis: number;
   selling_price: number;
   source_type: string;
+  funding_source?: string | null;
   created_at: string;
   sold_at: string | null;
   order_number: string | null;
@@ -226,6 +227,8 @@ export interface StatementVendorReturnUnit {
   imei_or_serial: string | null;
   status: string;
   is_returned?: boolean;
+  is_reacquired?: boolean;
+  reacquired_status?: string | null;
   return_reason: string | null;
   returned_at: string | null;
   maintenance_cost: number;
