@@ -25,15 +25,12 @@ import { StockIntakeModal } from '../components/inventory/StockIntakeModal';
 import { MobileOverview } from '../components/dashboard/MobileOverview';
 import {
   ChevronRight,
-  Plus,
   ArrowUp,
   ArrowDown,
-  Zap,
   Receipt,
-  Handshake,
   PackagePlus,
-  FileText,
-  ArrowRight,
+  ArrowDownLeft,
+  ArrowUpRight,
   Loader2,
 } from 'lucide-react';
 import { useBalancePrivacy } from '../context/BalancePrivacyContext';
@@ -629,10 +626,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           </div>
         </div>
 
-        {/* 3. Operational Row: Combined Receivables & Payables (7 cols) + Quick Actions Widget (5 cols) */}
+        {/* 3. Operational Row: Combined Receivables & Payables (8-9 cols, uncrowded) + Minimal Quick Actions (3-4 cols, zero slop) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 2xl:gap-6 animate-stagger-4">
-          {/* Card A: Combined Receivables & Payables (with thin central divider, each independently scrollable) */}
-          <div className="lg:col-span-7 bg-white dark:bg-[#131926] rounded-2xl shadow-xs h-[285px] 2xl:h-[340px] overflow-hidden flex flex-col">
+          {/* Card A: Combined Receivables & Payables (widened, spacious rows, uncrowded headers with thin divider) */}
+          <div className="lg:col-span-8 2xl:col-span-9 bg-white dark:bg-[#131926] rounded-2xl shadow-xs h-[285px] 2xl:h-[340px] overflow-hidden flex flex-col">
             <div className="grid grid-cols-2 divide-x divide-slate-100 dark:divide-slate-800/80 h-full">
               {/* Left Column: Receivables */}
               <div className="flex flex-col h-full p-4 sm:p-5 2xl:p-6 min-w-0 overflow-hidden">
@@ -640,26 +637,12 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   <span className="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 truncate">
                     Receivables
                   </span>
-                  <div className="flex items-center gap-1.5 shrink-0 text-xs">
-                    <button
-                      onClick={() => {
-                        setDebtModalDefaultType('receivable');
-                        setIsDebtModalOpen(true);
-                      }}
-                      title="Record new customer credit or receivable"
-                      className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 transition-colors flex items-center gap-0.5 cursor-pointer py-0.5 px-1.5 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
-                    >
-                      <Plus className="w-3.5 h-3.5 stroke-[2.2]" />
-                      <span>Record</span>
-                    </button>
-                    <span className="text-slate-300 dark:text-slate-700">·</span>
-                    <button
-                      onClick={() => onNavigateTab('debts', false, { debtType: 'receivable' })}
-                      className="text-xs font-medium text-slate-400 dark:text-slate-500 hover:text-emerald-600 transition-colors cursor-pointer py-0.5 px-1 rounded-lg"
-                    >
-                      View all · {counts.open_receivables} →
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => onNavigateTab('debts', false, { debtType: 'receivable' })}
+                    className="text-xs font-medium text-slate-400 dark:text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors cursor-pointer py-0.5 px-1 rounded-lg shrink-0"
+                  >
+                    View all · {counts.open_receivables} →
+                  </button>
                 </div>
 
                 {groupedReceivables.length === 0 ? (
@@ -667,15 +650,15 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                     No outstanding receivables
                   </div>
                 ) : (
-                  <div className="flex-1 overflow-y-auto space-y-1 pr-1 min-h-0">
+                  <div className="flex-1 overflow-y-auto space-y-1.5 pr-1.5 min-h-0">
                     {groupedReceivables.map((group) => (
                       <button
                         key={group.contactId}
                         onClick={() => openVital('receivables', group.contactId)}
-                        className="w-full flex items-center justify-between py-1.5 px-2 rounded-xl text-xs hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-all group text-left cursor-pointer"
+                        className="w-full flex items-center justify-between py-2 px-2.5 rounded-xl text-xs hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-all group text-left cursor-pointer"
                       >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className={`w-7 h-7 rounded-lg font-bold flex items-center justify-center text-[10px] uppercase shrink-0 border ${
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className={`w-8 h-8 rounded-lg font-bold flex items-center justify-center text-[10.5px] uppercase shrink-0 border ${
                             group.hasHandover
                               ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border-amber-200/60 dark:border-amber-800/50'
                               : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-200/60 dark:border-emerald-800/50'
@@ -693,14 +676,14 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                                 </span>
                               )}
                             </div>
-                            <div className="text-[10.5px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
+                            <div className="text-[11px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
                               {group.openCount} {group.openCount === 1 ? 'obligation' : 'obligations'}
                               {group.offsetAmount > 0.01 && ` · Offset −${isBalancesHidden ? '******' : group.offsetAmount.toLocaleString()} ETB`}
                             </div>
                           </div>
                         </div>
                         <div className="flex items-center gap-1 shrink-0 pl-1">
-                          <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono tracking-tight text-xs">
+                          <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono tracking-tight text-xs 2xl:text-sm">
                             {isBalancesHidden ? '+******' : `+${group.netRemaining.toLocaleString()}`}
                           </span>
                           <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0" />
@@ -717,26 +700,12 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   <span className="text-xs font-semibold uppercase tracking-wider text-rose-600 dark:text-rose-400 truncate">
                     Payables
                   </span>
-                  <div className="flex items-center gap-1.5 shrink-0 text-xs">
-                    <button
-                      onClick={() => {
-                        setDebtModalDefaultType('payable');
-                        setIsDebtModalOpen(true);
-                      }}
-                      title="Record new vendor payable or debt"
-                      className="text-xs font-semibold text-rose-600 dark:text-rose-400 hover:text-rose-700 transition-colors flex items-center gap-0.5 cursor-pointer py-0.5 px-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40"
-                    >
-                      <Plus className="w-3.5 h-3.5 stroke-[2.2]" />
-                      <span>Record</span>
-                    </button>
-                    <span className="text-slate-300 dark:text-slate-700">·</span>
-                    <button
-                      onClick={() => onNavigateTab('debts', false, { debtType: 'payable' })}
-                      className="text-xs font-medium text-slate-400 dark:text-slate-500 hover:text-rose-600 transition-colors cursor-pointer py-0.5 px-1 rounded-lg"
-                    >
-                      View all · {counts.open_payables} →
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => onNavigateTab('debts', false, { debtType: 'payable' })}
+                    className="text-xs font-medium text-slate-400 dark:text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 transition-colors cursor-pointer py-0.5 px-1 rounded-lg shrink-0"
+                  >
+                    View all · {counts.open_payables} →
+                  </button>
                 </div>
 
                 {groupedPayables.length === 0 ? (
@@ -744,15 +713,15 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                     No outstanding payables
                   </div>
                 ) : (
-                  <div className="flex-1 overflow-y-auto space-y-1 pr-1 min-h-0">
+                  <div className="flex-1 overflow-y-auto space-y-1.5 pr-1.5 min-h-0">
                     {groupedPayables.map((group) => (
                       <button
                         key={group.contactId}
                         onClick={() => openVital('payables', group.contactId)}
-                        className="w-full flex items-center justify-between py-1.5 px-2 rounded-xl text-xs hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-all group text-left cursor-pointer"
+                        className="w-full flex items-center justify-between py-2 px-2.5 rounded-xl text-xs hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-all group text-left cursor-pointer"
                       >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="w-7 h-7 rounded-lg bg-rose-500/10 text-rose-700 dark:text-rose-400 font-bold flex items-center justify-center text-[10px] uppercase shrink-0 border border-rose-200/60 dark:border-rose-800/50">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-700 dark:text-rose-400 font-bold flex items-center justify-center text-[10.5px] uppercase shrink-0 border border-rose-200/60 dark:border-rose-800/50">
                             {group.name.slice(0, 2).toUpperCase()}
                           </div>
                           <div className="truncate">
@@ -766,14 +735,14 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                                 </span>
                               )}
                             </div>
-                            <div className="text-[10.5px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
+                            <div className="text-[11px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
                               {group.openCount} {group.openCount === 1 ? 'obligation' : 'obligations'}
                               {group.offsetAmount > 0.01 && ` · Offset −${isBalancesHidden ? '******' : group.offsetAmount.toLocaleString()} ETB`}
                             </div>
                           </div>
                         </div>
                         <div className="flex items-center gap-1 shrink-0 pl-1">
-                          <span className="font-bold text-rose-600 dark:text-rose-400 font-mono tracking-tight text-xs">
+                          <span className="font-bold text-rose-600 dark:text-rose-400 font-mono tracking-tight text-xs 2xl:text-sm">
                             {isBalancesHidden ? '−******' : `−${group.netRemaining.toLocaleString()}`}
                           </span>
                           <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0" />
@@ -786,82 +755,96 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             </div>
           </div>
 
-          {/* Card B: Quick Actions Widget (5 cols, exact height match, modal openers) */}
-          <div className="hidden lg:flex lg:col-span-5 bg-white dark:bg-[#131926] rounded-2xl p-4 sm:p-5 2xl:p-6 shadow-xs flex-col justify-between h-[285px] 2xl:h-[340px] overflow-hidden">
-            <div>
-              {/* Header */}
-              <div className="flex items-center gap-2 mb-2.5 pb-2 border-b border-slate-100 dark:border-slate-800/80 shrink-0">
-                <Zap className="w-4 h-4 text-slate-800 dark:text-slate-200 stroke-[2.2]" />
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white tracking-tight">
-                  Quick Actions
-                </h3>
-              </div>
-
-              {/* Action Buttons List */}
-              <div className="space-y-2 2xl:space-y-2.5">
-                {/* 1. Record Expense */}
-                <button
-                  type="button"
-                  onClick={() => setIsExpenseModalOpen(true)}
-                  className="w-full flex items-center justify-center gap-2.5 py-2 sm:py-2.5 px-4 rounded-xl bg-slate-50/90 dark:bg-slate-800/50 hover:bg-slate-100/90 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-100/90 dark:border-slate-800/80 hover:border-slate-200 dark:hover:border-slate-700 shadow-2xs font-semibold text-xs 2xl:text-sm transition-all cursor-pointer group"
-                >
-                  <Receipt className="w-4 h-4 text-slate-600 dark:text-slate-400 group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors" />
-                  <span>Record Expense</span>
-                </button>
-
-                {/* 2. Record Debt */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDebtModalDefaultType('receivable');
-                    setIsDebtModalOpen(true);
-                  }}
-                  className="w-full flex items-center justify-center gap-2.5 py-2 sm:py-2.5 px-4 rounded-xl bg-slate-50/90 dark:bg-slate-800/50 hover:bg-slate-100/90 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-100/90 dark:border-slate-800/80 hover:border-slate-200 dark:hover:border-slate-700 shadow-2xs font-semibold text-xs 2xl:text-sm transition-all cursor-pointer group"
-                >
-                  <Handshake className="w-4 h-4 text-slate-600 dark:text-slate-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors" />
-                  <span>Record Debt</span>
-                </button>
-
-                {/* 3. Add Stock */}
-                <button
-                  type="button"
-                  onClick={handleOpenStockIntake}
-                  disabled={isLoadingStockMeta}
-                  className="w-full flex items-center justify-center gap-2.5 py-2 sm:py-2.5 px-4 rounded-xl bg-slate-50/90 dark:bg-slate-800/50 hover:bg-slate-100/90 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-100/90 dark:border-slate-800/80 hover:border-slate-200 dark:hover:border-slate-700 shadow-2xs font-semibold text-xs 2xl:text-sm transition-all cursor-pointer group disabled:opacity-70"
-                >
-                  {isLoadingStockMeta ? (
-                    <Loader2 className="w-4 h-4 animate-spin text-blue-600 dark:text-blue-400" />
-                  ) : (
-                    <PackagePlus className="w-4 h-4 text-slate-600 dark:text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
-                  )}
-                  <span>{isLoadingStockMeta ? 'Loading...' : 'Add Stock'}</span>
-                </button>
-              </div>
+          {/* Card B: Quick Actions Widget (minimal width, zero AI slop, modal openers) */}
+          <div className="hidden lg:flex lg:col-span-4 2xl:col-span-3 bg-white dark:bg-[#131926] rounded-2xl p-4 sm:p-5 2xl:p-6 shadow-xs flex-col justify-between h-[285px] 2xl:h-[340px] overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100 dark:border-slate-800/80 shrink-0">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Quick Actions
+              </span>
             </div>
 
-            {/* Bottom Insight Banner (Matches User Reference Image Pixel-for-Pixel) */}
-            <button
-              type="button"
-              onClick={() => onNavigateTab('reports')}
-              className="mt-2 text-left w-full bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-100/90 dark:border-emerald-900/40 rounded-xl p-2.5 2xl:p-3 flex items-center justify-between gap-3 group hover:border-emerald-300 dark:hover:border-emerald-700 transition-all cursor-pointer"
-            >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-9 h-9 2xl:w-10 2xl:h-10 rounded-lg bg-white dark:bg-[#131926] shadow-2xs border border-emerald-200/60 dark:border-emerald-800/50 flex items-center justify-center shrink-0">
-                  <FileText className="w-4.5 h-4.5 text-emerald-600 dark:text-emerald-400 stroke-[1.8]" />
-                </div>
-                <div className="min-w-0">
-                  <div className="text-xs 2xl:text-[13px] font-bold text-slate-900 dark:text-white leading-tight truncate">
-                    Keep your business on track
+            {/* Action Buttons List: 4 clean, minimal, functional buttons that open in-page modals */}
+            <div className="flex-1 flex flex-col justify-between gap-2 2xl:gap-2.5 py-0.5 min-h-0">
+              {/* 1. Record Expense */}
+              <button
+                type="button"
+                onClick={() => setIsExpenseModalOpen(true)}
+                className="w-full flex items-center justify-between px-3 py-2 2xl:py-2.5 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 hover:bg-slate-100/90 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-100 dark:border-slate-800 hover:border-slate-200 dark:hover:border-slate-700 transition-all cursor-pointer group text-left"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-7 h-7 2xl:w-8 2xl:h-8 rounded-lg bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0 border border-rose-100/80 dark:border-rose-900/50 group-hover:scale-105 transition-transform">
+                    <Receipt className="w-3.5 h-3.5 2xl:w-4 2xl:h-4 stroke-[2]" />
                   </div>
-                  <div className="text-[10px] 2xl:text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                    Get detailed insights and grow smarter.
-                  </div>
+                  <span className="text-xs 2xl:text-[13px] font-semibold text-slate-900 dark:text-white truncate">
+                    Record Expense
+                  </span>
                 </div>
-              </div>
-              <div className="w-7 h-7 rounded-full bg-emerald-200/70 dark:bg-emerald-900/60 text-emerald-900 dark:text-emerald-200 flex items-center justify-center shrink-0 group-hover:bg-emerald-300 dark:group-hover:bg-emerald-800 transition-colors">
-                <ArrowRight className="w-3.5 h-3.5 stroke-[2.2]" />
-              </div>
-            </button>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0" />
+              </button>
+
+              {/* 2. Record Receivable */}
+              <button
+                type="button"
+                onClick={() => {
+                  setDebtModalDefaultType('receivable');
+                  setIsDebtModalOpen(true);
+                }}
+                className="w-full flex items-center justify-between px-3 py-2 2xl:py-2.5 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 hover:bg-slate-100/90 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-100 dark:border-slate-800 hover:border-slate-200 dark:hover:border-slate-700 transition-all cursor-pointer group text-left"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-7 h-7 2xl:w-8 2xl:h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-100/80 dark:border-emerald-900/50 group-hover:scale-105 transition-transform">
+                    <ArrowDownLeft className="w-3.5 h-3.5 2xl:w-4 2xl:h-4 stroke-[2]" />
+                  </div>
+                  <span className="text-xs 2xl:text-[13px] font-semibold text-slate-900 dark:text-white truncate">
+                    Record Receivable
+                  </span>
+                </div>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0" />
+              </button>
+
+              {/* 3. Record Payable */}
+              <button
+                type="button"
+                onClick={() => {
+                  setDebtModalDefaultType('payable');
+                  setIsDebtModalOpen(true);
+                }}
+                className="w-full flex items-center justify-between px-3 py-2 2xl:py-2.5 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 hover:bg-slate-100/90 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-100 dark:border-slate-800 hover:border-slate-200 dark:hover:border-slate-700 transition-all cursor-pointer group text-left"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-7 h-7 2xl:w-8 2xl:h-8 rounded-lg bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0 border border-rose-100/80 dark:border-rose-900/50 group-hover:scale-105 transition-transform">
+                    <ArrowUpRight className="w-3.5 h-3.5 2xl:w-4 2xl:h-4 stroke-[2]" />
+                  </div>
+                  <span className="text-xs 2xl:text-[13px] font-semibold text-slate-900 dark:text-white truncate">
+                    Record Payable
+                  </span>
+                </div>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0" />
+              </button>
+
+              {/* 4. Add Stock */}
+              <button
+                type="button"
+                onClick={handleOpenStockIntake}
+                disabled={isLoadingStockMeta}
+                className="w-full flex items-center justify-between px-3 py-2 2xl:py-2.5 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 hover:bg-slate-100/90 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-100 dark:border-slate-800 hover:border-slate-200 dark:hover:border-slate-700 transition-all cursor-pointer group text-left disabled:opacity-70"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-7 h-7 2xl:w-8 2xl:h-8 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-100/80 dark:border-blue-900/50 group-hover:scale-105 transition-transform">
+                    {isLoadingStockMeta ? (
+                      <Loader2 className="w-3.5 h-3.5 2xl:w-4 2xl:h-4 animate-spin text-blue-600 dark:text-blue-400" />
+                    ) : (
+                      <PackagePlus className="w-3.5 h-3.5 2xl:w-4 2xl:h-4 stroke-[2]" />
+                    )}
+                  </div>
+                  <span className="text-xs 2xl:text-[13px] font-semibold text-slate-900 dark:text-white truncate">
+                    {isLoadingStockMeta ? 'Loading Stock...' : 'Add Stock'}
+                  </span>
+                </div>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
