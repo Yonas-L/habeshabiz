@@ -27,9 +27,11 @@ import {
   ChevronRight,
   ArrowUp,
   ArrowDown,
+  Zap,
   Receipt,
   Handshake,
   PackagePlus,
+  ArrowUpRight,
   Loader2,
 } from 'lucide-react';
 import { useBalancePrivacy } from '../context/BalancePrivacyContext';
@@ -754,32 +756,51 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             </div>
           </div>
 
-          {/* Card B: Quick Actions Widget (minimal width, zero AI slop, modal openers) */}
-          <div className="hidden lg:flex lg:col-span-4 2xl:col-span-3 bg-white dark:bg-[#131926] rounded-2xl p-4 sm:p-5 2xl:p-6 shadow-xs flex-col justify-between h-[285px] 2xl:h-[340px] overflow-hidden">
-            {/* Header */}
-            <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100 dark:border-slate-800/80 shrink-0">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Quick Actions
+          {/* Card B: Quick Actions Widget (minimal width, attention-grabbing, tactile action cards) */}
+          <div className="hidden lg:flex lg:col-span-4 2xl:col-span-3 bg-white dark:bg-[#131926] rounded-2xl p-3.5 sm:p-4 2xl:p-5 shadow-xs flex-col justify-between h-[285px] 2xl:h-[340px] border border-slate-100 dark:border-slate-800/80 relative overflow-hidden">
+            {/* Top Shimmer Accent Hairline */}
+            <div className="absolute top-0 inset-x-8 h-[2px] bg-gradient-to-r from-emerald-500 via-teal-400 to-indigo-500 opacity-90 rounded-full" />
+
+            {/* Header with Live Pulse */}
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800/80 shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 2xl:w-6 2xl:h-6 rounded-md bg-gradient-to-br from-amber-400 to-orange-500 text-white flex items-center justify-center shadow-xs shadow-amber-500/20">
+                  <Zap className="w-3 h-3 2xl:w-3.5 2xl:h-3.5 fill-current stroke-[1.5]" />
+                </div>
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+                  Quick Actions
+                </span>
+              </div>
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Instant
               </span>
             </div>
 
-            {/* Action Buttons List: 3 minimal, functional buttons that open in-page modals */}
-            <div className="flex-1 flex flex-col justify-between py-1 2xl:py-2 min-h-0">
+            {/* Action Buttons List: 3 attention-grabbing, tactile action cards */}
+            <div className="flex-1 flex flex-col justify-between py-1 2xl:py-1.5 gap-2 min-h-0">
               {/* 1. Record Expense */}
               <button
                 type="button"
                 onClick={() => setIsExpenseModalOpen(true)}
-                className="w-full flex items-center justify-between px-3.5 py-2.5 2xl:py-3.5 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 hover:bg-slate-100/90 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-100 dark:border-slate-800 hover:border-slate-200 dark:hover:border-slate-700 transition-all cursor-pointer group text-left"
+                className="w-full flex items-center justify-between p-2 2xl:p-2.5 rounded-xl border border-slate-100 dark:border-slate-800/80 bg-gradient-to-r from-rose-50/40 via-white to-white dark:from-rose-950/20 dark:via-slate-800/40 dark:to-slate-800/40 hover:from-rose-50 hover:to-white dark:hover:from-rose-950/40 dark:hover:to-slate-800/70 hover:border-rose-300 dark:hover:border-rose-700/60 hover:shadow-2xs transition-all duration-200 cursor-pointer group text-left"
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-8 h-8 2xl:w-9 2xl:h-9 rounded-lg bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0 border border-rose-100/80 dark:border-rose-900/50 group-hover:scale-105 transition-transform">
-                    <Receipt className="w-4 h-4 stroke-[2]" />
+                <div className="flex items-center gap-2.5 2xl:gap-3 min-w-0 flex-1">
+                  <div className="w-9 h-9 2xl:w-10 2xl:h-10 rounded-xl bg-gradient-to-br from-rose-500 to-red-600 text-white flex items-center justify-center shadow-xs shadow-rose-500/25 group-hover:scale-105 group-hover:shadow-rose-500/40 transition-all shrink-0">
+                    <Receipt className="w-4.5 h-4.5 stroke-[2]" />
                   </div>
-                  <span className="text-xs 2xl:text-sm font-semibold text-slate-900 dark:text-white truncate">
-                    Record Expense
-                  </span>
+                  <div className="min-w-0 flex-1">
+                    <span className="font-bold text-slate-900 dark:text-white text-xs 2xl:text-sm block truncate group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors">
+                      Record Expense
+                    </span>
+                    <span className="text-[10px] 2xl:text-[11px] text-slate-400 dark:text-slate-500 block truncate">
+                      Payouts, rent & costs
+                    </span>
+                  </div>
                 </div>
-                <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0" />
+                <div className="w-6 h-6 2xl:w-7 2xl:h-7 rounded-full bg-slate-100/90 dark:bg-slate-700/80 text-slate-400 group-hover:bg-rose-600 group-hover:border-rose-600 group-hover:text-white flex items-center justify-center transition-all shrink-0 group-hover:translate-x-0.5 ml-2">
+                  <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.2]" />
+                </div>
               </button>
 
               {/* 2. Record Debt */}
@@ -789,17 +810,24 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   setDebtModalDefaultType('receivable');
                   setIsDebtModalOpen(true);
                 }}
-                className="w-full flex items-center justify-between px-3.5 py-2.5 2xl:py-3.5 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 hover:bg-slate-100/90 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-100 dark:border-slate-800 hover:border-slate-200 dark:hover:border-slate-700 transition-all cursor-pointer group text-left"
+                className="w-full flex items-center justify-between p-2 2xl:p-2.5 rounded-xl border border-slate-100 dark:border-slate-800/80 bg-gradient-to-r from-emerald-50/40 via-white to-white dark:from-emerald-950/20 dark:via-slate-800/40 dark:to-slate-800/40 hover:from-emerald-50 hover:to-white dark:hover:from-emerald-950/40 dark:hover:to-slate-800/70 hover:border-emerald-300 dark:hover:border-emerald-700/60 hover:shadow-2xs transition-all duration-200 cursor-pointer group text-left"
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-8 h-8 2xl:w-9 2xl:h-9 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-100/80 dark:border-emerald-900/50 group-hover:scale-105 transition-transform">
-                    <Handshake className="w-4 h-4 stroke-[2]" />
+                <div className="flex items-center gap-2.5 2xl:gap-3 min-w-0 flex-1">
+                  <div className="w-9 h-9 2xl:w-10 2xl:h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-xs shadow-emerald-500/25 group-hover:scale-105 group-hover:shadow-emerald-500/40 transition-all shrink-0">
+                    <Handshake className="w-4.5 h-4.5 stroke-[2]" />
                   </div>
-                  <span className="text-xs 2xl:text-sm font-semibold text-slate-900 dark:text-white truncate">
-                    Record Debt
-                  </span>
+                  <div className="min-w-0 flex-1">
+                    <span className="font-bold text-slate-900 dark:text-white text-xs 2xl:text-sm block truncate group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                      Record Debt
+                    </span>
+                    <span className="text-[10px] 2xl:text-[11px] text-slate-400 dark:text-slate-500 block truncate">
+                      Customer credit & payables
+                    </span>
+                  </div>
                 </div>
-                <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0" />
+                <div className="w-6 h-6 2xl:w-7 2xl:h-7 rounded-full bg-slate-100/90 dark:bg-slate-700/80 text-slate-400 group-hover:bg-emerald-500 group-hover:border-emerald-500 group-hover:text-white flex items-center justify-center transition-all shrink-0 group-hover:translate-x-0.5 ml-2">
+                  <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.2]" />
+                </div>
               </button>
 
               {/* 3. Add Stock */}
@@ -807,21 +835,28 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 type="button"
                 onClick={handleOpenStockIntake}
                 disabled={isLoadingStockMeta}
-                className="w-full flex items-center justify-between px-3.5 py-2.5 2xl:py-3.5 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 hover:bg-slate-100/90 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-100 dark:border-slate-800 hover:border-slate-200 dark:hover:border-slate-700 transition-all cursor-pointer group text-left disabled:opacity-70"
+                className="w-full flex items-center justify-between p-2 2xl:p-2.5 rounded-xl border border-slate-100 dark:border-slate-800/80 bg-gradient-to-r from-blue-50/40 via-white to-white dark:from-blue-950/20 dark:via-slate-800/40 dark:to-slate-800/40 hover:from-blue-50 hover:to-white dark:hover:from-blue-950/40 dark:hover:to-slate-800/70 hover:border-blue-300 dark:hover:border-blue-700/60 hover:shadow-2xs transition-all duration-200 cursor-pointer group text-left disabled:opacity-60"
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-8 h-8 2xl:w-9 2xl:h-9 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-100/80 dark:border-blue-900/50 group-hover:scale-105 transition-transform">
+                <div className="flex items-center gap-2.5 2xl:gap-3 min-w-0 flex-1">
+                  <div className="w-9 h-9 2xl:w-10 2xl:h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-xs shadow-blue-500/25 group-hover:scale-105 group-hover:shadow-blue-500/40 transition-all shrink-0">
                     {isLoadingStockMeta ? (
-                      <Loader2 className="w-4 h-4 animate-spin text-blue-600 dark:text-blue-400" />
+                      <Loader2 className="w-4.5 h-4.5 animate-spin text-white" />
                     ) : (
-                      <PackagePlus className="w-4 h-4 stroke-[2]" />
+                      <PackagePlus className="w-4.5 h-4.5 stroke-[2]" />
                     )}
                   </div>
-                  <span className="text-xs 2xl:text-sm font-semibold text-slate-900 dark:text-white truncate">
-                    {isLoadingStockMeta ? 'Loading Stock...' : 'Add Stock'}
-                  </span>
+                  <div className="min-w-0 flex-1">
+                    <span className="font-bold text-slate-900 dark:text-white text-xs 2xl:text-sm block truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                      {isLoadingStockMeta ? 'Loading Stock...' : 'Add Stock'}
+                    </span>
+                    <span className="text-[10px] 2xl:text-[11px] text-slate-400 dark:text-slate-500 block truncate">
+                      Inventory intake & restock
+                    </span>
+                  </div>
                 </div>
-                <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0" />
+                <div className="w-6 h-6 2xl:w-7 2xl:h-7 rounded-full bg-slate-100/90 dark:bg-slate-700/80 text-slate-400 group-hover:bg-blue-600 group-hover:border-blue-600 group-hover:text-white flex items-center justify-center transition-all shrink-0 group-hover:translate-x-0.5 ml-2">
+                  <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.2]" />
+                </div>
               </button>
             </div>
           </div>
