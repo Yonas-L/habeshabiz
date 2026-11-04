@@ -1478,7 +1478,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
         ) : (
           <>
             <div
-              className="relative -mx-4 px-4 pt-0 pb-0 -mt-2 overflow-hidden select-none cursor-grab active:cursor-grabbing"
+              className="relative -mx-4 px-4 pt-1 pb-0 mt-2 overflow-hidden select-none cursor-grab active:cursor-grabbing"
               onTouchStart={(e) => handleGestureStart(e.targetTouches[0].clientX, e.targetTouches[0].clientY)}
               onTouchMove={(e) => handleGestureMove(e.targetTouches[0].clientX, e.targetTouches[0].clientY)}
               onTouchEnd={handleGestureEnd}
