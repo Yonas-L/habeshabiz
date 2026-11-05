@@ -395,6 +395,15 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           topSeller={topSeller}
           groupedReceivables={groupedReceivables}
           groupedPayables={groupedPayables}
+          salesRange={salesRange}
+          onRangeChange={handleRangeChange}
+          salesTrend={activeSalesTrend}
+          isLoadingRange={isLoadingRange}
+          rangeRevenue={activeRevenue}
+          rangeGrossProfit={activeGrossProfit}
+          rangeExpenses={activeExpenses}
+          rangeNetProfit={activeNetProfit}
+          rangeOwnerDraws={activeOwnerDraws}
         />
       </div>
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import type { DashboardData, User, FinancialAccount, Debt, LeaderboardItem } from '../../api/client';
+import type { DashboardData, User, FinancialAccount, Debt, LeaderboardItem, SalesTrend } from '../../api/client';
 import { AnimatedNumber } from '../AnimatedNumber';
 import type { VitalType } from '../drawers/VitalBreakdownDrawer';
 import { useBalancePrivacy } from '../../context/BalancePrivacyContext';
@@ -12,6 +12,8 @@ import {
   Sprout,
   Plus,
   ChevronRight,
+  ArrowDown,
+  ArrowUp,
 } from 'lucide-react';
 
 interface GroupedDebtContact {
@@ -39,6 +41,15 @@ interface MobileOverviewProps {
   topSeller: LeaderboardItem | null;
   groupedReceivables: GroupedDebtContact[];
   groupedPayables: GroupedDebtContact[];
+  salesRange?: '1M' | '3M' | '6M' | '1Y';
+  onRangeChange?: (range: '1M' | '3M' | '6M' | '1Y') => void;
+  salesTrend?: SalesTrend;
+  isLoadingRange?: boolean;
+  rangeRevenue?: number;
+  rangeGrossProfit?: number;
+  rangeExpenses?: number;
+  rangeNetProfit?: number;
+  rangeOwnerDraws?: number;
 }
 
 const HERO_CARD_PATH =
@@ -55,10 +66,26 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
   topSeller,
   groupedReceivables,
   groupedPayables,
+  salesRange,
+  onRangeChange,
+  salesTrend,
+  isLoadingRange,
+  rangeRevenue,
+  rangeGrossProfit,
+  rangeExpenses,
+  rangeNetProfit,
+  rangeOwnerDraws,
 }) => {
   const { isBalancesHidden } = useBalancePrivacy();
   const { capital_overview, monthly_performance, counts } = data;
   const canViewCost = user?.can_view_costs ?? false;
+
+  const effectiveRevenue = rangeRevenue ?? monthly_performance.revenue;
+  const effectiveGrossProfit = rangeGrossProfit ?? monthly_performance.gross_profit;
+  const effectiveExpenses = rangeExpenses ?? (monthly_performance.operating_expenses || 0);
+  const effectiveNetProfit = rangeNetProfit ?? monthly_performance.net_profit;
+  const effectiveOwnerDraws = rangeOwnerDraws ?? (monthly_performance.owner_draws || 0);
+  const effectiveTrend = salesTrend ?? data.sales_trend ?? monthly_performance.sales_trend;
 
   /* ─── Asset calculations for proportional bar ─── */
   const liquidVal = capital_overview.liquid_finance ?? capital_overview.cash_and_banks ?? 0;
@@ -329,28 +356,77 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
       </div>
 
       {/* ── 3. MONTHLY PERFORMANCE SECTION (Cardless, 4 Cards Span Full Space) ── */}
-      <div className="w-full space-y-2.5 select-none animate-stagger-3">
-        {/* Section Heading */}
+      <div className="w-full space-y-2 select-none animate-stagger-3">
+        {/* Row 1: Section Title + Range Filter Pills */}
         <div className="flex items-center justify-between px-0.5">
           <div className="leading-tight">
             <span className="text-[9px] font-bold tracking-wider uppercase text-slate-500 dark:text-slate-400 block">
-              {monthDisplayLabel}
+              {salesRange && salesRange !== '1M' ? `${salesRange} Overview` : monthDisplayLabel}
             </span>
             <h2 className="text-base min-[390px]:text-lg font-black text-slate-900 dark:text-white tracking-tight">
               Performance
             </h2>
           </div>
+
+          {/* Minimal Date Range Filter Pills (1M, 3M, 6M, 1Y) */}
+          {onRangeChange && (
+            <div className="inline-flex p-0.5 bg-slate-100/90 dark:bg-slate-800/90 rounded-xl text-[11px] font-medium shrink-0">
+              {(['1M', '3M', '6M', '1Y'] as const).map((r) => {
+                const isActive = (salesRange ?? '1M') === r;
+                return (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => onRangeChange(r)}
+                    className={`px-2 min-[390px]:px-2.5 py-1 rounded-lg transition-all cursor-pointer text-[11px] ${
+                      isActive
+                        ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 font-extrabold shadow-2xs border border-emerald-100/80 dark:border-emerald-900/30'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 font-semibold'
+                    }`}
+                  >
+                    {r}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Row 2: Trend Indicator (e.g. -85.3% vs last month) + Top Seller Chip */}
+        <div className="flex items-center justify-between px-0.5 text-xs min-h-[20px]">
+          {effectiveTrend ? (
+            <div className="flex items-center gap-1">
+              {effectiveTrend.is_up ? (
+                <span className="inline-flex items-center gap-0.5 text-emerald-600 dark:text-emerald-400 font-bold font-mono">
+                  <ArrowUp className="w-3.5 h-3.5 stroke-[2.2]" />
+                  <span>+{effectiveTrend.percentage}%</span>
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-0.5 text-rose-600 dark:text-rose-400 font-bold font-mono">
+                  <ArrowDown className="w-3.5 h-3.5 stroke-[2.2]" />
+                  <span>-{effectiveTrend.percentage}%</span>
+                </span>
+              )}
+              <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">
+                {effectiveTrend.comparison_label || (salesRange === '1M' ? 'vs last month' : `vs prior ${salesRange ?? '1M'}`)}
+              </span>
+              {isLoadingRange && (
+                <span className="text-[10px] text-slate-400 animate-pulse ml-1 font-sans">updating...</span>
+              )}
+            </div>
+          ) : <div />}
+
           {topSeller && user?.role === 'owner' && (
             <button
               type="button"
               onClick={() => onNavigateTab('staff')}
               title="View Staff & Team Dashboard"
-              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/80 shadow-2xs text-[11px] font-bold text-slate-800 dark:text-slate-200 active:scale-95 hover:scale-[1.03] cursor-pointer transition-all duration-150"
+              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/80 shadow-2xs text-[10.5px] font-bold text-slate-800 dark:text-slate-200 active:scale-95 hover:scale-[1.02] cursor-pointer transition-all duration-150"
             >
               <span>
                 Top: <span className="font-extrabold text-slate-900 dark:text-white">{topSeller.name}</span>
               </span>
-              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              <ChevronRight className="w-3 h-3 text-slate-400" />
             </button>
           )}
         </div>
@@ -435,7 +511,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
 
               <div className="mt-2 min-[390px]:mt-2.5">
                 <div className="text-base min-[390px]:text-[17px] font-black font-mono tracking-tight text-white flex items-baseline leading-none transition-opacity duration-200">
-                  {isBalancesHidden ? '******' : <AnimatedNumber value={monthly_performance.revenue} />}
+                  {isBalancesHidden ? '******' : <AnimatedNumber value={effectiveRevenue} />}
                   <span className="text-[9.5px] min-[390px]:text-[10px] font-semibold text-slate-300 ml-1 font-sans opacity-80">
                     ETB
                   </span>
@@ -515,14 +591,14 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
 
                 <div className="mt-2 min-[390px]:mt-2.5">
                   <div className={`text-base min-[390px]:text-[17px] font-black font-mono tracking-tight flex items-baseline leading-none transition-opacity duration-200 ${
-                    monthly_performance.gross_profit < 0 ? 'text-rose-600' : 'text-slate-900'
+                    effectiveGrossProfit < 0 ? 'text-rose-600' : 'text-slate-900'
                   }`}>
                     {isBalancesHidden ? (
                       '******'
                     ) : (
                       <>
-                        {monthly_performance.gross_profit > 0 ? '+' : monthly_performance.gross_profit < 0 ? '−' : ''}
-                        <AnimatedNumber value={Math.abs(monthly_performance.gross_profit)} />
+                        {effectiveGrossProfit > 0 ? '+' : effectiveGrossProfit < 0 ? '−' : ''}
+                        <AnimatedNumber value={Math.abs(effectiveGrossProfit)} />
                       </>
                     )}
                     <span className="text-[9.5px] min-[390px]:text-[10px] font-semibold text-slate-500 ml-1 font-sans">
@@ -616,8 +692,8 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                     '******'
                   ) : (
                     <>
-                      {(monthly_performance.operating_expenses || 0) > 0 ? '-' : ''}
-                      <AnimatedNumber value={monthly_performance.operating_expenses} />
+                      {effectiveExpenses > 0 ? '-' : ''}
+                      <AnimatedNumber value={effectiveExpenses} />
                     </>
                   )}
                   <span className="text-[9.5px] min-[390px]:text-[10px] font-semibold text-rose-500/80 ml-1 font-sans">
@@ -669,14 +745,14 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
 
               <div className="mt-2 min-[390px]:mt-2.5">
                 <div className={`text-base min-[390px]:text-[17px] font-black font-mono tracking-tight flex items-baseline leading-none transition-opacity duration-200 ${
-                  monthly_performance.net_profit < 0 ? 'text-rose-600' : 'text-slate-900'
+                  effectiveNetProfit < 0 ? 'text-rose-600' : 'text-slate-900'
                 }`}>
                   {isBalancesHidden ? (
                     '******'
                   ) : (
                     <>
-                      {monthly_performance.net_profit > 0 ? '+' : monthly_performance.net_profit < 0 ? '−' : ''}
-                      <AnimatedNumber value={Math.abs(monthly_performance.net_profit)} />
+                      {effectiveNetProfit > 0 ? '+' : effectiveNetProfit < 0 ? '−' : ''}
+                      <AnimatedNumber value={Math.abs(effectiveNetProfit)} />
                     </>
                   )}
                   <span className="text-[9.5px] min-[390px]:text-[10px] font-semibold text-slate-500 ml-1 font-sans">
@@ -692,7 +768,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
         </div>
 
         {/* Owner Draws (if present and user can view costs) */}
-        {canViewCost && (monthly_performance.owner_draws || 0) > 0 && (
+        {canViewCost && effectiveOwnerDraws > 0 && (
           <div className="rounded-2xl bg-white dark:bg-[#131926] p-3.5 border-0 shadow-xs flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-slate-400 dark:bg-slate-500" />
@@ -706,7 +782,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               </div>
             </div>
             <div className="text-base font-bold font-mono tracking-tight text-slate-900 dark:text-white">
-              −<AnimatedNumber value={Math.abs(monthly_performance.owner_draws)} />
+              −<AnimatedNumber value={Math.abs(effectiveOwnerDraws)} />
               <span className="text-[10px] font-medium text-slate-400 ml-1 font-sans">ETB</span>
             </div>
           </div>
