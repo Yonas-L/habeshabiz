@@ -6,8 +6,6 @@ import { useBalancePrivacy } from '../../context/BalancePrivacyContext';
 import {
   Package,
   Landmark,
-  ArrowDown,
-  ArrowUp,
   Coins,
   TrendingUp,
   MoreHorizontal,
@@ -266,9 +264,9 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
         </div>
       </div>
 
-      {/* ── 2. QUICK FINANCIAL METRICS & VITAL STATS ── */}
+      {/* ── 2. QUICK FINANCIAL METRICS & VITAL STATS (Stock, Bank, Other Assets) ── */}
       <div className="w-full rounded-[24px] sm:rounded-[28px] bg-white dark:bg-[#111C2D] border-0 shadow-xs p-2.5 min-[390px]:p-3.5 sm:p-4 select-none animate-stagger-2">
-        <div className="grid grid-cols-5 gap-1 min-[390px]:gap-2 sm:gap-3">
+        <div className="grid grid-cols-3 gap-2 min-[390px]:gap-3">
           {/* 1. Stock */}
           <button
             type="button"
@@ -309,47 +307,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
             </span>
           </button>
 
-          {/* 3. Receivables */}
-          <button
-            type="button"
-            onClick={() => openVital('receivables')}
-            className="flex flex-col items-center text-center group cursor-pointer haptic-press"
-            title={`Receivables: ${isBalancesHidden ? '******' : capital_overview.receivables.toLocaleString()} ETB`}
-          >
-            <div className="size-12 min-[390px]:size-[52px] rounded-[18px] min-[390px]:rounded-[20px] p-1 bg-slate-100/80 dark:bg-slate-800/50 border border-slate-200/60 dark:border-white/5 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 transition-all duration-200">
-              <div className="w-full h-full rounded-[14px] min-[390px]:rounded-[16px] bg-gradient-to-b from-[#eef9f2] to-[#ddf4e6] dark:from-[#0b2b1d] dark:to-[#071f15] flex items-center justify-center shadow-xs">
-                <ArrowDown className="w-6 h-6 min-[390px]:w-[26px] min-[390px]:h-[26px] text-[#065f46] dark:text-emerald-400 stroke-[2.4]" />
-              </div>
-            </div>
-            <span className="text-[11px] min-[390px]:text-xs font-semibold text-slate-800 dark:text-slate-200 mt-1.5 min-[390px]:mt-2 truncate max-w-full block">
-              Receivables
-            </span>
-            <span className="text-[10px] min-[390px]:text-[11.5px] font-semibold font-mono tracking-tight text-emerald-600 dark:text-emerald-400 mt-0.5 truncate max-w-full block transition-opacity duration-200">
-              {isBalancesHidden ? '******' : <AnimatedNumber value={capital_overview.receivables} compact prefix="+" />}
-            </span>
-          </button>
-
-          {/* 4. Payables */}
-          <button
-            type="button"
-            onClick={() => openVital('payables')}
-            className="flex flex-col items-center text-center group cursor-pointer haptic-press"
-            title={`Payables: ${isBalancesHidden ? '******' : capital_overview.payables.toLocaleString()} ETB`}
-          >
-            <div className="size-12 min-[390px]:size-[52px] rounded-[18px] min-[390px]:rounded-[20px] p-1 bg-slate-100/80 dark:bg-slate-800/50 border border-slate-200/60 dark:border-white/5 flex items-center justify-center shrink-0 mx-auto shadow-xs group-hover:scale-105 transition-all duration-200">
-              <div className="w-full h-full rounded-[14px] min-[390px]:rounded-[16px] bg-gradient-to-b from-[#eef9f2] to-[#ddf4e6] dark:from-[#0b2b1d] dark:to-[#071f15] flex items-center justify-center shadow-xs">
-                <ArrowUp className="w-6 h-6 min-[390px]:w-[26px] min-[390px]:h-[26px] text-[#065f46] dark:text-emerald-400 stroke-[2.4]" />
-              </div>
-            </div>
-            <span className="text-[11px] min-[390px]:text-xs font-semibold text-slate-800 dark:text-slate-200 mt-1.5 min-[390px]:mt-2 truncate max-w-full block">
-              Payables
-            </span>
-            <span className="text-[10px] min-[390px]:text-[11.5px] font-semibold font-mono tracking-tight text-rose-500 dark:text-rose-400 mt-0.5 truncate max-w-full block transition-opacity duration-200">
-              {isBalancesHidden ? '******' : <AnimatedNumber value={capital_overview.payables} compact prefix={(capital_overview.payables || 0) > 0 ? '-' : ''} />}
-            </span>
-          </button>
-
-          {/* 5. Other Assets */}
+          {/* 3. Other Assets */}
           <button
             type="button"
             onClick={() => openVital('reserves')}
