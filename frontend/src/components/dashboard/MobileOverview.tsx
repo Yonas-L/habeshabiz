@@ -329,12 +329,12 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
         </div>
       </div>
 
-      {/* ── 3. MONTHLY PERFORMANCE SECTION ── */}
-      <div className="rounded-[28px] bg-white dark:bg-[#111C2D] border-0 p-3 min-[390px]:p-3.5 shadow-xs space-y-3 select-none animate-stagger-3">
+      {/* ── 3. MONTHLY PERFORMANCE SECTION (Cardless, 4 Cards Span Full Space) ── */}
+      <div className="w-full space-y-2.5 select-none animate-stagger-3">
         {/* Section Heading */}
         <div className="flex items-center justify-between px-0.5">
-          <div className="flex items-center gap-2.5">
-            <div className="size-8 min-[390px]:size-8.5 rounded-[11px] bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center shrink-0">
+          <div className="flex items-center gap-2">
+            <div className="size-7 min-[390px]:size-8 rounded-lg bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center shrink-0">
               <TrendingUp className="w-4 h-4 text-emerald-700 dark:text-emerald-400 stroke-[2.4]" />
             </div>
             <div className="leading-tight">
@@ -351,7 +351,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               type="button"
               onClick={() => onNavigateTab('staff')}
               title="View Staff & Team Dashboard"
-              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/80 shadow-xs text-[11px] font-bold text-slate-800 dark:text-slate-200 active:scale-95 hover:scale-[1.03] cursor-pointer transition-all duration-150"
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/80 shadow-2xs text-[11px] font-bold text-slate-800 dark:text-slate-200 active:scale-95 hover:scale-[1.03] cursor-pointer transition-all duration-150"
             >
               <span>
                 Top: <span className="font-extrabold text-slate-900 dark:text-white">{topSeller.name}</span>
@@ -361,8 +361,8 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
           )}
         </div>
 
-        {/* 2x2 Performance Grid */}
-        <div className="grid grid-cols-2 gap-2 min-[390px]:gap-2.5">
+        {/* 2x2 Performance Grid (Spanning Full Horizontal Space) */}
+        <div className="grid grid-cols-2 gap-2.5 min-[390px]:gap-3">
           {/* Card 1: Revenue (Dark Mesh Surface with Multi-Node Spline & Luminous Beam) */}
           <div className="relative h-[106px] min-[390px]:h-[110px] flex flex-col overflow-visible active:scale-[0.97] hover:scale-[1.01] transition-all duration-200 ease-out cursor-pointer group haptic-press">
             {/* Pinched Card Background */}
