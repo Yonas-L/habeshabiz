@@ -719,18 +719,18 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
         )}
       </div>
 
-      {/* ── 4. UNIFIED TWO-COLUMN MOBILE FINANCIAL LEDGER (Receivables & Payables) ── */}
-      <div className="w-full bg-white dark:bg-[#111C2D] rounded-2xl border border-slate-100 dark:border-slate-800/80 p-3 min-[390px]:p-3.5 shadow-none select-none animate-stagger-4 mb-20 min-[390px]:mb-24">
+      {/* ── 4. UNIFIED TWO-COLUMN MOBILE FINANCIAL LEDGER (Cardless, Full Width, Bold Typography) ── */}
+      <div className="w-full select-none animate-stagger-4 pt-1 pb-1">
         <div
-          className="grid divide-x divide-slate-100 dark:divide-slate-800/80"
+          className="grid divide-x divide-slate-200 dark:divide-slate-800"
           style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}
         >
           {/* ── LEFT COLUMN: RECEIVABLES ── */}
-          <div className="flex flex-col pr-2.5 min-[390px]:pr-3 min-w-0 [box-sizing:border-box]">
+          <div className="flex flex-col pr-3 min-[390px]:pr-3.5 min-w-0 [box-sizing:border-box]">
             {/* Fixed Header */}
-            <div className="pb-2.5 mb-1 border-b border-slate-100 dark:border-slate-800/80 shrink-0">
+            <div className="pb-2 mb-1 border-b border-slate-200 dark:border-slate-800 shrink-0">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] min-[390px]:text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 truncate">
+                <span className="text-xs font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 truncate">
                   Receivables
                 </span>
                 <button
@@ -739,7 +739,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                   title="Record Receivable"
                   className="p-1 -mr-1 rounded-md text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 active:scale-90 transition-transform cursor-pointer shrink-0"
                 >
-                  <Plus className="w-3.5 h-3.5" />
+                  <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
                 </button>
               </div>
 
@@ -749,24 +749,24 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                 className="text-left cursor-pointer group mt-0.5 block w-full focus:outline-none"
                 title="View all receivables"
               >
-                <div className="text-[15px] min-[390px]:text-[17px] font-black font-mono tracking-tight text-emerald-600 dark:text-emerald-400 leading-tight truncate">
+                <div className="text-[17px] min-[390px]:text-[19px] font-black font-mono tracking-tight text-emerald-600 dark:text-emerald-400 leading-tight truncate">
                   {isBalancesHidden ? '+******' : (
                     <>
                       +<AnimatedNumber value={capital_overview.receivables} />
-                      <span className="text-[9.5px] font-sans font-medium text-emerald-600/70 dark:text-emerald-400/70 ml-0.5">ETB</span>
+                      <span className="text-[10px] font-sans font-bold text-emerald-600/70 dark:text-emerald-400/70 ml-0.5">ETB</span>
                     </>
                   )}
                 </div>
-                <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 truncate group-hover:text-emerald-600 transition-colors">
+                <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mt-0.5 truncate group-hover:text-emerald-600 transition-colors">
                   {counts.open_receivables ?? groupedReceivables.length} {((counts.open_receivables ?? groupedReceivables.length) === 1) ? 'record' : 'records'}
                 </div>
               </button>
             </div>
 
             {/* Independent Scroll Container */}
-            <div className="h-60 min-[390px]:h-72 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden overscroll-contain scroll-smooth">
+            <div className="h-[340px] min-[390px]:h-[380px] min-[410px]:h-[420px] overflow-y-auto overflow-x-hidden [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden overscroll-contain scroll-smooth">
               {groupedReceivables.length === 0 ? (
-                <div className="py-10 text-center text-xs text-slate-400 dark:text-slate-500">
+                <div className="py-12 text-center text-xs font-bold text-slate-400 dark:text-slate-500">
                   No receivables
                 </div>
               ) : (
@@ -776,14 +776,14 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                       key={group.contactId}
                       type="button"
                       onClick={() => openVital('receivables', group.contactId)}
-                      className="w-full flex items-center justify-between py-2 border-b border-slate-100/70 dark:border-slate-800/50 text-left active:opacity-60 transition-opacity cursor-pointer min-w-0 group"
+                      className="w-full flex items-center justify-between py-2.5 border-b border-slate-200/60 dark:border-slate-800/60 text-left active:opacity-60 transition-opacity cursor-pointer min-w-0 group"
                       title={`${group.name}: +${group.netRemaining.toLocaleString()} ETB`}
                     >
-                      <span className="text-xs min-[390px]:text-[12.5px] font-medium text-slate-800 dark:text-slate-200 truncate pr-1.5 leading-snug">
+                      <span className="text-[13px] min-[390px]:text-sm font-bold text-slate-900 dark:text-white truncate pr-1.5 leading-snug">
                         {group.name}
                       </span>
                       <span
-                        className="text-xs min-[390px]:text-[12.5px] font-semibold font-mono tracking-tight text-emerald-600 dark:text-emerald-400 shrink-0 text-right leading-snug pl-1"
+                        className="text-[13px] min-[390px]:text-sm font-black font-mono tracking-tight text-emerald-600 dark:text-emerald-400 shrink-0 text-right leading-snug pl-1"
                         style={{ fontVariantNumeric: 'tabular-nums' }}
                       >
                         {isBalancesHidden ? '+***' : `+${group.netRemaining.toLocaleString()}`}
@@ -796,11 +796,11 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
           </div>
 
           {/* ── RIGHT COLUMN: PAYABLES ── */}
-          <div className="flex flex-col pl-2.5 min-[390px]:pl-3 min-w-0 [box-sizing:border-box]">
+          <div className="flex flex-col pl-3 min-[390px]:pl-3.5 min-w-0 [box-sizing:border-box]">
             {/* Fixed Header */}
-            <div className="pb-2.5 mb-1 border-b border-slate-100 dark:border-slate-800/80 shrink-0">
+            <div className="pb-2 mb-1 border-b border-slate-200 dark:border-slate-800 shrink-0">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] min-[390px]:text-xs font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 truncate">
+                <span className="text-xs font-black uppercase tracking-wider text-rose-600 dark:text-rose-400 truncate">
                   Payables
                 </span>
                 <button
@@ -809,7 +809,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                   title="Record Payable"
                   className="p-1 -mr-1 rounded-md text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300 active:scale-90 transition-transform cursor-pointer shrink-0"
                 >
-                  <Plus className="w-3.5 h-3.5" />
+                  <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
                 </button>
               </div>
 
@@ -819,24 +819,24 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                 className="text-left cursor-pointer group mt-0.5 block w-full focus:outline-none"
                 title="View all payables"
               >
-                <div className="text-[15px] min-[390px]:text-[17px] font-black font-mono tracking-tight text-rose-600 dark:text-rose-400 leading-tight truncate">
+                <div className="text-[17px] min-[390px]:text-[19px] font-black font-mono tracking-tight text-rose-600 dark:text-rose-400 leading-tight truncate">
                   {isBalancesHidden ? '−******' : (
                     <>
                       {(capital_overview.payables || 0) > 0 ? '−' : ''}<AnimatedNumber value={capital_overview.payables} />
-                      <span className="text-[9.5px] font-sans font-medium text-rose-600/70 dark:text-rose-400/70 ml-0.5">ETB</span>
+                      <span className="text-[10px] font-sans font-bold text-rose-600/70 dark:text-rose-400/70 ml-0.5">ETB</span>
                     </>
                   )}
                 </div>
-                <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 truncate group-hover:text-rose-600 transition-colors">
+                <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mt-0.5 truncate group-hover:text-rose-600 transition-colors">
                   {counts.open_payables ?? groupedPayables.length} {((counts.open_payables ?? groupedPayables.length) === 1) ? 'record' : 'records'}
                 </div>
               </button>
             </div>
 
             {/* Independent Scroll Container */}
-            <div className="h-60 min-[390px]:h-72 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden overscroll-contain scroll-smooth">
+            <div className="h-[340px] min-[390px]:h-[380px] min-[410px]:h-[420px] overflow-y-auto overflow-x-hidden [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden overscroll-contain scroll-smooth">
               {groupedPayables.length === 0 ? (
-                <div className="py-10 text-center text-xs text-slate-400 dark:text-slate-500">
+                <div className="py-12 text-center text-xs font-bold text-slate-400 dark:text-slate-500">
                   No payables
                 </div>
               ) : (
@@ -846,14 +846,14 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
                       key={group.contactId}
                       type="button"
                       onClick={() => openVital('payables', group.contactId)}
-                      className="w-full flex items-center justify-between py-2 border-b border-slate-100/70 dark:border-slate-800/50 text-left active:opacity-60 transition-opacity cursor-pointer min-w-0 group"
+                      className="w-full flex items-center justify-between py-2.5 border-b border-slate-200/60 dark:border-slate-800/60 text-left active:opacity-60 transition-opacity cursor-pointer min-w-0 group"
                       title={`${group.name}: −${group.netRemaining.toLocaleString()} ETB`}
                     >
-                      <span className="text-xs min-[390px]:text-[12.5px] font-medium text-slate-800 dark:text-slate-200 truncate pr-1.5 leading-snug">
+                      <span className="text-[13px] min-[390px]:text-sm font-bold text-slate-900 dark:text-white truncate pr-1.5 leading-snug">
                         {group.name}
                       </span>
                       <span
-                        className="text-xs min-[390px]:text-[12.5px] font-semibold font-mono tracking-tight text-rose-600 dark:text-rose-400 shrink-0 text-right leading-snug pl-1"
+                        className="text-[13px] min-[390px]:text-sm font-black font-mono tracking-tight text-rose-600 dark:text-rose-400 shrink-0 text-right leading-snug pl-1"
                         style={{ fontVariantNumeric: 'tabular-nums' }}
                       >
                         {isBalancesHidden ? '−***' : `−${group.netRemaining.toLocaleString()}`}
