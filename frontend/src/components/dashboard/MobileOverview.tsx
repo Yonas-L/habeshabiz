@@ -7,7 +7,6 @@ import {
   Package,
   Landmark,
   Coins,
-  TrendingUp,
   MoreHorizontal,
   Wallet,
   Sprout,
@@ -333,18 +332,13 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
       <div className="w-full space-y-2.5 select-none animate-stagger-3">
         {/* Section Heading */}
         <div className="flex items-center justify-between px-0.5">
-          <div className="flex items-center gap-2">
-            <div className="size-7 min-[390px]:size-8 rounded-lg bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center shrink-0">
-              <TrendingUp className="w-4 h-4 text-emerald-700 dark:text-emerald-400 stroke-[2.4]" />
-            </div>
-            <div className="leading-tight">
-              <span className="text-[9px] font-bold tracking-wider uppercase text-slate-500 dark:text-slate-400 block">
-                {monthDisplayLabel}
-              </span>
-              <h2 className="text-base min-[390px]:text-lg font-black text-slate-900 dark:text-white tracking-tight">
-                Performance
-              </h2>
-            </div>
+          <div className="leading-tight">
+            <span className="text-[9px] font-bold tracking-wider uppercase text-slate-500 dark:text-slate-400 block">
+              {monthDisplayLabel}
+            </span>
+            <h2 className="text-base min-[390px]:text-lg font-black text-slate-900 dark:text-white tracking-tight">
+              Performance
+            </h2>
           </div>
           {topSeller && user?.role === 'owner' && (
             <button
