@@ -763,35 +763,39 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               </button>
             </div>
 
-            {/* Independent Scroll Container */}
-            <div className="h-[340px] min-[390px]:h-[380px] min-[410px]:h-[420px] overflow-y-auto overflow-x-hidden [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden overscroll-contain scroll-smooth">
-              {groupedReceivables.length === 0 ? (
-                <div className="py-12 text-center text-xs font-bold text-slate-400 dark:text-slate-500">
-                  No receivables
-                </div>
-              ) : (
-                <div className="divide-y-0">
-                  {groupedReceivables.map((group) => (
-                    <button
-                      key={group.contactId}
-                      type="button"
-                      onClick={() => openVital('receivables', group.contactId)}
-                      className="w-full flex items-center justify-between py-2.5 border-b border-slate-200/60 dark:border-slate-800/60 text-left active:opacity-60 transition-opacity cursor-pointer min-w-0 group"
-                      title={`${group.name}: +${group.netRemaining.toLocaleString()} ETB`}
-                    >
-                      <span className="text-[13px] min-[390px]:text-sm font-bold text-slate-900 dark:text-white truncate pr-1.5 leading-snug">
-                        {group.name}
-                      </span>
-                      <span
-                        className="text-[13px] min-[390px]:text-sm font-black font-mono tracking-tight text-emerald-600 dark:text-emerald-400 shrink-0 text-right leading-snug pl-1"
-                        style={{ fontVariantNumeric: 'tabular-nums' }}
+            {/* Independent Scroll Container with Soft Foamy Bottom Fade */}
+            <div className="relative">
+              <div className="h-[340px] min-[390px]:h-[380px] min-[410px]:h-[420px] overflow-y-auto overflow-x-hidden [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden overscroll-auto scroll-smooth pb-8">
+                {groupedReceivables.length === 0 ? (
+                  <div className="py-12 text-center text-xs font-bold text-slate-400 dark:text-slate-500">
+                    No receivables
+                  </div>
+                ) : (
+                  <div className="divide-y-0">
+                    {groupedReceivables.map((group) => (
+                      <button
+                        key={group.contactId}
+                        type="button"
+                        onClick={() => openVital('receivables', group.contactId)}
+                        className="w-full flex items-center justify-between py-2.5 border-b border-slate-200/50 dark:border-slate-800/50 text-left active:opacity-60 transition-opacity cursor-pointer min-w-0 group"
+                        title={`${group.name}: +${group.netRemaining.toLocaleString()} ETB`}
                       >
-                        {isBalancesHidden ? '+***' : `+${group.netRemaining.toLocaleString()}`}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
+                        <span className="text-[13px] min-[390px]:text-sm font-bold text-slate-900 dark:text-white truncate pr-1.5 leading-snug">
+                          {group.name}
+                        </span>
+                        <span
+                          className="text-[13px] min-[390px]:text-sm font-black font-mono tracking-tight text-emerald-600 dark:text-emerald-400 shrink-0 text-right leading-snug pl-1"
+                          style={{ fontVariantNumeric: 'tabular-nums' }}
+                        >
+                          {isBalancesHidden ? '+***' : `+${group.netRemaining.toLocaleString()}`}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {/* Foamy bottom gradient fade */}
+              <div className="pointer-events-none absolute bottom-0 inset-x-0 h-10 bg-gradient-to-t from-[#f6f8fa] via-[#f6f8fa]/80 to-transparent dark:from-[#0b0f17] dark:via-[#0b0f17]/80 dark:to-transparent" />
             </div>
           </div>
 
@@ -833,35 +837,39 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               </button>
             </div>
 
-            {/* Independent Scroll Container */}
-            <div className="h-[340px] min-[390px]:h-[380px] min-[410px]:h-[420px] overflow-y-auto overflow-x-hidden [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden overscroll-contain scroll-smooth">
-              {groupedPayables.length === 0 ? (
-                <div className="py-12 text-center text-xs font-bold text-slate-400 dark:text-slate-500">
-                  No payables
-                </div>
-              ) : (
-                <div className="divide-y-0">
-                  {groupedPayables.map((group) => (
-                    <button
-                      key={group.contactId}
-                      type="button"
-                      onClick={() => openVital('payables', group.contactId)}
-                      className="w-full flex items-center justify-between py-2.5 border-b border-slate-200/60 dark:border-slate-800/60 text-left active:opacity-60 transition-opacity cursor-pointer min-w-0 group"
-                      title={`${group.name}: −${group.netRemaining.toLocaleString()} ETB`}
-                    >
-                      <span className="text-[13px] min-[390px]:text-sm font-bold text-slate-900 dark:text-white truncate pr-1.5 leading-snug">
-                        {group.name}
-                      </span>
-                      <span
-                        className="text-[13px] min-[390px]:text-sm font-black font-mono tracking-tight text-rose-600 dark:text-rose-400 shrink-0 text-right leading-snug pl-1"
-                        style={{ fontVariantNumeric: 'tabular-nums' }}
+            {/* Independent Scroll Container with Soft Foamy Bottom Fade */}
+            <div className="relative">
+              <div className="h-[340px] min-[390px]:h-[380px] min-[410px]:h-[420px] overflow-y-auto overflow-x-hidden [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden overscroll-auto scroll-smooth pb-8">
+                {groupedPayables.length === 0 ? (
+                  <div className="py-12 text-center text-xs font-bold text-slate-400 dark:text-slate-500">
+                    No payables
+                  </div>
+                ) : (
+                  <div className="divide-y-0">
+                    {groupedPayables.map((group) => (
+                      <button
+                        key={group.contactId}
+                        type="button"
+                        onClick={() => openVital('payables', group.contactId)}
+                        className="w-full flex items-center justify-between py-2.5 border-b border-slate-200/50 dark:border-slate-800/50 text-left active:opacity-60 transition-opacity cursor-pointer min-w-0 group"
+                        title={`${group.name}: −${group.netRemaining.toLocaleString()} ETB`}
                       >
-                        {isBalancesHidden ? '−***' : `−${group.netRemaining.toLocaleString()}`}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
+                        <span className="text-[13px] min-[390px]:text-sm font-bold text-slate-900 dark:text-white truncate pr-1.5 leading-snug">
+                          {group.name}
+                        </span>
+                        <span
+                          className="text-[13px] min-[390px]:text-sm font-black font-mono tracking-tight text-rose-600 dark:text-rose-400 shrink-0 text-right leading-snug pl-1"
+                          style={{ fontVariantNumeric: 'tabular-nums' }}
+                        >
+                          {isBalancesHidden ? '−***' : `−${group.netRemaining.toLocaleString()}`}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {/* Foamy bottom gradient fade */}
+              <div className="pointer-events-none absolute bottom-0 inset-x-0 h-10 bg-gradient-to-t from-[#f6f8fa] via-[#f6f8fa]/80 to-transparent dark:from-[#0b0f17] dark:via-[#0b0f17]/80 dark:to-transparent" />
             </div>
           </div>
         </div>
