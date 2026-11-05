@@ -53,7 +53,7 @@ interface MobileOverviewProps {
 }
 
 const HERO_CARD_PATH =
-  'M 8 36 C 8 20, 20 12, 38 12 C 105 12, 155 26, 210 26 C 265 26, 315 12, 382 12 C 400 12, 412 20, 412 36 L 412 220 C 412 236, 400 246, 382 246 C 315 246, 265 234, 210 234 C 155 234, 105 246, 38 246 C 20 246, 8 236, 8 220 L 8 36 Z';
+  'M 8 36 C 8 20, 20 12, 38 12 C 105 12, 155 26, 210 26 C 265 26, 315 12, 382 12 C 400 12, 412 20, 412 36 L 412 244 C 412 260, 400 270, 382 270 C 315 270, 265 258, 210 258 C 155 258, 105 270, 38 270 C 20 270, 8 260, 8 244 L 8 36 Z';
 
 export const MobileOverview: React.FC<MobileOverviewProps> = ({
   data,
@@ -125,10 +125,10 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
     <div className="space-y-4 px-0.5 select-none scroll-smooth">
       {/* ── 1. WORKING CAPITAL HERO WIDGET (Curvature Silhouette with Solid High-Contrast Tone) ── */}
       <div className="relative w-full select-none -mx-1.5 px-0.5 py-0.5 animate-stagger-1">
-        <div className="relative w-full aspect-[420/260] min-[410px]:aspect-[420/250] overflow-visible">
+        <div className="relative w-full aspect-[420/280] min-[410px]:aspect-[420/275] overflow-visible">
           {/* Curvature SVG with Solid Slate/Emerald Tone & Fluid Trend Line */}
           <svg
-            viewBox="0 0 420 256"
+            viewBox="0 0 420 280"
             className="w-full h-full overflow-visible drop-shadow-sm"
             preserveAspectRatio="none"
           >
@@ -168,25 +168,25 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
               {/* Front luminous wave shape */}
               <path
                 d="
-                  M 175 160
-                  C 200 144, 225 118, 248 120
-                  C 268 122, 282 130, 298 128
-                  C 318 125, 332 104, 350 102
-                  C 366 101, 378 108, 388 96
-                  C 394 86, 398 72, 405 58
-                  L 408 160
-                  L 175 160
+                  M 175 180
+                  C 200 160, 225 134, 248 136
+                  C 268 138, 282 146, 298 144
+                  C 318 141, 332 118, 350 116
+                  C 366 115, 378 122, 388 108
+                  C 394 96, 398 82, 405 66
+                  L 408 180
+                  L 175 180
                   Z"
                 fill="url(#frontChartGrad)"
               />
               <path
                 d="
-                  M 175 160
-                  C 200 144, 225 118, 248 120
-                  C 268 122, 282 130, 298 128
-                  C 318 125, 332 104, 350 102
-                  C 366 101, 378 108, 388 96
-                  C 394 86, 398 72, 405 58"
+                  M 175 180
+                  C 200 160, 225 134, 248 136
+                  C 268 138, 282 146, 298 144
+                  C 318 141, 332 118, 350 116
+                  C 366 115, 378 122, 388 108
+                  C 394 96, 398 82, 405 66"
                 fill="none"
                 stroke="url(#frontLineGrad)"
                 strokeWidth="1.6"
@@ -195,17 +195,17 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
             </g>
 
             {/* Clean Static Endpoint Dot (No radial animation, no slop) */}
-            <circle cx="403" cy="60" r="2.5" fill="#34d399" />
+            <circle cx="403" cy="68" r="2.5" fill="#34d399" />
           </svg>
 
           {/* ── Foreground Interactive Content (Cleaned up, un-congested, zero truncation) ── */}
           <div
-            className="absolute z-10 flex flex-col justify-between px-3.5 min-[390px]:px-4 py-3 min-[410px]:py-3.5"
+            className="absolute z-10 flex flex-col justify-between px-4 min-[390px]:px-4.5 py-3.5 min-[410px]:py-4"
             style={{
               left: '2.5%',
               width: '95%',
-              top: '4%',
-              height: '92%',
+              top: '3.5%',
+              height: '93%',
             }}
           >
             {/* Top Row: Clean, Un-nested Header (No glowing dot, no chevron, no nested +12% pill) */}
@@ -220,23 +220,23 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
             </div>
 
             {/* Big Financial Number */}
-            <div className="my-auto py-1">
+            <div className="my-auto py-1.5">
               <div className="flex items-baseline gap-2">
-                <span className="text-[clamp(28px,7.5vw,36px)] min-[410px]:text-[38px] font-black tracking-tight text-white font-mono leading-none">
+                <span className="text-[32px] min-[360px]:text-[35px] min-[390px]:text-[38px] min-[410px]:text-[42px] font-black tracking-tight text-white font-mono leading-none">
                   {isBalancesHidden ? '******' : <AnimatedNumber value={capital_overview.net_capital || 10293682} />}
                 </span>
-                <span className="text-sm min-[410px]:text-base font-bold text-slate-400 font-sans tracking-wide">
+                <span className="text-base min-[410px]:text-lg font-bold text-slate-400 font-sans tracking-wide">
                   ETB
                 </span>
               </div>
-              <div className="mt-1 flex items-center gap-2 text-xs text-slate-400">
+              <div className="mt-1.5 flex items-center gap-2 text-xs min-[390px]:text-[13px] text-slate-400">
                 <span className="text-emerald-400 font-semibold font-mono">+12.5%</span>
                 <span>vs last month</span>
               </div>
             </div>
 
             {/* Proportional Asset Breakdown Bar & Clean Legend (Un-nested, generous breathing room) */}
-            <div className="space-y-2 pt-1">
+            <div className="space-y-2.5 pt-1.5 pb-0.5">
               {/* Proportional distribution bar (Teal for forex, zero purple) */}
               <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden flex">
                 {stockPct > 0 && <div style={{ width: `${stockPct}%` }} className="h-full bg-emerald-400" title={`Stock ${stockPct}%`} />}
