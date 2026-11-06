@@ -491,7 +491,7 @@ class InventoryController extends Controller
             $requestedBankAmount = null;
             if (is_array($rawSplits) && count($rawSplits) > 0) {
                 $requestedBankAmount = (float) collect($rawSplits)->sum(fn ($s) => (float) ($s['amount'] ?? 0));
-            } elseif (isset($validated['payment_amount']) && $validated['payment_amount'] !== null && $validated['payment_amount'] !== '') {
+            } elseif (isset($validated['payment_amount']) && $validated['payment_amount'] !== '') {
                 $requestedBankAmount = (float) $validated['payment_amount'];
             }
 
