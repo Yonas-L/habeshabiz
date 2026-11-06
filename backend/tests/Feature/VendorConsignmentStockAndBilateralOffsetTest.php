@@ -1271,6 +1271,16 @@ test('debtor offset where device cost exceeds debtor balance automatically offse
     expect((float) $statement['kpis']['current_net_balance'])->toBe(-30000.00)
         ->and((float) $statement['kpis']['current_open_receivable'])->toBe(0.0)
         ->and((float) $statement['kpis']['current_open_payable'])->toBe(30000.00);
+
+    // 5. Ledger has exactly 2 non-redundant rows: Old debt (+70k) and Item Received (-100k)
+    expect($statement['ledger'])->toHaveCount(2);
+    expect((float) $statement['ledger'][0]['receivable'])->toBe(70000.00);
+    expect($statement['ledger'][1]['type'])->toBe('stock_intake')
+        ->and($statement['ledger'][1]['type_label'])->toBe('Item Received')
+        ->and($statement['ledger'][1]['context'])->toBe('iPhone 15 Pro Max (SN: OFFSET-OVER-100K)')
+        ->and((float) $statement['ledger'][1]['payable'])->toBe(100000.00)
+        ->and((float) $statement['ledger'][1]['receivable'])->toBe(0.0)
+        ->and((float) $statement['ledger'][1]['running_balance'])->toBe(-30000.00);
 });
 
 test('split funding where offset plus cash is less than total cost creates payable debt for remainder', function () {

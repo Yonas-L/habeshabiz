@@ -125,6 +125,7 @@ class GeneratePartnerStatementAction
         $rawEntries = [];
         $bilateralGroups = [];
         $consolidatedPaymentGroups = [];
+        $handledIntakeUnitIds = [];
 
         foreach ($debts as $debt) {
             if (str_contains(strtolower($debt->notes ?? ''), 'exclude_statement')) {
@@ -237,15 +238,22 @@ class GeneratePartnerStatementAction
                     $sn = $unit?->imei_or_serial ? " (SN: {$unit->imei_or_serial})" : '';
                     $context = $unit ? "{$pName}{$sn}" : ($debt->notes ? $this->sanitizeContext($debt->notes) : 'Stock Received');
 
+                    if ($unit) {
+                        $handledIntakeUnitIds[$unit->id] = true;
+                    }
+
+                    $offsetOnUnit = $unit ? (float) $unit->receivable_offset_amount : 0.0;
+                    $totalPayable = (float) $debt->original_amount + $offsetOnUnit;
+
                     $rawEntries[] = [
                         'id' => "debt-{$debt->id}",
                         'date' => $debtCreatedDate,
                         'type' => 'stock_intake',
                         'type_label' => 'Item Received',
                         'context' => $context,
-                        'payable' => (float) $debt->original_amount,
+                        'payable' => $totalPayable,
                         'receivable' => 0.0,
-                        'balance_effect' => -(float) $debt->original_amount,
+                        'balance_effect' => -$totalPayable,
                         'reference_number' => null,
                     ];
                 } elseif ($debt->reference_type === 'customer_return_refund') {
@@ -498,10 +506,11 @@ class GeneratePartnerStatementAction
                 }
 
                 if ($payment->reference_number === 'MUTUAL-OFFSET'
-                    || (str_starts_with($payment->reference_number ?? '', 'OFFSET-') && $payment->reference_number !== 'OFFSET-INTAKE')
+                    || $payment->reference_number === 'OFFSET-INTAKE'
+                    || str_starts_with($payment->reference_number ?? '', 'OFFSET-')
                     || str_contains(strtolower($payment->notes ?? ''), 'mutual credit offset')
                 ) {
-                    // Internal mutual clearing offset; both underlying debts are already listed as distinct entries in the ledger
+                    // Internal mutual clearing offset; both underlying debts/items are already listed as distinct entries in the ledger
                     continue;
                 }
 
@@ -655,59 +664,6 @@ class GeneratePartnerStatementAction
                         'receivable' => 0.0,
                         'balance_effect' => -$revPayable,
                         'reference_number' => 'RECEIVE-FROM-VENDOR',
-                    ];
-                } elseif ($payment->reference_number === 'OFFSET-INTAKE') {
-                    $context = null;
-                    $rawNote = trim($payment->notes ?? '');
-
-                    // 1. If note already has explicit device details
-                    if (! empty($rawNote) && $rawNote !== 'Agreed credit balance settlement') {
-                        $cleanNote = preg_replace('/^(?:Paid\s+by\s+device:\s*|Device\s+received\s+as\s+settlement:\s*)/i', '', $rawNote);
-                        $context = $this->sanitizeContext($cleanNote);
-                    }
-
-                    // 2. Resolve matching inventory unit for legacy generic notes
-                    if (! $context && $offsetUnits->isNotEmpty()) {
-                        $payDateObj = Carbon::parse($payment->payment_date ?? $payment->created_at);
-                        $matchedUnit = $offsetUnits->first(function ($u) use ($payment, $payDateObj) {
-                            $unitDate = Carbon::parse($u->created_at);
-                            $amountMatches = abs((float) $u->receivable_offset_amount - (float) $payment->amount) < 0.01
-                                || abs((float) $u->cost_basis - (float) $payment->amount) < 0.01;
-
-                            return $amountMatches && abs($unitDate->diffInHours($payDateObj)) <= 48;
-                        });
-
-                        if (! $matchedUnit) {
-                            $candidates = $offsetUnits->filter(function ($u) use ($payment) {
-                                return abs((float) $u->receivable_offset_amount - (float) $payment->amount) < 0.01
-                                    || abs((float) $u->cost_basis - (float) $payment->amount) < 0.01;
-                            });
-                            if ($candidates->count() === 1) {
-                                $matchedUnit = $candidates->first();
-                            }
-                        }
-
-                        if ($matchedUnit) {
-                            $pName = $matchedUnit->variant?->product?->name ?? 'Device';
-                            $sn = $matchedUnit->imei_or_serial ? " (SN: {$matchedUnit->imei_or_serial})" : '';
-                            $context = "{$pName}{$sn}";
-                        }
-                    }
-
-                    if (! $context) {
-                        $context = 'Agreed credit balance settlement';
-                    }
-
-                    $rawEntries[] = [
-                        'id' => "pay-{$payment->id}",
-                        'date' => $payDate,
-                        'type' => 'paid_by_device',
-                        'type_label' => 'Paid by Device',
-                        'context' => $context,
-                        'payable' => $debt->type === 'payable' ? -(float) $payment->amount : 0.0,
-                        'receivable' => $debt->type === 'receivable' ? -(float) $payment->amount : 0.0,
-                        'balance_effect' => $debt->type === 'payable' ? (float) $payment->amount : -(float) $payment->amount,
-                        'reference_number' => 'PAID-BY-DEVICE',
                     ];
                 } elseif ($payment->reference_number === 'DEVICE-OFFSET' || str_contains(strtolower($payment->notes ?? ''), 'device') || str_contains(strtolower($payment->notes ?? ''), 'handover') || str_contains($payment->notes ?? '', 'Paid by device')) {
                     $rawEntries[] = [
@@ -931,11 +887,40 @@ class GeneratePartnerStatementAction
 
         $vendorDirectSaleUnitIds = $debts->where('reference_type', 'vendor_direct_sale')->pluck('reference_id')->filter()->all();
 
+        // Emit any offset-funded units that did not have an open stock intake debt (e.g. 100% offset)
+        foreach ($offsetUnits as $unit) {
+            if (isset($handledIntakeUnitIds[$unit->id])) {
+                continue;
+            }
+            if (str_contains(strtolower($unit->notes ?? ''), 'exclude_statement')) {
+                continue;
+            }
+            $pName = $unit->variant?->product?->name ?? 'Device';
+            $sn = $unit->imei_or_serial ? " (SN: {$unit->imei_or_serial})" : '';
+            $offsetVal = (float) $unit->cost_basis > 0 ? (float) $unit->cost_basis : (float) $unit->receivable_offset_amount;
+
+            if ($offsetVal > 0) {
+                $rawEntries[] = [
+                    'id' => "unit-offset-{$unit->id}",
+                    'date' => Carbon::parse($unit->created_at),
+                    'type' => 'stock_intake',
+                    'type_label' => 'Item Received',
+                    'context' => "{$pName}{$sn}",
+                    'payable' => $offsetVal,
+                    'receivable' => 0.0,
+                    'balance_effect' => -$offsetVal,
+                    'reference_number' => null,
+                ];
+                $handledIntakeUnitIds[$unit->id] = true;
+            }
+        }
+
         $allDebtedUnitIds = array_unique(array_merge(
             $existingStockIntakeUnitIds,
             $soldUnitIdsWithDebt,
             $brokeredUnitIds,
-            $vendorDirectSaleUnitIds
+            $vendorDirectSaleUnitIds,
+            array_keys($handledIntakeUnitIds)
         ));
 
         $vendorUnitsWithoutDebt = InventoryUnit::where('supplier_contact_id', $contact->id)
