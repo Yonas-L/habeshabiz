@@ -436,7 +436,27 @@ class InventoryController extends Controller
                     'message' => 'Please select a debtor contact for the receivable offset.',
                 ], 422);
             }
-            $offsetAmount = $receivableOffsetAmount > 0 ? min($totalCost, $receivableOffsetAmount) : $totalCost;
+            $debtor = Contact::where('tenant_id', $user->tenant_id)->findOrFail($receivableContactId);
+            $openDebt = (float) Debt::where('tenant_id', $user->tenant_id)
+                ->where('contact_id', $receivableContactId)
+                ->where('type', 'receivable')
+                ->where('reference_type', '!=', 'handover_holding')
+                ->where('reference_type', '!=', 'salesperson_bonus')
+                ->whereIn('status', ['open', 'partially_paid'])
+                ->sum('remaining_amount');
+
+            if ($openDebt <= 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Selected contact {$debtor->name} has no open debt balance to offset against.",
+                ], 422);
+            }
+
+            // Offset can settle up to the debtor's actual open debt balance or total cost
+            $maxApplicableOffset = min($totalCost, $openDebt);
+            $offsetAmount = $receivableOffsetAmount > 0 ? min($maxApplicableOffset, $receivableOffsetAmount) : $maxApplicableOffset;
+            $offsetAmount = round($offsetAmount, 2);
+            $bankAmount = 0.0;
         } elseif ($fundingSource === 'split') {
             $rawSplits = $validated['payment_splits'] ?? null;
             if (empty($paymentAccountId) && (empty($rawSplits) || count($rawSplits) === 0)) {
@@ -451,11 +471,40 @@ class InventoryController extends Controller
                     'message' => 'Please select a debtor contact for split funding offset.',
                 ], 422);
             }
-            $offsetAmount = (! empty($receivableContactId) && $receivableOffsetAmount > 0)
-                ? min($totalCost, $receivableOffsetAmount)
-                : 0.0;
-            $bankAmount = max(0, $totalCost - $offsetAmount);
+
+            if (! empty($receivableContactId)) {
+                $openDebt = (float) Debt::where('tenant_id', $user->tenant_id)
+                    ->where('contact_id', $receivableContactId)
+                    ->where('type', 'receivable')
+                    ->where('reference_type', '!=', 'handover_holding')
+                    ->where('reference_type', '!=', 'salesperson_bonus')
+                    ->whereIn('status', ['open', 'partially_paid'])
+                    ->sum('remaining_amount');
+
+                $maxApplicableOffset = min($totalCost, $openDebt);
+                $offsetAmount = $receivableOffsetAmount > 0 ? min($maxApplicableOffset, $receivableOffsetAmount) : $maxApplicableOffset;
+                $offsetAmount = round($offsetAmount, 2);
+            } else {
+                $offsetAmount = 0.0;
+            }
+
+            $requestedBankAmount = null;
+            if (is_array($rawSplits) && count($rawSplits) > 0) {
+                $requestedBankAmount = (float) collect($rawSplits)->sum(fn ($s) => (float) ($s['amount'] ?? 0));
+            } elseif (isset($validated['payment_amount']) && $validated['payment_amount'] !== null && $validated['payment_amount'] !== '') {
+                $requestedBankAmount = (float) $validated['payment_amount'];
+            }
+
+            if ($requestedBankAmount !== null) {
+                $bankAmount = min($requestedBankAmount, max(0.0, round($totalCost - $offsetAmount, 2)));
+            } else {
+                $bankAmount = max(0.0, round($totalCost - $offsetAmount, 2));
+            }
+            $bankAmount = round($bankAmount, 2);
         }
+
+        $unpaidCost = max(0.0, round($totalCost - ($bankAmount + $offsetAmount), 2));
+        $supplierContactId = $validated['supplier_contact_id'] ?? (! empty($receivableContactId) ? $receivableContactId : null);
 
         // Overdraft guard: verify bank balance(s)
         $preparedBankSplits = [];
@@ -510,22 +559,6 @@ class InventoryController extends Controller
             }
         }
 
-        // Debtor balance guard: verify open receivable debts
-        if ($offsetAmount > 0 && ! empty($receivableContactId)) {
-            $debtor = Contact::where('tenant_id', $user->tenant_id)->findOrFail($receivableContactId);
-            $openDebt = (float) Debt::where('tenant_id', $user->tenant_id)
-                ->where('contact_id', $receivableContactId)
-                ->where('type', 'receivable')
-                ->whereIn('status', ['open', 'partially_paid'])
-                ->sum('remaining_amount');
-
-            if ($openDebt < $offsetAmount) {
-                throw ValidationException::withMessages([
-                    'receivable_offset_amount' => ["Requested offset exceeds {$debtor->name}'s open debt balance of ".number_format($openDebt, 2).' ETB.'],
-                ]);
-            }
-        }
-
         $createdUnits = [];
         $revertGroupId = (string) Str::uuid();
 
@@ -538,6 +571,8 @@ class InventoryController extends Controller
             $receivableContactId,
             $offsetAmount,
             $bankAmount,
+            $unpaidCost,
+            $supplierContactId,
             $preparedBankSplits,
             $totalCost,
             $user,
@@ -580,7 +615,7 @@ class InventoryController extends Controller
                     ], $preparedBankSplits) : null,
                     'receivable_contact_id' => $receivableContactId,
                     'receivable_offset_amount' => $unitOffset,
-                    'supplier_contact_id' => $validated['supplier_contact_id'] ?? (! empty($receivableContactId) ? $receivableContactId : null),
+                    'supplier_contact_id' => $supplierContactId,
                     'return_deadline' => $validated['return_deadline'] ?? null,
                     'location' => $item['location'] ?? 'Shop Counter',
                     'notes' => $item['notes'] ?? null,
@@ -686,30 +721,46 @@ class InventoryController extends Controller
                 }
             }
 
-            // 3. Supplier Debt Tracking (for all vendor stock on credit / consignment where cash was not paid upfront)
-            if (! empty($validated['supplier_contact_id']) && $fundingSource === 'none' && $totalCost > 0) {
+            // 3. Supplier Debt Tracking (for unpaid cost balances: pay later, or excess cost over debtor offset/bank splits)
+            if (! empty($supplierContactId) && $unpaidCost > 0) {
+                $remainingUnpaidToAllocate = $unpaidCost;
                 foreach ($createdUnits as $unit) {
+                    if ($remainingUnpaidToAllocate <= 0) {
+                        break;
+                    }
                     $unitCost = (float) $unit->cost_basis;
-                    if ($unitCost > 0) {
+                    $debtAmount = ($fundingSource === 'none')
+                        ? $unitCost
+                        : min($remainingUnpaidToAllocate, $unitCost);
+                    $debtAmount = round($debtAmount, 2);
+
+                    if ($debtAmount > 0) {
                         $pName = $unit->variant?->product?->name ?? 'Device';
                         $sn = $unit->imei_or_serial ? " (SN: {$unit->imei_or_serial})" : '';
                         $intakeDebt = Debt::create([
                             'tenant_id' => $tenantId,
-                            'contact_id' => $validated['supplier_contact_id'],
+                            'contact_id' => $supplierContactId,
                             'type' => 'payable',
                             'reference_type' => 'stock_intake',
                             'reference_id' => $unit->id,
-                            'original_amount' => $unitCost,
+                            'original_amount' => $debtAmount,
                             'paid_amount' => 0.0,
-                            'remaining_amount' => $unitCost,
+                            'remaining_amount' => $debtAmount,
                             'due_date' => $unit->return_deadline ?? $validated['return_deadline'] ?? now()->addDays(30),
                             'status' => 'open',
                             'notes' => "Stock intake: {$pName}{$sn}",
                         ]);
                         Debt::applyOpenAdvancesToPayable($intakeDebt);
+                        $remainingUnpaidToAllocate = round($remainingUnpaidToAllocate - $debtAmount, 2);
                     }
                 }
-                Debt::reconcileContactMutualDebts($tenantId, (string) $validated['supplier_contact_id']);
+
+                if ($remainingUnpaidToAllocate > 0.009 && isset($intakeDebt)) {
+                    $intakeDebt->increment('original_amount', $remainingUnpaidToAllocate);
+                    $intakeDebt->increment('remaining_amount', $remainingUnpaidToAllocate);
+                }
+
+                Debt::reconcileContactMutualDebts($tenantId, (string) $supplierContactId);
             }
 
             // 4. Immediate Handover (if requested for single vendor stock intake)

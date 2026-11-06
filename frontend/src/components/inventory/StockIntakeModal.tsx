@@ -821,10 +821,16 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
   }, [isOwner, selectedAccount, fundingSource, totalInvestmentCost, splitCashAmount]);
 
   const handleSplitOffsetChange = (val: string) => {
-    setSplitOffsetAmount(val);
-    const offset = parseFormattedNumber(val) || 0;
+    const rawOffset = parseFormattedNumber(val) || 0;
+    const selectedDebtor = debtorsWithBalance.find((d) => d.contact.id === selectedDebtorContactId);
+    const debtorMax = selectedDebtor ? selectedDebtor.totalOwed : Infinity;
+
+    // Clamp offset to what the debtor actually owes
+    const effectiveOffset = Math.min(rawOffset, debtorMax);
+    setSplitOffsetAmount(effectiveOffset > 0 ? formatCurrencyInput(effectiveOffset) : (val === '' ? '' : '0'));
+
     if (totalInvestmentCost > 0) {
-      const remainder = Math.max(0, totalInvestmentCost - offset);
+      const remainder = Math.max(0, totalInvestmentCost - effectiveOffset);
       setSplitCashAmount(formatCurrencyInput(remainder));
     } else {
       // If total investment cost hasn't been set yet, preserve bank cash amount
@@ -832,7 +838,7 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
         ? accountSplits.reduce((sum, s) => sum + (Number(s.amount) || 0), 0)
         : (parseFormattedNumber(splitCashAmount) || 0);
       if (intakeMode !== 'batch' && (!costBasis || parseFormattedNumber(costBasis) === 0)) {
-        const combined = offset + currentCash;
+        const combined = effectiveOffset + currentCash;
         if (combined > 0) {
           const qty = parseInt(quantity, 10) || 1;
           setCostBasis(formatCurrencyInput(combined / (qty > 0 ? qty : 1)));
@@ -845,7 +851,9 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
     setSplitCashAmount(val);
     const cash = parseFormattedNumber(val) || 0;
     if (totalInvestmentCost > 0) {
-      const remainderOffset = Math.max(0, totalInvestmentCost - cash);
+      const selectedDebtor = debtorsWithBalance.find((d) => d.contact.id === selectedDebtorContactId);
+      const debtorMax = selectedDebtor ? selectedDebtor.totalOwed : Infinity;
+      const remainderOffset = Math.min(debtorMax, Math.max(0, totalInvestmentCost - cash));
       setSplitOffsetAmount(formatCurrencyInput(remainderOffset));
     } else {
       // If total investment cost hasn't been set yet, preserve debtor offset amount
@@ -1092,7 +1100,7 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
             };
           }),
           source_type: sourceType,
-          supplier_contact_id: supplierId || (fundingSource === 'debtor_offset' ? (selectedDebtorContactId || undefined) : undefined),
+          supplier_contact_id: supplierId || ((fundingSource === 'debtor_offset' || fundingSource === 'split') ? (selectedDebtorContactId || undefined) : undefined),
           return_deadline: calculatedReturnDeadline,
           funding_source: sourceType === 'purchase' ? (fundingSource === 'shop_account' ? 'account' : fundingSource === 'unpaid' ? 'none' : fundingSource) : 'none',
           payment_account_id: (sourceType === 'purchase' && (fundingSource === 'shop_account' || fundingSource === 'split')) ? (isAccountSplit ? undefined : (paymentAccountId || undefined)) : undefined,
@@ -1111,7 +1119,7 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
           location: location || 'Shop Counter',
           notes: notes.trim() || null,
           source_type: sourceType,
-          supplier_contact_id: supplierId || (fundingSource === 'debtor_offset' ? (selectedDebtorContactId || null) : null),
+          supplier_contact_id: supplierId || ((fundingSource === 'debtor_offset' || fundingSource === 'split') ? (selectedDebtorContactId || null) : null),
           return_deadline: calculatedReturnDeadline,
           funding_source: sourceType === 'purchase' ? (fundingSource === 'shop_account' ? 'account' : fundingSource === 'unpaid' ? 'none' : fundingSource) : 'none',
           payment_account_id: (sourceType === 'purchase' && (fundingSource === 'shop_account' || fundingSource === 'split')) ? (isAccountSplit ? undefined : (paymentAccountId || undefined)) : undefined,
@@ -3266,24 +3274,52 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                         ))}
                       </select>
                     )}
-                    {selectedDebtorContactId && (
-                      <div className="text-[11px] text-emerald-600 dark:text-emerald-400 bg-emerald-50/60 dark:bg-emerald-950/40 border border-emerald-200/50 dark:border-emerald-800/40 rounded-lg p-2 leading-relaxed">
-                        Device will be added to shop stock. Up to {totalInvestmentCost.toLocaleString()} ETB will be credited to reduce this contact's debt as <strong>Paid by Device</strong>.
-                      </div>
-                    )}
+                    {selectedDebtorContactId && (() => {
+                      const selectedDebtor = debtorsWithBalance.find((d) => d.contact.id === selectedDebtorContactId);
+                      const debtorOwed = selectedDebtor ? selectedDebtor.totalOwed : 0;
+                      const offsetVal = Math.min(debtorOwed, totalInvestmentCost);
+                      const excessPayable = Math.max(0, totalInvestmentCost - debtorOwed);
+                      return (
+                        <div className="flex items-center justify-between text-[11px] px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300">
+                          <span>
+                            Offset: <strong className="text-emerald-600 dark:text-emerald-400 font-semibold">{offsetVal.toLocaleString()} ETB</strong>
+                          </span>
+                          {excessPayable > 0 ? (
+                            <span>
+                              Payable: <strong className="text-amber-600 dark:text-amber-400 font-semibold">+{excessPayable.toLocaleString()} ETB</strong>
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 dark:text-slate-500 font-medium">Fully covered</span>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
 
                 {fundingSource === 'split' && (
-                  <div className="space-y-3 pt-1">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-2.5 pt-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                       <div>
                         <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
                           Debtor Contact (Offset)
                         </label>
                         <select
                           value={selectedDebtorContactId}
-                          onChange={(e) => setSelectedDebtorContactId(e.target.value)}
+                          onChange={(e) => {
+                            const newId = e.target.value;
+                            setSelectedDebtorContactId(newId);
+                            const debtor = debtorsWithBalance.find((d) => d.contact.id === newId);
+                            const debtorMax = debtor ? debtor.totalOwed : 0;
+                            const currentOffset = parseFormattedNumber(splitOffsetAmount) || 0;
+                            if (currentOffset > debtorMax) {
+                              const clamped = Math.min(debtorMax, totalInvestmentCost > 0 ? totalInvestmentCost : debtorMax);
+                              setSplitOffsetAmount(formatCurrencyInput(clamped));
+                              if (totalInvestmentCost > 0) {
+                                setSplitCashAmount(formatCurrencyInput(Math.max(0, totalInvestmentCost - clamped)));
+                              }
+                            }
+                          }}
                           className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none cursor-pointer"
                         >
                           <option value="">— Select Debtor Contact —</option>
@@ -3313,16 +3349,28 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                           onChange={(e) => handleSplitCashChange(formatCurrencyInput(e.target.value))}
                           className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none"
                         />
-                        <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1.5">
-                          {totalInvestmentCost > 0
-                            ? `Remaining after offset: ${Math.max(0, totalInvestmentCost - (parseFormattedNumber(splitOffsetAmount) || 0)).toLocaleString()} ETB`
-                            : (parseFormattedNumber(splitCashAmount) || 0) > 0
-                              ? `Bank Cash to fund: ${(parseFormattedNumber(splitCashAmount) || 0).toLocaleString()} ETB`
-                              : 'Enter debtor offset and bank cash amounts'
-                          }
-                        </p>
                       </div>
                     </div>
+
+                    {totalInvestmentCost > 0 && (() => {
+                      const offsetNum = parseFormattedNumber(splitOffsetAmount) || 0;
+                      const cashNum = parseFormattedNumber(splitCashAmount) || 0;
+                      const unpaidRemainder = Math.max(0, totalInvestmentCost - (offsetNum + cashNum));
+                      return (
+                        <div className="flex items-center justify-between text-[11px] px-2.5 py-1.5 rounded-lg bg-slate-100/80 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300">
+                          <span>
+                            Offset: <strong className="text-emerald-600 dark:text-emerald-400 font-semibold">{offsetNum.toLocaleString()}</strong> · Bank: <strong className="text-slate-900 dark:text-white font-semibold">{cashNum.toLocaleString()}</strong>
+                          </span>
+                          {unpaidRemainder > 0 ? (
+                            <span>
+                              Payable: <strong className="text-amber-600 dark:text-amber-400 font-semibold">+{unpaidRemainder.toLocaleString()} ETB</strong>
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 dark:text-slate-500 font-medium">Fully covered</span>
+                          )}
+                        </div>
+                      );
+                    })()}
 
                     {/* Bank Account / Split Accounts for the bank cash portion - Always visible */}
                     <div className="pt-2 border-t border-slate-100 dark:border-slate-800">

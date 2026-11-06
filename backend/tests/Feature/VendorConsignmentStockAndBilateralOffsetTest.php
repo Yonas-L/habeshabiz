@@ -1216,3 +1216,118 @@ test('intake with non-uuid foreign keys returns 422 validation response instead 
     $res->assertStatus(422);
     $res->assertJsonValidationErrors(['variant_id', 'supplier_contact_id']);
 });
+
+test('debtor offset where device cost exceeds debtor balance automatically offsets debt and creates payable for remainder', function () {
+    // Partner A owes the shop 70,000 ETB
+    $receivableDebt = Debt::create([
+        'tenant_id' => $this->tenant->id,
+        'contact_id' => $this->partnerA->id,
+        'type' => 'receivable',
+        'reference_type' => 'manual',
+        'original_amount' => 70000.00,
+        'paid_amount' => 0.0,
+        'remaining_amount' => 70000.00,
+        'status' => 'open',
+        'notes' => 'Old debt obligation',
+    ]);
+
+    // Intake device costing 100,000 ETB funded by debtor offset
+    $res = $this->actingAs($this->user, 'sanctum')->postJson('/api/v1/inventory/units', [
+        'variant_id' => $this->variantA->id,
+        'imei_or_serial' => 'OFFSET-OVER-100K',
+        'condition' => 'brand_new',
+        'cost_basis' => 100000.00,
+        'source_type' => 'purchase',
+        'funding_source' => 'debtor_offset',
+        'receivable_contact_id' => $this->partnerA->id,
+    ]);
+
+    $res->assertCreated();
+
+    // 1. Debtor's 70,000 ETB receivable is fully settled
+    $freshReceivable = $receivableDebt->fresh();
+    expect((float) $freshReceivable->remaining_amount)->toBe(0.0)
+        ->and($freshReceivable->status)->toBe('settled');
+
+    // 2. The remaining 30,000 ETB is automatically recorded as an open payable debt to Partner A
+    $payableDebt = Debt::where('tenant_id', $this->tenant->id)
+        ->where('contact_id', $this->partnerA->id)
+        ->where('type', 'payable')
+        ->where('reference_type', 'stock_intake')
+        ->first();
+
+    expect($payableDebt)->not->toBeNull()
+        ->and((float) $payableDebt->original_amount)->toBe(30000.00)
+        ->and((float) $payableDebt->remaining_amount)->toBe(30000.00)
+        ->and($payableDebt->status)->toBe('open');
+
+    // 3. Bank balance remains untouched
+    expect((float) $this->cbe->fresh()->current_balance)->toBe(500000.00);
+
+    // 4. Partner Statement reflects: Net balance = -30,000 ETB (Shop owes Partner 30k)
+    $action = app(GeneratePartnerStatementAction::class);
+    $statement = $action->execute($this->partnerA);
+
+    expect((float) $statement['kpis']['current_net_balance'])->toBe(-30000.00)
+        ->and((float) $statement['kpis']['current_open_receivable'])->toBe(0.0)
+        ->and((float) $statement['kpis']['current_open_payable'])->toBe(30000.00);
+});
+
+test('split funding where offset plus cash is less than total cost creates payable debt for remainder', function () {
+    // Partner B owes the shop 70,000 ETB
+    $receivableDebt = Debt::create([
+        'tenant_id' => $this->tenant->id,
+        'contact_id' => $this->partnerB->id,
+        'type' => 'receivable',
+        'reference_type' => 'manual',
+        'original_amount' => 70000.00,
+        'paid_amount' => 0.0,
+        'remaining_amount' => 70000.00,
+        'status' => 'open',
+        'notes' => 'Partner B initial debt',
+    ]);
+
+    // Total cost = 100,000 ETB. Offset = 70,000 ETB, Bank cash = 10,000 ETB. Unpaid = 20,000 ETB.
+    $res = $this->actingAs($this->user, 'sanctum')->postJson('/api/v1/inventory/units', [
+        'variant_id' => $this->variantA->id,
+        'imei_or_serial' => 'SPLIT-FUND-100K',
+        'condition' => 'brand_new',
+        'cost_basis' => 100000.00,
+        'source_type' => 'purchase',
+        'funding_source' => 'split',
+        'receivable_contact_id' => $this->partnerB->id,
+        'receivable_offset_amount' => 70000.00,
+        'payment_account_id' => $this->cbe->id,
+        'payment_amount' => 10000.00,
+    ]);
+
+    $res->assertCreated();
+
+    // 1. Debtor's 70,000 ETB receivable is fully settled
+    $freshReceivable = $receivableDebt->fresh();
+    expect((float) $freshReceivable->remaining_amount)->toBe(0.0)
+        ->and($freshReceivable->status)->toBe('settled');
+
+    // 2. Bank deducted exactly 10,000 ETB
+    expect((float) $this->cbe->fresh()->current_balance)->toBe(490000.00);
+
+    // 3. The remaining 20,000 ETB is automatically recorded as an open payable debt to Partner B
+    $payableDebt = Debt::where('tenant_id', $this->tenant->id)
+        ->where('contact_id', $this->partnerB->id)
+        ->where('type', 'payable')
+        ->where('reference_type', 'stock_intake')
+        ->first();
+
+    expect($payableDebt)->not->toBeNull()
+        ->and((float) $payableDebt->original_amount)->toBe(20000.00)
+        ->and((float) $payableDebt->remaining_amount)->toBe(20000.00)
+        ->and($payableDebt->status)->toBe('open');
+
+    // 4. Partner Statement reflects: Net balance = -20,000 ETB
+    $action = app(GeneratePartnerStatementAction::class);
+    $statement = $action->execute($this->partnerB);
+
+    expect((float) $statement['kpis']['current_net_balance'])->toBe(-20000.00)
+        ->and((float) $statement['kpis']['current_open_receivable'])->toBe(0.0)
+        ->and((float) $statement['kpis']['current_open_payable'])->toBe(20000.00);
+});
