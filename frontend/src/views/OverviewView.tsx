@@ -824,37 +824,47 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               </span>
             </div>
 
-            {/* Action Buttons List: 3 minimal, functional buttons that open in-page modals */}
-            <div className="relative z-10 flex-1 flex flex-col justify-center gap-2.5 2xl:gap-3 min-h-0">
-              {/* 1. Record Expense */}
+            {/* Action Buttons List: 4 minimal, functional buttons that open in-page modals / navigate */}
+            <div className="relative z-10 flex-1 flex flex-col justify-center gap-2 2xl:gap-2.5 min-h-0">
+              {/* 1. Record Sale */}
+              <button
+                type="button"
+                onClick={() => onNavigateTab('counter')}
+                className="w-full flex items-center justify-between py-2 2xl:py-2.5 px-3.5 2xl:px-4 rounded-xl bg-white dark:bg-slate-800/95 hover:bg-emerald-50/60 dark:hover:bg-slate-800 shadow-xs hover:shadow-sm border border-emerald-100/80 dark:border-emerald-900/40 text-emerald-700 dark:text-emerald-400 text-xs 2xl:text-sm font-semibold transition-all cursor-pointer group text-left"
+              >
+                <span className="truncate">Record Sale</span>
+                <ChevronRight className="w-3.5 h-3.5 text-emerald-500/70 dark:text-emerald-400/70 group-hover:text-emerald-600 dark:group-hover:text-emerald-300 group-hover:translate-x-0.5 transition-all shrink-0" />
+              </button>
+
+              {/* 2. Record Expense */}
               <button
                 type="button"
                 onClick={() => setIsExpenseModalOpen(true)}
-                className="w-full flex items-center justify-between py-2.5 2xl:py-3.5 px-4 rounded-xl bg-white dark:bg-slate-800/95 hover:bg-emerald-50/60 dark:hover:bg-slate-800 shadow-xs hover:shadow-sm border border-emerald-100/80 dark:border-emerald-900/40 text-emerald-700 dark:text-emerald-400 text-xs 2xl:text-sm font-semibold transition-all cursor-pointer group text-left"
+                className="w-full flex items-center justify-between py-2 2xl:py-2.5 px-3.5 2xl:px-4 rounded-xl bg-white dark:bg-slate-800/95 hover:bg-emerald-50/60 dark:hover:bg-slate-800 shadow-xs hover:shadow-sm border border-emerald-100/80 dark:border-emerald-900/40 text-emerald-700 dark:text-emerald-400 text-xs 2xl:text-sm font-semibold transition-all cursor-pointer group text-left"
               >
                 <span className="truncate">Record Expense</span>
                 <ChevronRight className="w-3.5 h-3.5 text-emerald-500/70 dark:text-emerald-400/70 group-hover:text-emerald-600 dark:group-hover:text-emerald-300 group-hover:translate-x-0.5 transition-all shrink-0" />
               </button>
 
-              {/* 2. Record Debt */}
+              {/* 3. Record Debt */}
               <button
                 type="button"
                 onClick={() => {
                   setDebtModalDefaultType('receivable');
                   setIsDebtModalOpen(true);
                 }}
-                className="w-full flex items-center justify-between py-2.5 2xl:py-3.5 px-4 rounded-xl bg-white dark:bg-slate-800/95 hover:bg-emerald-50/60 dark:hover:bg-slate-800 shadow-xs hover:shadow-sm border border-emerald-100/80 dark:border-emerald-900/40 text-emerald-700 dark:text-emerald-400 text-xs 2xl:text-sm font-semibold transition-all cursor-pointer group text-left"
+                className="w-full flex items-center justify-between py-2 2xl:py-2.5 px-3.5 2xl:px-4 rounded-xl bg-white dark:bg-slate-800/95 hover:bg-emerald-50/60 dark:hover:bg-slate-800 shadow-xs hover:shadow-sm border border-emerald-100/80 dark:border-emerald-900/40 text-emerald-700 dark:text-emerald-400 text-xs 2xl:text-sm font-semibold transition-all cursor-pointer group text-left"
               >
                 <span className="truncate">Record Debt</span>
                 <ChevronRight className="w-3.5 h-3.5 text-emerald-500/70 dark:text-emerald-400/70 group-hover:text-emerald-600 dark:group-hover:text-emerald-300 group-hover:translate-x-0.5 transition-all shrink-0" />
               </button>
 
-              {/* 3. Add Stock */}
+              {/* 4. Add Stock */}
               <button
                 type="button"
                 onClick={handleOpenStockIntake}
                 disabled={isLoadingStockMeta}
-                className="w-full flex items-center justify-between py-2.5 2xl:py-3.5 px-4 rounded-xl bg-white dark:bg-slate-800/95 hover:bg-emerald-50/60 dark:hover:bg-slate-800 shadow-xs hover:shadow-sm border border-emerald-100/80 dark:border-emerald-900/40 text-emerald-700 dark:text-emerald-400 text-xs 2xl:text-sm font-semibold transition-all cursor-pointer group text-left disabled:opacity-70"
+                className="w-full flex items-center justify-between py-2 2xl:py-2.5 px-3.5 2xl:px-4 rounded-xl bg-white dark:bg-slate-800/95 hover:bg-emerald-50/60 dark:hover:bg-slate-800 shadow-xs hover:shadow-sm border border-emerald-100/80 dark:border-emerald-900/40 text-emerald-700 dark:text-emerald-400 text-xs 2xl:text-sm font-semibold transition-all cursor-pointer group text-left disabled:opacity-70"
               >
                 <span className="truncate">{isLoadingStockMeta ? 'Loading...' : 'Add Stock'}</span>
                 {isLoadingStockMeta ? (

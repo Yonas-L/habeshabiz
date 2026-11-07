@@ -1026,14 +1026,22 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
                         const amount = Number(h.amount) || 0;
                         const rate = Number(h.rate) || 0;
                         const val = Number(h.etb_value) || (amount * rate);
+                        const lotName = (h.name || '').trim();
                         return (
                           <div
                             key={h.id || idx}
                             className="flex items-center justify-between p-2 rounded-xl bg-slate-50/70 dark:bg-slate-900/40 border border-slate-200/50 dark:border-slate-800/50 text-xs"
                           >
                             <div className="flex items-center gap-2 font-mono flex-wrap">
-                              <span className="text-[10px] font-sans font-bold text-slate-400 uppercase">
-                                Lot {idx + 1}
+                              <span className="text-[10px] font-sans font-bold uppercase">
+                                {lotName ? (
+                                  <>
+                                    <span className="text-slate-800 dark:text-slate-200 font-bold">{lotName}</span>
+                                    <span className="text-slate-400 font-normal ml-1">· Lot {idx + 1}</span>
+                                  </>
+                                ) : (
+                                  <span className="text-slate-400">Lot {idx + 1}</span>
+                                )}
                               </span>
                               <span className="font-bold text-slate-800 dark:text-slate-200">
                                 {amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {curr}

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { NavTab } from './Sidebar';
 import type { User, Tenant } from '../api/client';
-import { Menu, Plus, Calendar, Sun, Moon, ChevronLeft, ChevronRight, ChevronDown, Check, Eye, EyeOff } from 'lucide-react';
+import { Menu, Calendar, Sun, Moon, ChevronLeft, ChevronRight, ChevronDown, Check, Eye, EyeOff } from 'lucide-react';
 import { useBalancePrivacy } from '../context/BalancePrivacyContext';
  
 interface TopbarProps {
@@ -13,7 +13,6 @@ interface TopbarProps {
   theme?: 'light' | 'dark';
   onToggleTheme?: () => void;
   onOpenMobileSidebar: () => void;
-  onQuickAction?: () => void;
   onOpenProfile?: () => void;
 }
 
@@ -52,7 +51,6 @@ export const Topbar: React.FC<TopbarProps> = ({
   theme = 'light',
   onToggleTheme,
   onOpenMobileSidebar,
-  onQuickAction,
   onOpenProfile,
 }) => {
   const current = tabTitles[activeTab] || tabTitles.overview;
@@ -323,18 +321,6 @@ export const Topbar: React.FC<TopbarProps> = ({
             ) : (
               <Moon className="w-5 h-5 text-slate-600" />
             )}
-          </button>
-        )}
-
-        {/* New Sale Button (Desktop Only — on mobile handled via SpeedDial FAB & Bottom Nav) */}
-        {onQuickAction && (
-          <button
-            type="button"
-            onClick={onQuickAction}
-            className="hidden md:flex h-10 sm:h-11 px-4 rounded-xl bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 text-white dark:text-slate-900 text-xs font-bold transition-all shadow-sm items-center gap-1.5 active:scale-[0.98]"
-          >
-            <Plus className="w-4 h-4 text-emerald-400 dark:text-emerald-600" />
-            <span>Record Sale</span>
           </button>
         )}
       </div>

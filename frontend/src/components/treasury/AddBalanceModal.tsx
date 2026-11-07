@@ -22,6 +22,7 @@ interface AddBalanceModalProps {
 
 export interface ReserveHoldingRow {
   id: string;
+  name?: string;
   amount: string;
   rate: string;
 }
@@ -41,6 +42,7 @@ export const AddBalanceModal: React.FC<AddBalanceModalProps> = ({
 
   // Reserve holdings state
   const [reserveMode, setReserveMode] = useState<'add_lot' | 'all_lots'>('add_lot');
+  const [newLotName, setNewLotName] = useState('');
   const [newLotAmount, setNewLotAmount] = useState('');
   const [newLotRate, setNewLotRate] = useState('');
   const [holdings, setHoldings] = useState<ReserveHoldingRow[]>([]);
@@ -60,6 +62,7 @@ export const AddBalanceModal: React.FC<AddBalanceModalProps> = ({
       setAmountToAdd('');
       setDirectBalance(formatCurrencyInput(currentBalanceNum));
       setReserveMode('add_lot');
+      setNewLotName('');
       setNewLotAmount('');
 
       // Auto-populate last exchange rate if available
@@ -68,6 +71,7 @@ export const AddBalanceModal: React.FC<AddBalanceModalProps> = ({
         setHoldings(
           details.holdings.map((h: any, idx: number) => ({
             id: String(h.id || idx + 1),
+            name: h.name || '',
             amount: h.amount != null ? formatCurrencyInput(h.amount) : '',
             rate: h.rate != null ? formatCurrencyInput(h.rate) : '',
           }))
@@ -80,13 +84,14 @@ export const AddBalanceModal: React.FC<AddBalanceModalProps> = ({
         setHoldings([
           {
             id: '1',
+            name: '',
             amount: formatCurrencyInput(fAmt),
             rate: formatCurrencyInput(avgRate),
           },
         ]);
         setNewLotRate(formatCurrencyInput(avgRate));
       } else {
-        setHoldings([{ id: '1', amount: '', rate: '' }]);
+        setHoldings([{ id: '1', name: '', amount: '', rate: '' }]);
         setNewLotRate('');
       }
 
@@ -153,20 +158,20 @@ export const AddBalanceModal: React.FC<AddBalanceModalProps> = ({
     const lastRate = holdings.length > 0 ? holdings[holdings.length - 1].rate : '';
     setHoldings((prev) => [
       ...prev,
-      { id: Date.now().toString(), amount: '', rate: lastRate },
+      { id: Date.now().toString(), name: '', amount: '', rate: lastRate },
     ]);
   };
 
   const handleRemoveHoldingRow = (id: string) => {
     if (holdings.length <= 1) {
-      setHoldings([{ id: '1', amount: '', rate: '' }]);
+      setHoldings([{ id: '1', name: '', amount: '', rate: '' }]);
       return;
     }
     setHoldings((prev) => prev.filter((h) => h.id !== id));
   };
 
-  const handleUpdateHoldingRow = (id: string, field: 'amount' | 'rate', val: string) => {
-    const formatted = formatCurrencyInput(val);
+  const handleUpdateHoldingRow = (id: string, field: 'amount' | 'rate' | 'name', val: string) => {
+    const formatted = field === 'name' ? val : formatCurrencyInput(val);
     setHoldings((prev) =>
       prev.map((h) => (h.id === id ? { ...h, [field]: formatted } : h))
     );
@@ -195,6 +200,7 @@ export const AddBalanceModal: React.FC<AddBalanceModalProps> = ({
           // Existing valid holdings + new lot
           const existingValid = (details?.holdings || []).map((h: any, idx: number) => ({
             id: String(h.id || idx + 1),
+            name: h.name || undefined,
             amount: Number(h.amount) || 0,
             rate: Number(h.rate) || 0,
             etb_value: Number(h.etb_value) || (Number(h.amount) || 0) * (Number(h.rate) || 0),
@@ -202,6 +208,7 @@ export const AddBalanceModal: React.FC<AddBalanceModalProps> = ({
 
           const newLot = {
             id: String(Date.now()),
+            name: newLotName.trim() || undefined,
             amount: parsedNewLotAmt,
             rate: parsedNewLotRate,
             etb_value: newLotEtbValue,
@@ -220,6 +227,7 @@ export const AddBalanceModal: React.FC<AddBalanceModalProps> = ({
               const rate = parseFormattedNumber(h.rate) || 0;
               return {
                 id: String(h.id || idx + 1),
+                name: h.name?.trim() || undefined,
                 amount: amt,
                 rate: rate,
                 etb_value: amt * rate,
@@ -512,6 +520,19 @@ export const AddBalanceModal: React.FC<AddBalanceModalProps> = ({
 
               {reserveMode === 'add_lot' ? (
                 <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                      Lot Name / Item Description <span className="normal-case font-normal text-slate-400">(e.g. Necklace, Ring, 100g Ingot)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={newLotName}
+                      onChange={(e) => setNewLotName(e.target.value)}
+                      placeholder={account.currency === 'GOLD' ? 'e.g. Necklace, Ring, 21k Bracelet' : 'e.g. Vault Deposit, Exchange Lot'}
+                      className="w-full h-10 px-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm font-semibold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-slate-900 dark:focus:border-white focus:ring-1 focus:ring-inset focus:ring-slate-900 dark:focus:ring-white"
+                    />
+                  </div>
+
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
@@ -568,19 +589,33 @@ export const AddBalanceModal: React.FC<AddBalanceModalProps> = ({
                 </div>
               ) : (
                 <div className="space-y-3">
+                  <div className="flex items-center gap-2 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                    <span className="w-5 text-center shrink-0">#</span>
+                    <span className="w-28 sm:w-32 shrink-0">Item / Lot Name</span>
+                    <span className="flex-1">Amount</span>
+                    <span className="w-20 sm:w-24 shrink-0">Rate</span>
+                    <span className="w-7 shrink-0"></span>
+                  </div>
                   <div className="space-y-2">
                     {holdings.map((h, idx) => (
                       <div key={h.id} className="flex items-center gap-2">
-                        <span className="text-[10px] font-mono font-bold text-slate-400 w-5 text-center">
+                        <span className="text-[10px] font-mono font-bold text-slate-400 w-5 text-center shrink-0">
                           #{idx + 1}
                         </span>
+                        <input
+                          type="text"
+                          value={h.name || ''}
+                          onChange={(e) => handleUpdateHoldingRow(h.id, 'name', e.target.value)}
+                          placeholder="Item (e.g. Ring)"
+                          className="w-28 sm:w-32 h-9 px-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-slate-900 dark:focus:border-white focus:ring-1 focus:ring-inset focus:ring-slate-900 dark:focus:ring-white shrink-0"
+                        />
                         <input
                           type="text"
                           inputMode="decimal"
                           value={h.amount}
                           onChange={(e) => handleUpdateHoldingRow(h.id, 'amount', e.target.value)}
                           placeholder={`Amount (${assetCurrency})`}
-                          className="flex-1 h-9 px-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:border-slate-900 dark:focus:border-white focus:ring-1 focus:ring-inset focus:ring-slate-900 dark:focus:ring-white"
+                          className="flex-1 min-w-[70px] h-9 px-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:border-slate-900 dark:focus:border-white focus:ring-1 focus:ring-inset focus:ring-slate-900 dark:focus:ring-white"
                         />
                         <input
                           type="text"
@@ -588,12 +623,12 @@ export const AddBalanceModal: React.FC<AddBalanceModalProps> = ({
                           value={h.rate}
                           onChange={(e) => handleUpdateHoldingRow(h.id, 'rate', e.target.value)}
                           placeholder="Rate (ETB)"
-                          className="w-24 sm:w-28 h-9 px-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:border-slate-900 dark:focus:border-white focus:ring-1 focus:ring-inset focus:ring-slate-900 dark:focus:ring-white"
+                          className="w-20 sm:w-24 h-9 px-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:border-slate-900 dark:focus:border-white focus:ring-1 focus:ring-inset focus:ring-slate-900 dark:focus:ring-white shrink-0"
                         />
                         <button
                           type="button"
                           onClick={() => handleRemoveHoldingRow(h.id)}
-                          className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer shrink-0"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>

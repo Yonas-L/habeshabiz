@@ -13,8 +13,6 @@ import {
   Plus,
   Trash2,
   Landmark,
-  ChevronLeft,
-  ChevronRight,
   DollarSign,
   Home,
   Car,
@@ -22,6 +20,9 @@ import {
   Globe,
   FileText,
   Inbox,
+  Search,
+  Package,
+  Infinity,
 } from 'lucide-react';
 import { AnimatedNumber } from '../components/AnimatedNumber';
 import { useBalancePrivacy } from '../context/BalancePrivacyContext';
@@ -645,6 +646,76 @@ const getAssetCardTheme = (acc: FinancialAccount) => {
   }
 };
 
+// Compact table row metadata for Reserves & Assets list
+const getAssetRowInfo = (acc: FinancialAccount) => {
+  const cat = detectAssetCategory(acc);
+  if (cat === 'gold') {
+    return {
+      typeLabel: 'Gold',
+      badgeClass: 'bg-amber-100/80 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50 dark:border-amber-900/40',
+      icon: (
+        <div className="w-8 h-8 rounded-lg bg-amber-100/70 dark:bg-amber-950/60 flex items-center justify-center shrink-0">
+          <GoldIngotStack className="w-5 h-4" />
+        </div>
+      ),
+    };
+  }
+  if (cat === 'fx_usd') {
+    return {
+      typeLabel: 'FX',
+      badgeClass: 'bg-sky-100/80 dark:bg-sky-950/60 text-sky-700 dark:text-sky-400 border border-sky-200/50 dark:border-sky-900/40',
+      icon: (
+        <div className="w-8 h-8 rounded-full bg-sky-100 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0 font-black">
+          <DollarSign className="w-4 h-4 stroke-[2.75]" />
+        </div>
+      ),
+    };
+  }
+  if (cat === 'fx_eur') {
+    return {
+      typeLabel: 'FX',
+      badgeClass: 'bg-sky-100/80 dark:bg-sky-950/60 text-sky-700 dark:text-sky-400 border border-sky-200/50 dark:border-sky-900/40',
+      icon: (
+        <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 font-black text-sm">
+          €
+        </div>
+      ),
+    };
+  }
+  if (cat === 'fx_gbp') {
+    return {
+      typeLabel: 'FX',
+      badgeClass: 'bg-sky-100/80 dark:bg-sky-950/60 text-sky-700 dark:text-sky-400 border border-sky-200/50 dark:border-sky-900/40',
+      icon: (
+        <div className="w-8 h-8 rounded-full bg-violet-100 dark:bg-violet-950/60 text-violet-600 dark:text-violet-400 flex items-center justify-center shrink-0 font-black text-sm">
+          £
+        </div>
+      ),
+    };
+  }
+  if (cat === 'fx_crypto' || cat === 'fx_general') {
+    return {
+      typeLabel: 'FX',
+      badgeClass: 'bg-sky-100/80 dark:bg-sky-950/60 text-sky-700 dark:text-sky-400 border border-sky-200/50 dark:border-sky-900/40',
+      icon: (
+        <div className="w-8 h-8 rounded-full bg-teal-100 dark:bg-teal-950/60 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0 font-black">
+          <Globe className="w-4 h-4 stroke-[2.2]" />
+        </div>
+      ),
+    };
+  }
+  // Property, vehicle, gem, custom
+  return {
+    typeLabel: 'Other',
+    badgeClass: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60',
+    icon: (
+      <div className="w-8 h-8 rounded-lg bg-sky-50 dark:bg-slate-800 text-sky-600 dark:text-slate-300 flex items-center justify-center shrink-0">
+        <Package className="w-4 h-4 stroke-[2]" />
+      </div>
+    ),
+  };
+};
+
 interface TreasuryViewProps {
   accounts?: FinancialAccount[];
   initialSelectedAccount?: FinancialAccount | null;
@@ -688,98 +759,34 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
     }
   }, [accounts]);
 
-  // Pagination removed — desktop uses carousel slider approach
+  // Desktop Reserves & Assets Filtering State
+  const [assetSearchQuery, setAssetSearchQuery] = useState('');
+  const [assetCategoryFilter, setAssetCategoryFilter] = useState<'all' | 'gold' | 'fx' | 'other'>('all');
 
-  // Desktop Carousel Slides (max 2 rows x 3 columns = 6 for banks, 1 row x 3 columns = 3 for assets)
-  const BANK_SLIDE_SIZE = 6;
-  const bankSlides = React.useMemo(() => {
-    const slides: FinancialAccount[][] = [];
-    for (let i = 0; i < treasuryAccounts.length; i += BANK_SLIDE_SIZE) {
-      slides.push(treasuryAccounts.slice(i, i + BANK_SLIDE_SIZE));
-    }
-    return slides.length > 0 ? slides : [[]];
-  }, [treasuryAccounts]);
+  const filteredAssets = React.useMemo(() => {
+    return assetAccounts.filter((acc) => {
+      if (assetCategoryFilter !== 'all') {
+        const cat = detectAssetCategory(acc);
+        if (assetCategoryFilter === 'gold') {
+          if (cat !== 'gold') return false;
+        } else if (assetCategoryFilter === 'fx') {
+          if (!cat.startsWith('fx_')) return false;
+        } else if (assetCategoryFilter === 'other') {
+          if (cat === 'gold' || cat.startsWith('fx_')) return false;
+        }
+      }
 
-  const bankScrollRef = React.useRef<HTMLDivElement>(null);
-  const [canScrollBankLeft, setCanScrollBankLeft] = useState(false);
-  const [canScrollBankRight, setCanScrollBankRight] = useState(false);
+      if (assetSearchQuery.trim()) {
+        const q = assetSearchQuery.toLowerCase().trim();
+        const nameMatch = (acc.name || '').toLowerCase().includes(q);
+        const currMatch = (acc.currency || '').toLowerCase().includes(q);
+        const typeMatch = (acc.type || '').toLowerCase().includes(q);
+        if (!nameMatch && !currMatch && !typeMatch) return false;
+      }
 
-  const updateBankScrollState = () => {
-    const el = bankScrollRef.current;
-    if (!el) return;
-    const { scrollLeft, scrollWidth, clientWidth } = el;
-    setCanScrollBankLeft(scrollLeft > 4);
-    setCanScrollBankRight(scrollLeft < scrollWidth - clientWidth - 4);
-  };
-
-  useEffect(() => {
-    updateBankScrollState();
-    const timer = setTimeout(updateBankScrollState, 80);
-    const el = bankScrollRef.current;
-    if (!el) return () => clearTimeout(timer);
-    el.addEventListener('scroll', updateBankScrollState, { passive: true });
-    window.addEventListener('resize', updateBankScrollState);
-    return () => {
-      clearTimeout(timer);
-      el.removeEventListener('scroll', updateBankScrollState);
-      window.removeEventListener('resize', updateBankScrollState);
-    };
-  }, [treasuryAccounts.length, bankSlides.length]);
-
-  const scrollBank = (dir: 'left' | 'right') => {
-    const el = bankScrollRef.current;
-    if (!el) return;
-    const scrollAmt = el.clientWidth;
-    el.scrollBy({
-      left: dir === 'left' ? -scrollAmt : scrollAmt,
-      behavior: 'smooth',
+      return true;
     });
-  };
-
-  const RESERVE_SLIDE_SIZE = 3;
-  const reserveSlides = React.useMemo(() => {
-    const slides: FinancialAccount[][] = [];
-    for (let i = 0; i < assetAccounts.length; i += RESERVE_SLIDE_SIZE) {
-      slides.push(assetAccounts.slice(i, i + RESERVE_SLIDE_SIZE));
-    }
-    return slides.length > 0 ? slides : [[]];
-  }, [assetAccounts]);
-
-  const reserveScrollRef = React.useRef<HTMLDivElement>(null);
-  const [canScrollReserveLeft, setCanScrollReserveLeft] = useState(false);
-  const [canScrollReserveRight, setCanScrollReserveRight] = useState(false);
-
-  const updateReserveScrollState = () => {
-    const el = reserveScrollRef.current;
-    if (!el) return;
-    const { scrollLeft, scrollWidth, clientWidth } = el;
-    setCanScrollReserveLeft(scrollLeft > 4);
-    setCanScrollReserveRight(scrollLeft < scrollWidth - clientWidth - 4);
-  };
-
-  useEffect(() => {
-    updateReserveScrollState();
-    const timer = setTimeout(updateReserveScrollState, 80);
-    const el = reserveScrollRef.current;
-    if (!el) return () => clearTimeout(timer);
-    el.addEventListener('scroll', updateReserveScrollState, { passive: true });
-    window.addEventListener('resize', updateReserveScrollState);
-    return () => {
-      clearTimeout(timer);
-      el.removeEventListener('scroll', updateReserveScrollState);
-      window.removeEventListener('resize', updateReserveScrollState);
-    };
-  }, [assetAccounts.length, reserveSlides.length]);
-
-  const scrollReserve = (dir: 'left' | 'right') => {
-    const el = reserveScrollRef.current;
-    if (!el) return;
-    const scrollAmt = el.clientWidth;
-    el.scrollBy({
-      left: dir === 'left' ? -scrollAmt : scrollAmt,
-      behavior: 'smooth',
-    });
-  };
+  }, [assetAccounts, assetCategoryFilter, assetSearchQuery]);
 
   // Mobile ATM Cards and Transactions State (matches reference screenshot)
   const [mobileCategory, setMobileCategory] = useState<'banks' | 'reserves'>('banks');
@@ -1108,75 +1115,60 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
       </div>
 
       {/* ========================================================================= */}
-      {/* DESKTOP VIEW (≥ sm): Full desktop view preserved and completely unaffected */}
+      {/* DESKTOP & TABLET VIEW (≥ sm): Two-Column Layout (Bank Accounts 60% / Reserves 40%) */}
       {/* ========================================================================= */}
-      <div className="hidden sm:block space-y-8">
-        {/* Bank Accounts & Mobile Wallets Section */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between pt-1">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-              Bank Accounts & Wallets
-            </span>
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">
-                {treasuryAccounts.length} {treasuryAccounts.length === 1 ? 'account' : 'accounts'}
-              </span>
-              <button
-                onClick={() => handleOpenCreate('bank')}
-                className="h-7 px-2.5 rounded-lg border border-slate-200/80 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 transition-all flex items-center gap-1 active:scale-95 cursor-pointer ml-1"
-              >
-                <Plus className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Add Account</span>
-              </button>
-              <button
-                onClick={() => handleOpenTransfer()}
-                className="h-7 px-2.5 rounded-lg border border-slate-200/80 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 transition-all flex items-center gap-1 active:scale-95 cursor-pointer"
-              >
-                <ArrowRightLeft className="w-3.5 h-3.5 text-emerald-500" />
-                <span>Transfer</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Desktop Bank Cards (≥ sm): Max 2 rows x 3 columns visible, horizontally scrollable with big floating nav arrows */}
-          <div className="relative group/bank-slider">
-            {/* Big Left Floating Slider Arrow */}
-            {bankSlides.length > 1 && (
-              <button
-                onClick={() => scrollBank('left')}
-                disabled={!canScrollBankLeft}
-                className={`hidden sm:flex absolute -left-4 sm:-left-5 top-1/2 -translate-y-1/2 z-30 w-11 h-11 sm:w-12 sm:h-12 rounded-full items-center justify-center transition-all duration-300 border cursor-pointer ${
-                  canScrollBankLeft
-                    ? 'bg-white/95 dark:bg-slate-800/95 backdrop-blur-md border-slate-200/90 dark:border-slate-700 text-slate-700 dark:text-slate-100 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-600 dark:hover:text-emerald-400 hover:scale-110 active:scale-95 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.15),0_4px_10px_-2px_rgba(0,0,0,0.06)] dark:shadow-[0_10px_25px_-5px_rgba(0,0,0,0.6)]'
-                    : 'opacity-0 pointer-events-none scale-90'
-                }`}
-                aria-label="Previous bank accounts"
-              >
-                <ChevronLeft className="w-6 h-6 stroke-[2.5]" />
-              </button>
-            )}
-
-            <div
-              ref={bankScrollRef}
-              className="hidden sm:flex items-start overflow-x-auto scrollbar-none snap-x snap-mandatory gap-5 pb-2 pt-1"
-            >
-              {bankSlides.map((slide, sIdx) => (
-                <div
-                  key={sIdx}
-                  className="w-full shrink-0 snap-start grid grid-cols-3 gap-5 items-start content-start auto-rows-max"
+      <div className="hidden sm:block">
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 xl:gap-6 items-start">
+          {/* ── Left Column: Bank Accounts & Wallets (~60% / 7 cols) ── */}
+          <div className="xl:col-span-7 flex flex-col min-w-0">
+            {/* Header: Title + count + Add Account + Transfer */}
+            <div className="flex items-center justify-between pb-3 shrink-0">
+              <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
+                Bank Accounts
+              </h3>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">
+                  {treasuryAccounts.length} {treasuryAccounts.length === 1 ? 'account' : 'accounts'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleOpenCreate('bank')}
+                  className="h-7 px-2.5 rounded-lg border border-slate-200/80 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 transition-all flex items-center gap-1 active:scale-95 cursor-pointer ml-1"
                 >
-                  {slide.map((acc, aIdx) => {
-                    const globalIndex = sIdx * BANK_SLIDE_SIZE + aIdx;
+                  <Plus className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Add Account</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleOpenTransfer()}
+                  className="h-7 px-2.5 rounded-lg border border-slate-200/80 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 transition-all flex items-center gap-1 active:scale-95 cursor-pointer"
+                >
+                  <ArrowRightLeft className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>Transfer</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 2-Column Grid of Bank Cards, 2 rows max visible (4 cards), independently scrollable */}
+            <div className="overflow-y-auto max-h-[464px] scrollbar-thin pr-1 pb-1">
+              {treasuryAccounts.length === 0 ? (
+                <div className="bg-white dark:bg-[#131926] rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 p-8 text-center">
+                  <Landmark className="w-7 h-7 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+                  <p className="text-xs text-slate-400">No bank accounts yet</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {treasuryAccounts.map((acc, globalIndex) => {
                     const isInactive = acc.is_active === false;
                     const isCash = isCashAccount(acc);
                     return (
                       <div
                         key={acc.id}
                         onClick={() => setSelectedAccountForLedger(acc)}
-                        className={`relative overflow-hidden rounded-3xl border p-5 sm:p-6 transition-all duration-300 flex flex-col justify-between cursor-pointer group min-h-[220px] h-[220px] self-start w-full ${
+                        className={`relative overflow-hidden rounded-3xl border p-5 transition-all duration-300 flex flex-col justify-between cursor-pointer group min-h-[220px] h-[220px] self-start w-full ${
                           isInactive
                             ? 'bg-slate-50/80 dark:bg-[#131926]/60 border-slate-200/50 dark:border-slate-800/50 opacity-60'
-                            : 'bg-gradient-to-br from-white via-[#fcfdfe] to-[#f8fafc] dark:from-[#182133] dark:via-[#131926] dark:to-[#0f1420] border-slate-200/70 dark:border-slate-800 shadow-[0_20px_35px_-10px_rgba(0,0,0,0.07),0_10px_20px_-5px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1)] dark:shadow-[0_20px_35px_-10px_rgba(0,0,0,0.5),0_10px_20px_-5px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.06)] hover:shadow-[0_28px_45px_-12px_rgba(0,0,0,0.12),0_12px_24px_-6px_rgba(0,0,0,0.05)] hover:-translate-y-1'
+                            : 'bg-gradient-to-br from-white via-[#fcfdfe] to-[#f8fafc] dark:from-[#182133] dark:via-[#131926] dark:to-[#0f1420] border-slate-200/70 dark:border-slate-800 shadow-[0_20px_35px_-10px_rgba(0,0,0,0.07),0_10px_20px_-5px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1)] dark:shadow-[0_20px_35px_-10px_rgba(0,0,0,0.5),0_10px_20px_-5px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.06)] hover:shadow-[0_28px_45px_-12px_rgba(0,0,0,0.12),0_12px_24px_-6px_rgba(0,0,0,0.05)] hover:-translate-y-0.5'
                         }`}
                       >
                         <DynamicCardAmbientArt acc={acc} index={globalIndex} />
@@ -1186,7 +1178,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                             <div className="flex items-center gap-3 min-w-0">
                               <AccountLogo account={acc} size="md" className="w-10 h-10 rounded-xl shrink-0 shadow-xs" />
                               <div className="min-w-0">
-                                <div className="font-bold text-slate-800 dark:text-slate-100 text-sm sm:text-[14px] leading-tight truncate">
+                                <div className="font-bold text-slate-800 dark:text-slate-100 text-sm leading-tight truncate">
                                   {acc.name}
                                 </div>
                                 <div className="text-[11px] text-slate-400 dark:text-slate-500 font-medium truncate mt-0.5">
@@ -1210,7 +1202,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                             <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 block mb-1">
                               {isCash ? 'CASH IN SAFE' : 'AVAILABLE BALANCE'}
                             </span>
-                            <div className="font-mono font-black tabular-nums text-slate-900 dark:text-white text-2xl sm:text-[26px] tracking-tight leading-none">
+                            <div className="font-mono font-black tabular-nums text-slate-900 dark:text-white text-2xl tracking-tight leading-none">
                               <AnimatedNumber value={Number(acc.current_balance)} decimals={2} />
                               <span className="text-xs font-semibold text-slate-400 font-sans ml-1.5">ETB</span>
                             </div>
@@ -1233,6 +1225,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                             {!isCash && (
                               <>
                                 <button
+                                  type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleOpenAddBalance(acc);
@@ -1243,6 +1236,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                                   <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
                                 </button>
                                 <button
+                                  type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setDeletingAccount(acc);
@@ -1255,6 +1249,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                               </>
                             )}
                             <button
+                              type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleOpenTransfer(acc.id);
@@ -1270,173 +1265,135 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                     );
                   })}
                 </div>
-              ))}
-            </div>
-
-            {/* Big Right Floating Slider Arrow */}
-            {bankSlides.length > 1 && (
-              <button
-                onClick={() => scrollBank('right')}
-                disabled={!canScrollBankRight}
-                className={`hidden sm:flex absolute -right-4 sm:-right-5 top-1/2 -translate-y-1/2 z-30 w-11 h-11 sm:w-12 sm:h-12 rounded-full items-center justify-center transition-all duration-300 border cursor-pointer ${
-                  canScrollBankRight
-                    ? 'bg-white/95 dark:bg-slate-800/95 backdrop-blur-md border-slate-200/90 dark:border-slate-700 text-slate-700 dark:text-slate-100 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-600 dark:hover:text-emerald-400 hover:scale-110 active:scale-95 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.15),0_4px_10px_-2px_rgba(0,0,0,0.06)] dark:shadow-[0_10px_25px_-5px_rgba(0,0,0,0.6)]'
-                    : 'opacity-0 pointer-events-none scale-90'
-                }`}
-                aria-label="Next bank accounts"
-              >
-                <ChevronRight className="w-6 h-6 stroke-[2.5]" />
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Hedge Reserves Section - Cardless, Icon-first, Minimal, Vibrant */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between pt-2">
-            <div>
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block">
-                Hedge Reserves
-              </span>
-              <span className="text-xs text-slate-400 dark:text-slate-500 font-medium">Gold & foreign currency</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => handleOpenCreate('asset_fx')}
-                className="h-8 px-3.5 rounded-xl bg-[#064e3b] hover:bg-[#065f46] text-white text-xs font-semibold transition-all flex items-center gap-1.5 active:scale-95 shadow-xs cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                Add Reserve
-              </button>
-            </div>
-          </div>
-
-          {assetAccounts.length === 0 ? (
-            <div className="bg-white dark:bg-[#131926] rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 p-8 text-center">
-              <Coins className="w-7 h-7 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
-              <p className="text-xs text-slate-400">No asset reserves yet</p>
-              <p className="text-[11px] text-slate-400 mt-0.5">Add gold, USD, USDT, or other hedge assets</p>
-            </div>
-          ) : (
-            <div className="relative group/reserve-slider">
-              {/* Big Left Floating Slider Arrow */}
-              {reserveSlides.length > 1 && (
-                <button
-                  onClick={() => scrollReserve('left')}
-                  disabled={!canScrollReserveLeft}
-                  className={`hidden sm:flex absolute -left-4 sm:-left-5 top-1/2 -translate-y-1/2 z-30 w-11 h-11 sm:w-12 sm:h-12 rounded-full items-center justify-center transition-all duration-300 border cursor-pointer ${
-                    canScrollReserveLeft
-                      ? 'bg-white/95 dark:bg-slate-800/95 backdrop-blur-md border-slate-200/90 dark:border-slate-700 text-slate-700 dark:text-slate-100 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-600 dark:hover:text-emerald-400 hover:scale-110 active:scale-95 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.15),0_4px_10px_-2px_rgba(0,0,0,0.06)] dark:shadow-[0_10px_25px_-5px_rgba(0,0,0,0.6)]'
-                      : 'opacity-0 pointer-events-none scale-90'
-                  }`}
-                  aria-label="Previous reserves"
-                >
-                  <ChevronLeft className="w-6 h-6 stroke-[2.5]" />
-                </button>
               )}
+            </div>
+          </div>
 
-              <div
-                ref={reserveScrollRef}
-                className="hidden sm:flex items-start overflow-x-auto scrollbar-none snap-x snap-mandatory gap-5 pb-2 pt-1"
-              >
-                {reserveSlides.map((slide, sIdx) => (
-                  <div
-                    key={sIdx}
-                    className="w-full shrink-0 snap-start grid grid-cols-3 gap-6 items-start content-start auto-rows-max"
-                  >
-                    {slide.map((acc) => {
-                      const isInactive = acc.is_active === false;
-                      const theme = getAssetCardTheme(acc);
-                      return (
-                        <div
-                          key={acc.id}
-                          onClick={() => setSelectedAccountForLedger(acc)}
-                          className={`relative p-6 rounded-3xl transition-all duration-300 flex flex-col items-center justify-between cursor-pointer group min-h-[220px] self-start w-full hover:-translate-y-1 hover:bg-slate-50/70 dark:hover:bg-slate-800/30 ${
-                            isInactive ? 'opacity-60' : ''
-                          }`}
-                        >
-                          {/* Quick Action Buttons on hover */}
-                          <div
-                            className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-1 z-20"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleOpenAddBalance(acc);
-                              }}
-                              title="Deposit / Add balance"
-                              className="w-7 h-7 rounded-lg bg-white/90 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-emerald-600 shadow-xs flex items-center justify-center transition-all active:scale-95 cursor-pointer"
-                            >
-                              <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setDeletingAccount(acc);
-                              }}
-                              title="Remove reserve"
-                              className="w-7 h-7 rounded-lg bg-white/90 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 text-slate-400 hover:text-rose-600 shadow-xs flex items-center justify-center transition-all active:scale-95 cursor-pointer"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
+          {/* ── Right Column: Reserves & Assets (~40% / 5 cols) ── */}
+          <div className="xl:col-span-5 flex flex-col min-w-0">
+            <div className="h-[508px] rounded-3xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800 p-5 shadow-xs flex flex-col overflow-hidden">
+              {/* Header: Title + Add Reserve button */}
+              <div className="flex items-center justify-between pb-3 shrink-0">
+                <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
+                  Reserves & Assets
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => handleOpenCreate('asset_fx')}
+                  className="h-8 px-3.5 rounded-xl bg-[#064e3b] hover:bg-[#065f46] text-white text-xs font-semibold transition-all flex items-center gap-1.5 active:scale-95 shadow-xs cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Reserve</span>
+                </button>
+              </div>
 
-                          {/* Big Vibrant Centered Emblem with Radiant Ambient Halo */}
-                          <div className="relative mb-2 mt-1">
-                            <div className={`absolute inset-0 rounded-3xl blur-2xl opacity-70 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-tr ${theme.glow}`} />
-                            <div className="relative z-10 group-hover:scale-110 transition-transform duration-300">
-                              <ReserveAssetIcon acc={acc} size="lg" />
-                            </div>
-                          </div>
+              {/* Category Filter Pills: All, Gold, FX, Other */}
+              <div className="flex items-center gap-2 pb-3 shrink-0">
+                {(['all', 'gold', 'fx', 'other'] as const).map((cat) => {
+                  const isSelected = assetCategoryFilter === cat;
+                  const label = cat === 'all' ? 'All' : cat === 'gold' ? 'Gold' : cat === 'fx' ? 'FX' : 'Other';
+                  return (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setAssetCategoryFilter(cat)}
+                      className={`h-7 px-3.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-2xs'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/70'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
 
-                          {/* Asset Name: Minimal & Bold */}
-                          <h4 className="font-bold text-slate-900 dark:text-white text-base tracking-tight truncate max-w-full text-center leading-tight mt-1">
-                            {acc.name}
-                          </h4>
+              {/* Search Field */}
+              <div className="relative mb-2 shrink-0">
+                <Search className="w-3.5 h-3.5 text-slate-400 pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={assetSearchQuery}
+                  onChange={(e) => setAssetSearchQuery(e.target.value)}
+                  placeholder="Search reserves..."
+                  className="w-full h-8 pl-8 pr-3 rounded-lg border border-slate-200/70 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 text-xs text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-colors"
+                />
+              </div>
 
-                          {/* Clean Numbers (Holdings & Valuation on one line) */}
-                          <div className="flex items-center justify-center gap-2 mt-1 text-center">
-                            {acc.asset_details?.total_foreign_amount != null && (
-                              <span className="font-mono font-bold text-sm text-emerald-600 dark:text-emerald-400">
-                                {Number(acc.asset_details.total_foreign_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{' '}
-                                <span className="text-[11px] font-bold text-slate-400 uppercase font-sans">
-                                  {acc.currency === 'GOLD' ? 'g' : (acc.currency || 'USD')}
-                                </span>
-                              </span>
-                            )}
-                            {acc.asset_details?.total_foreign_amount != null && (
-                              <span className="text-slate-300 dark:text-slate-600 text-xs">•</span>
-                            )}
-                            <div className="font-mono font-black tabular-nums text-slate-900 dark:text-white text-base tracking-tight">
-                              <AnimatedNumber value={Number(acc.current_balance)} decimals={2} />
-                              <span className="text-[10px] font-semibold text-slate-400 font-sans ml-1">ETB</span>
+              {/* Table Header: Asset | Type | Value */}
+              <div className="grid grid-cols-12 gap-2 text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider py-2 border-b border-slate-100 dark:border-slate-800/80 shrink-0 px-2">
+                <div className="col-span-6">Asset</div>
+                <div className="col-span-3 text-center">Type</div>
+                <div className="col-span-3 text-right">Value</div>
+              </div>
+
+              {/* Asset List: Independently scrollable */}
+              <div className="flex-1 overflow-y-auto scrollbar-thin divide-y divide-slate-100 dark:divide-slate-800/70 pr-1">
+                {filteredAssets.length === 0 ? (
+                  <div className="py-12 text-center">
+                    <Coins className="w-6 h-6 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+                    <p className="text-xs text-slate-400">No matching reserves found</p>
+                  </div>
+                ) : (
+                  filteredAssets.map((acc) => {
+                    const rowInfo = getAssetRowInfo(acc);
+                    return (
+                      <div
+                        key={acc.id}
+                        onClick={() => setSelectedAccountForLedger(acc)}
+                        className="py-3 px-2 flex items-center justify-between gap-3 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 rounded-xl transition-colors cursor-pointer group"
+                      >
+                        {/* Left: Icon + Name */}
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          {rowInfo.icon}
+                          <div className="min-w-0">
+                            <div className="font-bold text-slate-800 dark:text-slate-100 text-xs sm:text-sm truncate leading-tight">
+                              {acc.name}
                             </div>
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                ))}
+
+                        {/* Middle: Type badge */}
+                        <div className="shrink-0 w-16 text-center">
+                          <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold ${rowInfo.badgeClass}`}>
+                            {rowInfo.typeLabel}
+                          </span>
+                        </div>
+
+                        {/* Right: Value + Add Holdings/Balance Plus Button */}
+                        <div className="flex items-center gap-2 shrink-0">
+                          <div className="font-mono font-bold text-xs sm:text-sm tabular-nums text-slate-900 dark:text-white text-right">
+                            <AnimatedNumber value={Number(acc.current_balance)} decimals={2} />
+                            <span className="text-[10px] font-sans font-semibold text-slate-400 dark:text-slate-500 ml-1">ETB</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenAddBalance(acc);
+                            }}
+                            title="Add holdings lot / balance"
+                            className="w-7 h-7 rounded-lg bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 shadow-[0_1px_3px_rgba(0,0,0,0.05)] hover:border-emerald-500/40 text-slate-500 hover:text-emerald-600 dark:text-slate-400 dark:hover:text-emerald-400 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/30 transition-all flex items-center justify-center active:scale-95 cursor-pointer ml-1"
+                          >
+                            <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
 
-              {/* Big Right Floating Slider Arrow */}
-              {reserveSlides.length > 1 && (
-                <button
-                  onClick={() => scrollReserve('right')}
-                  disabled={!canScrollReserveRight}
-                  className={`hidden sm:flex absolute -right-4 sm:-right-5 top-1/2 -translate-y-1/2 z-30 w-11 h-11 sm:w-12 sm:h-12 rounded-full items-center justify-center transition-all duration-300 border cursor-pointer ${
-                    canScrollReserveRight
-                      ? 'bg-white/95 dark:bg-slate-800/95 backdrop-blur-md border-slate-200/90 dark:border-slate-700 text-slate-700 dark:text-slate-100 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-600 dark:hover:text-emerald-400 hover:scale-110 active:scale-95 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.15),0_4px_10px_-2px_rgba(0,0,0,0.06)] dark:shadow-[0_10px_25px_-5px_rgba(0,0,0,0.6)]'
-                      : 'opacity-0 pointer-events-none scale-90'
-                  }`}
-                  aria-label="Next reserves"
-                >
-                  <ChevronRight className="w-6 h-6 stroke-[2.5]" />
-                </button>
-              )}
+              {/* Footer: ∞ Scroll for more... */}
+              <div className="pt-2.5 pb-0.5 text-center shrink-0 border-t border-slate-100 dark:border-slate-800/70">
+                <div className="inline-flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500 font-medium">
+                  <Infinity className="w-3.5 h-3.5" />
+                  <span>Scroll for more...</span>
+                </div>
+              </div>
             </div>
-          )}
+          </div>
         </div>
       </div>
 

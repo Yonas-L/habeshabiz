@@ -38,6 +38,7 @@ const ACCOUNT_TYPES = [
 
 export interface ReserveHoldingRow {
   id: string;
+  name?: string;
   amount: string; // foreign amount input, e.g. "13,000"
   rate: string;   // exchange rate input in ETB, e.g. "135"
 }
@@ -81,7 +82,7 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
 
   // Reserve Asset Holdings state
   const [holdings, setHoldings] = useState<ReserveHoldingRow[]>([
-    { id: '1', amount: '', rate: '' },
+    { id: '1', name: '', amount: '', rate: '' },
   ]);
   const rowInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const pendingFocusIdRef = useRef<string | null>(null);
@@ -139,6 +140,7 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
             setHoldings(
               details.holdings.map((h: any, idx: number) => ({
                 id: String(h.id || idx + 1),
+                name: h.name || '',
                 amount: h.amount != null ? formatCurrencyInput(h.amount) : '',
                 rate: h.rate != null ? formatCurrencyInput(h.rate) : '',
               }))
@@ -150,6 +152,7 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
             setHoldings([
               {
                 id: '1',
+                name: '',
                 amount: formatCurrencyInput(fAmt),
                 rate: formatCurrencyInput(avgRate),
               },
@@ -158,12 +161,13 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
             setHoldings([
               {
                 id: '1',
+                name: '',
                 amount: formatCurrencyInput(editAccount.current_balance),
                 rate: '1',
               },
             ]);
           } else {
-            setHoldings([{ id: '1', amount: '', rate: '' }]);
+            setHoldings([{ id: '1', name: '', amount: '', rate: '' }]);
           }
         } else {
           // Normal bank/cash account
@@ -202,7 +206,7 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
           // Set matching preset reserve logo
           const matchingPreset = PRESET_RESERVE_LOGOS.find((p) => p.currency === initCurr) || PRESET_RESERVE_LOGOS[0];
           setLogo(matchingPreset.dataUri);
-          setHoldings([{ id: '1', amount: '', rate: '' }]);
+          setHoldings([{ id: '1', name: '', amount: '', rate: '' }]);
         } else {
           setCurrency('ETB');
           setLogo(null);
@@ -222,7 +226,7 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
     pendingFocusIdRef.current = newId;
     setHoldings((prev) => [
       ...prev,
-      { id: newId, amount: '', rate: lastRate },
+      { id: newId, name: '', amount: '', rate: lastRate },
     ]);
   };
 
@@ -242,10 +246,16 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
 
   const removeHoldingRow = (id: string) => {
     if (holdings.length <= 1) {
-      setHoldings([{ id: '1', amount: '', rate: '' }]);
+      setHoldings([{ id: '1', name: '', amount: '', rate: '' }]);
       return;
     }
     setHoldings((prev) => prev.filter((h) => h.id !== id));
+  };
+
+  const updateHoldingName = (id: string, name: string) => {
+    setHoldings((prev) =>
+      prev.map((h) => (h.id === id ? { ...h, name } : h))
+    );
   };
 
   const updateHoldingAmount = (id: string, rawVal: string) => {
@@ -321,6 +331,7 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
             const rate = parseFormattedNumber(h.rate) || 0;
             return {
               id: String(h.id || idx + 1),
+              name: h.name?.trim() || undefined,
               amount: amt,
               rate: rate,
               etb_value: amt * rate,
@@ -685,7 +696,8 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
                 </div>
 
                 {/* Column header labels */}
-                <div className="grid grid-cols-[1fr_auto_1fr_auto_minmax(90px,1.2fr)_auto] gap-1.5 sm:gap-2 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                <div className="grid grid-cols-[105px_1fr_auto_1fr_auto_minmax(85px,1.1fr)_auto] gap-1.5 sm:gap-2 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                  <div>Item / Lot</div>
                   <div>Amount ({effectiveCurrency})</div>
                   <div className="w-3 text-center invisible">×</div>
                   <div>ETB Price</div>
@@ -708,8 +720,19 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
                     return (
                       <div
                         key={row.id}
-                        className="grid grid-cols-[1fr_auto_1fr_auto_minmax(90px,1.2fr)_auto] gap-1.5 sm:gap-2 items-center"
+                        className="grid grid-cols-[105px_1fr_auto_1fr_auto_minmax(85px,1.1fr)_auto] gap-1.5 sm:gap-2 items-center"
                       >
+                        {/* Lot name / description */}
+                        <div>
+                          <input
+                            type="text"
+                            value={row.name || ''}
+                            onChange={(e) => updateHoldingName(row.id, e.target.value)}
+                            placeholder={effectiveCurrency === 'GOLD' ? 'e.g. Ring' : 'e.g. Lot A'}
+                            className="w-full h-9 px-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-slate-900 dark:focus:border-white focus:ring-1 focus:ring-inset focus:ring-slate-900 dark:focus:ring-white transition-all"
+                          />
+                        </div>
+
                         {/* Left: Amount input with auto-focus ref */}
                         <div className="relative">
                           <input

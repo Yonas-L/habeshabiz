@@ -715,7 +715,6 @@ export default function App() {
           theme={theme}
           onToggleTheme={handleToggleTheme}
           onOpenMobileSidebar={handleOpenMobileSidebar}
-          onQuickAction={() => handleNavigateTab('counter')}
           onOpenProfile={handleOpenProfileModal}
         />
 
