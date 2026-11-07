@@ -174,6 +174,27 @@ class ContactController extends Controller
 
         try {
             $data = $action->execute($contact, $startDate, $endDate);
+            if ($request->has('custom_descriptions')) {
+                $raw = $request->input('custom_descriptions');
+                $customDescriptions = [];
+                if (is_string($raw)) {
+                    $decoded = json_decode($raw, true);
+                    if (is_array($decoded)) {
+                        $customDescriptions = $decoded;
+                    }
+                } elseif (is_array($raw)) {
+                    $customDescriptions = $raw;
+                }
+                if (! empty($customDescriptions) && isset($data['ledger'])) {
+                    foreach ($data['ledger'] as &$row) {
+                        $rowId = $row['id'] ?? null;
+                        if ($rowId && isset($customDescriptions[$rowId]) && trim((string) $customDescriptions[$rowId]) !== '') {
+                            $row['context'] = trim((string) $customDescriptions[$rowId]);
+                        }
+                    }
+                    unset($row);
+                }
+            }
         } finally {
             TenantScope::setForcedTenantId(null);
         }
@@ -195,10 +216,23 @@ class ContactController extends Controller
             $selectedAccountIds = explode(',', $accountsParam);
         }
 
+        $customDescriptions = [];
+        if ($request->has('custom_descriptions')) {
+            $raw = $request->input('custom_descriptions');
+            if (is_string($raw)) {
+                $decoded = json_decode($raw, true);
+                if (is_array($decoded)) {
+                    $customDescriptions = $decoded;
+                }
+            } elseif (is_array($raw)) {
+                $customDescriptions = $raw;
+            }
+        }
+
         $forceDownload = $request->query('download', '1') === '1';
 
         try {
-            return $pdfService->generateVendorStatement($contact, $startDate, $endDate, $selectedAccountIds, $forceDownload)->toResponse($request);
+            return $pdfService->generateVendorStatement($contact, $startDate, $endDate, $selectedAccountIds, $forceDownload, $customDescriptions)->toResponse($request);
         } catch (\Throwable $e) {
             Log::error('PDF Statement generation failed: '.$e->getMessage(), [
                 'contact_id' => $id,
@@ -223,12 +257,25 @@ class ContactController extends Controller
             $selectedAccountIds = explode(',', $accountsParam);
         }
 
+        $customDescriptions = [];
+        if ($request->has('custom_descriptions')) {
+            $raw = $request->input('custom_descriptions');
+            if (is_string($raw)) {
+                $decoded = json_decode($raw, true);
+                if (is_array($decoded)) {
+                    $customDescriptions = $decoded;
+                }
+            } elseif (is_array($raw)) {
+                $customDescriptions = $raw;
+            }
+        }
+
         $forceDownload = $request->query('download', '1') === '1';
 
         TenantScope::setForcedTenantId($contact->tenant_id);
 
         try {
-            return $pdfService->generateVendorStatement($contact, $startDate, $endDate, $selectedAccountIds, $forceDownload)->toResponse($request);
+            return $pdfService->generateVendorStatement($contact, $startDate, $endDate, $selectedAccountIds, $forceDownload, $customDescriptions)->toResponse($request);
         } catch (\Throwable $e) {
             Log::error('Public PDF Statement generation failed: '.$e->getMessage(), [
                 'token' => $token,
@@ -249,5 +296,32 @@ class ContactController extends Controller
         } finally {
             TenantScope::setForcedTenantId(null);
         }
+    }
+
+    public function updateStatementOverrides(Request $request, string $id): JsonResponse
+    {
+        $contact = Contact::findOrFail($id);
+
+        $rowId = $request->input('row_id');
+        $description = $request->input('description');
+        $overrides = $contact->statement_overrides ?? [];
+
+        if ($request->has('overrides') && is_array($request->input('overrides'))) {
+            $overrides = array_merge($overrides, $request->input('overrides'));
+        } elseif ($rowId) {
+            $trimmed = trim((string) $description);
+            if ($trimmed === '') {
+                unset($overrides[$rowId]);
+            } else {
+                $overrides[$rowId] = $trimmed;
+            }
+        }
+
+        $contact->update(['statement_overrides' => $overrides]);
+
+        return response()->json([
+            'success' => true,
+            'statement_overrides' => $contact->statement_overrides,
+        ]);
     }
 }

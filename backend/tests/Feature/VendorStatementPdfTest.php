@@ -61,3 +61,28 @@ test('public link allows anonymous vendors to download their statement pdf', fun
             && $pdf->viewData['contact']['name'] === 'Yenus Telecom';
     });
 });
+
+test('store owner can update statement overrides and public endpoint reflects them', function () {
+    $patchResponse = $this->actingAs($this->user)
+        ->patchJson("/api/v1/contacts/{$this->contact->id}/statement-overrides", [
+            'row_id' => 'row-test-123',
+            'description' => 'Brand New Custom Description',
+        ]);
+
+    $patchResponse->assertOk()
+        ->assertJson([
+            'success' => true,
+            'statement_overrides' => [
+                'row-test-123' => 'Brand New Custom Description',
+            ],
+        ]);
+
+    $this->contact->refresh();
+    expect($this->contact->statement_overrides)->toBe(['row-test-123' => 'Brand New Custom Description']);
+
+    // Public statement JSON should include custom overrides
+    $publicResponse = $this->getJson("/api/v1/public/statement/{$this->contact->statement_token}");
+    $publicResponse->assertOk();
+    $data = $publicResponse->json('data');
+    expect($data['contact']['statement_overrides'])->toBe(['row-test-123' => 'Brand New Custom Description']);
+});

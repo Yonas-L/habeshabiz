@@ -377,9 +377,8 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50/70 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
               <tr>
-                <th className="py-2.5 px-3.5 whitespace-nowrap">Order</th>
-                <th className="py-2.5 px-3.5 whitespace-nowrap">Customer</th>
                 <th className="py-2.5 px-3.5 whitespace-nowrap">Model</th>
+                <th className="py-2.5 px-3.5 whitespace-nowrap">Customer</th>
                 <th className="py-2.5 px-3.5 whitespace-nowrap font-mono">IMEI</th>
                 <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Total</th>
                 <th className="py-2.5 px-3.5 text-center whitespace-nowrap">Status</th>
@@ -390,13 +389,13 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-slate-700 dark:text-slate-300">
               {loading ? (
                 <tr>
-                  <td colSpan={canManageInv ? 8 : 7} className="py-8 text-center">
+                  <td colSpan={canManageInv ? 7 : 6} className="py-8 text-center">
                     <CustomPageLoader mode="app" fullScreen={false} />
                   </td>
                 </tr>
               ) : sales.length === 0 ? (
                 <tr>
-                  <td colSpan={canManageInv ? 8 : 7} className="py-16 text-center text-slate-400">
+                  <td colSpan={canManageInv ? 7 : 6} className="py-16 text-center text-slate-400">
                     <Receipt className="w-8 h-8 mx-auto mb-2 text-slate-300 dark:text-slate-600" />
                     <p className="font-semibold text-slate-600 dark:text-slate-400">No sales found</p>
                     <p className="text-xs text-slate-400 mt-0.5">Completed checkout orders will appear here.</p>
@@ -423,15 +422,26 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
                       onClick={() => setSelectedOrder(order)}
                       className="hover:bg-slate-50/90 dark:hover:bg-slate-800/40 transition-colors cursor-pointer group select-none"
                     >
-                      {/* Col 1: Order */}
-                      <td className="py-2.5 px-3.5 whitespace-nowrap">
-                        <div className="font-mono font-bold text-slate-900 dark:text-white text-xs group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                          {order.order_number}
-                        </div>
-                        <div className="text-[10px] text-slate-400 mt-0.5">
-                          {new Date(order.order_date).toLocaleDateString(undefined, {
-                            month: 'short',
-                            day: 'numeric',
+                      {/* Col 1: Model */}
+                      <td className="py-2.5 px-3.5">
+                        <div className="space-y-1 max-w-[260px]">
+                          {order.items.map((item, idx) => {
+                            const isAccessory = item.is_accessory || Boolean(item.accessory_name);
+                            const isVendoredAcc = isAccessory && (order.is_vendor_sourced || item.sourcing_type === 'brokered_neighbour' || Boolean(item.vendor_contact_id));
+                            const pName = item.accessory_name || (isVendoredAcc ? 'Vendored Accessory' : isAccessory ? 'Accessory' : (item.inventory_unit?.variant?.product?.name || item.variant?.product?.name || 'Device'));
+
+                            return (
+                              <div key={idx} className="min-w-0">
+                                <div className="font-bold text-slate-900 dark:text-white text-xs truncate flex items-center gap-1.5">
+                                  {item.quantity > 1 && (
+                                    <span className="font-mono text-slate-500 font-normal text-[11px]">
+                                      {item.quantity}×
+                                    </span>
+                                  )}
+                                  <span className="truncate group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">{pName}</span>
+                                </div>
+                              </div>
+                            );
                           })}
                         </div>
                       </td>
@@ -455,83 +465,7 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
                         )}
                       </td>
 
-                      {/* Col 3: Model */}
-                      <td className="py-2.5 px-3.5">
-                        <div className="space-y-1 max-w-[240px]">
-                          {order.items.map((item, idx) => {
-                            const isAccessory = item.is_accessory || Boolean(item.accessory_name);
-                            const isVendoredAcc = isAccessory && (order.is_vendor_sourced || item.sourcing_type === 'brokered_neighbour' || Boolean(item.vendor_contact_id));
-                            const pName = item.accessory_name || (isVendoredAcc ? 'Vendored Accessory' : isAccessory ? 'Accessory' : (item.inventory_unit?.variant?.product?.name || item.variant?.product?.name || 'Device'));
-                            const spec = [item.inventory_unit?.variant?.storage || item.variant?.storage, item.inventory_unit?.variant?.color || item.variant?.color].filter(Boolean).join(' • ');
-                            const unit = item.inventory_unit;
-                            const isReturned = unit?.status === 'returned';
-                            const isSwapped = Boolean(unit?.swapped_from_unit_id || unit?.is_swapped);
-                            const isExchanged = unit?.source_type === 'exchange' || Boolean(unit?.exchange_sales_order_id);
-                            const isVendored = order.is_vendor_sourced || item.sourcing_type === 'brokered_neighbour' || unit?.source_type === 'vendor_direct';
-
-                            return (
-                              <div key={idx} className="min-w-0">
-                                <div className="font-bold text-slate-900 dark:text-white text-xs truncate flex items-center gap-1.5">
-                                  {item.quantity > 1 && (
-                                    <span className="font-mono text-slate-500 font-normal text-[11px]">
-                                      {item.quantity}×
-                                    </span>
-                                  )}
-                                  <span className="truncate">{pName}</span>
-                                  {isAccessory ? (
-                                    <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold shrink-0 ${
-                                      isVendoredAcc
-                                        ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50 dark:border-amber-800/50'
-                                        : 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border border-indigo-200/50 dark:border-indigo-800/50'
-                                    }`}>
-                                      {isVendoredAcc ? 'Vendored Accessory' : 'Accessory'}
-                                    </span>
-                                  ) : isVendored ? (
-                                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50 dark:border-amber-800/50 shrink-0">
-                                      <Handshake className="w-2.5 h-2.5" />
-                                      Vendor
-                                    </span>
-                                  ) : null}
-                                  {isSwapped && (
-                                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50 shrink-0">
-                                      <ArrowLeftRight className="w-2.5 h-2.5" />
-                                      Swapped
-                                    </span>
-                                  )}
-                                  {isReturned && (
-                                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border border-rose-200/50 shrink-0">
-                                      <Undo2 className="w-2.5 h-2.5" />
-                                      Returned
-                                    </span>
-                                  )}
-                                  {!isReturned && !isSwapped && isExchanged && (
-                                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/50 shrink-0">
-                                      <Repeat className="w-2.5 h-2.5" />
-                                      Trade-In
-                                    </span>
-                                  )}
-                                </div>
-                                {!isAccessory && spec && (
-                                  <div className="text-[10px] text-slate-400 truncate mt-0.5">
-                                    {spec}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                          {exchange > 0 && (
-                            <div className="mt-1 pt-1 border-t border-purple-100 dark:border-purple-900/40 flex items-center gap-1 text-[10px] text-purple-700 dark:text-purple-300 font-medium">
-                              <Repeat className="w-3 h-3 text-purple-500 shrink-0" />
-                              <span className="truncate">
-                                Trade-In: {order.exchange_unit?.variant?.product?.name || 'Device'}
-                                {order.exchange_unit?.imei_or_serial ? ` (${order.exchange_unit.imei_or_serial})` : ''}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* Col 4: IMEI */}
+                      {/* Col 3: IMEI */}
                       <td className="py-2.5 px-3.5 font-mono text-xs whitespace-nowrap">
                         <div className="space-y-1">
                           {order.items.map((item, idx) => (
@@ -544,20 +478,11 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
                         </div>
                       </td>
 
-                      {/* Col 5: Total */}
+                      {/* Col 4: Total */}
                       <td className="py-2.5 px-3.5 text-right whitespace-nowrap">
                         <div className="font-mono font-bold text-slate-900 dark:text-white text-xs">
                           {gross.toLocaleString()} <span className="text-[10px] font-normal text-slate-400 font-sans">ETB</span>
                         </div>
-                        {exchange > 0 ? (
-                          <div className="text-[10px] text-purple-700 dark:text-purple-300 font-mono mt-0.5">
-                            {netPayable.toLocaleString()} cash + {exchange.toLocaleString()} trade
-                          </div>
-                        ) : disc > 0 ? (
-                          <div className="text-[10px] text-rose-600 dark:text-rose-400 font-mono mt-0.5">
-                            −{disc.toLocaleString()} disc ({netPayable.toLocaleString()} net)
-                          </div>
-                        ) : null}
                       </td>
 
                       {/* Col 6: Status (High-contrast minimal badges) */}
@@ -680,13 +605,27 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
                   onClick={() => setSelectedOrder(order)}
                   className="p-4 rounded-2xl bg-white dark:bg-[#131926] border border-slate-200/90 dark:border-slate-800 shadow-[0_3px_12px_-2px_rgba(0,0,0,0.06),0_1px_3px_-1px_rgba(0,0,0,0.03)] hover:shadow-md transition-all cursor-pointer active:scale-[0.99] space-y-3"
                 >
-                  {/* Card Header: Order # + Date + Status */}
+                  {/* Card Header: Model + Order # / Date + Total */}
                   <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="font-mono font-bold text-slate-900 dark:text-white text-sm">
-                        {order.order_number}
+                    <div className="min-w-0">
+                      <div className="font-bold text-slate-900 dark:text-white text-sm truncate">
+                        {order.items[0]?.accessory_name ||
+                          (order.items[0]?.is_accessory
+                            ? 'Accessory'
+                            : order.items[0]?.inventory_unit?.variant?.product?.name ||
+                              order.items[0]?.variant?.product?.name ||
+                              'Device')}
+                        {order.items.length > 1 && (
+                          <span className="text-xs font-normal text-slate-400 ml-1.5 font-mono">
+                            +{order.items.length - 1} more
+                          </span>
+                        )}
                       </div>
-                      <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1">
+                      <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                        <span className="font-mono font-semibold text-slate-600 dark:text-slate-300">
+                          {order.order_number}
+                        </span>
+                        <span>•</span>
                         <span>
                           {new Date(order.order_date).toLocaleDateString(undefined, {
                             month: 'short',
@@ -695,7 +634,7 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
                           })}
                         </span>
                         <span>•</span>
-                        <span className="font-medium text-slate-700 dark:text-slate-300">{order.customer?.name || 'Walk-in'}</span>
+                        <span className="font-medium text-slate-700 dark:text-slate-300 truncate">{order.customer?.name || 'Walk-in'}</span>
                         {(order.payment_method === 'debt_offset' || order.customer?.roles?.some((r: string) => ['peer_vendor', 'vendor', 'supplier', 'partner'].includes(r))) && (
                           <span className="inline-flex items-center px-1 py-0.1 rounded text-[9px] font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border border-indigo-200/50 dark:border-indigo-800/50 shrink-0">
                             B2B
@@ -707,15 +646,6 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
                       <div className="font-mono font-bold text-base text-slate-900 dark:text-white">
                         {gross.toLocaleString()} <span className="text-[10px] font-normal text-slate-400 font-sans">ETB</span>
                       </div>
-                      {exchange > 0 ? (
-                        <div className="text-[10px] text-purple-700 dark:text-purple-300 font-mono mt-0.5">
-                          {netPayable.toLocaleString()} cash + {exchange.toLocaleString()} trade
-                        </div>
-                      ) : disc > 0 ? (
-                        <div className="text-[10px] text-rose-600 dark:text-rose-400 font-mono mt-0.5">
-                          −{disc.toLocaleString()} disc ({netPayable.toLocaleString()} net)
-                        </div>
-                      ) : null}
                       <div className="mt-1">
                         {order.payment_status === 'refunded' || order.items.every((i) => i.inventory_unit?.status === 'returned' || i.inventory_unit?.status === 'returned_to_vendor') ? (
                           <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-600 dark:text-rose-400">

@@ -6,7 +6,7 @@ import {
   ArrowLeft,
   Copy,
   Check,
-  Printer,
+  ArrowDownToLine,
   Share2,
   Phone,
   Pencil,
@@ -15,13 +15,19 @@ import {
   ArrowRightLeft,
   Receipt,
   Search,
+  X,
+  RotateCcw,
 } from 'lucide-react';
 import { LdrsSpinner } from '../components/loading/LdrsSpinner';
 import { AnimatedNumber } from '../components/AnimatedNumber';
-import { VendorStatementPrintModal } from '../components/partners/VendorStatementPrintModal';
 import { PartnerFormModal } from '../components/partners/PartnerFormModal';
 import { CustomPageLoader } from '../components/loading/CustomPageLoader';
 import { formatLocalDate } from '../utils/dateUtils';
+import {
+  getCustomStatementDescriptions,
+  saveCustomStatementDescription,
+  clearCustomStatementDescription,
+} from '../utils/statementOverrides';
 
 interface PartnerDetailViewProps {
   contactId: string;
@@ -56,10 +62,104 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
   // Search filter inside ledger
   const [ledgerSearch, setLedgerSearch] = useState('');
 
-  // Modals
-  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  // Modals & Actions
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedPhone, setCopiedPhone] = useState(false);
+
+  // Inline editing state for statement descriptions
+  const [customDescriptions, setCustomDescriptions] = useState<Record<string, string>>({});
+  const [editingRowId, setEditingRowId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState('');
+
+  const handleDownloadStatement = async () => {
+    if (!statementData) return;
+    try {
+      setIsDownloadingPdf(true);
+      const { contact, range } = statementData;
+      const sanitizedContact = (contact.name || 'Partner').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const sanitizedRange = (range.formatted_range || 'Statement').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const filename = `Statement_${sanitizedContact}_${sanitizedRange}.pdf`;
+
+      const blob = await api.downloadPartnerStatementPdf(contactId, {
+        start_date: range.start_date || undefined,
+        end_date: range.end_date || undefined,
+        custom_descriptions: customDescriptions,
+      });
+
+      const downloadUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = filename;
+      link.rel = 'noopener';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+      toast.success('Statement PDF downloaded');
+    } catch (err) {
+      console.error('Failed to download partner statement PDF:', err);
+      toast.error('Failed to download statement PDF');
+    } finally {
+      setIsDownloadingPdf(false);
+    }
+  };
+
+  useEffect(() => {
+    if (contactId) {
+      setCustomDescriptions(
+        getCustomStatementDescriptions(contactId, statementData?.contact?.statement_overrides)
+      );
+    }
+  }, [contactId, statementData?.contact?.statement_overrides]);
+
+  const cleanContext = (ctx: string | null | undefined): string => {
+    return (ctx || '')
+      .replace(/Returned:\s*Transaction entry/gi, 'Device returned to vendor')
+      .replace(/Transaction entry/gi, 'Device')
+      .replace(/wire\s+payout/gi, 'Transferred')
+      .replace(/(?:in|for|from)?\s*Order\s*#[A-Za-z0-9_-]+/gi, '')
+      .replace(/#ORD-[A-Za-z0-9_-]+/gi, '')
+      .replace(/\bORD-[A-Za-z0-9_-]+\b/gi, '')
+      .replace(/\s+by\s+[A-Za-z0-9\s]+$/gi, '')
+      .trim();
+  };
+
+  const handleStartEdit = (rowId: string, currentText: string) => {
+    setEditingRowId(rowId);
+    setEditingText(customDescriptions[rowId] ?? currentText);
+  };
+
+  const handleSaveEdit = async (rowId: string) => {
+    const updated = saveCustomStatementDescription(contactId, rowId, editingText);
+    setCustomDescriptions(updated);
+    setEditingRowId(null);
+    toast.success('Description updated');
+
+    if (rowId.startsWith('debt-')) {
+      const rawDebtId = rowId.replace('debt-', '');
+      try {
+        await api.updateDebt(rawDebtId, { notes: editingText.trim() });
+      } catch (e) {
+        console.warn('Could not sync note to backend debt record:', e);
+      }
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingRowId(null);
+    setEditingText('');
+  };
+
+  const handleResetEdit = (rowId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const updated = clearCustomStatementDescription(contactId, rowId);
+    setCustomDescriptions(updated);
+    if (editingRowId === rowId) {
+      setEditingRowId(null);
+    }
+    toast.success('Description reset to default');
+  };
 
   const loadStatement = async () => {
     try {
@@ -261,11 +361,22 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
 
           <button
             type="button"
-            onClick={() => setIsPrintModalOpen(true)}
-            className="h-9 px-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-800 text-emerald-400 dark:text-emerald-400 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
+            onClick={handleDownloadStatement}
+            disabled={isDownloadingPdf}
+            className="h-9 px-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-800 text-emerald-400 dark:text-emerald-400 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+            title="Download Statement as PDF"
           >
-            <Printer className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Print Statement</span>
+            {isDownloadingPdf ? (
+              <>
+                <LdrsSpinner size={14} color="#34d399" stroke={2.5} />
+                <span>Downloading…</span>
+              </>
+            ) : (
+              <>
+                <ArrowDownToLine className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Download Statement</span>
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -594,7 +705,73 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
                             </span>
                           </td>
                           <td className="py-2.5 px-3.5 font-sans text-xs font-semibold text-slate-900 dark:text-white">
-                            <div>{(row.context || '').replace(/Returned:\s*Transaction entry/gi, 'Device returned to vendor').replace(/Transaction entry/gi, 'Device')}</div>
+                            {editingRowId === row.id ? (
+                              <div className="flex items-center gap-1.5 w-full max-w-sm">
+                                <input
+                                  type="text"
+                                  value={editingText}
+                                  onChange={(e) => setEditingText(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      handleSaveEdit(row.id);
+                                    } else if (e.key === 'Escape') {
+                                      e.preventDefault();
+                                      handleCancelEdit();
+                                    }
+                                  }}
+                                  autoFocus
+                                  className="flex-1 px-2 py-1 text-xs font-medium rounded border border-emerald-500 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 shadow-xs"
+                                  placeholder="Edit description..."
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleSaveEdit(row.id)}
+                                  className="p-1 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 cursor-pointer transition-colors shadow-2xs"
+                                  title="Save (Enter)"
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={handleCancelEdit}
+                                  className="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors"
+                                  title="Cancel (Esc)"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="group relative flex items-center justify-between gap-2">
+                                <div
+                                  onClick={() => handleStartEdit(row.id, cleanContext(row.context))}
+                                  className="cursor-pointer hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors flex-1"
+                                  title="Click to edit description"
+                                >
+                                  {customDescriptions[row.id] ?? cleanContext(row.context)}
+                                </div>
+                                <div className="no-print opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 shrink-0">
+                                  {customDescriptions[row.id] && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => handleResetEdit(row.id, e)}
+                                      className="p-1 text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 rounded transition-colors cursor-pointer"
+                                      title="Reset to default description"
+                                    >
+                                      <RotateCcw className="w-3 h-3" />
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStartEdit(row.id, cleanContext(row.context))}
+                                    className="p-1 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors cursor-pointer"
+                                    title="Edit description"
+                                  >
+                                    <Pencil className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              </div>
+                            )}
                           </td>
                           <td className="py-2.5 px-3.5 text-right tabular-nums text-slate-700 dark:text-slate-300">
                             {row.payable !== 0 ? (
@@ -685,7 +862,73 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
                   </div>
 
                   <div className="text-xs font-semibold text-slate-900 dark:text-white leading-snug">
-                    {row.context}
+                    {editingRowId === row.id ? (
+                      <div className="flex items-center gap-1.5 w-full mt-1">
+                        <input
+                          type="text"
+                          value={editingText}
+                          onChange={(e) => setEditingText(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleSaveEdit(row.id);
+                            } else if (e.key === 'Escape') {
+                              e.preventDefault();
+                              handleCancelEdit();
+                            }
+                          }}
+                          autoFocus
+                          className="flex-1 px-2 py-1 text-xs font-medium rounded border border-emerald-500 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 shadow-xs"
+                          placeholder="Edit description..."
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleSaveEdit(row.id)}
+                          className="p-1 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 hover:text-emerald-700 cursor-pointer shadow-2xs"
+                          title="Save"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleCancelEdit}
+                          className="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer"
+                          title="Cancel"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between gap-2">
+                        <div
+                          onClick={() => handleStartEdit(row.id, cleanContext(row.context))}
+                          className="cursor-pointer hover:text-emerald-600 dark:hover:text-emerald-400 flex-1"
+                          title="Click to edit description"
+                        >
+                          {customDescriptions[row.id] ?? cleanContext(row.context)}
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          {customDescriptions[row.id] && (
+                            <button
+                              type="button"
+                              onClick={(e) => handleResetEdit(row.id, e)}
+                              className="p-1 text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 rounded cursor-pointer"
+                              title="Reset to default description"
+                            >
+                              <RotateCcw className="w-3 h-3" />
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleStartEdit(row.id, cleanContext(row.context))}
+                            className="p-1 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 rounded cursor-pointer"
+                            title="Edit description"
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs font-mono">
@@ -1148,13 +1391,6 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
           </div>
         </div>
       )}
-
-      {/* ── Statement Printable PDF Modal ── */}
-      <VendorStatementPrintModal
-        isOpen={isPrintModalOpen}
-        onClose={() => setIsPrintModalOpen(false)}
-        data={statementData}
-      />
 
       {/* ── Edit Partner Modal ── */}
       {isEditModalOpen && (

@@ -165,6 +165,7 @@ export interface Contact {
   notes?: string | null;
   is_active?: boolean;
   statement_token?: string | null;
+  statement_overrides?: Record<string, string> | null;
   created_at?: string;
   updated_at?: string;
   debts_count?: number;
@@ -243,6 +244,7 @@ export interface PartnerStatementData {
     email?: string | null;
     roles: string[];
     statement_token: string;
+    statement_overrides?: Record<string, string>;
   };
   range: {
     start_date: string | null;
@@ -1889,22 +1891,47 @@ export const api = {
     return request<PartnerStatementData>(`/contacts/${id}/statement${qs ? `?${qs}` : ''}`);
   },
 
-  getPublicStatement: (token: string, params?: { start_date?: string; end_date?: string }) => {
+  updateContactStatementOverride: (
+    contactId: string,
+    rowId: string,
+    description: string
+  ) => {
+    return request<{ success: boolean; statement_overrides: Record<string, string> }>(
+      `/contacts/${contactId}/statement-overrides`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ row_id: rowId, description }),
+      }
+    );
+  },
+
+  getPublicStatement: (token: string, params?: { start_date?: string; end_date?: string; custom_descriptions?: Record<string, string> | string }) => {
     const query = new URLSearchParams();
     if (params?.start_date) query.set('start_date', params.start_date);
     if (params?.end_date) query.set('end_date', params.end_date);
+    if (params?.custom_descriptions) {
+      query.set(
+        'custom_descriptions',
+        typeof params.custom_descriptions === 'string'
+          ? params.custom_descriptions
+          : JSON.stringify(params.custom_descriptions)
+      );
+    }
     const qs = query.toString();
     return request<PartnerStatementData>(`/public/statement/${token}${qs ? `?${qs}` : ''}`);
   },
 
   downloadPartnerStatementPdf: async (
     id: string,
-    params?: { start_date?: string; end_date?: string; accounts?: string }
+    params?: { start_date?: string; end_date?: string; accounts?: string; custom_descriptions?: Record<string, string> }
   ): Promise<Blob> => {
     const query = new URLSearchParams();
     if (params?.start_date) query.set('start_date', params.start_date);
     if (params?.end_date) query.set('end_date', params.end_date);
     if (params?.accounts) query.set('accounts', params.accounts);
+    if (params?.custom_descriptions && Object.keys(params.custom_descriptions).length > 0) {
+      query.set('custom_descriptions', JSON.stringify(params.custom_descriptions));
+    }
     const qs = query.toString();
     const token = getAuthToken();
     const res = await fetch(`${API_BASE}/contacts/${id}/statement/pdf${qs ? `?${qs}` : ''}`, {
@@ -1916,12 +1943,20 @@ export const api = {
 
   downloadPublicStatementPdf: async (
     token: string,
-    params?: { start_date?: string; end_date?: string; accounts?: string }
+    params?: { start_date?: string; end_date?: string; accounts?: string; custom_descriptions?: Record<string, string> | string }
   ): Promise<Blob> => {
     const query = new URLSearchParams();
     if (params?.start_date) query.set('start_date', params.start_date);
     if (params?.end_date) query.set('end_date', params.end_date);
     if (params?.accounts) query.set('accounts', params.accounts);
+    if (params?.custom_descriptions) {
+      query.set(
+        'custom_descriptions',
+        typeof params.custom_descriptions === 'string'
+          ? params.custom_descriptions
+          : JSON.stringify(params.custom_descriptions)
+      );
+    }
     const qs = query.toString();
     const res = await fetch(`${API_BASE}/public/statement/${token}/pdf${qs ? `?${qs}` : ''}`);
     if (!res.ok) throw new Error('Failed to download public statement PDF');

@@ -1292,6 +1292,16 @@ class GeneratePartnerStatementAction
             ];
         });
 
+        // Apply persistent contact statement description overrides if present
+        if (! empty($contact->statement_overrides)) {
+            foreach ($ledger as &$row) {
+                if (isset($row['id']) && isset($contact->statement_overrides[$row['id']]) && trim((string) $contact->statement_overrides[$row['id']]) !== '') {
+                    $row['context'] = trim((string) $contact->statement_overrides[$row['id']]);
+                }
+            }
+            unset($row);
+        }
+
         return [
             'contact' => [
                 'id' => $contact->id,
@@ -1301,6 +1311,7 @@ class GeneratePartnerStatementAction
                 'email' => $contact->email,
                 'roles' => $contact->roles ?? [],
                 'statement_token' => $contact->statement_token,
+                'statement_overrides' => $contact->statement_overrides ?? [],
             ],
             'range' => [
                 'start_date' => $startDate?->toDateString(),

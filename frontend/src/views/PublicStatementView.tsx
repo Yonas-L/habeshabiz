@@ -51,10 +51,12 @@ export const PublicStatementView: React.FC<PublicStatementViewProps> = ({ token 
       const startDate = searchParams.get('start_date') || undefined;
       const endDate = searchParams.get('end_date') || undefined;
       const accountsParam = searchParams.get('accounts');
+      const customDescriptionsParam = searchParams.get('custom_descriptions') || undefined;
 
       const res = await api.getPublicStatement(token, {
         start_date: startDate,
         end_date: endDate,
+        custom_descriptions: customDescriptionsParam,
       });
       setData(res);
 
@@ -120,10 +122,14 @@ export const PublicStatementView: React.FC<PublicStatementViewProps> = ({ token 
           ? 'none'
           : selectedAccountIds.join(',');
 
+      const searchParams = new URLSearchParams(window.location.search);
+      const customDescriptionsParam = searchParams.get('custom_descriptions') || undefined;
+
       const blob = await api.downloadPublicStatementPdf(token, {
         start_date: range.start_date || undefined,
         end_date: range.end_date || undefined,
         accounts: accountsParam,
+        custom_descriptions: customDescriptionsParam,
       });
 
       const sanitizedContact = (contact.name || 'Partner').replace(/[^a-zA-Z0-9_-]/g, '_');

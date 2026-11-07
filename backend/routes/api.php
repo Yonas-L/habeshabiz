@@ -198,6 +198,7 @@ Route::prefix('v1')->group(function () {
         Route::delete('/contacts/{id}', [ContactController::class, 'destroy']);
         Route::get('/contacts/{id}/statement', [ContactController::class, 'statement']);
         Route::get('/contacts/{id}/statement/pdf', [ContactController::class, 'statementPdf']);
+        Route::patch('/contacts/{id}/statement-overrides', [ContactController::class, 'updateStatementOverrides']);
 
         // Operational Expenses & Owner Draws
         Route::get('/expenses', [ExpenseController::class, 'index']);

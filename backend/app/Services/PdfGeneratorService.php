@@ -268,9 +268,19 @@ class PdfGeneratorService
         ?string $startDate = null,
         ?string $endDate = null,
         array $selectedAccountIds = [],
-        bool $forceDownload = true
+        bool $forceDownload = true,
+        array $customDescriptions = []
     ): \Symfony\Component\HttpFoundation\Response {
         $data = $this->statementAction->execute($contact, $startDate, $endDate);
+
+        if (! empty($customDescriptions) && isset($data['ledger']) && is_array($data['ledger'])) {
+            foreach ($data['ledger'] as &$row) {
+                if (isset($row['id']) && isset($customDescriptions[$row['id']])) {
+                    $row['context'] = (string) $customDescriptions[$row['id']];
+                }
+            }
+            unset($row);
+        }
 
         // Resolve logo to base64
         $logoUrl = $data['business']['logo_url'] ?? null;

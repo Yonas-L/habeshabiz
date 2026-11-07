@@ -22,6 +22,7 @@ use Illuminate\Support\Str;
  * @property string|null $notes
  * @property bool $is_active
  * @property string|null $statement_token
+ * @property array<string, string>|null $statement_overrides
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
@@ -40,6 +41,7 @@ class Contact extends Model
         'notes',
         'is_active',
         'statement_token',
+        'statement_overrides',
     ];
 
     protected $appends = [
@@ -62,6 +64,7 @@ class Contact extends Model
     {
         return [
             'roles' => 'array',
+            'statement_overrides' => 'array',
             'is_active' => 'boolean',
         ];
     }
