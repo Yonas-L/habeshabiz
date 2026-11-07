@@ -1599,12 +1599,19 @@ export const api = {
     return request<SalesOrder[]>(`/sales?${query.toString()}`);
   },
 
-  getSalesWithCounts: async (params?: { payment_status?: string; source_type?: string; search?: string; per_page?: number | string }) => {
+  getSalesWithCounts: async (params?: {
+    payment_status?: string;
+    source_type?: string;
+    search?: string;
+    per_page?: number | string;
+    page?: number | string;
+  }) => {
     const query = new URLSearchParams();
     if (params?.payment_status) query.set('payment_status', params.payment_status);
     if (params?.source_type) query.set('source_type', params.source_type);
     if (params?.search) query.set('search', params.search);
     if (params?.per_page) query.set('per_page', String(params.per_page));
+    if (params?.page) query.set('page', String(params.page));
     const token = getAuthToken();
     const res = await fetch(`${API_BASE}/sales?${query.toString()}`, {
       headers: {
@@ -1616,13 +1623,30 @@ export const api = {
     if (!res.ok) throw new Error(json.message || 'API request failed');
     return {
       sales: (json.data || []) as SalesOrder[],
-      counts: (json.counts || { all: 0, paid: 0, credit: 0, exchange: 0 }) as {
+      counts: (json.counts || { all: 0, paid: 0, credit: 0, exchange: 0, b2b: 0 }) as {
         all: number;
         paid: number;
         credit: number;
         exchange: number;
+        b2b?: number;
       },
-      pagination: json.pagination,
+      summary: json.summary as
+        | {
+            total_volume: number;
+            total_profit: number;
+            total_orders: number;
+            settled_count: number;
+            trade_in_count: number;
+            brokered_count: number;
+          }
+        | undefined,
+      pagination: json.pagination as
+        | {
+            current_page: number;
+            last_page: number;
+            total: number;
+          }
+        | undefined,
     };
   },
 

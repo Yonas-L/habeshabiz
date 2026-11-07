@@ -125,6 +125,32 @@ class SaleController extends Controller
             })->count(),
         ];
 
+        $summaryOrdersQuery = (clone $query)->setEagerLoads([]);
+        $totalOrders = (clone $summaryOrdersQuery)->count();
+        $totalVolume = (float) (clone $summaryOrdersQuery)->selectRaw('COALESCE(SUM(GREATEST(0, total_amount - COALESCE(discount_amount, 0))), 0) as vol')->value('vol');
+        $settledCount = (clone $summaryOrdersQuery)->where('payment_status', 'paid')->count();
+        $tradeInCount = (clone $summaryOrdersQuery)->where(function ($q) {
+            $q->whereNotNull('exchange_unit_id')
+                ->orWhere('exchange_allowance', '>', 0);
+        })->count();
+        $brokeredCount = (clone $summaryOrdersQuery)->whereHas('items', fn ($iq) => $iq->where('sourcing_type', 'brokered_neighbour'))->count();
+
+        $totalProfit = 0.0;
+        if ($canViewCost) {
+            $totalProfit = (float) DB::table('sales_order_items')
+                ->whereIn('sales_order_id', (clone $summaryOrdersQuery)->select('id'))
+                ->sum('profit');
+        }
+
+        $summary = [
+            'total_volume' => $totalVolume,
+            'total_profit' => $totalProfit,
+            'total_orders' => $totalOrders,
+            'settled_count' => $settledCount,
+            'trade_in_count' => $tradeInCount,
+            'brokered_count' => $brokeredCount,
+        ];
+
         if ($request->filled('per_page') && $request->per_page !== 'all') {
             $paginated = $query->orderByDesc('order_date')->orderByDesc('created_at')->orderByDesc('id')->paginate((int) $request->per_page);
             $items = $paginated->getCollection();
@@ -157,6 +183,7 @@ class SaleController extends Controller
             'success' => true,
             'data' => $items,
             'counts' => $counts,
+            'summary' => $summary,
             'pagination' => $pagination,
         ]);
     }

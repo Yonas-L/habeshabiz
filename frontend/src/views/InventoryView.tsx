@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import type { InventoryUnit, Product, ProductCategory, Contact, User, FinancialAccount, SalesOrder } from '../api/client';
 import { api } from '../api/client';
 import { toast } from 'sonner';
@@ -3304,49 +3305,53 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         </div>
       )}
 
-      {/* Customer Return Modal (For SOLD units returned by customer with reason) */}
-      {returnTargetUnit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Customer Return Modal (Responsive Bottom Sheet on Mobile, Centered Modal on Desktop) */}
+      {returnTargetUnit && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 select-none">
           <div
             className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs animate-backdrop-enter"
             onClick={() => setReturnTargetUnit(null)}
           />
 
-          <div className="relative z-10 bg-white dark:bg-[#131926] rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-2xl max-w-md w-full p-6 space-y-4 animate-modal-enter">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center">
-                  <Undo2 className="w-4 h-4" />
+          <div className="relative z-10 bg-white dark:bg-[#131926] rounded-t-3xl sm:rounded-3xl border-t sm:border border-slate-200/80 dark:border-slate-800 shadow-2xl max-w-md w-full p-5 sm:p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] sm:pb-6 space-y-4 max-h-[92vh] sm:max-h-none overflow-y-auto animate-bottom-sheet sm:animate-modal-enter flex flex-col">
+            {/* Mobile Bottom Sheet Grab Handle */}
+            <div className="w-12 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700 mx-auto -mt-1 mb-2 sm:hidden shrink-0" />
+
+            <div className="flex items-center justify-between pb-3.5 sm:pb-3 border-b border-slate-100 dark:border-slate-800 shrink-0">
+              <div className="flex items-center gap-2.5 sm:gap-2 text-rose-600 dark:text-rose-400">
+                <div className="w-10 h-10 sm:w-8 sm:h-8 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200/60 dark:border-rose-800/60 flex items-center justify-center shrink-0">
+                  <Undo2 className="w-5 h-5 sm:w-4 sm:h-4" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-900 dark:text-white text-sm">
+                  <h3 className="font-bold text-slate-900 dark:text-white text-base sm:text-sm tracking-tight">
                     Record Customer Return
                   </h3>
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-xs sm:text-[11px] text-slate-400 font-medium sm:font-normal">
                     Track device for repair, warranty, or inspection
                   </p>
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => setReturnTargetUnit(null)}
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                className="w-8 h-8 sm:w-7 sm:h-7 rounded-xl sm:rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-800 text-xs">
-              <div className="font-bold text-slate-900 dark:text-white">
+            <div className="p-3.5 sm:p-3 rounded-2xl sm:rounded-xl bg-slate-50 dark:bg-slate-800/50 sm:dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 sm:border-slate-200/60 shrink-0 text-xs sm:text-xs">
+              <div className="font-bold text-slate-900 dark:text-white text-sm sm:text-xs">
                 {returnTargetUnit.variant?.product?.name}
               </div>
-              <div className="text-[11px] text-slate-400 font-mono mt-0.5">
-                Serial/IMEI: {returnTargetUnit.imei_or_serial || 'Standard stock'}
+              <div className="text-xs sm:text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-0.5 sm:font-normal">
+                Serial/IMEI: <strong className="text-slate-800 dark:text-slate-200 sm:font-normal">{returnTargetUnit.imei_or_serial || 'Standard stock'}</strong>
               </div>
             </div>
 
-            <form onSubmit={handleSubmitReturn} className="space-y-3.5">
+            <form onSubmit={handleSubmitReturn} className="space-y-4 sm:space-y-3.5 flex-1">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-sm sm:text-xs font-bold sm:font-semibold text-slate-800 sm:text-slate-700 dark:text-slate-200 sm:dark:text-slate-300 mb-1.5 sm:mb-1">
                   Reason for Return *
                 </label>
                 <input
@@ -3355,16 +3360,16 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   value={returnReason}
                   onChange={(e) => setReturnReason(e.target.value)}
                   placeholder="e.g. Screen flickering, Battery drops rapidly, Defective mic"
-                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700"
+                  className="w-full h-11 sm:h-10 px-3.5 sm:px-3 rounded-xl border border-slate-200 dark:border-slate-700 sm:dark:border-slate-800 bg-white dark:bg-[#151b26] text-base sm:text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500/40 sm:focus:ring-slate-900/10 sm:dark:focus:ring-slate-700 transition-all shadow-2xs sm:shadow-none"
                 />
                 {/* Quick Reason Pills */}
-                <div className="flex flex-wrap gap-1.5 mt-2">
+                <div className="flex flex-wrap gap-1.5 mt-2.5 sm:mt-2">
                   {['Screen defect / touch issue', 'Battery draining fast', 'Camera / FaceID failure', 'Audio / Mic fault', 'Customer changed mind'].map((reason) => (
                     <button
                       key={reason}
                       type="button"
                       onClick={() => setReturnReason(reason)}
-                      className="px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/60 transition-colors"
+                      className="px-2.5 sm:px-2 py-1 sm:py-0.5 rounded-xl sm:rounded-lg text-xs sm:text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 sm:text-slate-600 dark:text-slate-300 hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/60 active:scale-95 transition-all cursor-pointer"
                     >
                       {reason}
                     </button>
@@ -3373,13 +3378,13 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-sm sm:text-xs font-bold sm:font-semibold text-slate-800 sm:text-slate-700 dark:text-slate-200 sm:dark:text-slate-300 mb-1.5 sm:mb-1">
                   Device Condition upon Return
                 </label>
                 <select
                   value={returnCondition}
                   onChange={(e) => setReturnCondition(e.target.value)}
-                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white"
+                  className="w-full h-11 sm:h-10 px-3.5 sm:px-3 rounded-xl border border-slate-200 dark:border-slate-700 sm:dark:border-slate-800 bg-white dark:bg-[#151b26] text-sm sm:text-xs font-semibold sm:font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700 shadow-2xs sm:shadow-none cursor-pointer"
                 >
                   <option value="inspection_needed">Inspection Needed</option>
                   <option value="defective">Defective Hardware</option>
@@ -3391,14 +3396,14 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               {Boolean(returnTargetUnit.supplier_contact_id || returnTargetUnit.source_type === 'consignment' || returnTargetUnit.source_type === 'vendor_direct') && (
                 <div className="space-y-2">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    <label className="block text-sm sm:text-xs font-bold sm:font-semibold text-slate-800 sm:text-slate-700 dark:text-slate-200 sm:dark:text-slate-300 mb-1.5 sm:mb-1">
                       Return Destination
                     </label>
-                    <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl text-xs font-semibold">
+                    <div className="grid grid-cols-3 gap-1.5 p-1.5 sm:p-1 bg-slate-100 dark:bg-slate-800/80 rounded-2xl sm:rounded-xl text-xs sm:text-xs font-bold sm:font-semibold">
                       <button
                         type="button"
                         onClick={() => setReturnDestination('restock')}
-                        className={`py-1.5 px-2 rounded-lg transition-all cursor-pointer text-center ${
+                        className={`py-2 sm:py-1.5 px-2.5 sm:px-2 rounded-xl sm:rounded-lg transition-all cursor-pointer text-center ${
                           returnDestination === 'restock'
                             ? 'bg-white dark:bg-[#131926] text-emerald-600 dark:text-emerald-400 shadow-xs font-bold'
                             : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -3409,7 +3414,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                       <button
                         type="button"
                         onClick={() => setReturnDestination('repair')}
-                        className={`py-1.5 px-2 rounded-lg transition-all cursor-pointer text-center ${
+                        className={`py-2 sm:py-1.5 px-2.5 sm:px-2 rounded-xl sm:rounded-lg transition-all cursor-pointer text-center ${
                           returnDestination === 'repair'
                             ? 'bg-white dark:bg-[#131926] text-slate-900 dark:text-white shadow-xs font-bold'
                             : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -3420,7 +3425,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                       <button
                         type="button"
                         onClick={() => setReturnDestination('vendor')}
-                        className={`py-1.5 px-2 rounded-lg transition-all cursor-pointer text-center ${
+                        className={`py-2 sm:py-1.5 px-2.5 sm:px-2 rounded-xl sm:rounded-lg transition-all cursor-pointer text-center ${
                           returnDestination === 'vendor'
                             ? 'bg-white dark:bg-[#131926] text-amber-600 dark:text-amber-400 shadow-xs font-bold'
                             : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -3432,29 +3437,29 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   </div>
 
                   {returnDestination === 'restock' && (
-                    <div className="p-3 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-800/40 text-xs text-emerald-900 dark:text-emerald-200">
-                      <span className="font-semibold block">Restock to Active Counter</span>
-                      <span className="text-[11px] text-emerald-700 dark:text-emerald-400 mt-0.5 block">
+                    <div className="p-3.5 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-800/40 text-xs sm:text-sm text-emerald-900 dark:text-emerald-200">
+                      <span className="font-bold block">Restock to Active Counter</span>
+                      <span className="text-xs text-emerald-700 dark:text-emerald-400 mt-0.5 block font-medium">
                         Device will be placed back into active shop shelf stock. Any bilateral debt offset deductions will be reversed.
                       </span>
                     </div>
                   )}
 
                   {returnDestination === 'vendor' && (
-                    <div className="p-3 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-800/40 space-y-2">
+                    <div className="p-3.5 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-800/40 space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-amber-900 dark:text-amber-200">
+                        <span className="text-xs sm:text-sm font-bold text-amber-900 dark:text-amber-200">
                           Customer Ticket Status
                         </span>
                         <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300">
                           {returnCustomerWaiting ? 'Customer Waiting' : 'Customer Handled'}
                         </span>
                       </div>
-                      <div className="grid grid-cols-2 gap-1.5 bg-amber-100/60 dark:bg-amber-900/40 p-1 rounded-xl text-xs font-semibold">
+                      <div className="grid grid-cols-2 gap-1.5 bg-amber-100/60 dark:bg-amber-900/40 p-1.5 rounded-xl text-xs sm:text-sm font-bold">
                         <button
                           type="button"
                           onClick={() => setReturnCustomerWaiting(true)}
-                          className={`py-1 px-2 rounded-lg transition-all cursor-pointer text-center ${
+                          className={`py-1.5 px-2.5 rounded-lg transition-all cursor-pointer text-center ${
                             returnCustomerWaiting
                               ? 'bg-white dark:bg-[#131926] text-amber-900 dark:text-amber-200 shadow-xs font-bold'
                               : 'text-amber-700/70 dark:text-amber-400/70 hover:text-amber-900 dark:hover:text-white'
@@ -3465,7 +3470,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                         <button
                           type="button"
                           onClick={() => setReturnCustomerWaiting(false)}
-                          className={`py-1 px-2 rounded-lg transition-all cursor-pointer text-center ${
+                          className={`py-1.5 px-2.5 rounded-lg transition-all cursor-pointer text-center ${
                             !returnCustomerWaiting
                               ? 'bg-white dark:bg-[#131926] text-slate-800 dark:text-slate-200 shadow-xs font-bold'
                               : 'text-amber-700/70 dark:text-amber-400/70 hover:text-amber-900 dark:hover:text-white'
@@ -3474,7 +3479,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                           Customer Handled
                         </button>
                       </div>
-                      <p className="text-[11px] text-amber-800/80 dark:text-amber-300/80 leading-relaxed">
+                      <p className="text-xs text-amber-800/80 dark:text-amber-300/80 leading-relaxed font-medium">
                         {returnCustomerWaiting
                           ? 'Device will be logged as With Vendor. When vendor repairs or swaps it, you can deliver it to the customer.'
                           : 'Customer was already refunded or credited. This device is returned directly to vendor to clear payables.'}
@@ -3482,7 +3487,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     </div>
                   )}
 
-                  <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
+                  <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
                     <span>Need to replace from shop stock right away?</span>
                     <button
                       type="button"
@@ -3493,7 +3498,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                       }}
                       className="font-bold text-amber-600 hover:text-amber-700 dark:text-amber-400 inline-flex items-center gap-1 cursor-pointer"
                     >
-                      <ArrowLeftRight className="w-3 h-3" />
+                      <ArrowLeftRight className="w-3.5 h-3.5" />
                       <span>Swap Now from Stock</span>
                     </button>
                   </div>
@@ -3501,7 +3506,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               )}
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-sm sm:text-xs font-bold sm:font-semibold text-slate-800 sm:text-slate-700 dark:text-slate-200 sm:dark:text-slate-300 mb-1.5 sm:mb-1">
                   Technician / Customer Notes (Optional)
                 </label>
                 <textarea
@@ -3509,30 +3514,32 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   onChange={(e) => setReturnNotes(e.target.value)}
                   placeholder="e.g. Customer brought receipt, requested replacement or repair"
                   rows={2}
-                  className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700"
+                  className="w-full p-3 sm:p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 sm:dark:border-slate-800 bg-white dark:bg-[#151b26] text-sm sm:text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700 shadow-2xs sm:shadow-none"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex items-center justify-end gap-2.5 sm:gap-2 pt-3 sm:pt-2 border-t border-slate-100 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => setReturnTargetUnit(null)}
-                  className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  className="w-full sm:w-auto h-11 sm:h-9 px-5 sm:px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-sm sm:text-xs font-bold sm:font-semibold text-slate-700 sm:text-slate-600 dark:text-slate-300 sm:dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 active:scale-95 transition-all cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={returnSubmitting || !returnReason.trim()}
-                  className="h-9 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                  className="w-full sm:w-auto h-11 sm:h-9 px-5 sm:px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-sm sm:text-xs font-bold sm:font-semibold shadow-md sm:shadow-sm shadow-rose-600/20 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2 sm:gap-1.5 cursor-pointer flex-1 sm:flex-initial"
                 >
-                  {returnSubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Undo2 className="w-3.5 h-3.5" />}
-                  <span>Confirm Customer Return</span>
+                  {returnSubmitting ? <Loader2 className="w-4 h-4 sm:w-3.5 sm:h-3.5 animate-spin" /> : <Undo2 className="w-4 h-4 sm:w-3.5 sm:h-3.5" />}
+                  <span className="sm:hidden">Return</span>
+                  <span className="hidden sm:inline">Confirm Customer Return</span>
                 </button>
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Repaired Restock Modal (For RETURNED units after repair) */}

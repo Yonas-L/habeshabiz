@@ -512,22 +512,14 @@ export const StaffDetailView: React.FC<StaffDetailViewProps> = ({
             <ArrowLeft className="w-5 h-5" />
           </button>
 
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-800 to-slate-950 text-white flex items-center justify-center font-black text-sm shadow-xs uppercase">
-              {staff.name.slice(0, 2)}
-            </div>
-            <div>
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h1 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
+                <h1 className="text-base sm:text-xl font-bold text-slate-900 dark:text-white tracking-tight truncate">
                   {staff.name}
                 </h1>
-                <span
-                  className={`w-1.5 h-1.5 rounded-full ${
-                    staff.is_active ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'
-                  }`}
-                />
               </div>
-              <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
+              <div className="hidden sm:flex items-center gap-2 text-xs text-slate-400 mt-0.5">
                 {staff.phone && (
                   <button
                     onClick={() => handleCopyPhone(staff.phone!)}

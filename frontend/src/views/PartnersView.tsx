@@ -6,23 +6,18 @@ import {
   Handshake,
   Search,
   Plus,
-  Phone,
   Pencil,
   Trash2,
   Copy,
   Check,
-  ShoppingBag,
   ShieldAlert,
-  LayoutGrid,
-  List,
   X,
   ChevronRight,
-  ExternalLink,
+  CheckCircle2,
 } from 'lucide-react';
 import { LdrsSpinner } from '../components/loading/LdrsSpinner';
 import { PartnerFormModal } from '../components/partners/PartnerFormModal';
 import { PartnerDetailView } from './PartnerDetailView';
-import { Pagination } from '../components/Pagination';
 import { CustomPageLoader } from '../components/loading/CustomPageLoader';
 
 interface PartnersViewProps {
@@ -33,22 +28,19 @@ interface PartnersViewProps {
   onClearInitialContext?: () => void;
 }
 
-type RoleFilter = 'all' | 'peer_vendor' | 'supplier' | 'partner' | 'customer';
+type BalanceFilter = 'all' | 'payable' | 'receivable';
 
 export const PartnersView: React.FC<PartnersViewProps> = ({
   user: _user,
-  onNavigateTab,
+  onNavigateTab: _onNavigateTab,
   onRefreshContacts,
   initialSelectedPartnerId,
   onClearInitialContext,
 }) => {
   const [contacts, setContacts] = useState<Contact[]>([]);
-  const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 6;
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [selectedRole, setSelectedRole] = useState<RoleFilter>('all');
-  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
+  const [selectedFilter, setSelectedFilter] = useState<BalanceFilter>('all');
   const [onlyActive, setOnlyActive] = useState(true);
   const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(null);
 
@@ -123,17 +115,6 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
     }
   };
 
-  const handleToggleActive = async (contact: Contact) => {
-    try {
-      const updated = await api.updateContact(contact.id, { is_active: !contact.is_active });
-      toast.success(`"${contact.name}" marked as ${updated.is_active ? 'active' : 'inactive'}`);
-      setContacts((prev) => prev.map((c) => (c.id === contact.id ? { ...c, is_active: updated.is_active } : c)));
-      onRefreshContacts?.();
-    } catch (err: any) {
-      toast.error('Failed to update status', { description: err.message });
-    }
-  };
-
   // Filter and search
   const filteredContacts = useMemo(() => {
     return contacts.filter((c) => {
@@ -141,7 +122,10 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
       const isPureStaff = Array.isArray(c.roles) && c.roles.length > 0 && c.roles.every((r) => r === 'staff' || r === 'salesperson');
       if (isPureStaff) return false;
 
-      if (selectedRole !== 'all' && !c.roles.includes(selectedRole)) return false;
+      const bal = c.net_balance ?? 0;
+      if (selectedFilter === 'payable' && bal >= 0) return false;
+      if (selectedFilter === 'receivable' && bal <= 0) return false;
+
       if (onlyActive && c.is_active === false) return false;
       if (search.trim()) {
         const q = search.toLowerCase();
@@ -154,18 +138,34 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
       }
       return true;
     });
-  }, [contacts, selectedRole, onlyActive, search]);
+  }, [contacts, selectedFilter, onlyActive, search]);
 
-  // Statistics calculation
+  // Statistics calculation for All, Payable, Receivable
   const stats = useMemo(() => {
     const tradeContacts = contacts.filter((c) => !(Array.isArray(c.roles) && c.roles.length > 0 && c.roles.every((r) => r === 'staff' || r === 'salesperson')));
     const total = tradeContacts.length;
-    const brokers = tradeContacts.filter((c) => c.roles.includes('peer_vendor')).length;
-    const suppliers = tradeContacts.filter((c) => c.roles.includes('supplier')).length;
-    const partners = tradeContacts.filter((c) => c.roles.includes('partner')).length;
-    const customers = tradeContacts.filter((c) => c.roles.includes('customer')).length;
-    return { total, brokers, suppliers, partners, customers };
+    const payable = tradeContacts.filter((c) => (c.net_balance ?? 0) < 0).length;
+    const receivable = tradeContacts.filter((c) => (c.net_balance ?? 0) > 0).length;
+    return { total, payable, receivable };
   }, [contacts]);
+
+  // Sorting: "all filters must show the highest ammount to lowest decending"
+  const sortedContacts = useMemo(() => {
+    return [...filteredContacts].sort((a, b) => {
+      const balA = a.net_balance ?? 0;
+      const balB = b.net_balance ?? 0;
+      if (selectedFilter === 'receivable') {
+        return balB - balA;
+      }
+      if (selectedFilter === 'payable') {
+        return Math.abs(balB) - Math.abs(balA);
+      }
+      // 'all': highest magnitude balance first down to 0
+      const magDiff = Math.abs(balB) - Math.abs(balA);
+      if (magDiff !== 0) return magDiff;
+      return a.name.localeCompare(b.name);
+    });
+  }, [filteredContacts, selectedFilter]);
 
   const getRoleBadge = (role: string) => {
     switch (role) {
@@ -201,7 +201,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
   }
 
   return (
-    <div className="animate-page-enter space-y-4">
+    <div className="space-y-3 animate-page-enter flex-1 flex flex-col min-h-0">
 
       {/* ─── Page Header ─── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -215,34 +215,6 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* View toggle */}
-          <div className="hidden md:flex items-center p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl">
-            <button
-              type="button"
-              onClick={() => setViewMode('grid')}
-              title="Grid View"
-              className={`p-1.5 rounded-lg transition-colors ${
-                viewMode === 'grid'
-                  ? 'bg-white dark:bg-[#131926] text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
-              }`}
-            >
-              <LayoutGrid className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('table')}
-              title="Table View"
-              className={`p-1.5 rounded-lg transition-colors ${
-                viewMode === 'table'
-                  ? 'bg-white dark:bg-[#131926] text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
-              }`}
-            >
-              <List className="w-4 h-4" />
-            </button>
-          </div>
-
           <button
             type="button"
             onClick={() => handleOpenAddModal('peer_vendor')}
@@ -254,26 +226,21 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
         </div>
       </div>
 
-      {/* ─── Filter Row ─── */}
+      {/* ─── Filter Row (All, Payable, Receivable) ─── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        {/* Role tabs */}
-        <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl text-xs font-semibold overflow-x-auto shrink-0">
+        {/* Filter tabs: All, Payable, Receivable */}
+        <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl text-xs font-semibold shadow-2xs overflow-x-auto max-w-full no-scrollbar shrink-0">
           {[
             { id: 'all', label: `All`, count: stats.total },
-            { id: 'peer_vendor', label: 'Brokers', count: stats.brokers },
-            { id: 'supplier', label: 'Suppliers', count: stats.suppliers },
-            { id: 'partner', label: 'Partners', count: stats.partners },
-            { id: 'customer', label: 'Customers', count: stats.customers },
+            { id: 'payable', label: 'Payable', count: stats.payable },
+            { id: 'receivable', label: 'Receivable', count: stats.receivable },
           ].map((tab) => (
             <button
               key={tab.id}
               type="button"
-              onClick={() => {
-                setSelectedRole(tab.id as RoleFilter);
-                setCurrentPage(1);
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg whitespace-nowrap transition-all cursor-pointer ${
-                selectedRole === tab.id
+              onClick={() => setSelectedFilter(tab.id as BalanceFilter)}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg whitespace-nowrap transition-all cursor-pointer ${
+                selectedFilter === tab.id
                   ? 'bg-slate-900 dark:bg-slate-900 text-emerald-400 dark:text-emerald-400 border border-slate-800 shadow-xs font-bold ring-1 ring-emerald-500/20'
                   : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
@@ -281,7 +248,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
               <span>{tab.label}</span>
               {tab.count !== null && (
                 <span className={`text-[10px] font-mono leading-none px-1.5 py-0.5 rounded-md ${
-                  selectedRole === tab.id
+                  selectedFilter === tab.id
                     ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                     : 'bg-slate-200/60 dark:bg-slate-700/60 text-slate-500 dark:text-slate-400'
                 }`}>
@@ -294,26 +261,21 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
 
         {/* Search + Active toggle */}
         <div className="flex items-center gap-2.5">
-          <div className="relative">
+          <div className="relative w-full sm:w-64">
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setCurrentPage(1);
-              }}
+              onChange={(e) => setSearch(e.target.value)}
               placeholder="Search name, phone…"
-              className="h-9 w-52 pl-9 pr-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 transition-colors"
+              className="h-9 w-full pl-9 pr-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10 shadow-2xs transition-colors"
             />
             {search && (
               <button
                 type="button"
-                onClick={() => {
-                  setSearch('');
-                  setCurrentPage(1);
-                }}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                onClick={() => setSearch('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors cursor-pointer"
+                title="Clear search"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -324,434 +286,188 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
             <input
               type="checkbox"
               checked={onlyActive}
-              onChange={(e) => {
-                setOnlyActive(e.target.checked);
-                setCurrentPage(1);
-              }}
+              onChange={(e) => setOnlyActive(e.target.checked)}
               className="rounded text-slate-900 focus:ring-slate-900 dark:bg-slate-900 dark:border-slate-800"
             />
             Active only
           </label>
 
           <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium shrink-0 tabular-nums">
-            {filteredContacts.length} shown
+            {sortedContacts.length} shown
           </span>
         </div>
       </div>
 
-      {/* ─── Main Content ─── */}
-      {filteredContacts.length === 0 ? (
-        /* ═══ EMPTY STATE ═══ */
-        <div className="py-20 text-center rounded-2xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/90 shadow-[0_2px_12px_-2px_rgba(0,0,0,0.04)]">
-          <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-4">
-            <Handshake className="w-7 h-7 text-slate-400 dark:text-slate-500" />
+      {/* ─── MOBILE VIEW (< sm) — Cardless, Edge-to-Edge Matching Mobile Overview ─── */}
+      <div className="sm:hidden flex-1 overflow-y-auto h-[calc(100vh-235px)] min-h-[380px] scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800 px-0.5">
+        {sortedContacts.length === 0 ? (
+          <div className="py-16 text-center text-slate-400">
+            <Handshake className="w-8 h-8 mx-auto mb-2 text-slate-300 dark:text-slate-600" />
+            <p className="font-semibold text-slate-600 dark:text-slate-400 text-xs">
+              {search ? 'No partners matched' : 'No partners yet'}
+            </p>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              {search ? `No match for "${search}".` : 'Add neighbouring shop merchants or wholesale suppliers.'}
+            </p>
+            {!search && (
+              <button
+                type="button"
+                onClick={() => handleOpenAddModal('peer_vendor')}
+                className="mt-4 h-8 px-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-800 text-emerald-400 text-xs font-bold inline-flex items-center gap-1.5 shadow-xs cursor-pointer active:scale-[0.98]"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Add First Partner
+              </button>
+            )}
           </div>
-          <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-            {search ? 'No partners matched' : 'No partners yet'}
-          </h3>
-          <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5 max-w-xs mx-auto leading-relaxed">
-            {search
-              ? `No match for "${search}". Try clearing the search or adjusting filters.`
-              : 'Add neighbouring shop merchants or wholesale suppliers to begin brokered sourcing.'}
-          </p>
-          {!search && (
-            <button
-              type="button"
-              onClick={() => handleOpenAddModal('peer_vendor')}
-              className="mt-5 h-9 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold inline-flex items-center gap-1.5 shadow-sm hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors active:scale-[0.98]"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Add First Partner
-            </button>
-          )}
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {/* ═══ MOBILE CONTACT LIST (< sm) ═══ */}
-          <div className="sm:hidden space-y-2.5">
-            {filteredContacts.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((contact) => {
-              const isBrokered = contact.roles.includes('peer_vendor');
-              const initials = contact.name
-                .split(' ')
-                .map((n) => n[0])
-                .slice(0, 2)
-                .join('')
-                .toUpperCase();
-              const isInactive = contact.is_active === false;
-
-              return (
-                <div
-                  key={contact.id}
-                  onClick={() => setSelectedPartnerId(contact.id)}
-                  className={`rounded-2xl border p-4 transition-all active:scale-[0.99] cursor-pointer bg-white dark:bg-[#131926] shadow-xs ${
-                    isInactive
-                      ? 'border-slate-200/50 dark:border-slate-800/40 opacity-60'
-                      : 'border-slate-200/80 dark:border-slate-800/80 hover:border-slate-400/80'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2.5">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-extrabold text-xs shrink-0 ${
-                        isBrokered
-                          ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-200/60 dark:border-amber-800/50'
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200/60 dark:border-slate-700/60'
-                      }`}>
-                        {initials}
-                      </div>
-
-                      <div className="min-w-0">
-                        <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate leading-tight">
-                          {contact.name}
-                        </h3>
-                        {contact.phone ? (
-                          <div className="flex items-center gap-1.5 mt-0.5 text-xs text-slate-500 font-mono">
-                            <Phone className="w-3 h-3 text-slate-400 shrink-0" />
-                            <span>{contact.phone}</span>
-                          </div>
-                        ) : (
-                          <span className="text-[10px] text-slate-400 italic block mt-0.5">No phone</span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col items-end gap-1 shrink-0">
-                      <div className="flex flex-wrap gap-1 justify-end">
-                        {contact.roles.map((r) => {
-                          const badge = getRoleBadge(r);
-                          return (
-                            <span key={r} className={`text-[9px] font-bold px-1.5 py-0.5 rounded leading-none ${badge.classes}`}>
-                              {badge.label}
-                            </span>
-                          );
-                        })}
-                      </div>
-                      {isInactive && (
-                        <span className="text-[9px] font-semibold text-slate-400">Inactive</span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Financial Balance and Actions */}
-                  <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800/60 flex items-center justify-between text-xs">
-                    <div>
-                      {typeof contact.net_balance === 'number' ? (
-                        <span className={`font-mono font-bold text-xs ${
-                          contact.net_balance > 0
-                            ? 'text-emerald-600 dark:text-emerald-400'
-                            : contact.net_balance < 0
-                            ? 'text-rose-600 dark:text-rose-400'
-                            : 'text-slate-400'
-                        }`}>
-                          {contact.net_balance > 0
-                            ? `+${contact.net_balance.toLocaleString()} ETB`
-                            : contact.net_balance < 0
-                            ? `−${Math.abs(contact.net_balance).toLocaleString()} ETB`
-                            : '0.00 ETB'}
-                        </span>
-                      ) : (
-                        <span className="text-[10px] text-slate-400">No balance</span>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                      {contact.phone && (
-                        <a
-                          href={`tel:${contact.phone}`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-600 hover:bg-slate-100 dark:hover:bg-slate-800"
-                          title="Call"
+        ) : (
+          <div className="divide-y-0 pb-12">
+            {sortedContacts.map((contact) => (
+              <button
+                key={contact.id}
+                type="button"
+                onClick={() => setSelectedPartnerId(contact.id)}
+                className="w-full flex items-center justify-between py-2.5 border-b border-slate-200/50 dark:border-slate-800/50 text-left active:opacity-60 transition-opacity cursor-pointer min-w-0 group"
+                title={`${contact.name}: ${contact.net_balance ? `${contact.net_balance.toLocaleString()} ETB` : '0 ETB'}`}
+              >
+                <div className="min-w-0 pr-2">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="text-[13px] min-[390px]:text-sm font-bold text-slate-900 dark:text-white truncate leading-snug">
+                      {contact.name}
+                    </span>
+                    {contact.roles.map((r) => {
+                      const badge = getRoleBadge(r);
+                      return (
+                        <span
+                          key={r}
+                          className={`text-[9px] font-bold px-1.5 py-0.2 rounded leading-none shrink-0 ${badge.classes}`}
                         >
-                          <Phone className="w-3.5 h-3.5" />
-                        </a>
-                      )}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOpenEditModal(contact);
-                        }}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
-                        title="Edit"
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeletingContact(contact);
-                        }}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40"
-                        title="Delete"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                      <ChevronRight className="w-4 h-4 text-slate-300 ml-0.5" />
-                    </div>
+                          {badge.label}
+                        </span>
+                      );
+                    })}
                   </div>
+                  {contact.phone && (
+                    <div className="text-[11px] font-mono text-slate-400 dark:text-slate-500 mt-0.5">
+                      {contact.phone}
+                    </div>
+                  )}
                 </div>
-              );
-            })}
+
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span
+                    className={`text-[13px] min-[390px]:text-sm font-black font-mono tracking-tight text-right leading-snug ${
+                      (contact.net_balance || 0) > 0
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : (contact.net_balance || 0) < 0
+                        ? 'text-rose-600 dark:text-rose-400'
+                        : 'text-slate-400 dark:text-slate-500'
+                    }`}
+                    style={{ fontVariantNumeric: 'tabular-nums' }}
+                  >
+                    {typeof contact.net_balance === 'number' && contact.net_balance !== 0 ? (
+                      contact.net_balance > 0
+                        ? `+${contact.net_balance.toLocaleString()} ETB`
+                        : `−${Math.abs(contact.net_balance).toLocaleString()} ETB`
+                    ) : (
+                      '0.00 ETB'
+                    )}
+                  </span>
+                  <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 dark:group-hover:text-slate-300 transition-colors" />
+                </div>
+              </button>
+            ))}
+
+            {/* Footer count indicator */}
+            <div className="py-4 text-center text-[11px] text-slate-400 dark:text-slate-500 font-medium">
+              <span className="inline-flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                <span>All {sortedContacts.length} partners loaded</span>
+              </span>
+            </div>
           </div>
+        )}
+      </div>
 
-          {/* ═══ DESKTOP VIEW (≥ sm): user's chosen viewMode (grid or table) ═══ */}
-          <div className="hidden sm:block">
-            {viewMode === 'grid' ? (
-              /* ═══ GRID CARDS VIEW ═══ */
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                {filteredContacts.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((contact) => {
-                  const isBrokered = contact.roles.includes('peer_vendor');
-                  const initials = contact.name
-                    .split(' ')
-                    .map((n) => n[0])
-                    .slice(0, 2)
-                    .join('')
-                    .toUpperCase();
-                  const isInactive = contact.is_active === false;
+      {/* ─── DESKTOP VIEW (≥ sm) — Fixed-height Inside Scroll Ledger Matching Sales ─── */}
+      <div className="hidden sm:flex bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800/80 overflow-hidden shadow-2xs flex-1 flex-col min-h-0">
+        <div className="overflow-x-auto overflow-y-auto h-[calc(100vh-235px)] sm:h-[calc(100vh-190px)] min-h-[440px] scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800 relative">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead className="sticky top-0 z-20 bg-slate-50/95 dark:bg-[#131926]/95 backdrop-blur-xs border-b border-slate-200/80 dark:border-slate-800 text-slate-400 font-bold uppercase tracking-wider text-[10px] shadow-2xs">
+              <tr>
+                <th className="py-2.5 px-3.5 whitespace-nowrap">Partner / Vendor</th>
+                <th className="py-2.5 px-3.5 whitespace-nowrap">Roles</th>
+                <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Balance</th>
+                <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Actions</th>
+                <th className="py-2.5 px-2"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-slate-700 dark:text-slate-300">
+              {sortedContacts.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-20 text-center text-slate-400">
+                    <Handshake className="w-8 h-8 mx-auto mb-2 text-slate-300 dark:text-slate-600" />
+                    <p className="font-semibold text-slate-600 dark:text-slate-400">
+                      {search ? 'No partners matched' : 'No partners yet'}
+                    </p>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {search
+                        ? `No match for "${search}". Try clearing search or filters.`
+                        : 'Add neighbouring shop merchants or wholesale suppliers.'}
+                    </p>
+                    {!search && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenAddModal('peer_vendor')}
+                        className="mt-4 h-8 px-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-800 text-emerald-400 text-xs font-bold inline-flex items-center gap-1.5 shadow-xs cursor-pointer active:scale-[0.98]"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        Add First Partner
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ) : (
+                <>
+                  {sortedContacts.map((contact) => {
+                    const isBrokered = contact.roles.includes('peer_vendor');
+                    const initials = contact.name
+                      .split(' ')
+                      .map((n) => n[0])
+                      .slice(0, 2)
+                      .join('')
+                      .toUpperCase();
+                    const isInactive = contact.is_active === false;
 
-                  return (
-                    <div
-                      key={contact.id}
-                      onClick={() => setSelectedPartnerId(contact.id)}
-                      className={`group rounded-2xl border flex flex-col overflow-hidden transition-all duration-150 cursor-pointer ${
-                        isInactive
-                          ? 'bg-slate-50/80 dark:bg-[#131926]/60 border-slate-200/50 dark:border-slate-800/40 opacity-60'
-                          : 'bg-white dark:bg-[#131926] border-slate-200/80 dark:border-slate-800/80 hover:border-slate-400/80 dark:hover:border-slate-600 shadow-[0_2px_12px_-2px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_24px_-4px_rgba(0,0,0,0.08)]'
-                      }`}
-                    >
-                      {/* ── Card Body ── */}
-                      <div className="p-5 flex-1 space-y-3.5">
-                        {/* Header: Avatar + Name + Badges */}
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex items-center gap-3 min-w-0">
-                            {/* Avatar */}
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-extrabold text-xs shrink-0 ${
-                              isBrokered
-                                ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-200/60 dark:border-amber-800/50'
-                                : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200/60 dark:border-slate-700/60'
-                            }`}>
+                    return (
+                      <tr
+                        key={contact.id}
+                        onClick={() => setSelectedPartnerId(contact.id)}
+                        className={`hover:bg-slate-50/90 dark:hover:bg-slate-800/40 transition-colors cursor-pointer group select-none ${
+                          isInactive ? 'opacity-60' : ''
+                        }`}
+                      >
+                        {/* Col 1: Partner / Vendor (Avatar + Name + Phone) */}
+                        <td className="py-2.5 px-3.5">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div
+                              className={`w-8 h-8 rounded-lg flex items-center justify-center font-extrabold text-[11px] shrink-0 ${
+                                isBrokered
+                                  ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-200/60 dark:border-amber-800/50'
+                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60'
+                              }`}
+                            >
                               {initials}
                             </div>
-
-                            {/* Name + Inactive Flag */}
                             <div className="min-w-0">
-                              <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate tracking-tight leading-tight group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                              <div className="font-bold text-slate-900 dark:text-white text-xs truncate max-w-[180px] sm:max-w-[240px] group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
                                 {contact.name}
-                              </h3>
-                              {isInactive && (
-                                <span className="text-[10px] font-semibold text-slate-400 block mt-0.5">
-                                  Inactive
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Role Badges */}
-                          <div className="flex flex-wrap items-start justify-end gap-1 shrink-0 pt-0.5">
-                            {contact.roles.map((r) => {
-                              const badge = getRoleBadge(r);
-                              return (
-                                <span key={r} className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md leading-none ${badge.classes}`}>
-                                  {badge.label}
-                                </span>
-                              );
-                            })}
-                          </div>
-                        </div>
-
-                        {/* Phone */}
-                        <div className="flex items-center justify-between">
-                          {contact.phone ? (
-                            <div className="flex items-center gap-1.5 min-w-0">
-                              <Phone className="w-3 h-3 text-slate-400 shrink-0" />
-                              <a
-                                href={`tel:${contact.phone}`}
-                                onClick={(e) => e.stopPropagation()}
-                                className="text-[11px] font-mono text-slate-700 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors truncate"
-                              >
-                                {contact.phone}
-                              </a>
-                              {contact.alt_phone && (
-                                <span className="text-[11px] font-mono text-slate-400 truncate">· {contact.alt_phone}</span>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-[11px] text-slate-400 italic">No phone on file</span>
-                          )}
-
-                          {contact.phone && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleCopyPhone(contact.phone!, contact.id);
-                              }}
-                              title="Copy phone number"
-                              className="ml-2 p-1 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0"
-                            >
-                              {copiedId === contact.id
-                                ? <Check className="w-3.5 h-3.5 text-emerald-500" />
-                                : <Copy className="w-3.5 h-3.5" />
-                              }
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Notes */}
-                        {contact.notes && (
-                          <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1 leading-relaxed">
-                            {contact.notes}
-                          </p>
-                        )}
-
-                        {/* Clean Financial Balance Row */}
-                        {typeof contact.net_balance === 'number' && (
-                          <div className="pt-3 border-t border-slate-100 dark:border-slate-800/60 flex items-baseline justify-between">
-                            <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
-                              {contact.net_balance > 0 ? 'Receivable' : contact.net_balance < 0 ? 'Payable' : 'Balance'}
-                            </span>
-                            <span className={`font-mono font-bold text-xs ${
-                              contact.net_balance > 0
-                                ? 'text-emerald-600 dark:text-emerald-400'
-                                : contact.net_balance < 0
-                                ? 'text-rose-600 dark:text-rose-400'
-                                : 'text-slate-400'
-                            }`}>
-                              {contact.net_balance > 0
-                                ? `+${contact.net_balance.toLocaleString()} ETB`
-                                : contact.net_balance < 0
-                                ? `−${Math.abs(contact.net_balance).toLocaleString()} ETB`
-                                : '0.00 ETB'}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* ── Card Footer ── */}
-                      <div className="px-4 py-2.5 border-t border-slate-100 dark:border-slate-800/60 bg-slate-50/50 dark:bg-slate-900/20 flex items-center justify-between">
-                        {/* Left: Statement & Ledger indicator */}
-                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600 dark:text-slate-300 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                          Statement and Ledger
-                          <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
-                        </span>
-
-                        {/* Right: action buttons */}
-                        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                          {isBrokered && onNavigateTab && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onNavigateTab('counter');
-                                toast.info(`Source from ${contact.name} in Sales`);
-                              }}
-                              title="Source in Sales"
-                              className="p-1.5 rounded-lg text-amber-600 dark:text-amber-400 hover:bg-amber-100/50 dark:hover:bg-amber-950/50 transition-colors"
-                            >
-                              <ShoppingBag className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenEditModal(contact);
-                            }}
-                            title="Edit details"
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors"
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDeletingContact(contact);
-                            }}
-                            title="Remove partner"
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              /* ═══ TABLE VIEW ═══ */
-              <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800/80 overflow-hidden shadow-[0_2px_12px_-2px_rgba(0,0,0,0.04)]">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left">
-                    <thead>
-                      <tr className="border-b border-slate-100 dark:border-slate-800/80">
-                        <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 bg-slate-50/70 dark:bg-slate-900/40 whitespace-nowrap">
-                          Partner
-                        </th>
-                        <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 bg-slate-50/70 dark:bg-slate-900/40 whitespace-nowrap">
-                          Roles
-                        </th>
-                        <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 bg-slate-50/70 dark:bg-slate-900/40 whitespace-nowrap">
-                          Phone
-                        </th>
-                        <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 bg-slate-50/70 dark:bg-slate-900/40 whitespace-nowrap hidden lg:table-cell">
-                          Notes
-                        </th>
-                        <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 bg-slate-50/70 dark:bg-slate-900/40 text-center whitespace-nowrap">
-                          Status
-                        </th>
-                        <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 bg-slate-50/70 dark:bg-slate-900/40 text-right whitespace-nowrap">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
-                      {filteredContacts.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((contact) => {
-                        const isBrokered = contact.roles.includes('peer_vendor');
-                        const isInactive = contact.is_active === false;
-                        return (
-                          <tr
-                            key={contact.id}
-                            onClick={() => setSelectedPartnerId(contact.id)}
-                            className={`group transition-colors cursor-pointer ${isInactive ? 'opacity-60' : 'hover:bg-slate-50/70 dark:hover:bg-slate-800/30'}`}
-                          >
-                            {/* Name */}
-                            <td className="py-3 px-4">
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-sm font-semibold text-slate-900 dark:text-white block leading-tight group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                                  {contact.name}
-                                </span>
-                                <ChevronRight className="w-3.5 h-3.5 text-slate-300 opacity-0 group-hover:opacity-100 group-hover:text-emerald-500 transition-all" />
                               </div>
-                              {contact.email && (
-                                <span className="text-[10px] text-slate-400 font-medium mt-0.5 block">{contact.email}</span>
-                              )}
-                            </td>
-
-                            {/* Roles */}
-                            <td className="py-3 px-4">
-                              <div className="flex flex-wrap gap-1">
-                                {contact.roles.map((r) => {
-                                  const badge = getRoleBadge(r);
-                                  return (
-                                    <span key={r} className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md leading-none ${badge.classes}`}>
-                                      {badge.label}
-                                    </span>
-                                  );
-                                })}
-                              </div>
-                            </td>
-
-                            {/* Phone */}
-                            <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
                               {contact.phone ? (
-                                <div className="flex items-center gap-1.5">
+                                <div className="flex items-center gap-1 mt-0.5" onClick={(e) => e.stopPropagation()}>
                                   <a
                                     href={`tel:${contact.phone}`}
-                                    className="text-[11px] font-mono text-slate-700 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+                                    className="text-[10px] font-mono text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
                                   >
                                     {contact.phone}
                                   </a>
@@ -759,101 +475,108 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                                     type="button"
                                     onClick={() => handleCopyPhone(contact.phone!, contact.id)}
                                     title="Copy phone"
-                                    className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+                                    className="p-0.5 rounded text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
                                   >
-                                    {copiedId === contact.id
-                                      ? <Check className="w-3 h-3 text-emerald-500" />
-                                      : <Copy className="w-3 h-3" />
-                                    }
+                                    {copiedId === contact.id ? (
+                                      <Check className="w-2.5 h-2.5 text-emerald-500" />
+                                    ) : (
+                                      <Copy className="w-2.5 h-2.5" />
+                                    )}
                                   </button>
                                 </div>
                               ) : (
-                                <span className="text-[11px] text-slate-400">—</span>
+                                <span className="text-[10px] text-slate-400 italic">No phone</span>
                               )}
-                            </td>
+                            </div>
+                          </div>
+                        </td>
 
-                            {/* Notes (hidden on smaller screens) */}
-                            <td className="py-3 px-4 hidden lg:table-cell">
-                              <span className="text-[11px] text-slate-500 dark:text-slate-400 max-w-xs truncate block">
-                                {contact.notes || <span className="text-slate-300 dark:text-slate-600">—</span>}
-                              </span>
-                            </td>
-
-                            {/* Status */}
-                            <td className="py-3 px-4 text-center" onClick={(e) => e.stopPropagation()}>
-                              <button
-                                type="button"
-                                onClick={() => handleToggleActive(contact)}
-                                title={isInactive ? 'Mark active' : 'Mark inactive'}
-                                className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-bold transition-colors ${
-                                  !isInactive
-                                    ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-950/60'
-                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'
-                                }`}
-                              >
-                                <span className={`w-1.5 h-1.5 rounded-full ${!isInactive ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-                                {!isInactive ? 'Active' : 'Inactive'}
-                              </button>
-                            </td>
-
-                            {/* Actions */}
-                            <td className="py-3 px-4 text-right" onClick={(e) => e.stopPropagation()}>
-                              <div className="flex items-center justify-end gap-1">
-                                <button
-                                  type="button"
-                                  onClick={() => setSelectedPartnerId(contact.id)}
-                                  title="Open Statement and Ledger"
-                                  className="px-2 py-1 rounded-lg text-[10px] font-bold text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors inline-flex items-center gap-1"
+                        {/* Col 2: Roles */}
+                        <td className="py-2.5 px-3.5 whitespace-nowrap">
+                          <div className="flex flex-wrap gap-1">
+                            {contact.roles.map((r) => {
+                              const badge = getRoleBadge(r);
+                              return (
+                                <span
+                                  key={r}
+                                  className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md leading-none ${badge.classes}`}
                                 >
-                                  Statement
-                                  <ExternalLink className="w-3 h-3" />
-                                </button>
-                                {isBrokered && onNavigateTab && (
-                                  <button
-                                    type="button"
-                                    onClick={() => { onNavigateTab('counter'); toast.info(`Switched to Sales for ${contact.name}`); }}
-                                    title="Source in Sales"
-                                    className="p-1.5 rounded-lg text-amber-500 hover:text-amber-700 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors"
-                                  >
-                                    <ShoppingBag className="w-3.5 h-3.5" />
-                                  </button>
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenEditModal(contact)}
-                                  title="Edit"
-                                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                                >
-                                  <Pencil className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setDeletingContact(contact)}
-                                  title="Remove"
-                                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </div>
+                                  {badge.label}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        </td>
 
-          <Pagination
-            currentPage={currentPage}
-            totalItems={filteredContacts.length}
-            pageSize={pageSize}
-            onPageChange={setCurrentPage}
-          />
+                        {/* Col 3: Balance */}
+                        <td className="py-2.5 px-3.5 text-right whitespace-nowrap">
+                          {typeof contact.net_balance === 'number' && contact.net_balance !== 0 ? (
+                            <span
+                              className={`font-mono font-bold text-xs ${
+                                contact.net_balance > 0
+                                  ? 'text-emerald-600 dark:text-emerald-400'
+                                  : 'text-rose-600 dark:text-rose-400'
+                              }`}
+                            >
+                              {contact.net_balance > 0
+                                ? `+${contact.net_balance.toLocaleString()} ETB`
+                                : `−${Math.abs(contact.net_balance).toLocaleString()} ETB`}
+                            </span>
+                          ) : (
+                            <span className="font-mono text-slate-400 text-xs">0.00 ETB</span>
+                          )}
+                        </td>
+
+                        {/* Col 4: Actions (Edit, Delete) */}
+                        <td className="py-2.5 px-3.5 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditModal(contact)}
+                              title="Edit"
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDeletingContact(contact)}
+                              title="Remove"
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+
+                        {/* Col 5: Chevron */}
+                        <td className="py-2.5 px-2 text-right">
+                          <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-700 dark:group-hover:text-slate-300 group-hover:translate-x-0.5 transition-all" />
+                        </td>
+                      </tr>
+                    );
+                  })}
+
+                  {/* All caught up footer banner */}
+                  {sortedContacts.length > 0 && (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="py-3 text-center text-[11px] text-slate-400 dark:text-slate-500 bg-slate-50/50 dark:bg-slate-900/30 font-medium"
+                      >
+                        <span className="inline-flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                          <span>All {sortedContacts.length} partners loaded</span>
+                        </span>
+                      </td>
+                    </tr>
+                  )}
+                </>
+              )}
+            </tbody>
+          </table>
         </div>
-      )}
+      </div>
 
       {/* ─── Add / Edit Modal ─── */}
       <PartnerFormModal

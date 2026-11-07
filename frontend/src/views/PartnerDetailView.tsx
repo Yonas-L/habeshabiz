@@ -14,12 +14,12 @@ import {
   Wrench,
   ArrowRightLeft,
   Receipt,
-  Search,
   X,
   RotateCcw,
+  CheckCircle2,
+  ChevronDown,
 } from 'lucide-react';
 import { LdrsSpinner } from '../components/loading/LdrsSpinner';
-import { AnimatedNumber } from '../components/AnimatedNumber';
 import { PartnerFormModal } from '../components/partners/PartnerFormModal';
 import { CustomPageLoader } from '../components/loading/CustomPageLoader';
 import { formatLocalDate } from '../utils/dateUtils';
@@ -38,6 +38,39 @@ interface PartnerDetailViewProps {
 
 type DateRangeFilter = 'all' | 'this_month' | 'last_month' | 'last_30_days' | 'custom';
 type DashboardTab = 'statement' | 'inventory' | 'handovers' | 'repairs';
+
+const getLedgerBadgeClass = (type: string) => {
+  switch (type) {
+    case 'consignment_sale':
+    case 'brokered_sourcing':
+    case 'manual_payable':
+      return 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50';
+    case 'paid_by_device':
+    case 'device_offset':
+    case 'bilateral_offset':
+    case 'payment_received':
+      return 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50';
+    case 'payment_sent':
+      return 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 border border-blue-200/50';
+    case 'repair_offset':
+      return 'bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-400 border border-sky-200/50';
+    case 'repair_claim':
+      return 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border border-rose-200/50';
+    case 'sales_credit':
+    case 'handover_holding':
+    case 'manual_receivable':
+    case 'customer_purchase':
+      return 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/50';
+    case 'payout_advance':
+      return 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border border-indigo-200/50';
+    case 'handover_return':
+    case 'vendor_return':
+    case 'vendor_return_refund':
+      return 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50';
+    default:
+      return 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300';
+  }
+};
 
 export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
   contactId,
@@ -58,9 +91,6 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
   const [dateFilter, setDateFilter] = useState<DateRangeFilter>('all');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
-
-  // Search filter inside ledger
-  const [ledgerSearch, setLedgerSearch] = useState('');
 
   // Modals & Actions
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
@@ -270,47 +300,31 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
     );
   }
 
-  const { contact, range, kpis, ledger, supplied_units, handed_out_units, vendor_return_units } = statementData;
+  const { contact, kpis, ledger, supplied_units, handed_out_units, vendor_return_units } = statementData;
   const netBalance = kpis.range_closing_balance;
-  const isReceivable = netBalance > 0;
-  const isPayable = netBalance < 0;
 
-  // Filter ledger rows by search
-  const filteredLedger = ledger.filter((r) => {
-    if (!ledgerSearch.trim()) return true;
-    const term = ledgerSearch.toLowerCase();
-    return (
-      r.context.toLowerCase().includes(term) ||
-      r.type_label.toLowerCase().includes(term) ||
-      (r.reference_number && r.reference_number.toLowerCase().includes(term))
-    );
-  });
+  const filteredLedger = ledger;
 
   return (
     <div className="space-y-5 animate-page-enter">
-      {/* ── Top Navigation Bar ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200/80 dark:border-slate-800">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onBack}
-            className="p-2 rounded-xl text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-            title="Back to Network"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </button>
+      {/* ── Top Navigation & Header ── */}
+      <div className="space-y-3.5 pb-4 border-b border-slate-200/80 dark:border-slate-800">
+        {/* Row 1: Back Button + Name + Action Buttons */}
+        <div className="flex items-center justify-between gap-3 min-w-0">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <button
+              onClick={onBack}
+              className="p-1.5 -ml-1 rounded-xl text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0 cursor-pointer"
+              title="Back to Network"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
 
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-800 to-slate-950 text-white flex items-center justify-center font-black text-sm shadow-xs">
-              {contact.name.slice(0, 2).toUpperCase()}
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
-                  {contact.name}
-                </h1>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              </div>
-              <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
+            <div className="min-w-0">
+              <h1 className="text-lg sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight truncate">
+                {contact.name}
+              </h1>
+              <div className="hidden sm:flex items-center gap-2 text-xs text-slate-400 mt-0.5 flex-wrap">
                 {contact.phone && (
                   <button
                     onClick={() => handleCopyPhone(contact.phone!)}
@@ -322,67 +336,211 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
                   </button>
                 )}
                 {contact.roles && contact.roles.length > 0 && (
-                  <>
-                    <span>·</span>
+                  <span className="inline-flex items-center gap-1.5">
+                    {contact.phone && <span>·</span>}
                     <span className="capitalize">{contact.roles.join(', ')}</span>
-                  </>
+                  </span>
                 )}
               </div>
             </div>
           </div>
+
+          {/* Action Buttons: Edit, Share, PDF (Mobile only < sm) */}
+          <div className="sm:hidden flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={handleOpenEditModal}
+              disabled={isFetchingContact}
+              className="h-8 px-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/80 text-xs font-bold transition-all shadow-2xs flex items-center gap-1 cursor-pointer active:scale-95 disabled:opacity-50"
+              title="Edit Partner Details"
+            >
+              {isFetchingContact ? (
+                <LdrsSpinner size={13} color="#64748b" stroke={2.5} />
+              ) : (
+                <Pencil className="w-3.5 h-3.5 text-slate-500" />
+              )}
+              <span>Edit</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleCopyPublicLink}
+              className="h-8 px-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/80 text-xs font-bold transition-all shadow-2xs flex items-center gap-1 cursor-pointer active:scale-95"
+              title="Copy shareable public read-only link"
+            >
+              {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> : <Share2 className="w-3.5 h-3.5 text-slate-500" />}
+              <span>{copiedLink ? 'Copied' : 'Share'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDownloadStatement}
+              disabled={isDownloadingPdf}
+              className="h-8 px-2 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-800 text-emerald-400 dark:text-emerald-400 text-xs font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+              title="Download Statement as PDF"
+            >
+              {isDownloadingPdf ? (
+                <>
+                  <LdrsSpinner size={13} color="#34d399" stroke={2.5} />
+                  <span>Saving…</span>
+                </>
+              ) : (
+                <>
+                  <ArrowDownToLine className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>PDF</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Desktop Right Cluster (≥ sm): Balance + Divider + Actions */}
+          <div className="hidden sm:flex items-center gap-5 shrink-0">
+            <div className="text-right">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block leading-tight">
+                {netBalance > 0 ? 'Vendor Owes Us' : netBalance < 0 ? 'We Owe Vendor' : 'Net Balance'}
+              </span>
+              <div
+                className={`text-2xl lg:text-3xl font-black font-mono tracking-tight tabular-nums flex items-baseline justify-end gap-1.5 ${
+                  netBalance > 0
+                    ? 'text-emerald-600 dark:text-emerald-400'
+                    : netBalance < 0
+                    ? 'text-rose-600 dark:text-rose-400'
+                    : 'text-slate-900 dark:text-white'
+                }`}
+              >
+                <span>
+                  {netBalance > 0
+                    ? `+${netBalance.toLocaleString()}`
+                    : netBalance < 0
+                    ? `−${Math.abs(netBalance).toLocaleString()}`
+                    : '0.00'}
+                </span>
+                <span className="text-xs font-sans font-bold text-slate-400 dark:text-slate-500">
+                  ETB
+                </span>
+              </div>
+            </div>
+
+            <div className="h-9 w-px bg-slate-200 dark:bg-slate-800 shrink-0" />
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleOpenEditModal}
+                disabled={isFetchingContact}
+                className="h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/80 text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-50"
+                title="Edit Partner Details"
+              >
+                {isFetchingContact ? (
+                  <LdrsSpinner size={13} color="#64748b" stroke={2.5} />
+                ) : (
+                  <Pencil className="w-3.5 h-3.5 text-slate-500" />
+                )}
+                <span>Edit</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleCopyPublicLink}
+                className="h-9 px-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/80 text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95"
+                title="Copy shareable public read-only link"
+              >
+                {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> : <Share2 className="w-3.5 h-3.5 text-slate-500" />}
+                <span>{copiedLink ? 'Copied' : 'Share Statement'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDownloadStatement}
+                disabled={isDownloadingPdf}
+                className="h-9 px-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-800 text-emerald-400 dark:text-emerald-400 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+                title="Download Statement as PDF"
+              >
+                {isDownloadingPdf ? (
+                  <>
+                    <LdrsSpinner size={13} color="#34d399" stroke={2.5} />
+                    <span>Saving…</span>
+                  </>
+                ) : (
+                  <>
+                    <ArrowDownToLine className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>PDF Statement</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            type="button"
-            onClick={handleOpenEditModal}
-            disabled={isFetchingContact}
-            className="h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/80 text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-50"
-            title="Edit Partner Details"
-          >
-            {isFetchingContact ? (
-              <LdrsSpinner size={14} color="#64748b" stroke={2.5} />
-            ) : (
-              <Pencil className="w-3.5 h-3.5 text-slate-500" />
-            )}
-            <span>Edit</span>
-          </button>
+        {/* Row 2: Large Total Amount on Left + Minimal Period Dropdown on Right (Mobile only < sm) */}
+        <div className="sm:hidden flex items-end justify-between gap-3 pt-1">
+          <div>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block mb-0.5">
+              {netBalance > 0 ? 'Vendor Owes Us' : netBalance < 0 ? 'We Owe Vendor' : 'Net Balance'}
+            </span>
+            <div
+              className={`text-2xl font-black font-mono tracking-tight tabular-nums flex items-baseline gap-1.5 ${
+                netBalance > 0
+                  ? 'text-emerald-600 dark:text-emerald-400'
+                  : netBalance < 0
+                  ? 'text-rose-600 dark:text-rose-400'
+                  : 'text-slate-900 dark:text-white'
+              }`}
+            >
+              <span>
+                {netBalance > 0
+                  ? `+${netBalance.toLocaleString()}`
+                  : netBalance < 0
+                  ? `−${Math.abs(netBalance).toLocaleString()}`
+                  : '0.00'}
+              </span>
+              <span className="text-xs font-sans font-bold text-slate-400 dark:text-slate-500">
+                ETB
+              </span>
+            </div>
+          </div>
 
-          <button
-            type="button"
-            onClick={handleCopyPublicLink}
-            className="h-9 px-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/80 text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95"
-            title="Copy shareable public read-only link"
-          >
-            {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> : <Share2 className="w-3.5 h-3.5 text-slate-500" />}
-            <span>{copiedLink ? 'Link Copied!' : 'Share Public Statement'}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleDownloadStatement}
-            disabled={isDownloadingPdf}
-            className="h-9 px-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-800 text-emerald-400 dark:text-emerald-400 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
-            title="Download Statement as PDF"
-          >
-            {isDownloadingPdf ? (
-              <>
-                <LdrsSpinner size={14} color="#34d399" stroke={2.5} />
-                <span>Downloading…</span>
-              </>
-            ) : (
-              <>
-                <ArrowDownToLine className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Download Statement</span>
-              </>
-            )}
-          </button>
+          {/* Right (Mobile only < sm): Minimal native Period dropdown without nested cards */}
+          <div className="flex items-center shrink-0 pb-0.5">
+            <div className="relative">
+              <select
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value as DateRangeFilter)}
+                className="h-8 pl-2.5 pr-6 rounded-lg border border-slate-200/90 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/80 text-xs font-semibold text-slate-700 dark:text-slate-300 focus:outline-none cursor-pointer appearance-none shadow-2xs"
+              >
+                <option value="all">All Time</option>
+                <option value="this_month">This Month</option>
+                <option value="last_month">Last Month</option>
+                <option value="last_30_days">Last 30 Days</option>
+                <option value="custom">Custom</option>
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400 pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2" />
+            </div>
+          </div>
         </div>
+
+        {/* Custom Range Date Pickers on Mobile (< sm) */}
+        {dateFilter === 'custom' && (
+          <div className="sm:hidden flex items-center gap-2 text-xs pt-1">
+            <input
+              type="date"
+              value={customStartDate}
+              onChange={(e) => setCustomStartDate(e.target.value)}
+              className="h-7.5 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-mono font-medium text-slate-900 dark:text-white flex-1"
+            />
+            <span className="text-slate-400 text-xs">to</span>
+            <input
+              type="date"
+              value={customEndDate}
+              onChange={(e) => setCustomEndDate(e.target.value)}
+              className="h-7.5 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-mono font-medium text-slate-900 dark:text-white flex-1"
+            />
+          </div>
+        )}
       </div>
 
-      {/* ── Date Range Controls ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-2xl bg-white dark:bg-[#131926] border border-slate-100 dark:border-slate-800 shadow-2xs">
+      {/* ── Desktop Date Range Controls (≥ sm) ── */}
+      <div className="hidden sm:flex items-center justify-between gap-2.5 p-2 rounded-2xl bg-white dark:bg-[#131926] border border-slate-100 dark:border-slate-800 shadow-2xs">
         <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl text-xs font-semibold overflow-x-auto">
           <button
             onClick={() => setDateFilter('all')}
@@ -455,108 +613,6 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
         )}
       </div>
 
-      {/* ── Financial Position: Clean, Focused Net Balance ── */}
-      <div
-        className={`rounded-2xl border p-5 sm:p-6 shadow-xs transition-all ${
-          isPayable
-            ? 'bg-gradient-to-br from-rose-50/70 via-white to-rose-50/30 dark:from-rose-950/30 dark:via-[#131926] dark:to-[#131926] border-rose-200/90 dark:border-rose-900/60'
-            : isReceivable
-            ? 'bg-gradient-to-br from-emerald-50/70 via-white to-emerald-50/30 dark:from-emerald-950/30 dark:via-[#131926] dark:to-[#131926] border-emerald-200/90 dark:border-emerald-900/60'
-            : 'bg-white dark:bg-[#131926] border-slate-200/80 dark:border-slate-800'
-        }`}
-      >
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
-          {/* Left Column: Focused Net Balance */}
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                Bilateral Net Balance
-              </span>
-              <span
-                className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1.5 ${
-                  isPayable
-                    ? 'bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300 border border-rose-200/60 dark:border-rose-800/60'
-                    : isReceivable
-                    ? 'bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/60'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
-                }`}
-              >
-                <span
-                  className={`w-1.5 h-1.5 rounded-full ${
-                    isPayable
-                      ? 'bg-rose-500'
-                      : isReceivable
-                      ? 'bg-emerald-500 animate-pulse'
-                      : 'bg-slate-400'
-                  }`}
-                />
-                {isPayable ? 'We Owe Vendor' : isReceivable ? 'Vendor Owes Us' : 'Settled In Full'}
-              </span>
-            </div>
-
-            <div
-              className={`text-3xl sm:text-4xl font-black font-mono tracking-tight tabular-nums flex items-baseline gap-1.5 ${
-                isPayable
-                  ? 'text-rose-600 dark:text-rose-400'
-                  : isReceivable
-                  ? 'text-emerald-600 dark:text-emerald-400'
-                  : 'text-slate-900 dark:text-white'
-              }`}
-            >
-              <span>{isPayable ? '−' : isReceivable ? '+' : ''}</span>
-              <AnimatedNumber value={Math.abs(netBalance)} />
-              <span className="text-xs font-semibold font-sans text-slate-400 dark:text-slate-500">
-                ETB
-              </span>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500 dark:text-slate-400 font-medium">
-              <span>
-                {isPayable
-                  ? `Your shop owes this net balance to ${contact.name}.`
-                  : isReceivable
-                  ? `${contact.name} owes this net balance to your shop.`
-                  : `All accounts with ${contact.name} are fully balanced.`}
-              </span>
-              <span>·</span>
-              <span className="text-[11px] text-slate-400 font-normal">
-                {range.formatted_range}
-              </span>
-            </div>
-          </div>
-
-          {/* Right Column: Compact Operational Micro-Stats (Inventory & Activity Scope) */}
-          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 pt-3 md:pt-0 border-t md:border-t-0 md:border-l border-slate-200/70 dark:border-slate-800/80 md:pl-5 shrink-0">
-            <div className="px-3 py-2 rounded-xl bg-white/80 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800/60 text-center min-w-[95px] shadow-2xs">
-              <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400 block">
-                Stock On Shelf
-              </span>
-              <span className="text-sm font-mono font-bold text-slate-800 dark:text-slate-200 block mt-0.5">
-                {kpis.supplied_in_stock_count} <span className="text-[10px] font-sans font-normal text-slate-400">units</span>
-              </span>
-            </div>
-
-            <div className="px-3 py-2 rounded-xl bg-white/80 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800/60 text-center min-w-[95px] shadow-2xs">
-              <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400 block">
-                On Handover
-              </span>
-              <span className="text-sm font-mono font-bold text-slate-800 dark:text-slate-200 block mt-0.5">
-                {kpis.handed_out_count} <span className="text-[10px] font-sans font-normal text-slate-400">units</span>
-              </span>
-            </div>
-
-            <div className="px-3 py-2 rounded-xl bg-white/80 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800/60 text-center min-w-[95px] shadow-2xs">
-              <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400 block">
-                Ledger Entries
-              </span>
-              <span className="text-sm font-mono font-bold text-slate-800 dark:text-slate-200 block mt-0.5">
-                {ledger.length} <span className="text-[10px] font-sans font-normal text-slate-400">records</span>
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* ── Sub-Tabs Navigation Strip ── */}
       <div className="flex items-center gap-1 border-b border-slate-200 dark:border-slate-800 overflow-x-auto text-xs font-semibold">
         <button
@@ -625,28 +681,10 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
       {/* TAB 1: STATEMENT & LEDGER BREAKDOWN */}
       {activeTab === 'statement' && (
         <div className="space-y-3">
-          {/* Quick Search */}
-          <div className="flex items-center justify-between gap-3">
-            <div className="relative max-w-sm w-full">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-              <input
-                type="text"
-                value={ledgerSearch}
-                onChange={(e) => setLedgerSearch(e.target.value)}
-                placeholder="Search transactions, reference..."
-                className="w-full h-9 pl-9 pr-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs text-slate-900 dark:text-white focus:outline-none"
-              />
-            </div>
-
-            <span className="text-[11px] text-slate-400 font-mono">
-              Showing {filteredLedger.length} of {ledger.length} entries
-            </span>
-          </div>
-
-          {/* Desktop Table View (≥ sm) */}
-          <div className="hidden sm:block bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
+          {/* Table View: Cardless & Horizontally Scrollable on Mobile, Carded on Desktop */}
+          <div className="bg-transparent sm:bg-white sm:dark:bg-[#131926] sm:rounded-2xl sm:border sm:border-slate-200/80 sm:dark:border-slate-800 sm:shadow-2xs overflow-hidden">
+            <div className="overflow-x-auto scrollbar-thin">
+              <table className="w-full text-left text-xs border-collapse min-w-[640px]">
                 <thead>
                   <tr className="bg-slate-50/80 dark:bg-slate-900/60 border-b border-slate-200/80 dark:border-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                     <th className="py-2.5 px-3.5 whitespace-nowrap">Date</th>
@@ -679,27 +717,7 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
                           </td>
                           <td className="py-2.5 px-3.5 whitespace-nowrap font-sans">
                             <span
-                              className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                                row.type === 'consignment_sale' || row.type === 'brokered_sourcing' || row.type === 'manual_payable'
-                                  ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50'
-                                  : row.type === 'paid_by_device' || row.type === 'device_offset' || row.type === 'bilateral_offset'
-                                  ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50'
-                                  : row.type === 'payment_sent'
-                                  ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 border border-blue-200/50'
-                                  : row.type === 'repair_offset'
-                                  ? 'bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-400 border border-sky-200/50'
-                                  : row.type === 'repair_claim'
-                                  ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border border-rose-200/50'
-                                  : row.type === 'sales_credit' || row.type === 'handover_holding' || row.type === 'manual_receivable' || row.type === 'customer_purchase'
-                                  ? 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/50'
-                                  : row.type === 'payout_advance'
-                                  ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border border-indigo-200/50'
-                                  : row.type === 'handover_return' || row.type === 'vendor_return' || row.type === 'vendor_return_refund'
-                                  ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50'
-                                  : row.type === 'payment_received'
-                                  ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50'
-                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-                              }`}
+                              className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${getLedgerBadgeClass(row.type)}`}
                             >
                               {row.type_label}
                             </span>
@@ -813,156 +831,22 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
                       );
                     })
                   )}
+                  {filteredLedger.length > 0 && (
+                    <tr>
+                      <td
+                        colSpan={6}
+                        className="py-3 text-center text-[11px] text-slate-400 dark:text-slate-500 bg-slate-50/50 dark:bg-slate-900/30 font-medium font-sans"
+                      >
+                        <span className="inline-flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                          <span>All {filteredLedger.length} transactions loaded</span>
+                        </span>
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
-          </div>
-
-          {/* Mobile Ledger List (< sm): Native cards without horizontal scrolling */}
-          <div className="sm:hidden space-y-2.5">
-            {filteredLedger.length === 0 ? (
-              <div className="py-8 text-center text-slate-400 font-sans italic text-xs bg-white dark:bg-[#131926] rounded-xl border border-slate-200/80 dark:border-slate-800">
-                No transactions found matching your criteria.
-              </div>
-            ) : (
-              filteredLedger.map((row) => (
-                <div
-                  key={row.id}
-                  className="bg-white dark:bg-[#131926] rounded-xl border border-slate-200/80 dark:border-slate-800 p-3.5 space-y-2 shadow-2xs"
-                >
-                  <div className="flex items-center justify-between">
-                    <span
-                      className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                        row.type === 'consignment_sale' || row.type === 'brokered_sourcing' || row.type === 'manual_payable'
-                          ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50'
-                          : row.type === 'paid_by_device' || row.type === 'device_offset' || row.type === 'bilateral_offset'
-                          ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50'
-                          : row.type === 'payment_sent'
-                          ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 border border-blue-200/50'
-                          : row.type === 'repair_offset'
-                          ? 'bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-400 border border-sky-200/50'
-                          : row.type === 'repair_claim'
-                          ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border border-rose-200/50'
-                          : row.type === 'sales_credit' || row.type === 'handover_holding' || row.type === 'manual_receivable' || row.type === 'customer_purchase'
-                          ? 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/50'
-                          : row.type === 'payout_advance'
-                          ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border border-indigo-200/50'
-                          : row.type === 'handover_return' || row.type === 'vendor_return' || row.type === 'vendor_return_refund'
-                          ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50'
-                          : row.type === 'payment_received'
-                          ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50'
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-                      }`}
-                    >
-                      {row.type_label}
-                    </span>
-                    <span className="text-[11px] text-slate-400 font-mono">
-                      {row.formatted_date}
-                    </span>
-                  </div>
-
-                  <div className="text-xs font-semibold text-slate-900 dark:text-white leading-snug">
-                    {editingRowId === row.id ? (
-                      <div className="flex items-center gap-1.5 w-full mt-1">
-                        <input
-                          type="text"
-                          value={editingText}
-                          onChange={(e) => setEditingText(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              handleSaveEdit(row.id);
-                            } else if (e.key === 'Escape') {
-                              e.preventDefault();
-                              handleCancelEdit();
-                            }
-                          }}
-                          autoFocus
-                          className="flex-1 px-2 py-1 text-xs font-medium rounded border border-emerald-500 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 shadow-xs"
-                          placeholder="Edit description..."
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleSaveEdit(row.id)}
-                          className="p-1 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 hover:text-emerald-700 cursor-pointer shadow-2xs"
-                          title="Save"
-                        >
-                          <Check className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleCancelEdit}
-                          className="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer"
-                          title="Cancel"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-between gap-2">
-                        <div
-                          onClick={() => handleStartEdit(row.id, cleanContext(row.context))}
-                          className="cursor-pointer hover:text-emerald-600 dark:hover:text-emerald-400 flex-1"
-                          title="Click to edit description"
-                        >
-                          {customDescriptions[row.id] ?? cleanContext(row.context)}
-                        </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          {customDescriptions[row.id] && (
-                            <button
-                              type="button"
-                              onClick={(e) => handleResetEdit(row.id, e)}
-                              className="p-1 text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 rounded cursor-pointer"
-                              title="Reset to default description"
-                            >
-                              <RotateCcw className="w-3 h-3" />
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => handleStartEdit(row.id, cleanContext(row.context))}
-                            className="p-1 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 rounded cursor-pointer"
-                            title="Edit description"
-                          >
-                            <Pencil className="w-3 h-3" />
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs font-mono">
-                    <div>
-                      {row.payable !== 0 && (
-                        <div className="text-[11px] text-rose-600 dark:text-rose-400 font-semibold">
-                          Payable: {row.payable.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                        </div>
-                      )}
-                      {row.receivable !== 0 && (
-                        <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
-                          Receivable: +{row.receivable.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                        </div>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      <span className="text-[9px] text-slate-400 block font-sans uppercase font-bold">Balance</span>
-                      <span
-                        className={`font-bold tabular-nums ${
-                          row.running_balance > 0
-                            ? 'text-emerald-600 dark:text-emerald-400'
-                            : row.running_balance < 0
-                            ? 'text-rose-600 dark:text-rose-400'
-                            : 'text-slate-500'
-                        }`}
-                      >
-                        {row.running_balance > 0 ? '+' : ''}
-                        {row.running_balance.toLocaleString(undefined, { minimumFractionDigits: 2 })} ETB
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
           </div>
         </div>
       )}
@@ -970,10 +854,10 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
       {/* TAB 2: SUPPLIED INVENTORY UNITS */}
       {activeTab === 'inventory' && (
         <div>
-          {/* Desktop Table View (≥ sm) */}
-          <div className="hidden sm:block bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
+          {/* Table View: Cardless & Horizontally Scrollable on Mobile, Carded on Desktop */}
+          <div className="bg-transparent sm:bg-white sm:dark:bg-[#131926] sm:rounded-2xl sm:border sm:border-slate-200/80 sm:dark:border-slate-800 sm:shadow-2xs overflow-hidden">
+            <div className="overflow-x-auto scrollbar-thin">
+              <table className="w-full text-left text-xs border-collapse min-w-[640px]">
                 <thead>
                   <tr className="bg-slate-50/80 dark:bg-slate-900/60 border-b border-slate-200/80 dark:border-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                     <th className="py-2.5 px-3.5">Device Model</th>
@@ -1047,80 +931,22 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
                       </tr>
                     ))
                   )}
+                  {supplied_units.length > 0 && (
+                    <tr>
+                      <td
+                        colSpan={6}
+                        className="py-3 text-center text-[11px] text-slate-400 dark:text-slate-500 bg-slate-50/50 dark:bg-slate-900/30 font-medium font-sans"
+                      >
+                        <span className="inline-flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                          <span>All {supplied_units.length} units loaded</span>
+                        </span>
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
-          </div>
-
-          {/* Mobile Supplied Stock List (< sm) */}
-          <div className="sm:hidden space-y-2.5">
-            {supplied_units.length === 0 ? (
-              <div className="py-8 text-center text-slate-400 font-sans italic text-xs bg-white dark:bg-[#131926] rounded-xl border border-slate-200/80 dark:border-slate-800">
-                No inventory units supplied by this partner.
-              </div>
-            ) : (
-              supplied_units.map((unit) => (
-                <div
-                  key={unit.id}
-                  className="bg-white dark:bg-[#131926] rounded-xl border border-slate-200/80 dark:border-slate-800 p-3.5 space-y-2 shadow-2xs"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <h4 className="font-bold text-xs text-slate-900 dark:text-white leading-tight">
-                        {unit.model}
-                      </h4>
-                      {unit.specs.length > 0 && (
-                        <p className="text-[10px] text-slate-400 mt-0.5">
-                          {unit.specs.join(' · ')}
-                        </p>
-                      )}
-                      {unit.imei_or_serial && (
-                        <p className="font-mono text-[10px] text-slate-500 mt-0.5">
-                          SN: {unit.imei_or_serial}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex flex-col items-end gap-0.5 shrink-0">
-                      <span
-                        className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold shrink-0 ${
-                          unit.status === 'in_stock'
-                            ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400'
-                            : unit.status === 'sold'
-                            ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400'
-                            : unit.status === 'returned_to_vendor'
-                            ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400'
-                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-                        }`}
-                      >
-                        {unit.status.replace(/_/g, ' ')}
-                      </span>
-                      {(unit.source_type === 'paid_by_device' || unit.funding_source === 'debtor_offset') && (
-                        <span className="text-[9px] font-semibold text-emerald-600 dark:text-emerald-400">
-                          Paid by Device
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs">
-                    <div>
-                      <span className="text-[10px] text-slate-400 block">Cost</span>
-                      <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
-                        {unit.cost_basis.toLocaleString()} ETB
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-[10px] text-slate-400 block">
-                        {unit.order_number ? 'Sold In' : unit.sold_at ? 'Sold' : 'Status'}
-                      </span>
-                      <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                        {unit.order_number || (unit.sold_at ? new Date(unit.sold_at).toLocaleDateString() : 'Active in Shop')}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
           </div>
         </div>
       )}
@@ -1128,10 +954,10 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
       {/* TAB 3: HANDOVERS */}
       {activeTab === 'handovers' && (
         <div>
-          {/* Desktop Table View (≥ sm) */}
-          <div className="hidden sm:block bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
+          {/* Table View: Cardless & Horizontally Scrollable on Mobile, Carded on Desktop */}
+          <div className="bg-transparent sm:bg-white sm:dark:bg-[#131926] sm:rounded-2xl sm:border sm:border-slate-200/80 sm:dark:border-slate-800 sm:shadow-2xs overflow-hidden">
+            <div className="overflow-x-auto scrollbar-thin">
+              <table className="w-full text-left text-xs border-collapse min-w-[640px]">
                 <thead>
                   <tr className="bg-slate-50/80 dark:bg-slate-900/60 border-b border-slate-200/80 dark:border-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                     <th className="py-2.5 px-3.5">Device Model</th>
@@ -1185,62 +1011,22 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
                       </tr>
                     ))
                   )}
+                  {handed_out_units.length > 0 && (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="py-3 text-center text-[11px] text-slate-400 dark:text-slate-500 bg-slate-50/50 dark:bg-slate-900/30 font-medium font-sans"
+                      >
+                        <span className="inline-flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                          <span>All {handed_out_units.length} handover items loaded</span>
+                        </span>
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
-          </div>
-
-          {/* Mobile Handovers List (< sm) */}
-          <div className="sm:hidden space-y-2.5">
-            {handed_out_units.length === 0 ? (
-              <div className="py-8 text-center text-slate-400 font-sans italic text-xs bg-white dark:bg-[#131926] rounded-xl border border-slate-200/80 dark:border-slate-800">
-                No devices currently out on handover with this partner.
-              </div>
-            ) : (
-              handed_out_units.map((unit) => (
-                <div
-                  key={unit.id}
-                  className="bg-white dark:bg-[#131926] rounded-xl border border-slate-200/80 dark:border-slate-800 p-3.5 space-y-2 shadow-2xs"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <h4 className="font-bold text-xs text-slate-900 dark:text-white leading-tight">
-                        {unit.model}
-                      </h4>
-                      {unit.imei_or_serial && (
-                        <p className="font-mono text-[10px] text-slate-500 mt-0.5">
-                          SN: {unit.imei_or_serial}
-                        </p>
-                      )}
-                    </div>
-                    {unit.status === 'returned' || unit.is_returned ? (
-                      <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700 shrink-0">
-                        Returned to Shop
-                      </span>
-                    ) : (
-                      <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50 shrink-0">
-                        Out with Partner
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs">
-                    <div>
-                      <span className="text-[10px] text-slate-400 block">Holding Value</span>
-                      <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
-                        {unit.handover_payout > 0 ? `${unit.handover_payout.toLocaleString()} ETB` : '—'}
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-[10px] text-slate-400 block">Date</span>
-                      <span className="font-mono text-[11px] text-slate-500">
-                        {unit.handed_out_at ? new Date(unit.handed_out_at).toLocaleDateString() : '—'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
           </div>
         </div>
       )}
@@ -1248,10 +1034,10 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
       {/* TAB 4: REPAIRS & DEFECT RETURNS */}
       {activeTab === 'repairs' && (
         <div>
-          {/* Desktop Table View (≥ sm) */}
-          <div className="hidden sm:block bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
+          {/* Table View: Cardless & Horizontally Scrollable on Mobile, Carded on Desktop */}
+          <div className="bg-transparent sm:bg-white sm:dark:bg-[#131926] sm:rounded-2xl sm:border sm:border-slate-200/80 sm:dark:border-slate-800 sm:shadow-2xs overflow-hidden">
+            <div className="overflow-x-auto scrollbar-thin">
+              <table className="w-full text-left text-xs border-collapse min-w-[640px]">
                 <thead>
                   <tr className="bg-slate-50/80 dark:bg-slate-900/60 border-b border-slate-200/80 dark:border-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                     <th className="py-2.5 px-3.5">Device Model</th>
@@ -1315,79 +1101,22 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
                       </tr>
                     ))
                   )}
+                  {vendor_return_units.length > 0 && (
+                    <tr>
+                      <td
+                        colSpan={6}
+                        className="py-3 text-center text-[11px] text-slate-400 dark:text-slate-500 bg-slate-50/50 dark:bg-slate-900/30 font-medium font-sans"
+                      >
+                        <span className="inline-flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                          <span>All {vendor_return_units.length} warranty units loaded</span>
+                        </span>
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
-          </div>
-
-          {/* Mobile Repairs List (< sm) */}
-          <div className="sm:hidden space-y-2.5">
-            {vendor_return_units.length === 0 ? (
-              <div className="py-8 text-center text-slate-400 font-sans italic text-xs bg-white dark:bg-[#131926] rounded-xl border border-slate-200/80 dark:border-slate-800">
-                No warranty/defect units currently returned to this vendor.
-              </div>
-            ) : (
-              vendor_return_units.map((unit) => (
-                <div
-                  key={unit.id}
-                  className="bg-white dark:bg-[#131926] rounded-xl border border-slate-200/80 dark:border-slate-800 p-3.5 space-y-2 shadow-2xs"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <h4 className="font-bold text-xs text-slate-900 dark:text-white leading-tight">
-                        {unit.model}
-                      </h4>
-                      {unit.imei_or_serial && (
-                        <p className="font-mono text-[10px] text-slate-500 mt-0.5">
-                          SN: {unit.imei_or_serial}
-                        </p>
-                      )}
-                      <p className="text-[11px] text-rose-600 dark:text-rose-400 font-medium mt-1">
-                        Reason: {unit.return_reason || 'Defect repair'}
-                      </p>
-                    </div>
-                    <span
-                      className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold shrink-0 ${
-                        unit.is_reacquired
-                          ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50'
-                          : unit.status === 'fixed'
-                          ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 border border-blue-200/50'
-                          : unit.status === 'returned_to_vendor'
-                          ? 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700'
-                          : unit.status === 'returned' || unit.is_returned
-                          ? 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700'
-                          : 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50'
-                      }`}
-                    >
-                      {unit.is_reacquired
-                        ? 'Restocked in Shop'
-                        : unit.status === 'fixed'
-                        ? 'Fixed'
-                        : unit.status === 'returned_to_vendor'
-                        ? 'Returned to Vendor'
-                        : unit.status === 'returned' || unit.is_returned
-                        ? 'Returned to Shop'
-                        : 'With Vendor'}
-                    </span>
-                  </div>
-
-                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs">
-                    <div>
-                      <span className="text-[10px] text-slate-400 block">Maintenance Cost</span>
-                      <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
-                        {unit.maintenance_cost > 0 ? `${unit.maintenance_cost.toLocaleString()} ETB` : '—'}
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-[10px] text-slate-400 block">Returned</span>
-                      <span className="font-mono text-[11px] text-slate-500">
-                        {unit.returned_at ? new Date(unit.returned_at).toLocaleDateString() : '—'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
           </div>
         </div>
       )}
