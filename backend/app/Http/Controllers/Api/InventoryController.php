@@ -1155,7 +1155,8 @@ class InventoryController extends Controller
             $newProductName = trim($validated['product_name']);
             if ($newProductName !== $oldProductName) {
                 $existingProduct = Product::where('tenant_id', $user->tenant_id)
-                    ->where('name', $newProductName)
+                    ->whereNull('deleted_at')
+                    ->whereRaw('LOWER(TRIM(name)) = ?', [mb_strtolower($newProductName)])
                     ->first();
 
                 if ($existingProduct) {

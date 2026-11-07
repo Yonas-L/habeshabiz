@@ -453,3 +453,64 @@ test('owner can safely delete a variant with active units preserving data', func
     expect(InventoryUnit::find($unit->id))->toBeNull();
     expect(InventoryUnit::withTrashed()->find($unit->id)->status)->toBe('archived');
 });
+
+test('creating a product with duplicate model name in same tenant is rejected', function () {
+    $cat = Category::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Phones',
+        'slug' => 'phones',
+    ]);
+
+    $firstRes = $this->actingAs($this->owner)->postJson('/api/v1/products', [
+        'name' => 'iPhone 18 Pro',
+        'category_id' => $cat->id,
+        'category' => 'phones',
+        'variants' => [
+            ['storage' => '128GB', 'color' => 'Black'],
+        ],
+    ]);
+
+    $firstRes->assertStatus(201);
+
+    // Attempt to create duplicate model name with different case and whitespace
+    $dupRes = $this->actingAs($this->owner)->postJson('/api/v1/products', [
+        'name' => '  iphone 18 PRO  ',
+        'category_id' => $cat->id,
+        'category' => 'phones',
+        'variants' => [
+            ['storage' => '256GB', 'color' => 'Desert Titanium'],
+        ],
+    ]);
+
+    $dupRes->assertStatus(422)
+        ->assertJsonPath('success', false)
+        ->assertJsonPath('message', "Model 'iPhone 18 Pro' already exists.");
+});
+
+test('updating a product to a name of an existing model is rejected', function () {
+    $cat = Category::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Phones',
+        'slug' => 'phones',
+    ]);
+
+    $p1 = Product::create([
+        'tenant_id' => $this->tenant->id,
+        'category_id' => $cat->id,
+        'name' => 'Google Pixel 9',
+    ]);
+
+    $p2 = Product::create([
+        'tenant_id' => $this->tenant->id,
+        'category_id' => $cat->id,
+        'name' => 'Google Pixel 9 Pro',
+    ]);
+
+    $res = $this->actingAs($this->owner)->putJson("/api/v1/products/{$p2->id}", [
+        'name' => 'google pixel 9',
+    ]);
+
+    $res->assertStatus(422)
+        ->assertJsonPath('success', false)
+        ->assertJsonPath('message', "Model 'Google Pixel 9' already exists.");
+});

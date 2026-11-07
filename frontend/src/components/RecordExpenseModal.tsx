@@ -40,7 +40,6 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
   const [accountId, setAccountId] = useState('');
   const [isSplit, setIsSplit] = useState(false);
   const [paymentSplits, setPaymentSplits] = useState<PaymentSplitItem[]>([]);
-  const [isOwnerDraw, setIsOwnerDraw] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   // Vendor Payout state
@@ -69,8 +68,7 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       if (initialCategory) {
-        setCategory(initialCategory);
-        setIsOwnerDraw(initialCategory === 'personal_owner_draw');
+        setCategory(initialCategory === 'personal_owner_draw' ? 'personal' : initialCategory);
       }
       const targetUid = initialUnitId || initialUnit?.id;
       if (targetUid) {
@@ -214,7 +212,6 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
         setSelectedUnitId('');
         setSelectedVendorContactId('');
         setSelectedStaffId('');
-        setIsOwnerDraw(false);
         setIsSplit(false);
         setPaymentSplits([]);
         setCategory('ride');
@@ -223,7 +220,6 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
         return;
       }
 
-      const isDraw = isOwnerDraw || category === 'personal_owner_draw';
       const staffContact = selectedStaff
         ? contacts.find(
             (c) =>
@@ -247,15 +243,15 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
         inventory_unit_id: category === 'maintenance' && selectedUnitId ? selectedUnitId : undefined,
         category,
         amount: numAmount,
-        is_owner_draw: isDraw,
+        is_owner_draw: false,
         vendor_billing: category === 'maintenance' && selectedUnitId && hasVendor ? vendorBilling : 'shop',
         vendor_contact_id: finalVendorContactId || undefined,
         description,
       });
 
       toast.success(
-        isDraw
-          ? 'Owner Personal Draw Recorded'
+        category === 'personal'
+          ? 'Personal Expense Recorded'
           : category === 'vendor_payout'
           ? 'Vendor Transfer Recorded (Debts Auto-Settled)'
           : category === 'salary' && selectedStaff
@@ -264,7 +260,7 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
           ? 'Vendor-Deductible Repair Logged (Offset on Debt)'
           : vendorBilling === 'vendor_reimburse' && hasVendor
           ? 'Vendor Reimbursement Claim Created (Receivable)'
-          : 'Operating Expense Recorded',
+          : 'Expense Recorded',
         {
           description: `${numAmount.toLocaleString()} ETB • ${description}`,
         }
@@ -275,7 +271,6 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
       setSelectedUnitId('');
       setSelectedVendorContactId('');
       setSelectedStaffId('');
-      setIsOwnerDraw(false);
       setIsSplit(false);
       setPaymentSplits([]);
       setCategory('ride');
@@ -337,7 +332,6 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
               onChange={(e) => {
                 const cat = e.target.value;
                 setCategory(cat);
-                setIsOwnerDraw(cat === 'personal_owner_draw');
                 if (cat === 'vendor_payout' && !description) {
                   setDescription('Transfer to vendor');
                 } else if (cat === 'salary' && !description) {
@@ -352,7 +346,7 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
               <option value="rent">Shop Rent & Utilities</option>
               <option value="maintenance">Device Maintenance & Tooling</option>
               <option value="salary">Staff Bonus / Commission Payout</option>
-              <option value="personal_owner_draw">Personal Owner Draw</option>
+              <option value="personal">Personal Expense</option>
               <option value="other">Other Operational Expense</option>
             </select>
           </div>
@@ -642,22 +636,6 @@ export const RecordExpenseModal: React.FC<RecordExpenseModalProps> = ({
               className="w-full h-10 px-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm font-medium text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-slate-900 dark:focus:border-white focus:ring-1 focus:ring-inset focus:ring-slate-900 dark:focus:ring-white"
               required
             />
-          </div>
-
-          <div className="flex items-center gap-3 p-3.5 rounded-lg bg-slate-50 dark:bg-slate-900/40 border border-slate-200/70 dark:border-slate-800">
-            <input
-              type="checkbox"
-              id="recordExpenseIsOwnerDraw"
-              checked={isOwnerDraw}
-              onChange={(e) => setIsOwnerDraw(e.target.checked)}
-              className="w-4 h-4 rounded text-slate-900 focus:ring-slate-900 border-slate-300 dark:border-slate-700 dark:bg-slate-800 cursor-pointer"
-            />
-            <label
-              htmlFor="recordExpenseIsOwnerDraw"
-              className="text-xs text-slate-700 dark:text-slate-300 font-medium select-none cursor-pointer"
-            >
-              Mark as Owner Personal Draw (Does not reduce shop profit)
-            </label>
           </div>
         </form>
 

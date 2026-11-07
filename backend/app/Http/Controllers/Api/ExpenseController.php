@@ -70,7 +70,7 @@ class ExpenseController extends Controller
             'payment_splits.*.amount' => ['required', 'numeric', 'min:0.01'],
             'payment_splits.*.fee' => ['nullable', 'numeric', 'min:0'],
             'inventory_unit_id' => ['nullable', 'exists:inventory_units,id'],
-            'category' => ['required', 'string', 'in:ride,food,rent,utilities,maintenance,salary,personal_owner_draw,vendor_payout,other'],
+            'category' => ['required', 'string', 'in:ride,food,rent,utilities,maintenance,salary,personal,personal_owner_draw,vendor_payout,other'],
             'amount' => ['required', 'numeric', 'min:0.01'],
             'is_owner_draw' => ['boolean'],
             'vendor_billing' => ['nullable', 'string', 'in:shop,vendor_deduct,vendor_reimburse'],
@@ -155,7 +155,7 @@ class ExpenseController extends Controller
                 'vendor_contact_id' => $vendorContactId,
                 'category' => $validated['category'],
                 'amount' => $amount,
-                'is_owner_draw' => $validated['is_owner_draw'] ?? ($validated['category'] === 'personal_owner_draw'),
+                'is_owner_draw' => false,
                 'description' => $validated['description'],
                 'date' => $validated['date'] ?? now(),
                 'created_by' => auth()->id(),
@@ -368,7 +368,7 @@ class ExpenseController extends Controller
 
                 $txnType = ($validated['category'] === 'vendor_payout')
                     ? 'supplier_payment'
-                    : (($validated['is_owner_draw'] ?? false) ? 'owner_draw' : 'expense');
+                    : 'expense';
 
                 FinancialTransaction::create([
                     'tenant_id' => $tenantId,

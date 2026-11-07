@@ -667,24 +667,53 @@ class SaleController extends Controller
             if (! $variantId) {
                 $productId = $validated['product_id'] ?? null;
                 if (! $productId) {
-                    $product = Product::create([
-                        'tenant_id' => $tenantId,
-                        'name' => $validated['product_name'],
-                        'category_id' => $validated['category_id'] ?? null,
-                        'category' => $validated['category'] ?? 'phone_tablet',
-                        'has_serials' => $validated['has_serials'] ?? true,
-                        'is_active' => true,
-                    ]);
+                    $normalizedName = mb_strtolower(trim($validated['product_name']));
+                    $existingProduct = Product::where('tenant_id', $tenantId)
+                        ->whereNull('deleted_at')
+                        ->whereRaw('LOWER(TRIM(name)) = ?', [$normalizedName])
+                        ->first();
+
+                    if ($existingProduct) {
+                        $product = $existingProduct;
+                    } else {
+                        $product = Product::create([
+                            'tenant_id' => $tenantId,
+                            'name' => $validated['product_name'],
+                            'category_id' => $validated['category_id'] ?? null,
+                            'category' => $validated['category'] ?? 'phone_tablet',
+                            'has_serials' => $validated['has_serials'] ?? true,
+                            'is_active' => true,
+                        ]);
+                    }
                     $productId = $product->id;
                 }
-                $variant = ProductVariant::create([
-                    'product_id' => $productId,
-                    'storage' => $validated['storage'] ?? null,
-                    'ram' => $validated['ram'] ?? null,
-                    'color' => $validated['color'] ?? null,
-                    'specs' => $validated['specs'] ?? null,
-                    'default_selling_price' => $validated['selling_price'],
-                ]);
+
+                $existingVariant = ProductVariant::where('product_id', $productId)
+                    ->where(function ($q) use ($validated) {
+                        if (! empty($validated['storage'])) {
+                            $q->where('storage', $validated['storage']);
+                        }
+                        if (! empty($validated['ram'])) {
+                            $q->where('ram', $validated['ram']);
+                        }
+                        if (! empty($validated['color'])) {
+                            $q->whereRaw('LOWER(color) = ?', [strtolower($validated['color'])]);
+                        }
+                    })
+                    ->first();
+
+                if ($existingVariant) {
+                    $variant = $existingVariant;
+                } else {
+                    $variant = ProductVariant::create([
+                        'product_id' => $productId,
+                        'storage' => $validated['storage'] ?? null,
+                        'ram' => $validated['ram'] ?? null,
+                        'color' => $validated['color'] ?? null,
+                        'specs' => $validated['specs'] ?? null,
+                        'default_selling_price' => $validated['selling_price'],
+                    ]);
+                }
                 $variantId = $variant->id;
             }
 

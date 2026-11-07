@@ -44,8 +44,9 @@ export const ExpenseDrawer: React.FC<ExpenseDrawerProps> = ({
         return <Home className="w-4 h-4 text-blue-600 dark:text-blue-400" />;
       case 'maintenance':
         return <Wrench className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />;
+      case 'personal':
       case 'personal_owner_draw':
-        return <UserMinus className="w-4 h-4 text-slate-700 dark:text-slate-300" />;
+        return <UserMinus className="w-4 h-4 text-purple-600 dark:text-purple-400" />;
       default:
         return <DollarSign className="w-4 h-4 text-slate-600 dark:text-slate-300" />;
     }
@@ -70,7 +71,7 @@ export const ExpenseDrawer: React.FC<ExpenseDrawerProps> = ({
           }`}
         >
           {isOwnerDraw ? <UserMinus className="w-3 h-3" /> : <Receipt className="w-3 h-3" />}
-          {isOwnerDraw ? 'Owner Personal Draw' : 'Shop Overhead'}
+          {isOwnerDraw ? 'Personal Draw' : 'Expense'}
         </span>
       }
       footerActions={
@@ -122,7 +123,7 @@ export const ExpenseDrawer: React.FC<ExpenseDrawerProps> = ({
           <div className="flex items-center justify-between">
             <span className="text-slate-400">Ledger Classification</span>
             <span className="font-bold text-slate-900 dark:text-white">
-              {isOwnerDraw ? 'Owner Personal Draw' : 'Shop Operating Overhead'}
+              {isOwnerDraw ? 'Personal Draw' : 'Expense'}
             </span>
           </div>
 

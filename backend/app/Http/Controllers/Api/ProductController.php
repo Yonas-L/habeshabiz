@@ -78,6 +78,26 @@ class ProductController extends Controller
             'is_active' => ['nullable', 'boolean'],
         ]);
 
+        if (isset($validated['name'])) {
+            $tenantId = $user->tenant_id;
+            $normalizedName = mb_strtolower(trim($validated['name']));
+            $existing = Product::where('tenant_id', $tenantId)
+                ->where('id', '!=', $id)
+                ->whereNull('deleted_at')
+                ->whereRaw('LOWER(TRIM(name)) = ?', [$normalizedName])
+                ->first();
+
+            if ($existing) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Model '{$existing->name}' already exists.",
+                    'errors' => [
+                        'name' => ['Model already exists.'],
+                    ],
+                ], 422);
+            }
+        }
+
         if (! empty($validated['category_id'])) {
             $cat = Category::find($validated['category_id']);
             if ($cat) {
@@ -281,6 +301,24 @@ class ProductController extends Controller
             'variants.*.specs' => ['nullable', 'array'],
             'variants.*.default_selling_price' => ['nullable', 'numeric', 'min:0'],
         ]);
+
+        $tenantId = $user->tenant_id;
+        $normalizedName = mb_strtolower(trim($validated['name']));
+        $existing = Product::where('tenant_id', $tenantId)
+            ->whereNull('deleted_at')
+            ->whereRaw('LOWER(TRIM(name)) = ?', [$normalizedName])
+            ->first();
+
+        if ($existing) {
+            return response()->json([
+                'success' => false,
+                'message' => "Model '{$existing->name}' already exists.",
+                'errors' => [
+                    'name' => ['Model already exists.'],
+                ],
+                'existing_product' => $existing->load(['categoryRel', 'variants.stock']),
+            ], 422);
+        }
 
         // Auto-resolve category slug from category_id if needed
         $categorySlug = $validated['category'] ?? 'gadgets';

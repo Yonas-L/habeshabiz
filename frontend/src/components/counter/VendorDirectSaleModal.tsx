@@ -37,6 +37,7 @@ import {
   isCellularTablet,
 } from '../../utils/electronicsArchetypes';
 import { BrandSelectInput } from '../common/BrandSelectInput';
+import { getInitialCategoryId, setRecentCategoryId, sortCategoriesWithPreferredFirst } from '../../utils/categorySelection';
 
 interface VendorDirectSaleModalProps {
   isOpen: boolean;
@@ -70,7 +71,7 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
   }, [products]);
 
   // Category & Product Selection
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>(() => getInitialCategoryId(categories));
   const [selectedProductId, setSelectedProductId] = useState<string>('');
   const [modelSearchQuery, setModelSearchQuery] = useState('');
   const [isModelSearchOpen, setIsModelSearchOpen] = useState(false);
@@ -225,9 +226,13 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
           setModelSearchQuery(prod.name);
           if (prod.category_id) {
             setSelectedCategoryId(prod.category_id);
+            setRecentCategoryId(prod.category_id);
           } else if (prod.category) {
             const matchCat = categories.find((c) => c.slug === prod.category);
-            if (matchCat) setSelectedCategoryId(matchCat.id);
+            if (matchCat) {
+              setSelectedCategoryId(matchCat.id);
+              setRecentCategoryId(matchCat.id);
+            }
           }
           if (initialVariantId && prod.variants?.some((v) => v.id === initialVariantId)) {
             setSelectedVariantId(initialVariantId);
@@ -254,8 +259,10 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
             }
           }
         }
-      } else if (categories.length > 0 && !selectedCategoryId) {
-        setSelectedCategoryId(categories[0].id);
+      } else if (categories.length > 0) {
+        if (!selectedCategoryId || !categories.some((c) => c.id === selectedCategoryId)) {
+          setSelectedCategoryId(getInitialCategoryId(categories));
+        }
       }
       if (accounts.length > 0) {
         if (!vendorAccountId) setVendorAccountId(accounts[0].id);
@@ -555,6 +562,19 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
     });
   }, [filteredProducts, modelSearchQuery, selectedProduct]);
 
+  // Model existence checks to avoid duplicate models
+  const exactSearchModelMatch = useMemo(() => {
+    const q = modelSearchQuery.trim().toLowerCase();
+    if (!q) return null;
+    return filteredProducts.find((p) => p.name.trim().toLowerCase() === q) || null;
+  }, [modelSearchQuery, filteredProducts]);
+
+  const existingModelMatch = useMemo(() => {
+    const q = newProductName.trim().toLowerCase();
+    if (!q) return null;
+    return localProducts.find((p) => p.name.trim().toLowerCase() === q) || null;
+  }, [newProductName, localProducts]);
+
   const handleSelectSearchedProduct = (prod: Product) => {
     recordRecentModel(prod.id);
     setSelectedProductId(prod.id);
@@ -602,6 +622,10 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
     if (e) e.preventDefault();
     if (!newProductName.trim()) {
       toast.error('Model name is required');
+      return;
+    }
+    if (existingModelMatch) {
+      toast.error('Model already exists');
       return;
     }
 
@@ -1824,6 +1848,26 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
                       onChange={(e) => setNewProductName(e.target.value)}
                       className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
                     />
+                    {existingModelMatch && (
+                      <div className="mt-1.5 flex items-center justify-between p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs">
+                        <span className="font-semibold text-amber-700 dark:text-amber-300">
+                          Model already exists
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsCreatingProduct(false);
+                            setNewProductName('');
+                            handleSelectSearchedProduct(existingModelMatch);
+                            setIsCreatingVariant(true);
+                            resetVariantInputs();
+                          }}
+                          className="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-600 hover:bg-amber-700 text-white transition-colors cursor-pointer"
+                        >
+                          Select & Add Variant
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   <BrandSelectInput
@@ -1892,7 +1936,7 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
                   <button
                     type="button"
                     onClick={handleCreateProduct}
-                    disabled={isSubmittingProduct || !newProductName.trim()}
+                    disabled={isSubmittingProduct || !newProductName.trim() || !!existingModelMatch}
                     className="h-8 px-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-800 text-emerald-400 dark:text-emerald-400 text-xs font-bold disabled:opacity-50 transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
                   >
                     {isSubmittingProduct ? <LdrsSpinner size={14} color="#34d399" stroke={2.5} /> : null}
@@ -1917,13 +1961,14 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
                         onChange={(e) => {
                           const newCatId = e.target.value;
                           setSelectedCategoryId(newCatId);
+                          setRecentCategoryId(newCatId);
                           setSelectedProductId('');
                           setSelectedVariantId('');
                           setCustomProductName('');
                         }}
                         className="w-full h-10 pl-3 pr-8 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-900 dark:text-white appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
                       >
-                        {categories.map((c) => (
+                        {sortCategoriesWithPreferredFirst(categories, selectedCategoryId).map((c) => (
                           <option key={c.id} value={c.id}>
                             {c.name} {c.has_serials ? '(Serialized)' : '(Batch)'}
                           </option>
@@ -2073,7 +2118,7 @@ export const VendorDirectSaleModal: React.FC<VendorDirectSaleModalProps> = ({
 
                         {/* Quick Actions (Create Model or One-Off) */}
                         <div className="p-1.5 space-y-1 bg-slate-50/50 dark:bg-slate-800/40">
-                          {modelSearchQuery.trim() && (
+                          {!exactSearchModelMatch && modelSearchQuery.trim() && (
                             <button
                               type="button"
                               onClick={() => {

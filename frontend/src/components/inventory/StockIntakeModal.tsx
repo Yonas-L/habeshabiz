@@ -23,6 +23,7 @@ import {
 import { LdrsSpinner } from '../loading/LdrsSpinner';
 import { PartnerFormModal } from '../partners/PartnerFormModal';
 import { SplitPaymentSelector, type PaymentSplitItem } from '../common/SplitPaymentSelector';
+import { getInitialCategoryId, setRecentCategoryId, sortCategoriesWithPreferredFirst } from '../../utils/categorySelection';
 
 interface StockIntakeModalProps {
   isOpen: boolean;
@@ -33,6 +34,7 @@ interface StockIntakeModalProps {
   accounts?: FinancialAccount[];
   isOwner?: boolean;
   onIntakeSuccess: () => void;
+  onProductCreated?: (product?: Product) => void;
   onOpenCategoryManager?: () => void;
   initialProductId?: string;
   initialVariantId?: string;
@@ -68,13 +70,17 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
   accounts = [],
   isOwner = false,
   onIntakeSuccess,
+  onProductCreated,
   onOpenCategoryManager,
   initialProductId,
   initialVariantId,
 }) => {
   // Category & Product Selection
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>(() => getInitialCategoryId(categories));
   const [selectedProductId, setSelectedProductId] = useState<string>('');
+  const [modelSearchQuery, setModelSearchQuery] = useState('');
+  const [isModelSearchOpen, setIsModelSearchOpen] = useState(false);
+  const modelSearchContainerRef = useRef<HTMLDivElement>(null);
   const [selectedVariantId, setSelectedVariantId] = useState<string>('');
   const variantListRef = useRef<HTMLDivElement>(null);
 
@@ -166,33 +172,62 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
+  // Close model search dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (modelSearchContainerRef.current && !modelSearchContainerRef.current.contains(e.target as Node)) {
+        setIsModelSearchOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Sync model search input text when selected product changes
+  useEffect(() => {
+    if (selectedProductId) {
+      const p = localProducts.find((item) => item.id === selectedProductId);
+      if (p) setModelSearchQuery(p.name);
+    } else {
+      setModelSearchQuery('');
+    }
+  }, [selectedProductId, localProducts]);
+
   // Initialize selected category or preselected product
   useEffect(() => {
-    if (isOpen && initialProductId) {
-      const prod = localProducts.find((p) => p.id === initialProductId);
-      if (prod) {
-        setSelectedProductId(prod.id);
-        if (prod.category_id) {
-          setSelectedCategoryId(prod.category_id);
-        } else {
-          const matchCat = categories.find((c) => c.slug === prod.category);
-          if (matchCat) setSelectedCategoryId(matchCat.id);
+    if (isOpen) {
+      if (initialProductId) {
+        const prod = localProducts.find((p) => p.id === initialProductId);
+        if (prod) {
+          setSelectedProductId(prod.id);
+          if (prod.category_id) {
+            setSelectedCategoryId(prod.category_id);
+            setRecentCategoryId(prod.category_id);
+          } else {
+            const matchCat = categories.find((c) => c.slug === prod.category);
+            if (matchCat) {
+              setSelectedCategoryId(matchCat.id);
+              setRecentCategoryId(matchCat.id);
+            }
+          }
+          if (initialVariantId && prod.variants.some((v) => v.id === initialVariantId)) {
+            setSelectedVariantId(initialVariantId);
+            const v = prod.variants.find((v) => v.id === initialVariantId);
+            if (v?.default_selling_price && !sellingPrice) {
+              setSellingPrice(String(v.default_selling_price));
+            }
+          } else if (prod.variants && prod.variants.length > 0) {
+            setSelectedVariantId(prod.variants[0].id);
+            if (prod.variants[0].default_selling_price && !sellingPrice) {
+              setSellingPrice(String(prod.variants[0].default_selling_price));
+            }
+          }
         }
-        if (initialVariantId && prod.variants.some((v) => v.id === initialVariantId)) {
-          setSelectedVariantId(initialVariantId);
-          const v = prod.variants.find((v) => v.id === initialVariantId);
-          if (v?.default_selling_price && !sellingPrice) {
-            setSellingPrice(String(v.default_selling_price));
-          }
-        } else if (prod.variants && prod.variants.length > 0) {
-          setSelectedVariantId(prod.variants[0].id);
-          if (prod.variants[0].default_selling_price && !sellingPrice) {
-            setSellingPrice(String(prod.variants[0].default_selling_price));
-          }
+      } else if (categories.length > 0) {
+        if (!selectedCategoryId || !categories.some((c) => c.id === selectedCategoryId)) {
+          setSelectedCategoryId(getInitialCategoryId(categories));
         }
       }
-    } else if (categories.length > 0 && !selectedCategoryId) {
-      setSelectedCategoryId(categories[0].id);
     }
   }, [isOpen, initialProductId, initialVariantId, localProducts, categories, selectedCategoryId]);
 
@@ -233,6 +268,44 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
       return false;
     });
   }, [localProducts, selectedCategoryId, categories]);
+
+  // Real-time search filter for Model search field
+  const searchedProducts = useMemo(() => {
+    const query = modelSearchQuery.trim().toLowerCase();
+    if (!query || (selectedProduct && query === selectedProduct.name.toLowerCase())) {
+      return filteredProducts;
+    }
+    return filteredProducts.filter((p) => {
+      const name = p.name.toLowerCase();
+      const brand = (p.brand || '').toLowerCase();
+      return name.includes(query) || brand.includes(query);
+    });
+  }, [filteredProducts, modelSearchQuery, selectedProduct]);
+
+  // Model existence checks to avoid duplicate models
+  const exactSearchModelMatch = useMemo(() => {
+    const q = modelSearchQuery.trim().toLowerCase();
+    if (!q) return null;
+    return filteredProducts.find((p) => p.name.trim().toLowerCase() === q) || null;
+  }, [modelSearchQuery, filteredProducts]);
+
+  const existingModelMatch = useMemo(() => {
+    const q = newProductName.trim().toLowerCase();
+    if (!q) return null;
+    return localProducts.find((p) => p.name.trim().toLowerCase() === q) || null;
+  }, [newProductName, localProducts]);
+
+  const handleSelectProduct = (p: Product) => {
+    setSelectedProductId(p.id);
+    setModelSearchQuery(p.name);
+    setIsModelSearchOpen(false);
+    setIsCreatingVariant(false);
+    if (p.variants && p.variants.length > 0) {
+      handleVariantChange(p.variants[0].id);
+    } else {
+      setSelectedVariantId('');
+    }
+  };
 
   // Extract existing variants' attributes for selected product
   const productExistingStorages = useMemo(() => {
@@ -462,6 +535,10 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
       toast.error('Product model name is required');
       return;
     }
+    if (existingModelMatch) {
+      toast.error('Model already exists');
+      return;
+    }
 
     try {
       setIsSubmittingProduct(true);
@@ -487,7 +564,7 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
       if (res.variants?.[0]?.id) {
         setSelectedVariantId(res.variants[0].id);
       }
-      onIntakeSuccess();
+      onProductCreated?.(res);
     } catch (err: any) {
       toast.error(err.message || 'Failed to create product model');
     } finally {
@@ -529,7 +606,7 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
       }
       setIsCreatingVariant(false);
       resetVariantInputs();
-      onIntakeSuccess();
+      onProductCreated?.();
     } catch (err: any) {
       toast.error(err.message || 'Failed to add variant');
     } finally {
@@ -1968,6 +2045,26 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                       onChange={(e) => setNewProductName(e.target.value)}
                       className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
                     />
+                    {existingModelMatch && (
+                      <div className="mt-1.5 flex items-center justify-between p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs">
+                        <span className="font-semibold text-amber-700 dark:text-amber-300">
+                          Model already exists
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsCreatingProduct(false);
+                            setNewProductName('');
+                            handleSelectProduct(existingModelMatch);
+                            setIsCreatingVariant(true);
+                            resetVariantInputs();
+                          }}
+                          className="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-600 hover:bg-amber-700 text-white transition-colors cursor-pointer"
+                        >
+                          Select & Add Variant
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   <BrandSelectInput
@@ -2000,7 +2097,7 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                   <button
                     type="button"
                     onClick={handleCreateProduct}
-                    disabled={isSubmittingProduct || !newProductName.trim()}
+                    disabled={isSubmittingProduct || !newProductName.trim() || !!existingModelMatch}
                     className="h-9 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-800 text-emerald-400 dark:text-emerald-400 text-xs font-bold disabled:opacity-50 transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
                   >
                     {isSubmittingProduct ? <LdrsSpinner size={14} color="#34d399" stroke={2.5} /> : null}
@@ -2035,13 +2132,14 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                       onChange={(e) => {
                         const newCatId = e.target.value;
                         setSelectedCategoryId(newCatId);
+                        setRecentCategoryId(newCatId);
                         setSelectedProductId('');
                         setSelectedVariantId('');
                         setIsCreatingVariant(false);
                       }}
                       className="w-full h-10 pl-3 pr-8 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-900 dark:text-white appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
                     >
-                      {categories.map((c) => (
+                      {sortCategoriesWithPreferredFirst(categories, selectedCategoryId).map((c) => (
                         <option key={c.id} value={c.id}>
                           {c.name} {c.has_serials ? '(Serialized)' : '(Batch)'}
                         </option>
@@ -2051,34 +2149,111 @@ export const StockIntakeModal: React.FC<StockIntakeModalProps> = ({
                   </div>
                 </div>
 
-                {/* Product Model */}
-                <div>
+                {/* Searchable Product Model */}
+                <div ref={modelSearchContainerRef} className="relative">
                   <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
-                    Model
+                    Model <span className="text-slate-400 font-normal">({filteredProducts.length} available)</span>
                   </label>
-                  <div className="relative">
-                    <select
-                      value={selectedProductId}
+                  <div className="relative flex items-center">
+                    <input
+                      type="text"
+                      value={modelSearchQuery}
+                      onFocus={() => setIsModelSearchOpen(true)}
                       onChange={(e) => {
-                        setSelectedProductId(e.target.value);
-                        setSelectedVariantId('');
-                        setIsCreatingVariant(false);
+                        setModelSearchQuery(e.target.value);
+                        setIsModelSearchOpen(true);
+                        if (selectedProductId) {
+                          const current = localProducts.find((p) => p.id === selectedProductId);
+                          if (current && e.target.value !== current.name) {
+                            setSelectedProductId('');
+                            setSelectedVariantId('');
+                          }
+                        }
                       }}
-                      className="w-full h-10 pl-3 pr-8 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-900 dark:text-white appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
-                    >
-                      <option value="">
-                        {filteredProducts.length === 0
-                          ? '-- No models in this category yet --'
-                          : `-- Choose Model (${filteredProducts.length} available) --`}
-                      </option>
-                      {filteredProducts.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name} {p.brand ? `(${p.brand})` : ''}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-3.5 pointer-events-none" />
+                      placeholder={
+                        filteredProducts.length === 0
+                          ? 'No models in category...'
+                          : 'Search or select model...'
+                      }
+                      className="w-full h-10 pl-3 pr-8 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-400/10"
+                    />
+                    {modelSearchQuery ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setModelSearchQuery('');
+                          setSelectedProductId('');
+                          setSelectedVariantId('');
+                          setIsModelSearchOpen(true);
+                        }}
+                        className="absolute right-2.5 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                        title="Clear model"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    ) : (
+                      <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-3 pointer-events-none" />
+                    )}
                   </div>
+
+                  {/* Floating Filtered Suggestions */}
+                  {isModelSearchOpen && (
+                    <div className="absolute left-0 right-0 top-full mt-1.5 py-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-30 max-h-60 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
+                      {searchedProducts.length > 0 ? (
+                        <div className="py-1">
+                          {searchedProducts.map((p) => {
+                            const isSelected = p.id === selectedProductId;
+                            return (
+                              <button
+                                key={p.id}
+                                type="button"
+                                onClick={() => handleSelectProduct(p)}
+                                className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/70 transition-colors cursor-pointer ${
+                                  isSelected
+                                    ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 font-semibold'
+                                    : 'text-slate-700 dark:text-slate-200'
+                                }`}
+                              >
+                                <div className="min-w-0 pr-2">
+                                  <div className="font-semibold truncate">{p.name}</div>
+                                  {p.brand && (
+                                    <div className="text-[10px] text-slate-400 dark:text-slate-500 font-normal">
+                                      {p.brand}
+                                    </div>
+                                  )}
+                                </div>
+                                {isSelected && (
+                                  <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="px-3 py-3 text-xs text-slate-400 text-center">
+                          No existing models found for "{modelSearchQuery}"
+                        </div>
+                      )}
+
+                      {/* Quick Action: Create Model */}
+                      {!exactSearchModelMatch && modelSearchQuery.trim() && (
+                        <div className="p-1.5 bg-slate-50/50 dark:bg-slate-800/40">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setNewProductName(modelSearchQuery.trim());
+                              setIsCreatingProduct(true);
+                              setIsModelSearchOpen(false);
+                            }}
+                            className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 flex items-center gap-1.5 transition-colors cursor-pointer"
+                          >
+                            <Plus className="w-3.5 h-3.5 shrink-0" />
+                            <span className="truncate">Add "{modelSearchQuery.trim()}" to Catalog</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Variant Selector — Radio Tiles & Inline Builder */}

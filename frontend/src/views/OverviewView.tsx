@@ -931,6 +931,11 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           contacts={stockContacts}
           accounts={accounts}
           isOwner={user?.role === 'owner'}
+          onProductCreated={(newProduct) => {
+            if (newProduct) {
+              setStockProducts((prev) => [newProduct, ...prev.filter((p) => p.id !== newProduct.id)]);
+            }
+          }}
           onIntakeSuccess={() => {
             setIsStockIntakeOpen(false);
             if (onRefreshData) onRefreshData();

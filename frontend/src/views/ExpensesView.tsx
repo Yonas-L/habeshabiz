@@ -10,15 +10,12 @@ import {
   Coffee,
   Home,
   Wrench,
-  Receipt,
-  TrendingDown,
   ChevronRight,
   Landmark,
   Trash2,
   AlertTriangle,
   Loader2,
 } from 'lucide-react';
-import { AnimatedNumber } from '../components/AnimatedNumber';
 import { ExpenseDrawer } from '../components/drawers/ExpenseDrawer';
 import { RecordExpenseModal } from '../components/RecordExpenseModal';
 import { Pagination } from '../components/Pagination';
@@ -42,7 +39,6 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
   const isOwner = !user || user.role === 'owner';
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [bankFees, setBankFees] = useState<BankFeeItem[]>([]);
-  const [totalBankFees, setTotalBankFees] = useState<number>(0);
   const [activeTab, setActiveTab] = useState<ExpenseTabFilter>('all');
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -75,11 +71,9 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
       if (res && typeof res === 'object' && 'expenses' in res) {
         setExpenses(res.expenses || []);
         setBankFees(res.bank_fees || []);
-        setTotalBankFees(res.total_bank_fees || 0);
       } else if (Array.isArray(res)) {
         setExpenses(res);
         setBankFees([]);
-        setTotalBankFees(0);
       }
       setCurrentPage(1);
     } catch (err: any) {
@@ -112,21 +106,6 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
 
   const operatingExpenses = useMemo(() => expenses.filter((e) => !e.is_owner_draw), [expenses]);
   const ownerDraws = useMemo(() => expenses.filter((e) => e.is_owner_draw), [expenses]);
-
-  const operatingTotal = useMemo(
-    () => operatingExpenses.reduce((sum, e) => sum + parseFloat(String(e.amount)), 0),
-    [operatingExpenses]
-  );
-
-  const ownerDrawsTotal = useMemo(
-    () => ownerDraws.reduce((sum, e) => sum + parseFloat(String(e.amount)), 0),
-    [ownerDraws]
-  );
-
-  const totalDeductible = useMemo(
-    () => operatingTotal + totalBankFees,
-    [operatingTotal, totalBankFees]
-  );
 
   // Unified items list for table based on active tab
   interface UnifiedExpenseItem {
@@ -200,6 +179,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
         return <Home className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />;
       case 'maintenance':
         return <Wrench className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />;
+      case 'personal':
       case 'personal_owner_draw':
         return <UserMinus className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />;
       default:
@@ -216,16 +196,11 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
       {/* Top Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="font-bold text-slate-900 dark:text-white text-base sm:text-lg tracking-tight">
-              Operating Expenses & Owner Draws
-            </h2>
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700">
-              Segregated Ledgers
-            </span>
-          </div>
+          <h2 className="font-bold text-slate-900 dark:text-white text-base sm:text-lg tracking-tight">
+            Expenses
+          </h2>
           <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5">
-            Strict segregation between shop operational costs and owner personal withdrawals
+            Store operational costs and outflows
           </p>
         </div>
 
@@ -236,105 +211,6 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
           <Plus className="w-4 h-4 text-emerald-400 dark:text-emerald-600" />
           <span>Record Expense</span>
         </button>
-      </div>
-
-      {/* Desktop Summary Matrix (sm and up) */}
-      <div className="hidden sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-        {/* 1. Shop Bills */}
-        <div className="bg-white dark:bg-[#131926] rounded-xl border border-slate-200/70 dark:border-slate-800/80 p-4 shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-              Shop Bills & Vouchers
-            </span>
-            <div className="w-7 h-7 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60 flex items-center justify-center">
-              <Receipt className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400" />
-            </div>
-          </div>
-          <div className="text-xl font-bold font-mono tracking-tight text-slate-900 dark:text-white mt-2">
-            <AnimatedNumber value={operatingTotal} decimals={2} />{' '}
-            <span className="text-[11px] font-medium text-slate-400 font-sans">ETB</span>
-          </div>
-          <span className="text-[10px] text-slate-400 mt-2 block">Rent, rides, utilities, salary</span>
-        </div>
-
-        {/* 2. Bank & Transfer Fees */}
-        <div className="bg-white dark:bg-[#131926] rounded-xl border border-slate-200/70 dark:border-slate-800/80 p-4 shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-              Bank & Transfer Fees
-            </span>
-            <div className="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/40 flex items-center justify-center">
-              <Landmark className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-            </div>
-          </div>
-          <div className="text-xl font-bold font-mono tracking-tight text-blue-600 dark:text-blue-400 mt-2">
-            <AnimatedNumber value={totalBankFees} decimals={2} />{' '}
-            <span className="text-[11px] font-medium text-slate-400 font-sans">ETB</span>
-          </div>
-          <span className="text-[10px] text-slate-400 mt-2 block">Automated wallet & bank charges</span>
-        </div>
-
-        {/* 3. Total Deductions */}
-        <div className="bg-white dark:bg-[#131926] rounded-xl border border-slate-200/70 dark:border-slate-800/80 p-4 shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-rose-600/80 dark:text-rose-400/80">
-              Total Deductions
-            </span>
-            <div className="w-7 h-7 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-100 dark:border-rose-900/40 flex items-center justify-center">
-              <TrendingDown className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
-            </div>
-          </div>
-          <div className="text-xl font-bold font-mono tracking-tight text-rose-600 dark:text-rose-400 mt-2">
-            {totalDeductible > 0 ? '−' : ''}<AnimatedNumber value={totalDeductible} decimals={2} />{' '}
-            <span className="text-[11px] font-medium text-rose-400/80 font-sans">ETB</span>
-          </div>
-          <span className="text-[10px] text-slate-400 mt-2 block">Deducted from gross profit</span>
-        </div>
-
-        {/* 4. Owner Draws */}
-        <div className="bg-white dark:bg-[#131926] rounded-xl border border-slate-200/70 dark:border-slate-800/80 p-4 shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Owner Draws
-            </span>
-            <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60 flex items-center justify-center">
-              <UserMinus className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400" />
-            </div>
-          </div>
-          <div className="text-xl font-bold font-mono tracking-tight text-slate-900 dark:text-white mt-2">
-            <AnimatedNumber value={ownerDrawsTotal} decimals={2} />{' '}
-            <span className="text-[11px] font-medium text-slate-400 font-sans">ETB</span>
-          </div>
-          <span className="text-[10px] text-slate-400 mt-2 block">Personal drawings</span>
-        </div>
-      </div>
-
-      {/* Mobile Summary Matrix (< sm) */}
-      <div className="sm:hidden grid grid-cols-2 gap-2.5">
-        <div className="bg-white dark:bg-[#131926] rounded-xl border border-slate-200/80 dark:border-slate-800/80 p-3 shadow-xs">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Shop Bills</div>
-          <div className="text-sm font-bold font-mono text-slate-900 dark:text-white mt-1">
-            <AnimatedNumber value={operatingTotal} decimals={0} /> <span className="text-[9px] text-slate-400 font-sans">ETB</span>
-          </div>
-        </div>
-        <div className="bg-white dark:bg-[#131926] rounded-xl border border-slate-200/80 dark:border-slate-800/80 p-3 shadow-xs">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-blue-500">Bank Fees</div>
-          <div className="text-sm font-bold font-mono text-blue-600 dark:text-blue-400 mt-1">
-            <AnimatedNumber value={totalBankFees} decimals={0} /> <span className="text-[9px] text-slate-400 font-sans">ETB</span>
-          </div>
-        </div>
-        <div className="bg-white dark:bg-[#131926] rounded-xl border border-slate-200/80 dark:border-slate-800/80 p-3 shadow-xs">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-rose-500">Total Deductions</div>
-          <div className="text-sm font-bold font-mono text-rose-600 dark:text-rose-400 mt-1">
-            {totalDeductible > 0 ? '−' : ''}<AnimatedNumber value={totalDeductible} decimals={0} /> <span className="text-[9px] text-slate-400 font-sans">ETB</span>
-          </div>
-        </div>
-        <div className="bg-white dark:bg-[#131926] rounded-xl border border-slate-200/80 dark:border-slate-800/80 p-3 shadow-xs">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Owner Draws</div>
-          <div className="text-sm font-bold font-mono text-slate-900 dark:text-white mt-1">
-            <AnimatedNumber value={ownerDrawsTotal} decimals={0} /> <span className="text-[9px] text-slate-400 font-sans">ETB</span>
-          </div>
-        </div>
       </div>
 
       {/* Filter Tabs & History Table */}
@@ -360,7 +236,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              Shop Bills ({operatingExpenses.length})
+              Expenses ({operatingExpenses.length})
             </button>
             <button
               onClick={() => { setActiveTab('fees'); setCurrentPage(1); }}
@@ -372,16 +248,18 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
             >
               Bank Fees ({bankFees.length})
             </button>
-            <button
-              onClick={() => { setActiveTab('draws'); setCurrentPage(1); }}
-              className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
-                activeTab === 'draws'
-                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-bold'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              Owner Draws ({ownerDraws.length})
-            </button>
+            {ownerDraws.length > 0 && (
+              <button
+                onClick={() => { setActiveTab('draws'); setCurrentPage(1); }}
+                className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
+                  activeTab === 'draws'
+                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-bold'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                Draws ({ownerDraws.length})
+              </button>
+            )}
           </div>
           <span className="text-[11px] text-slate-400 font-medium">
             {unifiedItems.length} records in view
@@ -441,7 +319,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
                           : 'bg-slate-50 dark:bg-slate-800/70 border-slate-200/60 dark:border-slate-700 text-slate-800 dark:text-slate-200'
                       } capitalize`}>
                         {getCategoryIcon(item.category)}
-                        <span>{item.isFee ? 'Bank Fee' : item.category.replace(/_/g, ' ')}</span>
+                        <span>{item.isFee ? 'Bank Fee' : item.category === 'personal_owner_draw' ? 'personal' : item.category.replace(/_/g, ' ')}</span>
                       </div>
                     </td>
 
@@ -489,7 +367,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
                             : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
                         }`}
                       >
-                        {item.isFee ? 'Bank Fee' : item.isOwnerDraw ? 'Owner Draw' : 'Business Expense'}
+                        {item.isFee ? 'Bank Fee' : item.isOwnerDraw ? 'Personal Draw' : 'Expense'}
                       </span>
                     </td>
 
@@ -609,7 +487,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
                           : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
                       }`}
                     >
-                      {item.isFee ? 'Bank Fee' : item.isOwnerDraw ? 'Owner Draw' : 'Business'}
+                      {item.isFee ? 'Bank Fee' : item.isOwnerDraw ? 'Draw' : 'Expense'}
                     </span>
                     {item.rawExpense && isOwner && (
                       <button

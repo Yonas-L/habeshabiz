@@ -282,6 +282,18 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
           cat.toLowerCase().includes(q);
         if (matchesText) return true;
 
+        // Match variant attributes (e.g. storage, color, ram)
+        const matchesVariant = (p.variants || []).some((v) => {
+          const varText = [v.storage, v.ram, v.color, ...(v.specs ? Object.values(v.specs).map(String) : [])]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+          const combined = `${p.name} ${p.brand || ''} ${varText}`.toLowerCase();
+          const words = q.split(/\s+/).filter(Boolean);
+          return words.every((w) => combined.includes(w));
+        });
+        if (matchesVariant) return true;
+
         // Fast search by unit serial number or IMEI
         const variantIds = (p.variants || []).map((v) => v.id);
         return availableUnits.some(
@@ -448,14 +460,26 @@ export const CounterView: React.FC<CounterViewProps> = ({ user, accounts, contac
   const currentStep = !step1Done ? 1 : !step2Done ? 2 : !step3Done ? 3 : 4;
 
   const handleSelectProduct = (productId: string) => {
+    const q = productSearch.toLowerCase().trim();
     setSelectedProductId(productId);
     setIsModelSearchOpen(false);
     recordRecentModel(productId);
     const prod = products.find((p) => p.id === productId);
     const vList = prod?.variants || [];
 
-    // Auto-select the first in-stock variant, or the first variant if available
-    const preferredVariant = vList.find((v) => {
+    // Check if search query matched a specific variant (e.g. storage or color)
+    const matchingQueryVariant = q
+      ? vList.find((v) => {
+          const varText = [v.storage, v.ram, v.color, ...(v.specs ? Object.values(v.specs).map(String) : [])]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+          return q.split(/\s+/).some((w) => varText.includes(w));
+        })
+      : undefined;
+
+    // Auto-select matching variant, first in-stock variant, or first variant if available
+    const preferredVariant = matchingQueryVariant || vList.find((v) => {
       const uCount = availableUnits.filter((u) => u.variant_id === v.id).length || (v.inventory_units || []).filter((u) => u.status === 'in_stock').length;
       const qOnHand = v.stock?.quantity_on_hand ?? 0;
       return prod?.has_serials ? uCount > 0 : Math.max(uCount, qOnHand) > 0;

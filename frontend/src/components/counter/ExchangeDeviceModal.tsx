@@ -12,6 +12,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { BrandSelectInput } from '../common/BrandSelectInput';
+import { getInitialCategoryId, setRecentCategoryId, sortCategoriesWithPreferredFirst } from '../../utils/categorySelection';
 
 export interface ExchangeDevicePayload {
   variant_id: string;
@@ -58,7 +59,7 @@ export const ExchangeDeviceModal: React.FC<ExchangeDeviceModalProps> = ({
   const [mode, setMode] = useState<'existing' | 'new'>('existing');
 
   // Existing selection state
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>(() => getInitialCategoryId(categories));
   const [selectedProductId, setSelectedProductId] = useState<string>('');
   const [selectedVariantId, setSelectedVariantId] = useState<string>('');
 
@@ -75,7 +76,7 @@ export const ExchangeDeviceModal: React.FC<ExchangeDeviceModalProps> = ({
   const [notes, setNotes] = useState<string>('');
 
   // New product quick create inline
-  const [newCatId, setNewCatId] = useState<string>('');
+  const [newCatId, setNewCatId] = useState<string>(() => getInitialCategoryId(categories));
   const [newProductName, setNewProductName] = useState<string>('');
   const [newProductBrand, setNewProductBrand] = useState<string>('');
   const [newStorage, setNewStorage] = useState<string>('128GB');
@@ -108,9 +109,12 @@ export const ExchangeDeviceModal: React.FC<ExchangeDeviceModalProps> = ({
       setMode('existing');
     } else {
       // Defaults
-      if (categories.length > 0 && !selectedCategoryId) {
-        setSelectedCategoryId(categories[0].id);
-        setNewCatId(categories[0].id);
+      if (categories.length > 0) {
+        if (!selectedCategoryId || !categories.some((c) => c.id === selectedCategoryId)) {
+          const initialCat = getInitialCategoryId(categories);
+          setSelectedCategoryId(initialCat);
+          setNewCatId(initialCat);
+        }
       }
       setTradeInValue('');
       setIsCustomValue(false);
@@ -227,10 +231,20 @@ export const ExchangeDeviceModal: React.FC<ExchangeDeviceModalProps> = ({
   };
 
   // Inline Quick Creation of New Model
+  const existingModelMatch = useMemo(() => {
+    const q = newProductName.trim().toLowerCase();
+    if (!q) return null;
+    return products.find((p) => p.name.trim().toLowerCase() === q) || null;
+  }, [newProductName, products]);
+
   const handleCreateNewModel = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProductName.trim()) {
       toast.error('Please enter the device name.');
+      return;
+    }
+    if (existingModelMatch) {
+      toast.error('Model already exists');
       return;
     }
     const cat = categories.find((c) => c.id === newCatId) || categories[0];
@@ -392,10 +406,13 @@ export const ExchangeDeviceModal: React.FC<ExchangeDeviceModalProps> = ({
                   </label>
                   <select
                     value={newCatId}
-                    onChange={(e) => setNewCatId(e.target.value)}
+                    onChange={(e) => {
+                      setNewCatId(e.target.value);
+                      setRecentCategoryId(e.target.value);
+                    }}
                     className="w-full h-8 px-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-900 dark:text-white"
                   >
-                    {categories.map((c) => (
+                    {sortCategoriesWithPreferredFirst(categories, newCatId).map((c) => (
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
                   </select>
@@ -412,6 +429,27 @@ export const ExchangeDeviceModal: React.FC<ExchangeDeviceModalProps> = ({
                     className="w-full h-8 px-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-900 dark:text-white"
                     required
                   />
+                  {existingModelMatch && (
+                    <div className="mt-1.5 flex items-center justify-between p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-[11px]">
+                      <span className="font-semibold text-amber-700 dark:text-amber-300">
+                        Model already exists
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNewProductName('');
+                          setSelectedProductId(existingModelMatch.id);
+                          if (existingModelMatch.category_id) {
+                            setSelectedCategoryId(existingModelMatch.category_id);
+                          }
+                          setMode('existing');
+                        }}
+                        className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-600 hover:bg-amber-700 text-white transition-colors cursor-pointer"
+                      >
+                        Select Existing
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -485,14 +523,16 @@ export const ExchangeDeviceModal: React.FC<ExchangeDeviceModalProps> = ({
                     <select
                       value={selectedCategoryId}
                       onChange={(e) => {
-                        setSelectedCategoryId(e.target.value);
+                        const val = e.target.value;
+                        setSelectedCategoryId(val);
+                        if (val) setRecentCategoryId(val);
                         setSelectedProductId('');
                         setSelectedVariantId('');
                       }}
                       className="w-full h-9 px-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs font-semibold text-slate-900 dark:text-white"
                     >
                       <option value="">All Categories</option>
-                      {categories.map((c) => (
+                      {sortCategoriesWithPreferredFirst(categories, selectedCategoryId).map((c) => (
                         <option key={c.id} value={c.id}>{c.name}</option>
                       ))}
                     </select>

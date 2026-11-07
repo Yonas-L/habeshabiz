@@ -1180,13 +1180,13 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           {statusFilter === 'in_stock' ? (
             /* COLLAPSIBLE GROUPED IN-STOCK TABLE */
             <div className="overflow-x-auto max-h-[calc(100vh-230px)] min-h-[500px] overflow-y-auto overscroll-contain scroll-smooth pb-8">
-              <table className="w-full text-left text-xs table-fixed min-w-[720px]">
+              <table className="w-full text-left text-xs table-fixed min-w-[840px]">
                 <colgroup>
-                  <col className="w-auto min-w-[260px]" />
+                  <col className="w-auto min-w-[240px]" />
                   <col className="w-20" />
-                  <col className="w-32" />
-                  {canViewCost && <col className="w-32" />}
-                  {canAction && <col className="w-32" />}
+                  <col className="w-28" />
+                  {canViewCost && <col className="w-28" />}
+                  {canAction && <col className="w-56" />}
                   <col className="w-10" />
                 </colgroup>
                 <thead className="sticky top-0 z-10 bg-slate-50/95 dark:bg-[#131926]/95 backdrop-blur-xs border-b border-slate-200 dark:border-slate-800 text-slate-400 font-bold uppercase tracking-wider text-[10px] shadow-2xs">
@@ -1194,8 +1194,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     <th className="py-2.5 px-3.5 whitespace-nowrap">Model</th>
                     <th className="py-2.5 px-3.5 whitespace-nowrap font-mono">Stock</th>
                     <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Price ETB</th>
-                    {canViewCost && <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Cost ETB</th>}
-                    {canAction && <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Action</th>}
+                    {canViewCost && <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[100px]">Cost ETB</th>}
+                    {canAction && <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[210px]">Action</th>}
                     <th className="py-2.5 px-2"></th>
                   </tr>
                 </thead>
@@ -1256,9 +1256,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                                       </span>
                                     )}
                                   </div>
-                                  <div className="text-[10px] text-slate-400 truncate">
-                                    {item.variantBreakdowns.length} variant{item.variantBreakdowns.length !== 1 ? 's' : ''}
-                                  </div>
                                 </div>
                               </div>
                             </td>
@@ -1281,7 +1278,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
                             {/* Col 4: Total Cost (Owner Only) */}
                             {canViewCost && (
-                              <td className="py-2.5 px-3.5 text-right whitespace-nowrap font-mono font-bold text-slate-900 dark:text-white text-xs">
+                              <td className="py-2.5 px-3.5 text-right whitespace-nowrap font-mono font-bold text-slate-900 dark:text-white text-xs min-w-[100px]">
                                 {item.totalCost > 0 ? (
                                   Number(item.totalCost).toLocaleString()
                                 ) : (
@@ -1292,8 +1289,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
                             {/* Col 5: Actions */}
                             {canAction && (
-                              <td className="py-2.5 px-3.5 text-right">
-                                <div className="inline-flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                              <td className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[210px]">
+                                <div className="inline-flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                                   {(isOwner || canIntake) && (
                                     <button
                                       onClick={() => {
@@ -1330,13 +1327,13 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                                 className="p-0 border-y border-slate-200/80 dark:border-slate-800/80"
                               >
                                 <div className="max-h-80 overflow-y-auto overscroll-contain shadow-inner pb-3">
-                                  <table className="w-full text-left text-xs table-fixed min-w-[720px]">
+                                  <table className="w-full text-left text-xs table-fixed min-w-[840px]">
                                     <colgroup>
-                                      <col className="w-auto min-w-[260px]" />
+                                      <col className="w-auto min-w-[240px]" />
                                       <col className="w-20" />
-                                      <col className="w-32" />
-                                      {canViewCost && <col className="w-32" />}
-                                      {canAction && <col className="w-32" />}
+                                      <col className="w-28" />
+                                      {canViewCost && <col className="w-28" />}
+                                      {canAction && <col className="w-56" />}
                                       <col className="w-10" />
                                     </colgroup>
                                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50 text-slate-700 dark:text-slate-300">
@@ -1417,7 +1414,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
                                             {/* Col 4: Cost */}
                                             {canViewCost && (
-                                              <td className="py-2 px-3.5 text-right whitespace-nowrap font-mono font-bold text-slate-900 dark:text-white text-xs">
+                                              <td className="py-2 px-3.5 text-right whitespace-nowrap font-mono font-bold text-slate-900 dark:text-white text-xs min-w-[100px]">
                                                 {unit.cost_basis ? (
                                                   Number(unit.cost_basis).toLocaleString()
                                                 ) : (
@@ -1428,35 +1425,35 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
                                             {/* Col 5: Action */}
                                             {canAction && (
-                                              <td className="py-2 px-3.5 text-right whitespace-nowrap">
-                                                <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                                              <td className="py-2 px-3.5 text-right whitespace-nowrap min-w-[210px]">
+                                                <div className="flex items-center justify-end gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
                                                   {(isOwner || canManageInv) && unit.source_type === 'consignment' && (
                                                     <button
                                                       onClick={() => {
                                                         setReturnToVendorUnit(unit);
                                                         setReturnToVendorReason('');
                                                       }}
-                                                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-50 dark:bg-amber-950/50 border border-amber-200/60 dark:border-amber-800/60 text-amber-700 dark:text-amber-400 hover:bg-amber-100 transition-colors shadow-2xs active:scale-95 cursor-pointer"
+                                                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-50 dark:bg-amber-950/50 border border-amber-200/60 dark:border-amber-800/60 text-amber-700 dark:text-amber-400 hover:bg-amber-100 transition-colors shadow-2xs active:scale-95 cursor-pointer shrink-0"
                                                       title="Return unsold consignment unit back to broker"
                                                     >
-                                                      <Handshake className="w-3 h-3" />
+                                                      <Handshake className="w-3 h-3 shrink-0" />
                                                       <span>Return</span>
                                                     </button>
                                                   )}
                                                   {(isOwner || canHandover) && (
                                                     <button
                                                       onClick={() => openHandoverModal(unit)}
-                                                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-amber-950/50 text-slate-700 dark:text-slate-300 hover:text-amber-700 dark:hover:text-amber-400 transition-colors shadow-2xs active:scale-95 cursor-pointer"
+                                                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-amber-950/50 text-slate-700 dark:text-slate-300 hover:text-amber-700 dark:hover:text-amber-400 transition-colors shadow-2xs active:scale-95 cursor-pointer shrink-0"
                                                       title="Handover device to staff or broker"
                                                     >
-                                                      <UserCheck className="w-3 h-3" />
+                                                      <UserCheck className="w-3 h-3 shrink-0" />
                                                       <span>Handover</span>
                                                     </button>
                                                   )}
                                                   {(isOwner || canManageInv) && unit.status !== 'sold' && unit.status !== 'out' && (
                                                     <button
                                                       onClick={() => setUnitToDelete(unit)}
-                                                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors shadow-2xs active:scale-95 cursor-pointer"
+                                                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors shadow-2xs active:scale-95 cursor-pointer shrink-0"
                                                       title="Delete this unit"
                                                     >
                                                       <Trash2 className="w-3.5 h-3.5" />
@@ -1506,12 +1503,12 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                                               )}
                                             </td>
                                             {canViewCost && (
-                                              <td className="py-2 px-3.5 text-right font-mono font-bold text-slate-900 dark:text-white text-xs whitespace-nowrap">
+                                              <td className="py-2 px-3.5 text-right font-mono font-bold text-slate-900 dark:text-white text-xs whitespace-nowrap min-w-[100px]">
                                                 {vb.costBasis > 0 ? Number(vb.costBasis).toLocaleString() : '—'}
                                               </td>
                                             )}
                                             {canAction && (
-                                              <td className="py-2 px-3.5 text-right">
+                                              <td className="py-2 px-3.5 text-right whitespace-nowrap min-w-[210px]">
                                                 {(isOwner || canIntake) && (
                                                   <button
                                                     onClick={() => {
@@ -1519,7 +1516,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                                                       setIntakeInitialVariantId(vb.variant.id);
                                                       setShowIntakeModal(true);
                                                     }}
-                                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-700 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors shadow-2xs active:scale-95 cursor-pointer"
+                                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-700 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors shadow-2xs active:scale-95 cursor-pointer shrink-0"
                                                     title={`Add stock for ${specLabel}`}
                                                   >
                                                     <Plus className="w-3 h-3" />
@@ -1672,14 +1669,14 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             </table>
           ) : (
             /* FLAT TABLE FOR OTHER TABS (OUT, SOLD, RETURNED, ALL, EXCHANGE) */
-            <table className="w-full text-left text-xs">
+            <table className="w-full text-left text-xs min-w-[800px]">
               <thead className="bg-slate-50/70 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
                 <tr>
                   <th className="py-2.5 px-3.5 whitespace-nowrap">Model</th>
                   <th className="py-2.5 px-3.5 whitespace-nowrap font-mono">IMEI</th>
                   <th className="py-2.5 px-3.5 text-center whitespace-nowrap">Status</th>
-                  {canViewCost && <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Cost ETB</th>}
-                  {canAction && <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Action</th>}
+                  {canViewCost && <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[100px] w-28">Cost ETB</th>}
+                  {canAction && <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[210px] w-56">Action</th>}
                   <th className="py-2.5 px-2"></th>
                 </tr>
               </thead>
@@ -1868,7 +1865,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
                         {/* Cost basis (owner only) */}
                         {canViewCost && (
-                          <td className="py-2.5 px-3.5 text-right whitespace-nowrap font-mono font-bold text-slate-900 dark:text-white text-xs">
+                          <td className="py-2.5 px-3.5 text-right whitespace-nowrap font-mono font-bold text-slate-900 dark:text-white text-xs min-w-[100px] w-28">
                             {unit.cost_basis ? (
                               Number(unit.cost_basis).toLocaleString()
                             ) : (
@@ -1879,8 +1876,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
                         {/* Contextual Action Button */}
                         {(isOwner || canHandover || canManageInv) && (
-                          <td className="py-2.5 px-3.5 text-right whitespace-nowrap">
-                            <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                          <td className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[210px] w-56">
+                            <div className="flex items-center justify-end gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
                               {(isOwner || canManageInv) && unit.source_type === 'consignment' && unit.status === 'in_stock' && (
                                 <button
                                   onClick={() => {
@@ -2128,8 +2125,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                               <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
                                 {item.totalInStock} in stock
                               </span>
-                              <span>•</span>
-                              <span>{item.variantBreakdowns.length} var</span>
                             </div>
                           </div>
                         </div>
@@ -2212,28 +2207,25 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                                     )}
                                   </div>
 
-                                  {/* Selling Price */}
+                                  {/* Selling Price & Cost */}
                                   <div className="text-right shrink-0">
-                                    <span className="font-mono font-bold text-xs text-slate-900 dark:text-white">
+                                    <div className="font-mono font-bold text-xs text-slate-900 dark:text-white">
                                       {unitSellingPrice ? `${Number(unitSellingPrice).toLocaleString()} ETB` : '—'}
-                                    </span>
+                                    </div>
+                                    {canViewCost && unit.cost_basis ? (
+                                      <div className="text-[9px] font-mono text-slate-400 dark:text-slate-500 mt-0.5">
+                                        Cost: {Number(unit.cost_basis).toLocaleString()}
+                                      </div>
+                                    ) : null}
                                   </div>
                                 </div>
 
-                                {/* Bottom Row: Specs + Cost Basis + Action Buttons */}
+                                {/* Bottom Row: Specs + Action Buttons */}
                                 <div className="flex items-center justify-between gap-2 mt-1.5 pt-1.5 border-t border-slate-100 dark:border-slate-800/60 text-xs">
                                   <div className="flex items-center gap-2 min-w-0">
-                                    <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 truncate max-w-[170px]">
+                                    <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 truncate">
                                       {unitSpec}
                                     </span>
-                                    {canViewCost && unit.cost_basis ? (
-                                      <>
-                                        <span className="text-slate-300 dark:text-slate-700 text-[10px]">•</span>
-                                        <span className="text-[10px] font-mono text-slate-400 whitespace-nowrap">
-                                          Cost: {Number(unit.cost_basis).toLocaleString()}
-                                        </span>
-                                      </>
-                                    ) : null}
                                   </div>
 
                                   {/* Actions */}
@@ -4317,6 +4309,10 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               isOwner={isOwner}
               initialProductId={intakeInitialProductId}
               initialVariantId={intakeInitialVariantId}
+              onProductCreated={() => {
+                loadInventory();
+                onInventoryChange?.();
+              }}
               onIntakeSuccess={() => {
                 loadInventory();
                 onInventoryChange?.();

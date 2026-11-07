@@ -152,6 +152,12 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
     setNewPrice('');
   };
 
+  const existingModelMatch = useMemo(() => {
+    const q = name.trim().toLowerCase();
+    if (!q || !product) return null;
+    return products.find((p) => p.id !== product.id && p.name.trim().toLowerCase() === q) || null;
+  }, [name, product, products]);
+
   if (!isOpen || !product) return null;
 
   // Handle Save Main Product Details
@@ -159,6 +165,10 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
     e.preventDefault();
     if (!name.trim()) {
       toast.error('Product model name is required');
+      return;
+    }
+    if (existingModelMatch) {
+      toast.error('Model already exists');
       return;
     }
 
@@ -420,6 +430,12 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                 placeholder="e.g. MacBook Pro M5, iPhone 16 Pro Max"
                 className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-slate-700"
               />
+              {existingModelMatch && (
+                <div className="mt-1.5 flex items-center gap-1.5 p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs text-amber-700 dark:text-amber-300 font-medium">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                  <span>A model named "{existingModelMatch.name}" already exists</span>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1291,7 +1307,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
               <button
                 type="submit"
                 form="edit-product-form"
-                disabled={isSubmitting}
+                disabled={isSubmitting || !!existingModelMatch}
                 className="h-9 px-5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs flex items-center gap-1.5 active:scale-[0.98] cursor-pointer disabled:opacity-50"
               >
                 {isSubmitting ? (
