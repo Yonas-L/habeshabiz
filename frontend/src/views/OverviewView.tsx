@@ -4,7 +4,6 @@ import type {
   User,
   FinancialAccount,
   Debt,
-  LeaderboardItem,
   SalesTrend,
   DashboardSalesChartPoint,
   ProductCategory,
@@ -52,7 +51,6 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   const [selectedVital, setSelectedVital] = useState<VitalType | null>(null);
   const [focusedContactId, setFocusedContactId] = useState<string | null>(null);
   const [selectedDebt, setSelectedDebt] = useState<Debt | null>(null);
-  const [topSeller, setTopSeller] = useState<LeaderboardItem | null>(null);
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [isDebtModalOpen, setIsDebtModalOpen] = useState(false);
   const [debtModalDefaultType, setDebtModalDefaultType] = useState<'receivable' | 'payable'>('receivable');
@@ -92,6 +90,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     owner_draws: number;
     sales_trend?: SalesTrend;
     sales_chart?: DashboardSalesChartPoint[];
+    top_product?: { name: string; units_sold: number; total_revenue: number } | null;
   } | null>(null);
   const [isLoadingRange, setIsLoadingRange] = useState(false);
   const [hoveredPointVal, setHoveredPointVal] = useState<number | null>(null);
@@ -103,6 +102,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     owner_draws: number;
     sales_trend?: SalesTrend;
     sales_chart?: DashboardSalesChartPoint[];
+    top_product?: { name: string; units_sold: number; total_revenue: number } | null;
   }>>({});
   const activeReqRef = useRef<string>('');
 
@@ -137,6 +137,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           owner_draws: res.monthly_performance.owner_draws,
           sales_trend: res.sales_trend,
           sales_chart: res.sales_chart,
+          top_product: res.top_product ?? res.monthly_performance?.top_product ?? null,
         };
         rangeCacheRef.current[cacheKey] = perf;
         setRangePerformance(perf);
@@ -164,14 +165,6 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     setFocusedContactId(contactId);
     setSelectedVital(vital);
   };
-
-  useEffect(() => {
-    if (user?.role === 'owner') {
-      api.getLeaderboard(selectedMonth)
-        .then((res) => setTopSeller(res.top_seller || null))
-        .catch(() => {});
-    }
-  }, [user, selectedMonth]);
 
   /* ─── Skeleton ─── */
   if (!data) {
@@ -325,6 +318,9 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     prior_revenue: 0,
     comparison_label: salesRange === '1M' ? 'vs last month' : `vs prior ${salesRange}`,
   };
+  const activeTopProduct = rangePerformance?.top_product !== undefined
+    ? rangePerformance.top_product
+    : (data?.top_product ?? data?.monthly_performance?.top_product ?? null);
   const displaySalesVal = hoveredPointVal !== null ? hoveredPointVal : activeRevenue;
 
   /* ─── Capital metrics for the unified strip ─── */
@@ -392,7 +388,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             setDebtModalDefaultType(type);
             setIsDebtModalOpen(true);
           }}
-          topSeller={topSeller}
+          topProduct={activeTopProduct}
           groupedReceivables={groupedReceivables}
           groupedPayables={groupedPayables}
           salesRange={salesRange}
@@ -441,14 +437,15 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                     Sales Performance
                   </span>
 
-                  {topSeller && user?.role === 'owner' && (
+                  {activeTopProduct && (
                     <button
-                      onClick={() => onNavigateTab('staff')}
-                      title="View Staff & Team Dashboard"
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-900/50 text-amber-900 dark:text-amber-300 text-[10.5px] 2xl:text-xs font-semibold hover:border-amber-400 transition-all cursor-pointer"
+                      onClick={() => onNavigateTab('sales')}
+                      title={`View Sales History • ${activeTopProduct.units_sold} ${activeTopProduct.units_sold === 1 ? 'unit' : 'units'} sold across all categories`}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-emerald-50/90 dark:bg-emerald-950/40 border border-emerald-200/70 dark:border-emerald-800/50 text-emerald-900 dark:text-emerald-300 text-[10.5px] 2xl:text-xs font-semibold hover:border-emerald-400 dark:hover:border-emerald-700 transition-all cursor-pointer truncate max-w-[220px]"
                     >
-                      <span>Top: <span className="font-bold">{topSeller.name}</span></span>
-                      <ChevronRight className="w-3 h-3 opacity-60" />
+                      <span className="truncate">Top: <span className="font-bold">{activeTopProduct.name}</span></span>
+                      <span className="text-[9.5px] text-emerald-700/80 dark:text-emerald-400/80 font-mono font-medium shrink-0">({activeTopProduct.units_sold})</span>
+                      <ChevronRight className="w-3 h-3 opacity-60 shrink-0" />
                     </button>
                   )}
                 </div>
@@ -538,11 +535,23 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                       <div className="text-[10.5px] 2xl:text-xs font-semibold text-slate-500 dark:text-slate-400 truncate">
                         Gross Profit
                       </div>
-                      <div className="text-sm sm:text-base 2xl:text-lg font-bold font-mono tracking-tight text-emerald-600 dark:text-emerald-400 mt-1 2xl:mt-1.5 truncate">
+                      <div className={`text-sm sm:text-base 2xl:text-lg font-bold font-mono tracking-tight mt-1 2xl:mt-1.5 truncate ${
+                        activeGrossProfit < 0
+                          ? 'text-rose-600 dark:text-rose-400'
+                          : activeGrossProfit > 0
+                          ? 'text-emerald-600 dark:text-emerald-400'
+                          : 'text-slate-700 dark:text-slate-300'
+                      }`}>
                         {isBalancesHidden ? '******' : (
                           <>
                             {activeGrossProfit < 0 ? '−' : ''}<AnimatedNumber value={Math.abs(activeGrossProfit)} />
-                            <span className="text-[10px] 2xl:text-xs font-sans font-medium text-emerald-600/70 ml-1">ETB</span>
+                            <span className={`text-[10px] 2xl:text-xs font-sans font-medium ml-1 ${
+                              activeGrossProfit < 0
+                                ? 'text-rose-600/70 dark:text-rose-400/70'
+                                : activeGrossProfit > 0
+                                ? 'text-emerald-600/70'
+                                : 'text-slate-400 dark:text-slate-500'
+                            }`}>ETB</span>
                           </>
                         )}
                       </div>
@@ -553,11 +562,23 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                       <div className="text-[10.5px] 2xl:text-xs font-semibold text-slate-500 dark:text-slate-400 truncate">
                         Net Profit
                       </div>
-                      <div className="text-sm sm:text-base 2xl:text-lg font-bold font-mono tracking-tight text-emerald-600 dark:text-emerald-400 mt-1 2xl:mt-1.5 truncate">
+                      <div className={`text-sm sm:text-base 2xl:text-lg font-bold font-mono tracking-tight mt-1 2xl:mt-1.5 truncate ${
+                        activeNetProfit < 0
+                          ? 'text-rose-600 dark:text-rose-400'
+                          : activeNetProfit > 0
+                          ? 'text-emerald-600 dark:text-emerald-400'
+                          : 'text-slate-700 dark:text-slate-300'
+                      }`}>
                         {isBalancesHidden ? '******' : (
                           <>
                             {activeNetProfit < 0 ? '−' : ''}<AnimatedNumber value={Math.abs(activeNetProfit)} />
-                            <span className="text-[10px] 2xl:text-xs font-sans font-medium text-emerald-600/70 ml-1">ETB</span>
+                            <span className={`text-[10px] 2xl:text-xs font-sans font-medium ml-1 ${
+                              activeNetProfit < 0
+                                ? 'text-rose-600/70 dark:text-rose-400/70'
+                                : activeNetProfit > 0
+                                ? 'text-emerald-600/70'
+                                : 'text-slate-400 dark:text-slate-500'
+                            }`}>ETB</span>
                           </>
                         )}
                       </div>

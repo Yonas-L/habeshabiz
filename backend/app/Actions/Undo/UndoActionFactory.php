@@ -26,6 +26,8 @@ class UndoActionFactory
         'staff_bonus_paid' => UndoDebtPaymentAction::class,
         'debt_payment_settled' => UndoDebtPaymentAction::class,
         'bonus_used_for_debt' => UndoBonusDebtOffsetAction::class,
+        'unit_agreed_payout_adjusted' => UndoAgreedPayoutAction::class,
+        'manual_debt_created' => UndoManualDebtAction::class,
     ];
 
     /**

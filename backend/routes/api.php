@@ -139,10 +139,12 @@ Route::prefix('v1')->group(function () {
 
         // Serialized & Quantity Inventory
         Route::get('/inventory/units', [InventoryController::class, 'units']);
+        Route::get('/inventory/units/{id}', [InventoryController::class, 'showUnit']);
         Route::post('/inventory/units', [InventoryController::class, 'intakeUnit']);
         Route::put('/inventory/units/{id}', [InventoryController::class, 'updateUnit']);
         Route::delete('/inventory/units/{id}', [InventoryController::class, 'destroyUnit']);
         Route::post('/inventory/units/{id}/handover', [InventoryController::class, 'handoverUnit']);
+        Route::post('/inventory/units/{id}/adjust-agreed-payout', [InventoryController::class, 'adjustAgreedPayout']);
         Route::post('/inventory/units/{id}/mark-handover-sold', [InventoryController::class, 'markHandoverSold']);
         Route::post('/inventory/units/{id}/mark-sold', [InventoryController::class, 'markHandoverSold']);
         Route::post('/inventory/units/{id}/restock', [InventoryController::class, 'restockUnit']);

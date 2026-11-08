@@ -73,6 +73,7 @@ const MONEY_KEYS = new Set([
   'bonus_amount',
   'profit',
   'price',
+  'handover_payout',
 ]);
 
 // Friendly human labels for common database field names
@@ -106,6 +107,7 @@ const FIELD_LABEL_MAP: Record<string, string> = {
   notes: 'Notes',
   location: 'Shop Location',
   handover_to: 'Custody Handed To',
+  handover_payout: 'Agreed Payout',
   selling_price: 'Selling Price',
   cost_basis: 'Cost Basis',
   due_date: 'Due Date',
@@ -224,6 +226,11 @@ export function humanizeAuditLog(log: AuditLogItem): HumanizedAuditData {
   } else if (action === 'staff_bonus_paid' || action.includes('bonus')) {
     eventTitle = 'Staff Commission Bonus Paid';
     eventSubtitle = newVals?.staff_name || newVals?.contact_name ? `Disbursed to ${newVals.staff_name || newVals.contact_name}` : 'Sales commission bonus payout';
+  } else if (action === 'manual_debt_created') {
+    const isReceivable = newVals?.type === 'receivable';
+    const contact = newVals?.contact || newVals?.contact_name || 'Contact';
+    eventTitle = isReceivable ? 'Manual Receivable Recorded' : 'Manual Payable Recorded';
+    eventSubtitle = `${isReceivable ? 'Money owed to shop' : 'Money shop owes'} · ${contact}`;
   } else if (action === 'debt_payment_settled') {
     eventTitle = 'Debt Settlement Payment';
     eventSubtitle = newVals?.contact_name ? `Settled with ${newVals.contact_name}` : 'Obligation settlement';
@@ -236,6 +243,11 @@ export function humanizeAuditLog(log: AuditLogItem): HumanizedAuditData {
   } else if (action.includes('transfer')) {
     eventTitle = 'Account Fund Transfer';
     eventSubtitle = 'Internal treasury balance movement';
+  } else if (action === 'unit_agreed_payout_adjusted') {
+    eventTitle = 'Agreed Handover Payout Adjusted';
+    const partner = newVals?.partner_name || newVals?.handover_to || 'Partner';
+    const device = newVals?.product_name || 'Device';
+    eventSubtitle = `${device} · Handed out to ${partner}`;
   } else if (action.includes('handover') && action.includes('sold')) {
     eventTitle = 'Partner Handover Device Sold';
     eventSubtitle = 'Partner custody device converted to sale';
@@ -419,6 +431,15 @@ export function getAuditQuickSummary(log: AuditLogItem): string {
     return parts.join(' · ') || 'Staff commission bonus disbursed';
   }
 
+  // Manual debt creation summary
+  if (log.action === 'manual_debt_created') {
+    const isReceivable = src.type === 'receivable';
+    if (src.amount) parts.push(`${isReceivable ? 'Receivable' : 'Payable'} ${Number(src.amount).toLocaleString()} ETB`);
+    if (src.contact || src.contact_name) parts.push(`With ${src.contact || src.contact_name}`);
+    if (src.with_disbursement) parts.push(src.direction === 'out' ? 'Cash Disbursed' : 'Cash Received');
+    return parts.join(' · ') || 'Manual debt obligation recorded';
+  }
+
   // Debt payment settled summary
   if (log.action === 'debt_payment_settled') {
     if (src.amount) parts.push(`${src.type === 'payable' ? 'Paid' : 'Settled'} ${Number(src.amount).toLocaleString()} ETB`);
@@ -444,6 +465,22 @@ export function getAuditQuickSummary(log: AuditLogItem): string {
   if (log.action.includes('transfer')) {
     if (src.amount) parts.push(`Transferred ${Number(src.amount).toLocaleString()} ETB`);
     return parts.join(' · ') || 'Fund transfer executed';
+  }
+
+  // Agreed payout adjustment summary
+  if (log.action === 'unit_agreed_payout_adjusted') {
+    const partner = src.partner_name || src.handover_to;
+    const device = src.product_name;
+    const oldP = oldVals?.handover_payout;
+    const newP = newVals?.handover_payout;
+    if (oldP !== undefined && newP !== undefined) {
+      parts.push(`${Number(oldP).toLocaleString()} → ${Number(newP).toLocaleString()} ETB`);
+    } else if (newP) {
+      parts.push(`${Number(newP).toLocaleString()} ETB`);
+    }
+    if (device) parts.push(device);
+    if (partner) parts.push(`With ${partner}`);
+    return parts.join(' · ') || 'Agreed price adjusted';
   }
 
   // Handover summary

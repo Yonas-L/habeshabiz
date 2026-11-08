@@ -35,6 +35,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { BrandSelectInput } from '../common/BrandSelectInput';
+import { InlineEditablePrice } from '../common/InlineEditablePrice';
 
 interface InventoryUnitDrawerProps {
   unit: InventoryUnit | null;
@@ -122,6 +123,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
   const [condition, setCondition] = useState('new');
   const [costBasis, setCostBasis] = useState('');
   const [sellingPrice, setSellingPrice] = useState('');
+  const [handoverPayout, setHandoverPayout] = useState('');
   const [batteryHealth, setBatteryHealth] = useState('');
   const [cycleCount, setCycleCount] = useState('');
   const [simType, setSimType] = useState('physical');
@@ -153,6 +155,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
     setCondition(u.condition || 'new');
     setCostBasis(u.cost_basis !== undefined && u.cost_basis !== null ? formatCurrencyInput(u.cost_basis) : '');
     setSellingPrice(u.selling_price ? formatCurrencyInput(u.selling_price) : '');
+    setHandoverPayout(u.handover_payout !== undefined && u.handover_payout !== null ? formatCurrencyInput(u.handover_payout) : '');
     setBatteryHealth(u.battery_health !== null && u.battery_health !== undefined ? String(u.battery_health) : '');
     setCycleCount(u.cycle_count !== null && u.cycle_count !== undefined ? String(u.cycle_count) : '');
     setSimType(u.sim_type || 'physical');
@@ -285,6 +288,13 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
         payload.selling_price = parsedSelling;
       } else {
         payload.selling_price = null;
+      }
+
+      if (isOut) {
+        const parsedHandover = parseFormattedNumber(handoverPayout);
+        if (parsedHandover !== null) {
+          payload.handover_payout = parsedHandover;
+        }
       }
 
       if (batteryHealth !== '') {
@@ -1442,6 +1452,42 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
                   </span>
                 </div>
 
+                {/* Agreed Handover Payout if unit is out */}
+                {isOut && (
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Agreed Handover Payout ETB
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={handoverPayout}
+                      onChange={(e) => setHandoverPayout(formatCurrencyInput(e.target.value))}
+                      placeholder="e.g. 90,000"
+                      className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-mono font-bold text-amber-600 dark:text-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+                    />
+                    {(() => {
+                      const pNum = parseFormattedNumber(handoverPayout);
+                      const cNum = parseFormattedNumber(costBasis);
+                      if (pNum !== null && cNum !== null && pNum > 0 && cNum > 0) {
+                        if (pNum < cNum) {
+                          return (
+                            <span className="text-[11px] font-mono text-amber-600 dark:text-amber-400 font-semibold mt-1 block">
+                              Below cost basis (−{(cNum - pNum).toLocaleString()} ETB loss)
+                            </span>
+                          );
+                        }
+                        return (
+                          <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-semibold mt-1 block">
+                            Margin: +{(pNum - cNum).toLocaleString()} ETB
+                          </span>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </div>
+                )}
+
                 {/* Minimal Projected Margin Indicator */}
                 {hasMargin && profit !== null && (
                   <div className="sm:col-span-2 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
@@ -1618,14 +1664,23 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
 
               {(currentUnit.handover_payout || currentUnit.return_deadline) && (
                 <div className="grid grid-cols-2 gap-3 pt-1 text-[11px]">
-                  {currentUnit.handover_payout && (
-                    <div>
-                      <span className="text-[10px] text-slate-500 dark:text-slate-400 block">Agreed Payout:</span>
-                      <div className="font-mono font-bold text-emerald-700 dark:text-emerald-400 text-xs mt-0.5">
-                        {Number(currentUnit.handover_payout).toLocaleString()} ETB
-                      </div>
+                  <div>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block">Agreed Payout:</span>
+                    <div className="mt-0.5">
+                      <InlineEditablePrice
+                        value={currentUnit.handover_payout || 0}
+                        costBasis={currentUnit.cost_basis}
+                        unitId={currentUnit.id}
+                        field="handover_payout"
+                        align="left"
+                        disabled={!canHandover && !isOwner}
+                        onSaved={(updated) => {
+                          setCurrentUnit((prev) => (prev ? { ...prev, ...updated } : updated));
+                          if (onUnitUpdated) onUnitUpdated(updated);
+                        }}
+                      />
                     </div>
-                  )}
+                  </div>
                   {currentUnit.return_deadline && (
                     <div>
                       <span className="text-[10px] text-slate-500 dark:text-slate-400 block">Return Window:</span>

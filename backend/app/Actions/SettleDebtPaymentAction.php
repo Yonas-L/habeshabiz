@@ -397,7 +397,7 @@ class SettleDebtPaymentAction
                     ]);
 
                     $costBasis = (float) $unit->cost_basis;
-                    $profit = max(0, $finalPrice - $costBasis);
+                    $profit = $finalPrice - $costBasis;
 
                     SalesOrderItem::create([
                         'tenant_id' => $tenantId,

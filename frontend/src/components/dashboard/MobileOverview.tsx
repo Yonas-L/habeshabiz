@@ -1,5 +1,5 @@
 import React from 'react';
-import type { DashboardData, User, FinancialAccount, Debt, LeaderboardItem, SalesTrend } from '../../api/client';
+import type { DashboardData, User, FinancialAccount, Debt, SalesTrend } from '../../api/client';
 import { AnimatedNumber } from '../AnimatedNumber';
 import type { VitalType } from '../drawers/VitalBreakdownDrawer';
 import { useBalancePrivacy } from '../../context/BalancePrivacyContext';
@@ -38,7 +38,7 @@ interface MobileOverviewProps {
   openVital: (vital: VitalType, contactId?: string | null) => void;
   onOpenExpenseModal: () => void;
   onOpenDebtModal: (type: 'receivable' | 'payable') => void;
-  topSeller: LeaderboardItem | null;
+  topProduct?: { name: string; units_sold: number; total_revenue: number } | null;
   groupedReceivables: GroupedDebtContact[];
   groupedPayables: GroupedDebtContact[];
   salesRange?: '1M' | '3M' | '6M' | '1Y';
@@ -63,7 +63,7 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
   openVital,
   onOpenExpenseModal,
   onOpenDebtModal,
-  topSeller,
+  topProduct,
   groupedReceivables,
   groupedPayables,
   salesRange,
@@ -416,19 +416,20 @@ export const MobileOverview: React.FC<MobileOverviewProps> = ({
             </div>
           ) : <div />}
 
-          {topSeller && user?.role === 'owner' && (
+          {topProduct ? (
             <button
               type="button"
-              onClick={() => onNavigateTab('staff')}
-              title="View Staff & Team Dashboard"
-              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/80 shadow-2xs text-[10.5px] font-bold text-slate-800 dark:text-slate-200 active:scale-95 hover:scale-[1.02] cursor-pointer transition-all duration-150"
+              onClick={() => onNavigateTab('sales')}
+              title={`View Sales History • ${topProduct.units_sold} sold`}
+              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/80 shadow-2xs text-[10.5px] font-bold text-slate-800 dark:text-slate-200 active:scale-95 hover:scale-[1.02] cursor-pointer transition-all duration-150 max-w-[190px] truncate"
             >
-              <span>
-                Top: <span className="font-extrabold text-slate-900 dark:text-white">{topSeller.name}</span>
+              <span className="truncate">
+                Top: <span className="font-extrabold text-slate-900 dark:text-white">{topProduct.name}</span>
               </span>
-              <ChevronRight className="w-3 h-3 text-slate-400" />
+              <span className="text-[9.5px] text-slate-500 font-mono font-normal shrink-0">({topProduct.units_sold})</span>
+              <ChevronRight className="w-3 h-3 text-slate-400 shrink-0" />
             </button>
-          )}
+          ) : <div />}
         </div>
 
         {/* 2x2 Performance Grid (Spanning Full Horizontal Space) */}

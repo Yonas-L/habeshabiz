@@ -665,7 +665,7 @@ class GeneratePartnerStatementAction
                         'balance_effect' => -$revPayable,
                         'reference_number' => 'RECEIVE-FROM-VENDOR',
                     ];
-                } elseif ($payment->reference_number === 'DEVICE-OFFSET' || str_contains(strtolower($payment->notes ?? ''), 'device') || str_contains(strtolower($payment->notes ?? ''), 'handover') || str_contains($payment->notes ?? '', 'Paid by device')) {
+                } elseif ($debt->type === 'payable' && empty($payment->financial_account_id) && ($payment->reference_number === 'DEVICE-OFFSET' || str_contains(strtolower($payment->notes ?? ''), 'device') || str_contains(strtolower($payment->notes ?? ''), 'handover') || str_contains($payment->notes ?? '', 'Paid by device'))) {
                     $rawEntries[] = [
                         'id' => "pay-{$payment->id}",
                         'date' => $payDate,
@@ -1231,6 +1231,7 @@ class GeneratePartnerStatementAction
                     'returned_at' => $u->returned_at?->toIso8601String(),
                     'return_reason' => $u->return_reason,
                     'handover_payout' => (float) ($u->handover_payout ?: $u->selling_price),
+                    'cost_basis' => (float) ($u->cost_basis ?? 0),
                 ];
             });
 

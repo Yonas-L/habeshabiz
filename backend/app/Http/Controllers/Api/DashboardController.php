@@ -241,6 +241,37 @@ class DashboardController extends Controller
             'range' => $range,
         ];
 
+        // Top sold model across all categories within the active period
+        $topSoldItems = SalesOrderItem::whereHas('salesOrder', function ($q) use ($startOfPerformance, $endOfMonth) {
+            $q->whereBetween('order_date', [$startOfPerformance, $endOfMonth])
+                ->whereNotIn('payment_status', ['refunded', 'cancelled']);
+        })
+            ->with(['variant.product', 'inventoryUnit.variant.product'])
+            ->get();
+
+        $productCounts = [];
+        foreach ($topSoldItems as $item) {
+            $name = $item->variant?->product?->name
+                ?? $item->inventoryUnit?->variant?->product?->name
+                ?? ($item->accessory_name ?: null);
+            if (! $name) {
+                continue;
+            }
+            $qty = (int) $item->quantity;
+            if (! isset($productCounts[$name])) {
+                $productCounts[$name] = [
+                    'name' => $name,
+                    'units_sold' => 0,
+                    'total_revenue' => 0.0,
+                ];
+            }
+            $productCounts[$name]['units_sold'] += $qty;
+            $productCounts[$name]['total_revenue'] += (float) $item->unit_price * $qty;
+        }
+
+        uasort($productCounts, fn ($a, $b) => $b['units_sold'] <=> $a['units_sold'] ?: $b['total_revenue'] <=> $a['total_revenue']);
+        $topProduct = ! empty($productCounts) ? array_values($productCounts)[0] : null;
+
         // 6. Recent Sales Orders (filtered by selected month)
         $recentSales = SalesOrder::with(['customer', 'salesperson', 'items.variant.product'])
             ->whereBetween('order_date', [$startOfMonth, $endOfMonth])
@@ -490,6 +521,7 @@ class DashboardController extends Controller
                     'owner_draws' => $monthlyOwnerDraws,
                     'net_profit' => $monthlyNetProfit,
                     'sales_trend' => $salesTrend,
+                    'top_product' => $topProduct,
                 ],
                 'counts' => [
                     'in_stock_phones' => InventoryUnit::where('created_at', '<=', $endOfMonth)
@@ -527,6 +559,7 @@ class DashboardController extends Controller
                 'top_payables' => $topPayables,
                 'sales_chart' => $salesChart,
                 'sales_trend' => $salesTrend,
+                'top_product' => $topProduct,
                 'range' => $range,
             ],
         ]);

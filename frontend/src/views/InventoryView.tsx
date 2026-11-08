@@ -34,6 +34,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { InventoryUnitDrawer } from '../components/drawers/InventoryUnitDrawer';
+import { InlineEditablePrice } from '../components/common/InlineEditablePrice';
 import { SplitPaymentSelector, type PaymentSplitItem } from '../components/common/SplitPaymentSelector';
 import { SalesOrderDrawer } from '../components/drawers/SalesOrderDrawer';
 import { Pagination } from '../components/Pagination';
@@ -1676,7 +1677,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   <th className="py-2.5 px-3.5 whitespace-nowrap">Model</th>
                   <th className="py-2.5 px-3.5 whitespace-nowrap font-mono">IMEI</th>
                   <th className="py-2.5 px-3.5 text-center whitespace-nowrap">Status</th>
-                  {canViewCost && <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[100px] w-28">Cost ETB</th>}
+                  {statusFilter === 'out' ? (
+                    <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[130px]">Agreed Payout</th>
+                  ) : canViewCost ? (
+                    <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[100px] w-28">Cost ETB</th>
+                  ) : null}
                   {canAction && <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[210px] w-56">Action</th>}
                   <th className="py-2.5 px-2"></th>
                 </tr>
@@ -1684,13 +1689,13 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-slate-700 dark:text-slate-300">
                 {loading ? (
                   <tr>
-                    <td colSpan={canViewCost ? (canAction ? 6 : 5) : (canAction ? 5 : 4)} className="py-8 text-center">
+                    <td colSpan={(canViewCost || statusFilter === 'out') ? (canAction ? 6 : 5) : (canAction ? 5 : 4)} className="py-8 text-center">
                       <CustomPageLoader mode="app" fullScreen={false} />
                     </td>
                   </tr>
                 ) : displayUnits.length === 0 ? (
                   <tr>
-                    <td colSpan={canViewCost ? (canAction ? 6 : 5) : (canAction ? 5 : 4)} className="py-16 text-center text-slate-400">
+                    <td colSpan={(canViewCost || statusFilter === 'out') ? (canAction ? 6 : 5) : (canAction ? 5 : 4)} className="py-16 text-center text-slate-400">
                       {statusFilter === 'out'
                         ? 'No items are currently out with staff or brokers.'
                         : statusFilter === 'sold'
@@ -1864,16 +1869,41 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                           )}
                         </td>
 
-                        {/* Cost basis (owner only) */}
-                        {canViewCost && (
+                        {/* Cost basis (owner only) or Agreed Payout (out tab) */}
+                        {statusFilter === 'out' ? (
+                          <td className="py-2.5 px-3.5 text-right whitespace-nowrap font-mono font-bold text-slate-900 dark:text-white text-xs min-w-[130px]" onClick={(e) => e.stopPropagation()}>
+                            <InlineEditablePrice
+                              value={unit.handover_payout || 0}
+                              costBasis={unit.cost_basis}
+                              unitId={unit.id}
+                              field="handover_payout"
+                              disabled={!canHandover && !isOwner}
+                              onSaved={(updatedUnit) => {
+                                setUnits((prev) => prev.map((u) => u.id === updatedUnit.id ? { ...u, ...updatedUnit } : u));
+                              }}
+                            />
+                          </td>
+                        ) : canViewCost ? (
                           <td className="py-2.5 px-3.5 text-right whitespace-nowrap font-mono font-bold text-slate-900 dark:text-white text-xs min-w-[100px] w-28">
-                            {unit.cost_basis ? (
+                            {unit.source_type === 'consignment' ? (
+                              <span onClick={(e) => e.stopPropagation()}>
+                                <InlineEditablePrice
+                                  value={unit.cost_basis || 0}
+                                  unitId={unit.id}
+                                  field="cost_basis"
+                                  disabled={unit.status === 'sold' || (!canManageInv && !isOwner)}
+                                  onSaved={(updatedUnit) => {
+                                    setUnits((prev) => prev.map((u) => u.id === updatedUnit.id ? { ...u, ...updatedUnit } : u));
+                                  }}
+                                />
+                              </span>
+                            ) : unit.cost_basis ? (
                               Number(unit.cost_basis).toLocaleString()
                             ) : (
                               <span className="text-slate-400 font-normal">—</span>
                             )}
                           </td>
-                        )}
+                        ) : null}
 
                         {/* Contextual Action Button */}
                         {(isOwner || canHandover || canManageInv) && (
@@ -3057,11 +3087,17 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 <span>SN: {markSoldUnit.imei_or_serial || 'Standard stock'}</span>
                 <span>With: <strong className="text-slate-800 dark:text-slate-200 font-sans">{markSoldUnit.handover_to || 'Vendor'}</strong></span>
               </div>
-              {markSoldUnit.handover_payout && (
-                <div className="text-[11px] text-slate-500 dark:text-slate-400 pt-1 border-t border-slate-200/50 dark:border-slate-700/50 flex justify-between items-center">
-                  <span>Agreed Handover Payout:</span>
-                  <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                    {Number(markSoldUnit.handover_payout).toLocaleString()} ETB
+              <div className="pt-1 border-t border-slate-200/50 dark:border-slate-700/50 flex justify-between items-center text-[11px] text-slate-500 dark:text-slate-400">
+                <span>Agreed Handover Payout:</span>
+                <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                  {markSoldUnit.handover_payout ? `${Number(markSoldUnit.handover_payout).toLocaleString()} ETB` : '—'}
+                </span>
+              </div>
+              {canViewCost && markSoldUnit.cost_basis !== undefined && markSoldUnit.cost_basis !== null && (
+                <div className="flex justify-between items-center text-[11px] text-slate-500 dark:text-slate-400">
+                  <span>Unit Cost Basis:</span>
+                  <span className="font-mono font-bold text-slate-700 dark:text-slate-300">
+                    {Number(markSoldUnit.cost_basis).toLocaleString()} ETB
                   </span>
                 </div>
               )}
@@ -3255,6 +3291,28 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   placeholder="e.g. 100000"
                   className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b26] text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                 />
+                {(() => {
+                  const saleNum = parseFloat(markSoldPrice) || (markSoldUnit.handover_payout ? Number(markSoldUnit.handover_payout) : (markSoldUnit.selling_price ? Number(markSoldUnit.selling_price) : 0));
+                  const costNum = Number(markSoldUnit.cost_basis || 0);
+                  if (canViewCost && costNum > 0 && saleNum > 0) {
+                    const diff = saleNum - costNum;
+                    if (diff < 0) {
+                      return (
+                        <div className="mt-1 flex items-center justify-between text-[11px] font-mono text-amber-600 dark:text-amber-400 font-semibold">
+                          <span>Below cost basis (−{Math.abs(diff).toLocaleString()} ETB loss)</span>
+                          <span className="text-[10px] font-sans font-normal text-slate-400">Recorded as loss</span>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="mt-1 flex items-center justify-between text-[11px] font-mono">
+                        <span className="text-slate-500 font-sans text-[10px]">Realized margin</span>
+                        <span className="text-emerald-600 dark:text-emerald-400 font-bold">+{diff.toLocaleString()} ETB</span>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
 
               {/* Notes */}

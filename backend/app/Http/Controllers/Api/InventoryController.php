@@ -18,6 +18,7 @@ use App\Models\ProductVariant;
 use App\Models\SalesOrder;
 use App\Models\SalesOrderItem;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -145,6 +146,35 @@ class InventoryController extends Controller
             'data' => $mapped,
             'counts' => $counts,
         ]);
+    }
+
+    public function showUnit(Request $request, string $id): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        $unit = InventoryUnit::with([
+            'variant.product.categoryRel',
+            'supplier',
+            'paymentAccount',
+            'maintenanceRecords.financialAccount',
+            'salesOrderItem.salesOrder.customer',
+            'salesOrderItem.salesOrder.salesperson',
+            'salesOrderItem.salesOrder.financialAccount',
+            'salesOrderItem.salesOrder.exchangeUnit.variant.product',
+            'swappedSalesOrder',
+            'swappedFromUnit.variant.product',
+            'swappedReplacementUnit.variant.product',
+        ])
+            ->where('tenant_id', $user->tenant_id)
+            ->findOrFail($id);
+
+        $canViewCost = $user->isOwner() || $user->canViewCosts();
+        $data = $unit->toArray();
+        if (! $canViewCost) {
+            unset($data['cost_basis']);
+        }
+
+        return response()->json($data);
     }
 
     public function intakeUnit(Request $request): JsonResponse
@@ -1094,6 +1124,7 @@ class InventoryController extends Controller
             'location' => ['nullable', 'string', 'max:100'],
             'notes' => ['nullable', 'string'],
             'supplier_contact_id' => ['nullable', 'exists:contacts,id'],
+            'handover_payout' => ['nullable', 'numeric', 'min:0'],
         ]);
 
         // If IMEI is provided and changed, ensure no other active unit has it
@@ -1307,6 +1338,21 @@ class InventoryController extends Controller
         ) {
             $unit->update($validated);
 
+            if (array_key_exists('handover_payout', $validated) && $validated['handover_payout'] !== null) {
+                $newPayout = (float) $validated['handover_payout'];
+                if ($unit->status === 'out') {
+                    $holdingDebts = Debt::where('tenant_id', $user->tenant_id)
+                        ->where('reference_type', 'handover_holding')
+                        ->where('reference_id', $unit->id)
+                        ->whereIn('status', ['open', 'partially_paid'])
+                        ->get();
+                    foreach ($holdingDebts as $hDebt) {
+                        $hDebt->original_amount = $newPayout;
+                        $hDebt->recalculateSettlement();
+                    }
+                }
+            }
+
             // 1. Cascade update to sales_order_items (linking this unit to the new variant)
             $soItems = SalesOrderItem::where('inventory_unit_id', $unit->id)->get();
             $soItemsUpdated = 0;
@@ -1315,7 +1361,7 @@ class InventoryController extends Controller
                 if ($costBasisChanged) {
                     $newCost = (float) $validated['cost_basis'];
                     $soItem->unit_cost = $newCost;
-                    $soItem->profit = max(0, ((float) $soItem->unit_price - $newCost) * (int) $soItem->quantity);
+                    $soItem->profit = ((float) $soItem->unit_price - $newCost) * (int) $soItem->quantity;
                 }
                 $soItem->save();
                 $soItemsUpdated++;
@@ -2075,6 +2121,135 @@ class InventoryController extends Controller
     }
 
     /**
+     * Atomically adjust agreed handover payout or vendor cut for a specific inventory unit.
+     * Updates unit value, linked holding/payable debt, and logs the change.
+     */
+    public function adjustAgreedPayout(Request $request, string $id): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        if (! ($user->isOwner() || $user->canHandover() || $user->canManageInventory())) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. Adjusting agreed transaction values is restricted to authorized personnel.',
+            ], 403);
+        }
+
+        $unit = InventoryUnit::with(['variant.product', 'supplier'])->findOrFail($id);
+
+        $validated = $request->validate([
+            'handover_payout' => ['nullable', 'numeric', 'min:0'],
+            'cost_basis' => ['nullable', 'numeric', 'min:0'],
+            'notes' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $oldPayout = (float) ($unit->handover_payout ?? 0);
+        $oldCost = (float) ($unit->cost_basis ?? 0);
+        $revertGroupId = (string) Str::uuid();
+        $isLoss = false;
+        $lossAmount = 0.0;
+
+        DB::transaction(function () use ($unit, $validated, $user, $oldPayout, $oldCost, $revertGroupId, &$isLoss, &$lossAmount) {
+            $updates = [];
+
+            if (array_key_exists('handover_payout', $validated) && $validated['handover_payout'] !== null) {
+                $newPayout = (float) $validated['handover_payout'];
+                $updates['handover_payout'] = $newPayout;
+
+                if ($unit->status === 'out') {
+                    $holdingDebts = Debt::where('tenant_id', $user->tenant_id)
+                        ->where('reference_type', 'handover_holding')
+                        ->where('reference_id', $unit->id)
+                        ->whereIn('status', ['open', 'partially_paid'])
+                        ->get();
+
+                    foreach ($holdingDebts as $holdingDebt) {
+                        $holdingDebt->original_amount = $newPayout;
+                        $holdingDebt->recalculateSettlement();
+                        if (! empty($validated['notes'])) {
+                            $holdingDebt->notes = ($holdingDebt->notes ? "{$holdingDebt->notes} | " : '')."Agreed price adjusted: {$validated['notes']}";
+                            $holdingDebt->save();
+                        }
+                    }
+                }
+
+                if ($newPayout < (float) $unit->cost_basis) {
+                    $isLoss = true;
+                    $lossAmount = (float) $unit->cost_basis - $newPayout;
+                }
+            }
+
+            if (array_key_exists('cost_basis', $validated) && $validated['cost_basis'] !== null) {
+                $newCost = (float) $validated['cost_basis'];
+                $updates['cost_basis'] = $newCost;
+
+                $payableDebts = Debt::where('tenant_id', $user->tenant_id)
+                    ->whereIn('reference_type', ['stock_intake', 'consignment_sale'])
+                    ->where('reference_id', $unit->id)
+                    ->whereIn('status', ['open', 'partially_paid'])
+                    ->get();
+
+                foreach ($payableDebts as $payableDebt) {
+                    $payableDebt->original_amount = $newCost;
+                    $payableDebt->recalculateSettlement();
+                    if (! empty($validated['notes'])) {
+                        $payableDebt->notes = ($payableDebt->notes ? "{$payableDebt->notes} | " : '')."Agreed vendor cut adjusted: {$validated['notes']}";
+                        $payableDebt->save();
+                    }
+                }
+            }
+
+            if (! empty($updates)) {
+                $unit->update($updates);
+
+                $pName = $unit->variant?->product?->name ?? 'Device';
+                $partnerName = $unit->handover_to ?: ($unit->supplier?->name ?? 'Partner');
+
+                AuditLog::record(
+                    action: 'unit_agreed_payout_adjusted',
+                    entityType: 'InventoryUnit',
+                    entityId: (string) $unit->id,
+                    oldValues: [
+                        'handover_payout' => $oldPayout,
+                        'cost_basis' => $oldCost,
+                        'product_name' => $pName,
+                        'partner_name' => $partnerName,
+                        'handover_to' => $unit->handover_to,
+                        'imei_or_serial' => $unit->imei_or_serial,
+                    ],
+                    newValues: [
+                        'handover_payout' => $unit->handover_payout,
+                        'cost_basis' => $unit->cost_basis,
+                        'product_name' => $pName,
+                        'partner_name' => $partnerName,
+                        'handover_to' => $unit->handover_to,
+                        'imei_or_serial' => $unit->imei_or_serial,
+                        'is_loss' => $isLoss,
+                        'loss_amount' => $lossAmount,
+                    ],
+                    revertGroupId: $revertGroupId
+                );
+            }
+        });
+
+        $devName = $unit->variant?->product?->name ?? 'Device';
+        $msg = "Agreed value for {$devName} updated successfully.";
+        if ($isLoss) {
+            $msg .= " Recorded below cost basis (Loss: ".number_format($lossAmount, 2)." ETB).";
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $msg,
+            'data' => $unit->fresh()->load('variant.product'),
+            'is_loss' => $isLoss,
+            'loss_amount' => $lossAmount,
+            'old_value' => array_key_exists('handover_payout', $validated) ? $oldPayout : $oldCost,
+            'new_value' => array_key_exists('handover_payout', $validated) ? (float) $validated['handover_payout'] : (float) ($validated['cost_basis'] ?? 0),
+        ]);
+    }
+
+    /**
      * Restock an unsold item that was out with staff/broker back to shop shelf.
      * Note: Sold items are NOT restocked directly; they must go through customer return.
      */
@@ -2233,8 +2408,14 @@ class InventoryController extends Controller
                 ->whereIn('status', ['open', 'partially_paid'])
                 ->first();
 
+            // If the user specified a sale price that differs from holding debt, update holding debt amount first
+            if ($holdingDebt && $finalPrice > 0 && abs((float) $holdingDebt->original_amount - $finalPrice) > 0.01) {
+                $holdingDebt->original_amount = $finalPrice;
+                $holdingDebt->recalculateSettlement();
+            }
+
             if ($settlementType === 'paid') {
-                $paymentAmount = $holdingDebt ? (float) $holdingDebt->remaining_amount : $finalPrice;
+                $paymentAmount = $finalPrice;
 
                 if ($holdingDebt && $paymentAmount > 0) {
                     (new SettleDebtPaymentAction)->execute($holdingDebt, [
@@ -2339,7 +2520,9 @@ class InventoryController extends Controller
                 // Credit: Device sold to end-user, payment collection pending
                 if ($holdingDebt) {
                     $holdingDebt->update([
-                        'notes' => ($holdingDebt->notes ? $holdingDebt->notes.' | ' : '')."Device confirmed SOLD by {$vendorName}. Awaiting payment collection.",
+                        'original_amount' => $finalPrice,
+                        'remaining_amount' => $finalPrice,
+                        'notes' => ($holdingDebt->notes ? $holdingDebt->notes.' | ' : '')."Device confirmed SOLD by {$vendorName} for ".number_format($finalPrice, 2)." ETB. Awaiting payment collection.",
                     ]);
                 } else {
                     $contact = Contact::where('tenant_id', $user->tenant_id)->where('name', '=', $vendorName)->first();
@@ -2417,7 +2600,7 @@ class InventoryController extends Controller
 
                 $existingOrderItem->update([
                     'unit_price' => $finalPrice > 0 ? $finalPrice : $existingOrderItem->unit_price,
-                    'profit' => max(0, ($finalPrice > 0 ? $finalPrice : (float) $existingOrderItem->unit_price) - (float) $unit->cost_basis),
+                    'profit' => ($finalPrice > 0 ? $finalPrice : (float) $existingOrderItem->unit_price) - (float) $unit->cost_basis,
                 ]);
             } else {
                 $orderNumber = 'SO-'.strtoupper(Str::random(8));
@@ -2443,7 +2626,7 @@ class InventoryController extends Controller
                     'quantity' => 1,
                     'unit_price' => $finalPrice,
                     'unit_cost' => (float) $unit->cost_basis,
-                    'profit' => max(0, $finalPrice - (float) $unit->cost_basis),
+                    'profit' => $finalPrice - (float) $unit->cost_basis,
                     'sourcing_type' => 'internal_stock',
                 ]);
             }
@@ -2458,6 +2641,7 @@ class InventoryController extends Controller
                 'status' => 'sold',
                 'sold_at' => $now,
                 'selling_price' => $finalPrice > 0 ? $finalPrice : $unit->selling_price,
+                'handover_payout' => $finalPrice > 0 ? $finalPrice : $unit->handover_payout,
                 'location' => "Sold by {$vendorName}",
                 'notes' => $unit->notes ? "{$unit->notes} | {$notesAppend}" : $notesAppend,
             ]);

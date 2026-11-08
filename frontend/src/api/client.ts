@@ -219,6 +219,7 @@ export interface StatementHandedOutUnit {
   returned_at?: string | null;
   return_reason?: string | null;
   handover_payout: number;
+  cost_basis?: number;
 }
 
 export interface StatementVendorReturnUnit {
@@ -619,6 +620,7 @@ export interface DashboardData {
     owner_draws: number;
     net_profit: number;
     sales_trend?: SalesTrend;
+    top_product?: { name: string; units_sold: number; total_revenue: number } | null;
   };
   counts: {
     in_stock_phones: number;
@@ -639,6 +641,7 @@ export interface DashboardData {
   top_payables: Debt[];
   sales_chart?: DashboardSalesChartPoint[];
   sales_trend?: SalesTrend;
+  top_product?: { name: string; units_sold: number; total_revenue: number } | null;
   range?: string;
 }
 
@@ -1359,6 +1362,8 @@ export const api = {
       method: 'DELETE',
     }),
 
+  getInventoryUnit: (id: string) => request<InventoryUnit>(`/inventory/units/${id}`),
+
   getInventoryUnits: (params?: { status?: string; category_id?: string; category?: string; search?: string; variant_id?: string; product_id?: string }) => {
     const query = new URLSearchParams();
     if (params?.status) query.set('status', params.status);
@@ -1474,10 +1479,32 @@ export const api = {
       location?: string;
       notes?: string | null;
       supplier_contact_id?: string | null;
+      handover_payout?: number | null;
     }
   ) =>
     request<InventoryUnit>(`/inventory/units/${id}`, {
       method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  adjustAgreedPayout: (
+    id: string,
+    data: {
+      handover_payout?: number;
+      cost_basis?: number;
+      notes?: string;
+    }
+  ) =>
+    request<{
+      success: boolean;
+      message: string;
+      data: InventoryUnit;
+      is_loss?: boolean;
+      loss_amount?: number;
+      old_value?: number;
+      new_value?: number;
+    }>(`/inventory/units/${id}/adjust-agreed-payout`, {
+      method: 'POST',
       body: JSON.stringify(data),
     }),
 

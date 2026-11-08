@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import type { Contact, PartnerStatementData, User } from '../api/client';
+import type { Contact, PartnerStatementData, User, InventoryUnit } from '../api/client';
 import { api } from '../api/client';
 import { toast } from 'sonner';
+import { InlineEditablePrice } from '../components/common/InlineEditablePrice';
+import { InventoryUnitDrawer } from '../components/drawers/InventoryUnitDrawer';
 import {
   ArrowLeft,
   Copy,
@@ -101,6 +103,22 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
   const [customDescriptions, setCustomDescriptions] = useState<Record<string, string>>({});
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
+
+  // Inventory Unit Drawer State
+  const [drawerUnit, setDrawerUnit] = useState<InventoryUnit | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+  const handleOpenUnitDrawer = async (unitId: string) => {
+    const tId = toast.loading('Loading device details...');
+    try {
+      const unitData = await api.getInventoryUnit(unitId);
+      setDrawerUnit(unitData);
+      setIsDrawerOpen(true);
+      toast.dismiss(tId);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to load device details', { id: tId });
+    }
+  };
 
   const handleDownloadStatement = async () => {
     if (!statementData) return;
@@ -877,7 +895,11 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
                     </tr>
                   ) : (
                     supplied_units.map((unit) => (
-                      <tr key={unit.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
+                      <tr
+                        key={unit.id}
+                        onClick={() => handleOpenUnitDrawer(unit.id)}
+                        className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30 cursor-pointer transition-colors"
+                      >
                         <td className="py-2.5 px-3.5 font-sans font-bold text-slate-900 dark:text-white">
                           <div>{unit.model}</div>
                           {unit.specs.length > 0 && (
@@ -889,8 +911,14 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
                         <td className="py-2.5 px-3.5 text-slate-700 dark:text-slate-300">
                           {unit.imei_or_serial || <span className="text-slate-400 italic font-sans">—</span>}
                         </td>
-                        <td className="py-2.5 px-3.5 text-right tabular-nums text-slate-800 dark:text-slate-200">
-                          {unit.cost_basis.toLocaleString()} ETB
+                        <td className="py-2.5 px-3.5 text-right tabular-nums text-slate-800 dark:text-slate-200" onClick={(e) => e.stopPropagation()}>
+                          <InlineEditablePrice
+                            value={unit.cost_basis || 0}
+                            unitId={unit.id}
+                            field="cost_basis"
+                            disabled={unit.status === 'sold'}
+                            onSaved={() => loadStatement()}
+                          />
                         </td>
                         <td className="py-2.5 px-3.5 text-right tabular-nums text-slate-600 dark:text-slate-400">
                           {unit.selling_price > 0 ? `${unit.selling_price.toLocaleString()} ETB` : '—'}
@@ -976,15 +1004,25 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
                     </tr>
                   ) : (
                     handed_out_units.map((unit) => (
-                      <tr key={unit.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
+                      <tr
+                        key={unit.id}
+                        onClick={() => handleOpenUnitDrawer(unit.id)}
+                        className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30 cursor-pointer transition-colors"
+                      >
                         <td className="py-2.5 px-3.5 font-sans font-bold text-slate-900 dark:text-white">
                           {unit.model}
                         </td>
                         <td className="py-2.5 px-3.5 text-slate-700 dark:text-slate-300">
                           {unit.imei_or_serial || '—'}
                         </td>
-                        <td className="py-2.5 px-3.5 text-right tabular-nums text-slate-800 dark:text-slate-200 font-bold">
-                          {unit.handover_payout > 0 ? `${unit.handover_payout.toLocaleString()} ETB` : '—'}
+                        <td className="py-2.5 px-3.5 text-right tabular-nums text-slate-800 dark:text-slate-200 font-bold" onClick={(e) => e.stopPropagation()}>
+                          <InlineEditablePrice
+                            value={unit.handover_payout || 0}
+                            costBasis={unit.cost_basis}
+                            unitId={unit.id}
+                            field="handover_payout"
+                            onSaved={() => loadStatement()}
+                          />
                         </td>
                         <td className="py-2.5 px-3.5 font-sans text-slate-500 text-[11px]">
                           <div>{unit.handed_out_at ? new Date(unit.handed_out_at).toLocaleDateString() : '—'}</div>
@@ -1120,6 +1158,23 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* ── Inventory Unit Drawer ── */}
+      <InventoryUnitDrawer
+        unit={drawerUnit}
+        isOpen={isDrawerOpen}
+        onClose={() => {
+          setIsDrawerOpen(false);
+          setDrawerUnit(null);
+        }}
+        user={_user || null}
+        onUnitUpdated={() => {
+          loadStatement();
+        }}
+        onRestockSuccess={() => {
+          loadStatement();
+        }}
+      />
 
       {/* ── Edit Partner Modal ── */}
       {isEditModalOpen && (

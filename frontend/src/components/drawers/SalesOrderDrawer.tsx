@@ -159,8 +159,19 @@ export const SalesOrderDrawer: React.FC<SalesOrderDrawerProps> = ({
       .join('\n');
   };
 
+  const getItemProfit = (item: any): number => {
+    if (item.unit_cost !== null && item.unit_cost !== undefined) {
+      return (
+        (Number(item.unit_price || 0) - Number(item.unit_cost || 0)) *
+          (item.quantity || 1) -
+        Number(item.bonus_amount || 0)
+      );
+    }
+    return parseFloat(String(item.profit || '0'));
+  };
+
   const itemProfit = order.items.reduce(
-    (sum, i) => sum + parseFloat(String(i.profit || '0')),
+    (sum, i) => sum + getItemProfit(i),
     0
   );
   const totalProfit = itemProfit - discountAmount - writeOffAmount;
@@ -1146,13 +1157,20 @@ Thank you for choosing Habeshabiz Electronics!
                 <span className="flex items-center gap-2 font-mono text-slate-700 dark:text-slate-300">
                   <span
                     className={
-                      totalProfit >= 0
+                      totalProfit > 0
                         ? 'text-emerald-600 dark:text-emerald-400 font-semibold'
-                        : 'text-rose-600 dark:text-rose-400 font-semibold'
+                        : totalProfit < 0
+                        ? 'text-rose-600 dark:text-rose-400 font-bold'
+                        : 'text-slate-500 font-semibold'
                     }
                   >
-                    {totalProfit >= 0 ? '+' : '−'}
+                    {totalProfit > 0 ? '+' : totalProfit < 0 ? '−' : ''}
                     {Math.abs(totalProfit).toLocaleString()} ETB Net
+                    {totalProfit < 0 && (
+                      <span className="ml-1.5 text-[10px] font-sans font-bold px-1.5 py-0.5 rounded bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200/50 dark:border-rose-800/50">
+                        Loss
+                      </span>
+                    )}
                   </span>
                   {showInternalAudit ? (
                     <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
@@ -1170,7 +1188,7 @@ Thank you for choosing Habeshabiz Electronics!
                       item.inventory_unit?.variant?.product?.name ||
                       item.variant?.product?.name ||
                       'Device';
-                    const itemProfitVal = Number(item.profit || 0);
+                    const itemProfitVal = getItemProfit(item);
 
                     return (
                       <div
@@ -1178,9 +1196,16 @@ Thank you for choosing Habeshabiz Electronics!
                         className="pt-2 first:pt-0 flex items-center justify-between text-xs"
                       >
                         <div>
-                          <span className="font-medium text-slate-800 dark:text-slate-200">
-                            {pName}
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-medium text-slate-800 dark:text-slate-200">
+                              {pName}
+                            </span>
+                            {itemProfitVal < 0 && (
+                              <span className="text-[9px] font-sans font-bold px-1 py-0.2 rounded bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200/50 dark:border-rose-800/50">
+                                Loss
+                              </span>
+                            )}
+                          </div>
                           {item.unit_cost != null && (
                             <div className="text-[11px] text-slate-400 font-mono">
                               Cost: {Number(item.unit_cost).toLocaleString()} ETB
@@ -1190,12 +1215,14 @@ Thank you for choosing Habeshabiz Electronics!
                         <div className="text-right font-mono font-medium">
                           <span
                             className={
-                              itemProfitVal >= 0
-                                ? 'text-emerald-600 dark:text-emerald-400'
-                                : 'text-rose-600 dark:text-rose-400'
+                              itemProfitVal > 0
+                                ? 'text-emerald-600 dark:text-emerald-400 font-bold'
+                                : itemProfitVal < 0
+                                ? 'text-rose-600 dark:text-rose-400 font-bold'
+                                : 'text-slate-500'
                             }
                           >
-                            {itemProfitVal >= 0 ? '+' : '−'}
+                            {itemProfitVal > 0 ? '+' : itemProfitVal < 0 ? '−' : ''}
                             {Math.abs(itemProfitVal).toLocaleString()} ETB
                           </span>
                         </div>

@@ -489,6 +489,8 @@ class DebtController extends Controller
                 }
             }
 
+            $revertGroupId = (string) Str::uuid();
+
             AuditLog::record(
                 action: 'manual_debt_created',
                 entityType: 'Debt',
@@ -496,12 +498,15 @@ class DebtController extends Controller
                 newValues: [
                     'type' => $debt->type,
                     'contact' => $contact?->name,
+                    'contact_name' => $contact?->name,
+                    'contact_id' => $contact?->id,
                     'amount' => $debt->original_amount,
                     'status' => $debt->status,
                     'due_date' => $debt->due_date,
                     'with_disbursement' => $hasCashMovement,
                     'direction' => $hasCashMovement ? $direction : null,
-                ]
+                ],
+                revertGroupId: $revertGroupId
             );
 
             return $debt;
