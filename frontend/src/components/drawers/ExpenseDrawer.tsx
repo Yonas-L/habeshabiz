@@ -1,19 +1,8 @@
 import React from 'react';
 import type { Expense } from '../../api/client';
 import { SlideOverDrawer } from './SlideOverDrawer';
-import { ProgressiveSection } from './ProgressiveSection';
 import { AnimatedNumber } from '../AnimatedNumber';
-import {
-  Receipt,
-  Car,
-  Coffee,
-  Home,
-  Wrench,
-  UserMinus,
-  DollarSign,
-  Landmark,
-  Trash2,
-} from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 
 interface ExpenseDrawerProps {
   expense: Expense | null;
@@ -32,189 +21,172 @@ export const ExpenseDrawer: React.FC<ExpenseDrawerProps> = ({
 }) => {
   if (!expense) return null;
 
-  const isOwnerDraw = expense.is_owner_draw;
+  const isOwnerDraw = Boolean(expense.is_owner_draw);
 
-  const getCategoryIcon = (cat: string) => {
+  const getCategoryLabel = (cat: string) => {
+    if (isOwnerDraw || cat === 'personal_owner_draw' || cat === 'personal') return 'Personal Draw';
     switch (cat) {
-      case 'ride':
-        return <Car className="w-4 h-4 text-slate-600 dark:text-slate-300" />;
-      case 'food':
-        return <Coffee className="w-4 h-4 text-amber-600 dark:text-amber-400" />;
-      case 'rent':
-        return <Home className="w-4 h-4 text-blue-600 dark:text-blue-400" />;
-      case 'maintenance':
-        return <Wrench className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />;
-      case 'personal':
-      case 'personal_owner_draw':
-        return <UserMinus className="w-4 h-4 text-purple-600 dark:text-purple-400" />;
-      default:
-        return <DollarSign className="w-4 h-4 text-slate-600 dark:text-slate-300" />;
+      case 'ride': return 'Ride';
+      case 'food': return 'Food';
+      case 'rent': return 'Rent';
+      case 'maintenance': return 'Maintenance';
+      case 'salary': return 'Staff Bonus';
+      case 'vendor_payout': return 'Vendor Settlement';
+      case 'bank_fee': return 'Bank Fee';
+      case 'other': return 'Other';
+      default: return cat ? cat.replace(/_/g, ' ') : 'Expense';
     }
   };
+
+  const formattedDate = new Date(expense.date).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
 
   return (
     <SlideOverDrawer
       isOpen={isOpen}
       onClose={onClose}
-      title={expense.description}
-      subtitle={`Recorded on ${new Date(expense.date).toLocaleDateString(undefined, {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-      })}`}
+      widthClass="sm:max-w-md"
+      title={expense.description || getCategoryLabel(expense.category)}
+      subtitle={`Recorded on ${formattedDate}`}
       badge={
         <span
-          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+          className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold ${
             isOwnerDraw
-              ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200/50 dark:border-amber-800/50'
-              : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+              ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400'
+              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
           }`}
         >
-          {isOwnerDraw ? <UserMinus className="w-3 h-3" /> : <Receipt className="w-3 h-3" />}
           {isOwnerDraw ? 'Personal Draw' : 'Expense'}
         </span>
       }
       footerActions={
         <div className="flex items-center justify-between w-full gap-2">
-          {canDelete && onDelete && (
+          {canDelete && onDelete ? (
             <button
               type="button"
               onClick={() => onDelete(expense)}
-              className="h-9 px-3.5 rounded-xl border border-rose-200 dark:border-rose-900/60 bg-rose-50/50 dark:bg-rose-950/20 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-100/70 dark:hover:bg-rose-900/40 transition-colors flex items-center gap-1.5 cursor-pointer active:scale-[0.98]"
+              className="h-9 px-3.5 rounded-xl border border-rose-200/80 dark:border-rose-900/40 bg-rose-50/50 dark:bg-rose-950/20 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-100/70 dark:hover:bg-rose-900/40 transition-colors flex items-center gap-1.5 cursor-pointer active:scale-[0.98]"
             >
               <Trash2 className="w-3.5 h-3.5" />
               <span>Delete Expense</span>
             </button>
-          )}
+          ) : <div />}
           <button
             type="button"
             onClick={onClose}
-            className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors ml-auto cursor-pointer"
+            className="h-9 px-4 rounded-xl border border-slate-200/80 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
           >
             Close
           </button>
         </div>
       }
     >
-      {/* Hero Outflow Amount */}
-      <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between">
+      <div className="space-y-6">
+        {/* Outflow Amount (clean, prominent, no card-on-card, no border-on-border) */}
         <div>
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-            Outflow Amount
+          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+            Amount
           </span>
-          <div className="text-3xl font-black text-slate-900 dark:text-white font-mono tabular-nums tracking-tight mt-1">
-            <AnimatedNumber value={parseFloat(String(expense.amount))} decimals={2} />{' '}
-            <span className="text-sm font-bold text-slate-400 font-sans">ETB</span>
+          <div className="text-3xl font-extrabold text-slate-900 dark:text-white font-mono tabular-nums tracking-tight mt-1">
+            −<AnimatedNumber value={parseFloat(String(expense.amount))} decimals={2} />{' '}
+            <span className="text-sm font-semibold text-slate-400 font-sans">ETB</span>
           </div>
         </div>
 
-        <div className="w-10 h-10 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 flex items-center justify-center">
-          {getCategoryIcon(expense.category)}
-        </div>
-      </div>
-
-      {/* Progressive Section 1: Classification & Accounting Rule */}
-      <ProgressiveSection
-        title="Ledger Segregation & Classification"
-        icon={<Receipt className="w-4 h-4 text-rose-500" />}
-        defaultOpen={true}
-      >
-        <div className="space-y-2 text-xs">
+        {/* Clean Property Details List */}
+        <div className="space-y-3.5 pt-4 border-t border-slate-100 dark:border-slate-800/80 text-xs">
           <div className="flex items-center justify-between">
-            <span className="text-slate-400">Ledger Classification</span>
-            <span className="font-bold text-slate-900 dark:text-white">
-              {isOwnerDraw ? 'Personal Draw' : 'Expense'}
+            <span className="text-slate-400 dark:text-slate-500">Category</span>
+            <span className="font-semibold text-slate-900 dark:text-white capitalize">
+              {getCategoryLabel(expense.category)}
             </span>
           </div>
 
           <div className="flex items-center justify-between">
-            <span className="text-slate-400">Impact on Shop Profit</span>
-            <span
-              className={`font-semibold ${
-                isOwnerDraw ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'
-              }`}
-            >
-              {isOwnerDraw
-                ? 'Neutral to Shop Margin'
-                : 'Deducted from Net Operating Profit'}
+            <span className="text-slate-400 dark:text-slate-500">Paid From</span>
+            <span className="font-mono font-semibold text-slate-900 dark:text-white">
+              {expense.financial_account?.name || 'Cash Drawer'}
             </span>
           </div>
 
           {expense.vendor_contact && (
             <div className="flex items-center justify-between">
-              <span className="text-slate-400">Recipient / Staff</span>
-              <span className="font-semibold text-slate-800 dark:text-slate-200">
-                {expense.vendor_contact.name} {expense.vendor_contact.phone ? `(${expense.vendor_contact.phone})` : ''}
+              <span className="text-slate-400 dark:text-slate-500">Vendor / Contact</span>
+              <span className="font-semibold text-slate-900 dark:text-white">
+                {expense.vendor_contact.name}{' '}
+                {expense.vendor_contact.phone ? (
+                  <span className="text-slate-400 font-mono text-[11px]">({expense.vendor_contact.phone})</span>
+                ) : null}
               </span>
             </div>
           )}
 
-          {expense.payment_splits && expense.payment_splits.length > 1 ? (
-            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400">Funding Method</span>
-                <span className="font-semibold text-blue-600 dark:text-blue-400">
-                  Split Payment ({expense.payment_splits.length} Accounts)
-                </span>
-              </div>
-              <div className="space-y-1.5">
-                {expense.payment_splits.map((s, idx) => (
-                  <div
-                    key={idx}
-                    className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-800 flex items-center justify-between"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <Landmark className="w-3.5 h-3.5 text-slate-400" />
-                      <span className="font-medium text-slate-800 dark:text-slate-200">
-                        {s.account_name || 'Account'}
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <span className="font-mono font-bold text-slate-900 dark:text-white">
-                        {Number(s.amount).toLocaleString()} ETB
-                      </span>
-                      {Number(s.fee || 0) > 0 && (
-                        <span className="text-[10px] text-amber-600 dark:text-amber-400 block">
-                          +{Number(s.fee).toLocaleString()} fee
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
-              <span className="text-slate-400">Paid from Account</span>
-              <div className="flex items-center gap-1.5 font-mono font-bold text-slate-900 dark:text-white">
-                <Landmark className="w-3.5 h-3.5 text-slate-400" />
-                <span>{expense.financial_account?.name || 'Cash Drawer'}</span>
-              </div>
+          {expense.inventory_unit && (
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400 dark:text-slate-500">Device</span>
+              <span className="font-mono font-semibold text-slate-900 dark:text-white">
+                {expense.inventory_unit.variant?.product?.name || 'Device'}{' '}
+                {expense.inventory_unit.imei_or_serial ? (
+                  <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                    • {expense.inventory_unit.imei_or_serial}
+                  </span>
+                ) : null}
+              </span>
             </div>
           )}
-        </div>
-      </ProgressiveSection>
 
-      {/* Progressive Section 2: Details & Memo */}
-      <ProgressiveSection
-        title="Voucher Detail & Memo"
-        icon={<Receipt className="w-4 h-4" />}
-        defaultOpen={true}
-      >
-        <div className="space-y-2 text-xs">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-            Purpose
-          </span>
-          <p className="font-medium text-slate-900 dark:text-white leading-relaxed">
-            {expense.description}
-          </p>
-
-          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-between text-[11px] text-slate-400 font-mono">
-            <span>Category: {expense.category.replace(/_/g, ' ')}</span>
-            <span>Date: {new Date(expense.date).toLocaleDateString()}</span>
+          <div className="flex items-center justify-between">
+            <span className="text-slate-400 dark:text-slate-500">Date</span>
+            <span className="font-mono text-slate-700 dark:text-slate-300">
+              {formattedDate}
+            </span>
           </div>
         </div>
-      </ProgressiveSection>
+
+        {/* Payment Splits (if multiple accounts used) */}
+        {expense.payment_splits && expense.payment_splits.length > 1 && (
+          <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80 space-y-2.5">
+            <span className="text-xs font-semibold text-slate-900 dark:text-white block">
+              Split Funding ({expense.payment_splits.length} Accounts)
+            </span>
+            <div className="space-y-1.5">
+              {expense.payment_splits.map((s, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center justify-between text-xs py-1.5 px-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/50"
+                >
+                  <span className="text-slate-700 dark:text-slate-300 font-medium">
+                    {s.account_name || 'Account'}
+                  </span>
+                  <div className="text-right font-mono font-bold text-slate-900 dark:text-white">
+                    {Number(s.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} ETB
+                    {Number(s.fee || 0) > 0 && (
+                      <span className="text-[10px] text-amber-600 dark:text-amber-400 block font-normal">
+                        +{Number(s.fee).toLocaleString()} fee
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Description / Memo */}
+        {expense.description && (
+          <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block mb-1.5">
+              Description
+            </span>
+            <p className="text-xs text-slate-800 dark:text-slate-200 leading-relaxed font-medium">
+              {expense.description}
+            </p>
+          </div>
+        )}
+      </div>
     </SlideOverDrawer>
   );
 };

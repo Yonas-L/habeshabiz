@@ -2054,8 +2054,8 @@ export const api = {
 
   createStaff: (data: {
     name: string;
-    phone: string;
-    email?: string;
+    email: string;
+    phone?: string;
     can_discount?: boolean;
     can_handover?: boolean;
     can_intake_stock?: boolean;
@@ -2071,8 +2071,8 @@ export const api = {
     id: number,
     data: {
       name: string;
-      phone: string;
-      email?: string;
+      email: string;
+      phone?: string;
       can_discount?: boolean;
       can_handover?: boolean;
       can_intake_stock?: boolean;

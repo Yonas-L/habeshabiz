@@ -10,7 +10,6 @@ import {
   Copy,
   Check,
   Search,
-  Phone,
   X,
   Loader2,
   RefreshCw,
@@ -19,11 +18,16 @@ import {
   Edit2,
   Trash2,
   FileText,
+  ChevronRight,
+  CheckCircle2,
+  UserX,
+  UserCheck,
+  MoreVertical,
 } from 'lucide-react';
 import { AnimatedNumber } from '../components/AnimatedNumber';
-import { Pagination } from '../components/Pagination';
 import { CustomPageLoader } from '../components/loading/CustomPageLoader';
 import { StaffDetailView } from './StaffDetailView';
+import { EditStaffBottomSheet } from '../components/staff/EditStaffBottomSheet';
 
 interface StaffViewProps {
   currentUser: User | null;
@@ -49,15 +53,7 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
 
   // Edit Staff Modal State
   const [editingStaff, setEditingStaff] = useState<StaffMember | null>(null);
-  const [editName, setEditName] = useState('');
-  const [editPhone, setEditPhone] = useState('');
-  const [editEmail, setEditEmail] = useState('');
-  const [editCanDiscount, setEditCanDiscount] = useState(false);
-  const [editCanHandover, setEditCanHandover] = useState(false);
-  const [editCanIntakeStock, setEditCanIntakeStock] = useState(false);
-  const [editCanViewCosts, setEditCanViewCosts] = useState(false);
-  const [editCanManageInventory, setEditCanManageInventory] = useState(false);
-  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
+  const [mobileActionStaff, setMobileActionStaff] = useState<StaffMember | null>(null);
 
   // Temporary Credentials Share Modal
   const [shareCredentials, setShareCredentials] = useState<{
@@ -100,8 +96,8 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
 
   const handleCreateStaff = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newName.trim() || !newPhone.trim()) {
-      toast.error('Please provide worker full name and phone number');
+    if (!newName.trim() || !newEmail.trim()) {
+      toast.error('Please provide worker full name and email address');
       return;
     }
 
@@ -109,8 +105,8 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
       setIsSubmittingStaff(true);
       const res = await api.createStaff({
         name: newName.trim(),
-        phone: newPhone.trim(),
-        email: newEmail.trim() || undefined,
+        email: newEmail.trim().toLowerCase(),
+        phone: newPhone.trim() || undefined,
         can_discount: canDiscount,
         can_handover: canHandover,
         can_intake_stock: canIntakeStock,
@@ -124,7 +120,7 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
       // Open the share credentials dialog
       setShareCredentials({
         name: res.user.name,
-        login: res.user.phone || res.user.email,
+        login: res.user.email || res.user.phone || '',
         temporaryPassword: res.temporary_password,
       });
 
@@ -139,7 +135,7 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
       setCanManageInventory(false);
       loadData();
     } catch (err: any) {
-      const msg = err.errors?.phone?.[0] || err.errors?.email?.[0] || err.message || 'Failed to create staff member';
+      const msg = err.errors?.email?.[0] || err.errors?.phone?.[0] || err.message || 'Failed to create staff member';
       toast.error(msg);
     } finally {
       setIsSubmittingStaff(false);
@@ -148,46 +144,6 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
 
   const handleOpenEdit = (member: StaffMember) => {
     setEditingStaff(member);
-    setEditName(member.name);
-    setEditPhone(member.phone || '');
-    setEditEmail(member.email || '');
-    setEditCanDiscount(!!member.permissions?.can_discount);
-    setEditCanHandover(!!member.permissions?.can_handover);
-    setEditCanIntakeStock(!!member.permissions?.can_intake_stock);
-    setEditCanViewCosts(!!member.permissions?.can_view_costs);
-    setEditCanManageInventory(!!member.permissions?.can_manage_inventory);
-  };
-
-  const handleUpdateStaff = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingStaff) return;
-    if (!editName.trim() || !editPhone.trim()) {
-      toast.error('Please provide worker full name and phone number');
-      return;
-    }
-
-    try {
-      setIsSubmittingEdit(true);
-      await api.updateStaff(editingStaff.id, {
-        name: editName.trim(),
-        phone: editPhone.trim(),
-        email: editEmail.trim() || undefined,
-        can_discount: editCanDiscount,
-        can_handover: editCanHandover,
-        can_intake_stock: editCanIntakeStock,
-        can_view_costs: editCanViewCosts,
-        can_manage_inventory: editCanManageInventory,
-      });
-
-      toast.success(`${editName.trim()} updated successfully!`);
-      setEditingStaff(null);
-      loadData();
-    } catch (err: any) {
-      const msg = err.errors?.phone?.[0] || err.errors?.email?.[0] || err.message || 'Failed to update staff member';
-      toast.error(msg);
-    } finally {
-      setIsSubmittingEdit(false);
-    }
   };
 
   const handleConfirmRemoveStaff = async () => {
@@ -229,7 +185,7 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
       // Open share credentials modal with new temporary password
       setShareCredentials({
         name: targetStaff.name,
-        login: targetStaff.phone || targetStaff.email,
+        login: targetStaff.email || targetStaff.phone || '',
         temporaryPassword: res.temporary_password,
       });
       loadData();
@@ -251,8 +207,6 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
     setTimeout(() => setCopiedCredentials(false), 3000);
   };
 
-  const [currentPage, setCurrentPage] = useState(1);
-
   const filteredStaff = staff.filter((s) => {
     const q = searchTerm.toLowerCase();
     return (
@@ -261,8 +215,6 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
       (s.phone && s.phone.includes(q))
     );
   });
-
-  const pagedStaff = filteredStaff.slice((currentPage - 1) * 6, currentPage * 6);
 
   const totalWeekVolume = staff.reduce((acc, s) => acc + (s.stats?.sales_volume_week || 0), 0);
   const activeCount = staff.filter((s) => s.is_active).length;
@@ -279,9 +231,6 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
         onBack={() => {
           setSelectedStaffId(null);
           loadData();
-        }}
-        onEditStaff={(member) => {
-          handleOpenEdit(member);
         }}
         onStaffUpdated={loadData}
       />
@@ -383,23 +332,25 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
           </div>
         </div>
 
-        <div className="lg:col-span-2 p-4 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between">
-          <div>
+        <div className="col-span-2 lg:col-span-2 p-4 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between">
+          <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 text-[10px] font-bold uppercase tracking-wider mb-1">
-              <TrendingUp className="w-3.5 h-3.5" />
-              Top This Week
+              <TrendingUp className="w-3.5 h-3.5 shrink-0" />
+              <span>Top This Week</span>
             </div>
             {topSeller ? (
-              <div>
-                <div className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  {topSeller.name}
-                  <span className="text-[10px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded">
-                    {topSeller.bonus_tier}
-                  </span>
-                </div>
-                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">
-                  <span className="font-bold text-slate-900 dark:text-slate-100">{topSeller.week_volume.toLocaleString()} ETB</span>
-                  {' · '}{topSeller.week_count} sold
+              <div className="flex items-center justify-between">
+                <div className="min-w-0">
+                  <div className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2 truncate">
+                    <span className="truncate">{topSeller.name}</span>
+                    <span className="text-[10px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 px-1.5 py-0.2 rounded shrink-0">
+                      {topSeller.bonus_tier}
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">
+                    <span className="font-bold text-slate-900 dark:text-slate-100">{topSeller.week_volume.toLocaleString()} ETB</span>
+                    {' · '}{topSeller.week_count} sold
+                  </div>
                 </div>
               </div>
             ) : (
@@ -409,30 +360,138 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-[#131926] rounded-xl border border-slate-200/80 dark:border-slate-800/80 overflow-hidden">
-        {/* Desktop Table View */}
-        <div className="hidden md:block overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/30 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                  <th className="py-3 px-4 whitespace-nowrap">Member</th>
-                  <th className="py-3 px-4 whitespace-nowrap">Phone</th>
-                  <th className="py-3 px-4 whitespace-nowrap">Access</th>
-                  <th className="py-3 px-4 whitespace-nowrap">Week</th>
-                  <th className="py-3 px-4 whitespace-nowrap">Month</th>
-                  <th className="py-3 px-4 whitespace-nowrap">Bonus</th>
-                  <th className="py-3 px-4 whitespace-nowrap">Handovers</th>
-                  <th className="py-3 px-4 whitespace-nowrap">Status</th>
-                  <th className="py-3 px-4 text-right whitespace-nowrap">Actions</th>
+      {/* ─── MOBILE VIEW (< md) — Cardless, Edge-to-Edge Matching Vendors & Expenses ─── */}
+      <div className="md:hidden flex-1 overflow-y-auto h-[calc(100vh-250px)] min-h-[380px] scrollbar-thin px-0.5">
+        {filteredStaff.length === 0 ? (
+          <div className="py-16 text-center text-slate-400">
+            <Users className="w-8 h-8 mx-auto mb-2 text-slate-300 dark:text-slate-600" />
+            <p className="font-semibold text-slate-600 dark:text-slate-400 text-xs">
+              No staff members found
+            </p>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Team members you register will appear here.
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y-0 pb-12">
+            {filteredStaff.map((member) => {
+              const isSelf = member.id === currentUser?.id;
+              const uncollected = member.stats?.uncollected_bonus ?? 0;
+              const settledBonus = member.stats?.total_bonus_earned ?? 0;
+              const handoversCount = member.stats?.active_handovers_count ?? 0;
+
+              return (
+                <div
+                  key={member.id}
+                  onClick={() => setSelectedStaffId(member.id)}
+                  className="w-full flex items-center justify-between py-3 border-b border-slate-200/50 dark:border-slate-800/50 text-left active:opacity-60 transition-opacity cursor-pointer min-w-0 group"
+                >
+                  {/* Left: Name, Badges, Phone / Email, Handovers count */}
+                  <div className="min-w-0 pr-3 flex-1">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${member.is_active ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                      <span className="text-[13px] min-[390px]:text-sm font-bold text-slate-900 dark:text-white truncate">
+                        {member.name}
+                      </span>
+                      {isSelf && (
+                        <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold shrink-0">You</span>
+                      )}
+                      {member.role === 'owner' && (
+                        <span className="text-[9px] font-bold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-400 px-1.5 py-0.2 rounded shrink-0">
+                          Owner
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-400 dark:text-slate-500">
+                      <span className="font-mono truncate">{member.email || member.phone}</span>
+                      {handoversCount > 0 && (
+                        <span className="text-emerald-600 dark:text-emerald-400 font-bold font-sans shrink-0">
+                          • {handoversCount} {handoversCount === 1 ? 'unit held' : 'units held'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right: Bonus badge + clean action menu / chevron */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div className="text-right">
+                      <div className={`font-mono font-bold text-[13px] min-[390px]:text-sm tabular-nums ${
+                        uncollected > 0
+                          ? 'text-rose-600 dark:text-rose-400'
+                          : settledBonus > 0
+                          ? 'text-slate-900 dark:text-white'
+                          : 'text-slate-400 dark:text-slate-500'
+                      }`}>
+                        {uncollected > 0
+                          ? `−${uncollected.toLocaleString()} ETB`
+                          : settledBonus > 0
+                          ? `${settledBonus.toLocaleString()} ETB`
+                          : '0 ETB'}
+                      </div>
+                      <div className={`text-[10px] font-semibold text-right ${
+                        uncollected > 0
+                          ? 'text-rose-600 dark:text-rose-400'
+                          : settledBonus > 0
+                          ? 'text-emerald-600 dark:text-emerald-400'
+                          : 'text-slate-400'
+                      }`}>
+                        {uncollected > 0 ? 'bonus due' : settledBonus > 0 ? 'settled' : 'no sales'}
+                      </div>
+                    </div>
+
+                    {member.role !== 'owner' && !isSelf && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setMobileActionStaff(member);
+                        }}
+                        className="p-1.5 -mr-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                        title="Staff quick actions"
+                      >
+                        <MoreVertical className="w-4 h-4" />
+                      </button>
+                    )}
+
+                    <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 dark:group-hover:text-slate-300 transition-colors shrink-0" />
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Footer count indicator */}
+            <div className="py-4 text-center text-[11px] text-slate-400 dark:text-slate-500 font-medium">
+              <span className="inline-flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                <span>All {filteredStaff.length} staff loaded</span>
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ─── DESKTOP VIEW (≥ md) — Fixed-height Inside Scroll Staff Table (No horizontal scroll, unpaginated) ─── */}
+      <div className="hidden md:flex bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800/80 overflow-hidden shadow-2xs flex-1 flex-col min-h-0">
+        <div className="overflow-x-hidden overflow-y-auto h-[calc(100vh-270px)] sm:h-[calc(100vh-250px)] min-h-[440px] scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800 relative">
+          <table className="w-full text-left text-xs border-collapse table-auto">
+            <thead className="sticky top-0 z-20 bg-slate-50/95 dark:bg-[#131926]/95 backdrop-blur-xs border-b border-slate-100 dark:border-slate-800 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 shadow-2xs">
+              <tr>
+                <th className="py-3.5 px-5">Member</th>
+                <th className="py-3.5 px-5">Phone</th>
+                <th className="py-3.5 px-5">Bonus</th>
+                <th className="py-3.5 px-5">Handovers</th>
+                <th className="py-3.5 px-5">Status</th>
+                <th className="py-3.5 px-5 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+              {filteredStaff.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-16 text-center text-slate-400">No staff found.</td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                {filteredStaff.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="py-8 text-center text-slate-400">No staff found.</td>
-                  </tr>
-                ) : (
-                  pagedStaff.map((member) => {
+              ) : (
+                <>
+                  {filteredStaff.map((member) => {
                     const isSelf = member.id === currentUser?.id;
 
                     return (
@@ -441,112 +500,57 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
                         onClick={() => setSelectedStaffId(member.id)}
                         className="hover:bg-slate-50/70 dark:hover:bg-slate-800/30 transition-colors cursor-pointer group"
                       >
-                        {/* Name */}
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-bold text-xs text-slate-700 dark:text-slate-200 uppercase shrink-0">
-                              {member.name.slice(0, 2)}
+                        {/* Member */}
+                        <td className="py-4 px-5">
+                          <div className="min-w-0">
+                            <div className="font-semibold text-slate-900 dark:text-white text-sm flex items-center gap-1.5 whitespace-nowrap">
+                              {member.name}
+                              {isSelf && <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold ml-1">You</span>}
+                              {member.role === 'owner' && (
+                                <span className="text-[9px] font-bold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-400 px-1.5 py-0.5 rounded">Owner</span>
+                              )}
                             </div>
-                            <div className="min-w-0">
-                              <div className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5 whitespace-nowrap">
-                                {member.name}
-                                {isSelf && <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold ml-1">You</span>}
-                                {member.role === 'owner' && (
-                                  <span className="text-[9px] font-bold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-400 px-1.5 py-0.5 rounded">Owner</span>
-                                )}
-                              </div>
-                              <div className="text-[10px] text-slate-400 truncate max-w-[160px]">{member.email}</div>
-                            </div>
+                            <div className="text-xs text-slate-400 truncate max-w-[220px] font-mono mt-0.5">{member.email}</div>
                           </div>
                         </td>
 
                         {/* Phone */}
-                        <td className="py-3 px-4 font-mono text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                        <td className="py-4 px-5 font-mono text-slate-600 dark:text-slate-300 whitespace-nowrap text-xs">
                           {member.phone || <span className="text-slate-400 italic font-sans">—</span>}
                         </td>
 
-                        {/* Access */}
-                        <td className="py-3 px-4">
-                          {member.role === 'owner' ? (
-                            <span className="text-[10px] font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/60 px-2 py-0.5 rounded-md">Full Access</span>
-                          ) : (
-                            <div className="flex flex-wrap gap-1 max-w-[210px]">
-                              {member.permissions?.can_discount && (
-                                <span className="text-[9px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded">Discount</span>
-                              )}
-                              {member.permissions?.can_handover && (
-                                <span className="text-[9px] font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 px-1.5 py-0.5 rounded">Handover</span>
-                              )}
-                              {member.permissions?.can_intake_stock && (
-                                <span className="text-[9px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 px-1.5 py-0.5 rounded">Intake</span>
-                              )}
-                              {member.permissions?.can_view_costs && (
-                                <span className="text-[9px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 rounded">Costs</span>
-                              )}
-                              {member.permissions?.can_manage_inventory && (
-                                <span className="text-[9px] font-bold text-cyan-700 dark:text-cyan-300 bg-cyan-50 dark:bg-cyan-950/60 px-1.5 py-0.5 rounded">Inventory</span>
-                              )}
-                              {!member.permissions?.can_discount &&
-                               !member.permissions?.can_handover &&
-                               !member.permissions?.can_intake_stock &&
-                               !member.permissions?.can_view_costs &&
-                               !member.permissions?.can_manage_inventory && (
-                                <span className="text-[10px] font-medium text-slate-400">Sales Only</span>
-                              )}
-                            </div>
-                          )}
-                        </td>
-
-                        {/* Weekly */}
-                        <td className="py-3 px-4 font-mono whitespace-nowrap">
-                          <span className="font-bold text-slate-900 dark:text-white text-xs">
-                            {(member.stats?.sales_volume_week || 0).toLocaleString()}
-                          </span>
-                          <span className="text-[10px] text-slate-400 ml-1">ETB</span>
-                          <span className="text-[10px] text-slate-400 ml-1">· {member.stats?.sales_count_week || 0}</span>
-                        </td>
-
-                        {/* Monthly */}
-                        <td className="py-3 px-4 font-mono whitespace-nowrap">
-                          <span className="font-bold text-slate-900 dark:text-white text-xs">
-                            {(member.stats?.sales_volume_month || 0).toLocaleString()}
-                          </span>
-                          <span className="text-[10px] text-slate-400 ml-1">ETB</span>
-                          <span className="text-[10px] text-slate-400 ml-1">· {member.stats?.sales_count_month || 0}</span>
-                        </td>
-
                         {/* Bonus */}
-                        <td className="py-3 px-4 font-mono whitespace-nowrap">
+                        <td className="py-4 px-5 font-mono whitespace-nowrap">
                           {(member.stats?.uncollected_bonus ?? 0) > 0 ? (
                             <div>
-                              <span className="font-bold text-rose-600 dark:text-rose-400 text-xs">
+                              <span className="font-bold text-rose-600 dark:text-rose-400 text-sm tabular-nums">
                                 −{(member.stats.uncollected_bonus ?? 0).toLocaleString()}
                               </span>
-                              <span className="text-[10px] text-rose-500 dark:text-rose-400 ml-1">ETB</span>
-                              <span className="text-[9px] block text-rose-600 dark:text-rose-400 font-sans font-semibold">uncollected bonus</span>
+                              <span className="text-[11px] text-rose-500 dark:text-rose-400 ml-1">ETB</span>
+                              <span className="text-[10px] block text-rose-600 dark:text-rose-400 font-sans font-semibold">uncollected bonus</span>
                             </div>
                           ) : (member.stats?.total_bonus_earned ?? 0) > 0 ? (
                             <div>
-                              <span className="font-semibold text-slate-700 dark:text-slate-300 text-xs">
+                              <span className="font-semibold text-slate-700 dark:text-slate-300 text-sm tabular-nums">
                                 {(member.stats.total_bonus_earned ?? 0).toLocaleString()}
                               </span>
-                              <span className="text-[10px] text-slate-400 ml-1">ETB</span>
-                              <span className="text-[9px] block text-emerald-600 dark:text-emerald-400 font-sans">settled</span>
+                              <span className="text-[11px] text-slate-400 ml-1">ETB</span>
+                              <span className="text-[10px] block text-emerald-600 dark:text-emerald-400 font-sans font-medium">settled</span>
                             </div>
                           ) : (
                             <span className="text-slate-400 text-xs">—</span>
                           )}
                         </td>
 
-                        {/* Handovers Out */}
-                        <td className="py-3 px-4 font-mono whitespace-nowrap">
+                        {/* Handovers */}
+                        <td className="py-4 px-5 font-mono whitespace-nowrap">
                           {(member.stats?.active_handovers_count ?? 0) > 0 ? (
                             <div>
-                              <span className="font-bold text-slate-900 dark:text-white text-xs">
+                              <span className="font-bold text-slate-900 dark:text-white text-sm tabular-nums">
                                 {(member.stats?.active_handovers_value || 0).toLocaleString()}
                               </span>
-                              <span className="text-[10px] text-slate-400 ml-1">ETB</span>
-                              <span className="text-[9px] block text-emerald-600 dark:text-emerald-400 font-sans font-semibold">
+                              <span className="text-[11px] text-slate-400 ml-1">ETB</span>
+                              <span className="text-[10px] block text-emerald-600 dark:text-emerald-400 font-sans font-semibold">
                                 {member.stats?.active_handovers_count} {member.stats?.active_handovers_count === 1 ? 'unit held' : 'units held'}
                               </span>
                             </div>
@@ -556,290 +560,105 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
                         </td>
 
                         {/* Status */}
-                        <td className="py-3 px-4">
-                          <span className={`inline-flex items-center gap-1 text-[10px] font-bold ${
+                        <td className="py-4 px-5 whitespace-nowrap">
+                          <span className={`inline-flex items-center gap-1.5 text-xs font-bold ${
                             member.is_active
                               ? 'text-emerald-600 dark:text-emerald-400'
                               : 'text-rose-500 dark:text-rose-400'
                           }`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${member.is_active ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+                            <span className={`w-2 h-2 rounded-full ${member.is_active ? 'bg-emerald-500' : 'bg-rose-500'}`} />
                             {member.is_active ? 'Active' : 'Suspended'}
                           </span>
                         </td>
 
-                        {/* Actions */}
-                        <td className="py-3 px-4 text-right">
+                        {/* Minimalized Actions */}
+                        <td className="py-4 px-5 text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                             <button
+                              type="button"
                               onClick={() => setSelectedStaffId(member.id)}
-                              title="View performance statement, bonus ledger, and handovers"
-                              className="px-2.5 py-1.5 rounded-lg bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 dark:hover:bg-purple-900/60 text-purple-700 dark:text-purple-300 font-semibold text-[11px] flex items-center gap-1 transition-colors cursor-pointer"
+                              title="Performance Statement"
+                              className="p-2 rounded-xl text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/40 transition-colors cursor-pointer"
                             >
-                              <FileText className="w-3 h-3 text-purple-600 dark:text-purple-400" />
-                              Statement
+                              <FileText className="w-4 h-4" />
                             </button>
-                            {member.role !== 'owner' && !isSelf ? (
+                            {member.role !== 'owner' && !isSelf && (
                               <>
                                 <button
+                                  type="button"
                                   onClick={() => handleOpenEdit(member)}
-                                  title="Edit staff details and privileges"
-                                  className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-[11px] flex items-center gap-1 transition-colors cursor-pointer"
+                                  title="Edit details & access"
+                                  className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                                 >
-                                  <Edit2 className="w-3 h-3 text-slate-500 dark:text-slate-400" />
-                                  Edit
+                                  <Edit2 className="w-4 h-4" />
                                 </button>
                                 <button
+                                  type="button"
                                   onClick={() => setResetConfirmStaff(member)}
                                   title="Reset password"
-                                  className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-semibold text-[11px] flex items-center gap-1 transition-colors cursor-pointer"
+                                  className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                                 >
-                                  <KeyRound className="w-3 h-3" />
-                                  Reset
+                                  <KeyRound className="w-4 h-4" />
                                 </button>
                                 <button
+                                  type="button"
                                   onClick={() => handleToggleStatus(member)}
-                                  className={`px-2.5 py-1.5 rounded-lg font-semibold text-[11px] transition-colors cursor-pointer ${
+                                  title={member.is_active ? 'Suspend staff' : 'Activate staff'}
+                                  className={`p-2 rounded-xl transition-colors cursor-pointer ${
                                     member.is_active
-                                      ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-950/60'
-                                      : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-950/60'
+                                      ? 'text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40'
+                                      : 'text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/40'
                                   }`}
                                 >
-                                  {member.is_active ? 'Suspend' : 'Activate'}
+                                  {member.is_active ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
                                 </button>
                                 <button
+                                  type="button"
                                   onClick={() => setRemoveConfirmStaff(member)}
-                                  title="Remove staff account from system"
-                                  className="px-2 py-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                                  title="Remove staff account"
+                                  className="p-2 rounded-xl text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
                                 >
-                                  <Trash2 className="w-3.5 h-3.5" />
+                                  <Trash2 className="w-4 h-4" />
                                 </button>
                               </>
-                            ) : null}
+                            )}
                           </div>
                         </td>
                       </tr>
                     );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
+                  })}
 
-        {/* Mobile Staff Cards (< md) */}
-        <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800/60">
-          {filteredStaff.length === 0 ? (
-            <div className="py-12 text-center text-slate-400 text-xs">No staff found.</div>
-          ) : (
-            pagedStaff.map((member) => {
-              const isSelf = member.id === currentUser?.id;
-              return (
-                <div
-                  key={member.id}
-                  onClick={() => setSelectedStaffId(member.id)}
-                  className="p-3.5 space-y-3 cursor-pointer hover:bg-slate-50/60 dark:hover:bg-slate-800/20 transition-colors"
-                >
-                  {/* Top row: Avatar, name, role badge, status */}
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="size-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-bold text-xs text-slate-700 dark:text-slate-200 uppercase shrink-0 shadow-xs">
-                        {member.name.slice(0, 2)}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-1.5 flex-wrap">
-                          <span className="truncate">{member.name}</span>
-                          {isSelf && (
-                            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">You</span>
-                          )}
-                          {member.role === 'owner' && (
-                            <span className="text-[9px] font-bold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-400 px-1.5 py-0.5 rounded">Owner</span>
-                          )}
-                        </div>
-                        <div className="text-[10px] text-slate-400 truncate mt-0.5">
-                          {member.email || 'No email registered'}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Status Pill */}
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
-                      member.is_active
-                        ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60'
-                        : 'bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200/60 dark:border-rose-800/60'
-                    }`}>
-                      <span className={`size-1.5 rounded-full ${member.is_active ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
-                      {member.is_active ? 'Active' : 'Suspended'}
-                    </span>
-                  </div>
-
-                  {/* Info row: Phone, Access badge */}
-                  <div className="flex items-center justify-between gap-2 text-[11px] pt-0.5">
-                    {member.phone ? (
-                      <a
-                        href={`tel:${member.phone}`}
-                        className="inline-flex items-center gap-1 font-mono text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
-                      >
-                        <Phone className="size-3 text-slate-400" />
-                        <span>{member.phone}</span>
-                      </a>
-                    ) : (
-                      <span className="text-slate-400 italic text-[10px]">No phone</span>
-                    )}
-
-                    <div className="shrink-0">
-                      {member.role === 'owner' ? (
-                        <span className="text-[10px] font-bold text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded-md bg-purple-50 dark:bg-purple-950/60">Full Access</span>
-                      ) : (
-                        <div className="flex flex-wrap gap-1 justify-end max-w-[200px]">
-                          {member.permissions?.can_discount && (
-                            <span className="text-[9px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded">Discount</span>
-                          )}
-                          {member.permissions?.can_handover && (
-                            <span className="text-[9px] font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 px-1.5 py-0.5 rounded">Handover</span>
-                          )}
-                          {member.permissions?.can_intake_stock && (
-                            <span className="text-[9px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 px-1.5 py-0.5 rounded">Intake</span>
-                          )}
-                          {member.permissions?.can_view_costs && (
-                            <span className="text-[9px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 rounded">Costs</span>
-                          )}
-                          {member.permissions?.can_manage_inventory && (
-                            <span className="text-[9px] font-bold text-cyan-700 dark:text-cyan-300 bg-cyan-50 dark:bg-cyan-950/60 px-1.5 py-0.5 rounded">Inventory</span>
-                          )}
-                          {!member.permissions?.can_discount &&
-                           !member.permissions?.can_handover &&
-                           !member.permissions?.can_intake_stock &&
-                           !member.permissions?.can_view_costs &&
-                           !member.permissions?.can_manage_inventory && (
-                            <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800">Sales Only</span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Performance stats: 3 mini columns */}
-                  <div className="grid grid-cols-3 gap-2 p-2 rounded-xl bg-slate-50/70 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800/60 text-center">
-                    <div>
-                      <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Week</div>
-                      <div className="font-mono font-bold text-xs text-slate-900 dark:text-white mt-0.5">
-                        {(member.stats?.sales_volume_week || 0).toLocaleString()}
-                      </div>
-                      <div className="text-[9px] text-slate-400 mt-0.5">{member.stats?.sales_count_week || 0} sold</div>
-                    </div>
-                    <div className="border-x border-slate-200/60 dark:border-slate-800/60">
-                      <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Month</div>
-                      <div className="font-mono font-bold text-xs text-slate-900 dark:text-white mt-0.5">
-                        {(member.stats?.sales_volume_month || 0).toLocaleString()}
-                      </div>
-                      <div className="text-[9px] text-slate-400 mt-0.5">{member.stats?.sales_count_month || 0} sold</div>
-                    </div>
-                    <div>
-                      <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Bonus</div>
-                      {(member.stats?.uncollected_bonus ?? 0) > 0 ? (
-                        <div>
-                          <div className="font-mono font-bold text-xs text-rose-600 dark:text-rose-400 mt-0.5">
-                            −{(member.stats.uncollected_bonus ?? 0).toLocaleString()}
-                          </div>
-                          <div className="text-[9px] text-rose-600 dark:text-rose-400 font-semibold mt-0.5">uncollected</div>
-                        </div>
-                      ) : (member.stats?.total_bonus_earned ?? 0) > 0 ? (
-                        <div>
-                          <div className="font-mono font-semibold text-xs text-slate-700 dark:text-slate-300 mt-0.5">
-                            {(member.stats.total_bonus_earned ?? 0).toLocaleString()}
-                          </div>
-                          <div className="text-[9px] text-emerald-600 dark:text-emerald-400 mt-0.5">settled</div>
-                        </div>
-                      ) : (
-                        <div className="text-slate-400 text-xs mt-0.5">—</div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Handover Held Notice on Mobile */}
-                  {(member.stats?.active_handovers_count ?? 0) > 0 && (
-                    <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/50 dark:border-emerald-900/40 text-[11px]">
-                      <span className="text-slate-600 dark:text-slate-300 font-medium">Devices Held on Handover:</span>
-                      <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                        {member.stats?.active_handovers_count} units ({(member.stats?.active_handovers_value || 0).toLocaleString()} ETB)
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Actions row on mobile */}
-                  <div
-                    className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100 dark:border-slate-800/60"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <button
-                      onClick={() => setSelectedStaffId(member.id)}
-                      className="px-3 py-1.5 rounded-lg bg-purple-50 dark:bg-purple-950/50 hover:bg-purple-100 dark:hover:bg-purple-900/60 text-purple-700 dark:text-purple-300 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                  {/* All staff loaded footer indicator */}
+                  <tr>
+                    <td
+                      colSpan={6}
+                      className="py-4 text-center text-xs text-slate-400 dark:text-slate-500 bg-slate-50/50 dark:bg-slate-900/30 font-medium"
                     >
-                      <FileText className="size-3 text-purple-600 dark:text-purple-400" />
-                      <span>Statement</span>
-                    </button>
-
-                    {member.role !== 'owner' && !isSelf && (
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => handleOpenEdit(member)}
-                          className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs flex items-center gap-1 transition-colors cursor-pointer"
-                        >
-                          <Edit2 className="size-3 text-slate-500" />
-                          <span>Edit</span>
-                        </button>
-                        <button
-                          onClick={() => setResetConfirmStaff(member)}
-                          className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors cursor-pointer"
-                          title="Reset Password"
-                        >
-                          <KeyRound className="size-3.5" />
-                        </button>
-                        <button
-                          onClick={() => handleToggleStatus(member)}
-                          className={`px-2.5 py-1.5 rounded-lg font-semibold text-xs transition-colors cursor-pointer ${
-                            member.is_active
-                              ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-100'
-                              : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100'
-                          }`}
-                        >
-                          {member.is_active ? 'Suspend' : 'Activate'}
-                        </button>
-                        <button
-                          onClick={() => setRemoveConfirmStaff(member)}
-                          title="Remove staff member"
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
-                        >
-                          <Trash2 className="size-3.5" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })
-          )}
+                      <span className="inline-flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                        <span>All {filteredStaff.length} staff members loaded</span>
+                      </span>
+                    </td>
+                  </tr>
+                </>
+              )}
+            </tbody>
+          </table>
         </div>
-          {filteredStaff.length > 6 && (
-            <div className="px-4 pb-4">
-              <Pagination
-                currentPage={currentPage}
-                totalItems={filteredStaff.length}
-                pageSize={6}
-                onPageChange={setCurrentPage}
-              />
-            </div>
-          )}
-        </div>
+      </div>
 
-      {/* ── Modal 1: Add Staff Member ── */}
+      {/* ── Bottom Sheet 1: Add Staff Member ── */}
       {isAddModalOpen && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
           <div
-            className="fixed inset-0 bg-slate-950/50 dark:bg-slate-950/75 backdrop-blur-xs transition-opacity"
+            className="fixed inset-0 bg-slate-950/50 dark:bg-black/70 backdrop-blur-xs animate-backdrop-enter"
             onClick={() => setIsAddModalOpen(false)}
           />
 
-          <div className="relative z-10 w-full max-w-lg bg-white dark:bg-[#131926] text-slate-900 dark:text-white rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-2xl overflow-hidden animate-modal-enter flex flex-col max-h-[calc(100dvh-2.5rem)] sm:max-h-[85vh] my-auto">
+          <div className="relative z-10 w-full max-w-lg bg-white dark:bg-[#131926] text-slate-900 dark:text-white rounded-t-3xl sm:rounded-2xl border-t sm:border border-slate-200/90 dark:border-slate-800 shadow-2xl overflow-hidden max-sm:animate-bottom-sheet sm:animate-modal-enter flex flex-col max-h-[90vh] sm:max-h-[85vh] my-0 sm:my-auto pb-[calc(1rem+env(safe-area-inset-bottom,0px))] sm:pb-0">
+            {/* Mobile Drag Indicator */}
+            <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mt-2.5 mb-1 sm:hidden shrink-0" />
+
             {/* Pinned Header */}
             <div className="flex items-center justify-between px-5 py-4 sm:px-6 sm:py-4.5 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-[#131926] shrink-0">
               <div>
@@ -879,32 +698,32 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Phone Number * <span className="text-[11px] text-slate-400 font-normal">(used for staff login)</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="0911234567"
-                    value={newPhone}
-                    onChange={(e) => setNewPhone(e.target.value)}
-                    className="w-full h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c1017] text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono transition-all"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Email Address <span className="text-[11px] text-slate-400 font-normal">(Defaults to name@mail.com)</span>
+                    Email Address * <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-normal">(used for staff login & unique ID)</span>
                   </label>
                   <input
                     type="email"
-                    placeholder={`e.g. ${newName.trim() ? newName.trim().split(' ')[0].toLowerCase().replace(/[^a-z0-9]/g, '') : 'name'}@mail.com`}
+                    required
+                    placeholder="e.g. kidus@boletech.et"
                     value={newEmail}
                     onChange={(e) => setNewEmail(e.target.value)}
                     className="w-full h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c1017] text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                   />
                   <p className="text-[10px] text-slate-400 mt-1">
-                    Auto-assigned as <span className="font-mono text-slate-600 dark:text-slate-300 font-semibold">{newName.trim() ? newName.trim().split(' ')[0].toLowerCase().replace(/[^a-z0-9]/g, '') : 'name'}@mail.com</span> if left empty. Default password: <span className="font-mono text-slate-600 dark:text-slate-300 font-semibold">434344#Pass</span>
+                    Worker will use this email to log in. Default temporary password: <span className="font-mono text-slate-600 dark:text-slate-300 font-semibold">434344#Pass</span>
                   </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                    Phone Number <span className="text-[11px] text-slate-400 font-normal">(Optional)</span>
+                  </label>
+                  <input
+                    type="tel"
+                    placeholder="e.g. 0911234567"
+                    value={newPhone}
+                    onChange={(e) => setNewPhone(e.target.value)}
+                    className="w-full h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c1017] text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono transition-all"
+                  />
                 </div>
 
                 {/* Granular Permissions Section */}
@@ -1043,205 +862,112 @@ export const StaffView: React.FC<StaffViewProps> = ({ currentUser }) => {
         document.body
       )}
 
-      {/* ── Modal: Edit Staff Member ── */}
-      {editingStaff && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+      {/* ── Edit Staff Bottom Sheet ── */}
+      {editingStaff && (
+        <EditStaffBottomSheet
+          isOpen={!!editingStaff}
+          onClose={() => setEditingStaff(null)}
+          staff={editingStaff}
+          onSuccess={() => {
+            setEditingStaff(null);
+            loadData();
+          }}
+        />
+      )}
+
+      {/* ── Mobile Staff Quick Action Sheet ── */}
+      {mobileActionStaff && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-end justify-center p-0 overflow-y-auto">
           <div
-            className="fixed inset-0 bg-slate-950/50 dark:bg-slate-950/75 backdrop-blur-xs transition-opacity"
-            onClick={() => setEditingStaff(null)}
+            className="fixed inset-0 bg-slate-950/50 dark:bg-black/70 backdrop-blur-xs animate-backdrop-enter"
+            onClick={() => setMobileActionStaff(null)}
           />
 
-          <div className="relative z-10 w-full max-w-lg bg-white dark:bg-[#131926] text-slate-900 dark:text-white rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-2xl overflow-hidden animate-modal-enter flex flex-col max-h-[calc(100dvh-2.5rem)] sm:max-h-[85vh] my-auto">
-            {/* Pinned Header */}
-            <div className="flex items-center justify-between px-5 py-4 sm:px-6 sm:py-4.5 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-[#131926] shrink-0">
-              <div>
-                <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight">
-                  Edit Staff & Privileges
-                </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Modify profile details and toggle granular operational permissions.
+          <div className="relative z-10 w-full max-w-lg bg-white dark:bg-[#131926] text-slate-900 dark:text-white rounded-t-3xl border-t border-slate-200/90 dark:border-slate-800 shadow-2xl overflow-hidden max-sm:animate-bottom-sheet sm:animate-modal-enter flex flex-col pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))]">
+            {/* Mobile Drag Indicator */}
+            <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mt-2.5 mb-2 shrink-0" />
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="min-w-0 pr-2">
+                <h3 className="font-bold text-sm text-slate-900 dark:text-white truncate">
+                  {mobileActionStaff.name}
+                </h3>
+                <p className="text-xs text-slate-400 dark:text-slate-500 font-mono truncate">
+                  {mobileActionStaff.email || mobileActionStaff.phone}
                 </p>
               </div>
-
               <button
-                type="button"
-                onClick={() => setEditingStaff(null)}
-                className="w-8 h-8 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center justify-center cursor-pointer"
+                onClick={() => setMobileActionStaff(null)}
+                className="w-7 h-7 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 flex items-center justify-center cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Scrollable Form Body */}
-            <form onSubmit={handleUpdateStaff} className="flex flex-col flex-1 min-h-0">
-              <div className="p-5 sm:p-6 space-y-4 overflow-y-auto overscroll-contain flex-1">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Worker Full Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Kidus Tesfaye"
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    className="w-full h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c1017] text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-                  />
-                </div>
+            {/* Actions List */}
+            <div className="p-3 space-y-1">
+              <button
+                type="button"
+                onClick={() => {
+                  const target = mobileActionStaff;
+                  setMobileActionStaff(null);
+                  handleOpenEdit(target);
+                }}
+                className="w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-left text-xs font-semibold text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <Edit2 className="w-4 h-4 text-slate-500" />
+                <span>Edit Staff & Privileges</span>
+              </button>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Phone Number * <span className="text-[11px] text-slate-400 font-normal">(used for staff login)</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="0911234567"
-                    value={editPhone}
-                    onChange={(e) => setEditPhone(e.target.value)}
-                    className="w-full h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c1017] text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono transition-all"
-                  />
-                </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const target = mobileActionStaff;
+                  setMobileActionStaff(null);
+                  handleToggleStatus(target);
+                }}
+                className="w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-left text-xs font-semibold text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                {mobileActionStaff.is_active ? (
+                  <>
+                    <UserX className="w-4 h-4 text-rose-500" />
+                    <span>Suspend Staff Account</span>
+                  </>
+                ) : (
+                  <>
+                    <UserCheck className="w-4 h-4 text-emerald-500" />
+                    <span>Activate Staff Account</span>
+                  </>
+                )}
+              </button>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Email Address <span className="text-[11px] text-slate-400 font-normal">(Optional)</span>
-                  </label>
-                  <input
-                    type="email"
-                    placeholder="e.g. kidus@boletech.et"
-                    value={editEmail}
-                    onChange={(e) => setEditEmail(e.target.value)}
-                    className="w-full h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c1017] text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-                  />
-                </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const target = mobileActionStaff;
+                  setMobileActionStaff(null);
+                  setResetConfirmStaff(target);
+                }}
+                className="w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-left text-xs font-semibold text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <KeyRound className="w-4 h-4 text-amber-500" />
+                <span>Reset Temporary Password</span>
+              </button>
 
-                {/* Granular Permissions Section */}
-                <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-slate-900 dark:text-white">
-                      Staff Privileges & Permissions
-                    </label>
-                    <span className="text-[10px] text-slate-400">Configure access level</span>
-                  </div>
-
-                  <div className="space-y-1 bg-slate-50 dark:bg-[#0c1017] p-2.5 sm:p-3 rounded-xl border border-slate-200/80 dark:border-slate-800">
-                    {/* Privilege 1: Discount */}
-                    <label className="flex items-start gap-3 cursor-pointer group p-2 rounded-lg hover:bg-slate-100/70 dark:hover:bg-slate-900/60 transition-colors">
-                      <input
-                        type="checkbox"
-                        checked={editCanDiscount}
-                        onChange={(e) => setEditCanDiscount(e.target.checked)}
-                        className="mt-0.5 w-4 h-4 rounded border-slate-300 dark:border-slate-700 text-emerald-600 focus:ring-emerald-500 accent-emerald-600 cursor-pointer"
-                      />
-                      <div className="min-w-0">
-                        <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                          Allow Counter Discounts
-                        </div>
-                        <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
-                          Can apply custom price discounts during POS checkout.
-                        </div>
-                      </div>
-                    </label>
-
-                    {/* Privilege 2: Handover */}
-                    <label className="flex items-start gap-3 cursor-pointer group p-2 rounded-lg hover:bg-slate-100/70 dark:hover:bg-slate-900/60 transition-colors pt-2 border-t border-slate-200/60 dark:border-slate-800/60">
-                      <input
-                        type="checkbox"
-                        checked={editCanHandover}
-                        onChange={(e) => setEditCanHandover(e.target.checked)}
-                        className="mt-0.5 w-4 h-4 rounded border-slate-300 dark:border-slate-700 text-emerald-600 focus:ring-emerald-500 accent-emerald-600 cursor-pointer"
-                      />
-                      <div className="min-w-0">
-                        <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                          Allow Device Handover & Flow
-                        </div>
-                        <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
-                          Can hand out units to brokers/staff, confirm handover sales, or restock to shelf.
-                        </div>
-                      </div>
-                    </label>
-
-                    {/* Privilege 3: Intake Stock */}
-                    <label className="flex items-start gap-3 cursor-pointer group p-2 rounded-lg hover:bg-slate-100/70 dark:hover:bg-slate-900/60 transition-colors pt-2 border-t border-slate-200/60 dark:border-slate-800/60">
-                      <input
-                        type="checkbox"
-                        checked={editCanIntakeStock}
-                        onChange={(e) => setEditCanIntakeStock(e.target.checked)}
-                        className="mt-0.5 w-4 h-4 rounded border-slate-300 dark:border-slate-700 text-emerald-600 focus:ring-emerald-500 accent-emerald-600 cursor-pointer"
-                      />
-                      <div className="min-w-0">
-                        <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                          Allow Stock Intake
-                        </div>
-                        <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
-                          Can add new inventory units, record supplier shipments, and add catalog models.
-                        </div>
-                      </div>
-                    </label>
-
-                    {/* Privilege 4: View Costs */}
-                    <label className="flex items-start gap-3 cursor-pointer group p-2 rounded-lg hover:bg-slate-100/70 dark:hover:bg-slate-900/60 transition-colors pt-2 border-t border-slate-200/60 dark:border-slate-800/60">
-                      <input
-                        type="checkbox"
-                        checked={editCanViewCosts}
-                        onChange={(e) => setEditCanViewCosts(e.target.checked)}
-                        className="mt-0.5 w-4 h-4 rounded border-slate-300 dark:border-slate-700 text-emerald-600 focus:ring-emerald-500 accent-emerald-600 cursor-pointer"
-                      />
-                      <div className="min-w-0">
-                        <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                          Allow View Cost Basis & Margins
-                        </div>
-                        <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
-                          Can view purchase prices, cost basis, and margin percentages on devices.
-                        </div>
-                      </div>
-                    </label>
-
-                    {/* Privilege 5: Manage Inventory */}
-                    <label className="flex items-start gap-3 cursor-pointer group p-2 rounded-lg hover:bg-slate-100/70 dark:hover:bg-slate-900/60 transition-colors pt-2 border-t border-slate-200/60 dark:border-slate-800/60">
-                      <input
-                        type="checkbox"
-                        checked={editCanManageInventory}
-                        onChange={(e) => setEditCanManageInventory(e.target.checked)}
-                        className="mt-0.5 w-4 h-4 rounded border-slate-300 dark:border-slate-700 text-emerald-600 focus:ring-emerald-500 accent-emerald-600 cursor-pointer"
-                      />
-                      <div className="min-w-0">
-                        <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                          Allow Inventory Management & Swaps
-                        </div>
-                        <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
-                          Can edit unit IMEI/serials, process customer warranty returns, and handle vendor swaps.
-                        </div>
-                      </div>
-                    </label>
-                  </div>
-                </div>
-              </div>
-
-              {/* Pinned Footer */}
-              <div className="p-4 sm:p-5 border-t border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/40 shrink-0 flex items-center justify-end gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => setEditingStaff(null)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmittingEdit}
-                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm shadow-emerald-600/25 disabled:opacity-50 cursor-pointer"
-                >
-                  {isSubmittingEdit ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <Check className="w-3.5 h-3.5" />
-                  )}
-                  <span>Save Changes</span>
-                </button>
-              </div>
-            </form>
+              <button
+                type="button"
+                onClick={() => {
+                  const target = mobileActionStaff;
+                  setMobileActionStaff(null);
+                  setRemoveConfirmStaff(target);
+                }}
+                className="w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-left text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+              >
+                <Trash2 className="w-4 h-4 text-rose-500" />
+                <span>Remove Staff Account</span>
+              </button>
+            </div>
           </div>
         </div>,
         document.body

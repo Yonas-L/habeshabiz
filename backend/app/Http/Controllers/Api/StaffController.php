@@ -134,8 +134,8 @@ class StaffController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:100'],
-            'phone' => ['required', 'string', 'max:25'],
-            'email' => ['nullable', 'email', 'max:100'],
+            'email' => ['required', 'email', 'max:100', 'unique:users,email'],
+            'phone' => ['nullable', 'string', 'max:25'],
             'can_discount' => ['nullable', 'boolean'],
             'can_handover' => ['nullable', 'boolean'],
             'can_intake_stock' => ['nullable', 'boolean'],
@@ -145,44 +145,33 @@ class StaffController extends Controller
 
         $tenantId = $currentUser->tenant_id ?? TenantScope::getActiveTenantId();
 
-        // Validate phone uniqueness for staff in this shop/system
-        $cleanPhone = preg_replace('/[^0-9]/', '', $validated['phone']);
-        $last9 = strlen($cleanPhone) >= 9 ? substr($cleanPhone, -9) : $cleanPhone;
+        $phone = ! empty($validated['phone']) ? trim($validated['phone']) : null;
 
-        $phoneExists = User::where('tenant_id', $tenantId)
-            ->where(function ($q) use ($validated, $last9) {
-                $q->where('phone', $validated['phone']);
-                if (! empty($last9)) {
-                    $q->orWhere('phone', 'like', "%{$last9}");
-                }
-            })
-            ->exists();
+        // Validate phone uniqueness for staff in this shop/system if provided
+        if ($phone) {
+            $cleanPhone = preg_replace('/[^0-9]/', '', $phone);
+            $last9 = strlen($cleanPhone) >= 9 ? substr($cleanPhone, -9) : $cleanPhone;
 
-        if ($phoneExists) {
-            return response()->json([
-                'message' => 'A staff member with this phone number already exists in your shop.',
-                'errors' => [
-                    'phone' => ['A staff member with this phone number already exists in your shop.'],
-                ],
-            ], 422);
-        }
+            $phoneExists = User::where('tenant_id', $tenantId)
+                ->where(function ($q) use ($phone, $last9) {
+                    $q->where('phone', $phone);
+                    if (! empty($last9)) {
+                        $q->orWhere('phone', 'like', "%{$last9}");
+                    }
+                })
+                ->exists();
 
-        // Generate default email if omitted: name@mail.com
-        $email = $validated['email'] ?? null;
-        if (! $email) {
-            $firstName = explode(' ', trim($validated['name']))[0];
-            $cleanName = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $firstName));
-            if (empty($cleanName)) {
-                $cleanName = 'staff';
-            }
-            $baseEmail = "{$cleanName}@mail.com";
-            $email = $baseEmail;
-            $counter = 1;
-            while (User::where('email', $email)->exists()) {
-                $email = "{$cleanName}{$counter}@mail.com";
-                $counter++;
+            if ($phoneExists) {
+                return response()->json([
+                    'message' => 'A staff member with this phone number already exists in your shop.',
+                    'errors' => [
+                        'phone' => ['A staff member with this phone number already exists in your shop.'],
+                    ],
+                ], 422);
             }
         }
+
+        $email = strtolower(trim($validated['email']));
 
         // Default password for salesperson staff registration
         $tempPassword = '434344#Pass';
@@ -190,7 +179,7 @@ class StaffController extends Controller
         $user = User::create([
             'tenant_id' => $tenantId,
             'name' => $validated['name'],
-            'phone' => $validated['phone'],
+            'phone' => $phone,
             'email' => $email,
             'password' => Hash::make($tempPassword),
             'role' => 'salesperson',
@@ -205,16 +194,25 @@ class StaffController extends Controller
         ]);
 
         // Safely sync staff contact in contacts table
-        $cleanPhone = preg_replace('/[^0-9]/', '', $validated['phone']);
-        $last9 = strlen($cleanPhone) >= 9 ? substr($cleanPhone, -9) : $cleanPhone;
-        $staffContact = Contact::where('tenant_id', $tenantId)
-            ->where(function ($q) use ($validated, $last9) {
-                $q->where('phone', $validated['phone']);
-                if (! empty($last9)) {
-                    $q->orWhere('phone', 'like', "%{$last9}");
-                }
-            })
-            ->first();
+        $staffContact = null;
+        if ($phone) {
+            $cleanPhone = preg_replace('/[^0-9]/', '', $phone);
+            $last9 = strlen($cleanPhone) >= 9 ? substr($cleanPhone, -9) : $cleanPhone;
+            $staffContact = Contact::where('tenant_id', $tenantId)
+                ->where(function ($q) use ($phone, $last9) {
+                    $q->where('phone', $phone);
+                    if (! empty($last9)) {
+                        $q->orWhere('phone', 'like', "%{$last9}");
+                    }
+                })
+                ->first();
+        }
+
+        if (! $staffContact) {
+            $staffContact = Contact::where('tenant_id', $tenantId)
+                ->where('email', $email)
+                ->first();
+        }
 
         if (! $staffContact) {
             $staffContact = Contact::where('tenant_id', $tenantId)
@@ -229,13 +227,16 @@ class StaffController extends Controller
             if ($staffContact->name !== $validated['name']) {
                 $staffContact->name = $validated['name'];
             }
-            if ($email && empty($staffContact->email)) {
+            if ($phone && empty($staffContact->phone)) {
+                $staffContact->phone = $phone;
+            }
+            if (empty($staffContact->email)) {
                 $staffContact->email = $email;
             }
             $staffContact->save();
         } else {
-            $phoneToUse = $validated['phone'];
-            if (Contact::where('tenant_id', $tenantId)->where('phone', $phoneToUse)->exists()) {
+            $phoneToUse = $phone;
+            if ($phoneToUse && Contact::where('tenant_id', $tenantId)->where('phone', $phoneToUse)->exists()) {
                 $phoneToUse = null;
             }
             Contact::create([
@@ -295,8 +296,8 @@ class StaffController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:100'],
-            'phone' => ['required', 'string', 'max:25'],
-            'email' => ['nullable', 'email', 'max:100', 'unique:users,email,'.$staff->id],
+            'email' => ['required', 'email', 'max:100', 'unique:users,email,'.$staff->id],
+            'phone' => ['nullable', 'string', 'max:25'],
             'can_discount' => ['nullable', 'boolean'],
             'can_handover' => ['nullable', 'boolean'],
             'can_intake_stock' => ['nullable', 'boolean'],
@@ -304,27 +305,31 @@ class StaffController extends Controller
             'can_manage_inventory' => ['nullable', 'boolean'],
         ]);
 
-        // Validate phone uniqueness excluding current staff
-        $cleanPhone = preg_replace('/[^0-9]/', '', $validated['phone']);
-        $last9 = strlen($cleanPhone) >= 9 ? substr($cleanPhone, -9) : $cleanPhone;
+        $phone = ! empty($validated['phone']) ? trim($validated['phone']) : null;
 
-        $phoneExists = User::where('tenant_id', $currentUser->tenant_id)
-            ->where('id', '!=', $staff->id)
-            ->where(function ($q) use ($validated, $last9) {
-                $q->where('phone', $validated['phone']);
-                if (! empty($last9)) {
-                    $q->orWhere('phone', 'like', "%{$last9}");
-                }
-            })
-            ->exists();
+        // Validate phone uniqueness excluding current staff if phone is provided
+        if ($phone) {
+            $cleanPhone = preg_replace('/[^0-9]/', '', $phone);
+            $last9 = strlen($cleanPhone) >= 9 ? substr($cleanPhone, -9) : $cleanPhone;
 
-        if ($phoneExists) {
-            return response()->json([
-                'message' => 'A staff member with this phone number already exists in your shop.',
-                'errors' => [
-                    'phone' => ['A staff member with this phone number already exists in your shop.'],
-                ],
-            ], 422);
+            $phoneExists = User::where('tenant_id', $currentUser->tenant_id)
+                ->where('id', '!=', $staff->id)
+                ->where(function ($q) use ($phone, $last9) {
+                    $q->where('phone', $phone);
+                    if (! empty($last9)) {
+                        $q->orWhere('phone', 'like', "%{$last9}");
+                    }
+                })
+                ->exists();
+
+            if ($phoneExists) {
+                return response()->json([
+                    'message' => 'A staff member with this phone number already exists in your shop.',
+                    'errors' => [
+                        'phone' => ['A staff member with this phone number already exists in your shop.'],
+                    ],
+                ], 422);
+            }
         }
 
         $currentPermissions = is_array($staff->permissions) ? $staff->permissions : [];
@@ -338,13 +343,10 @@ class StaffController extends Controller
 
         $updateData = [
             'name' => $validated['name'],
-            'phone' => $validated['phone'],
+            'email' => strtolower(trim($validated['email'])),
+            'phone' => $phone,
             'permissions' => $newPermissions,
         ];
-
-        if (array_key_exists('email', $validated) && ! empty($validated['email'])) {
-            $updateData['email'] = $validated['email'];
-        }
 
         $staff->update($updateData);
 

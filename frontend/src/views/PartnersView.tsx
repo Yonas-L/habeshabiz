@@ -393,13 +393,13 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
       <div className="hidden sm:flex bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800/80 overflow-hidden shadow-2xs flex-1 flex-col min-h-0">
         <div className="overflow-x-auto overflow-y-auto h-[calc(100vh-235px)] sm:h-[calc(100vh-190px)] min-h-[440px] scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800 relative">
           <table className="w-full text-left text-xs border-collapse">
-            <thead className="sticky top-0 z-20 bg-slate-50/95 dark:bg-[#131926]/95 backdrop-blur-xs border-b border-slate-200/80 dark:border-slate-800 text-slate-400 font-bold uppercase tracking-wider text-[10px] shadow-2xs">
+            <thead className="sticky top-0 z-20 bg-slate-50/95 dark:bg-[#131926]/95 backdrop-blur-xs border-b border-slate-200/80 dark:border-slate-800 text-slate-400 font-bold uppercase tracking-wider text-[11px] shadow-2xs">
               <tr>
-                <th className="py-2.5 px-3.5 whitespace-nowrap">Partner / Vendor</th>
-                <th className="py-2.5 px-3.5 whitespace-nowrap">Roles</th>
-                <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Balance</th>
-                <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Actions</th>
-                <th className="py-2.5 px-2"></th>
+                <th className="py-3.5 px-5 whitespace-nowrap">Partner / Vendor</th>
+                <th className="py-3.5 px-5 whitespace-nowrap">Roles</th>
+                <th className="py-3.5 px-5 text-right whitespace-nowrap">Balance</th>
+                <th className="py-3.5 px-5 text-right whitespace-nowrap">Actions</th>
+                <th className="py-3.5 px-3"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-slate-700 dark:text-slate-300">
@@ -432,11 +432,11 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                   {sortedContacts.map((contact) => {
                     const isBrokered = contact.roles.includes('peer_vendor');
                     const initials = contact.name
-                      .split(' ')
-                      .map((n) => n[0])
-                      .slice(0, 2)
-                      .join('')
-                      .toUpperCase();
+                        .split(' ')
+                        .map((n) => n[0])
+                        .slice(0, 2)
+                        .join('')
+                        .toUpperCase();
                     const isInactive = contact.is_active === false;
 
                     return (
@@ -448,10 +448,10 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                         }`}
                       >
                         {/* Col 1: Partner / Vendor (Avatar + Name + Phone) */}
-                        <td className="py-2.5 px-3.5">
-                          <div className="flex items-center gap-2.5 min-w-0">
+                        <td className="py-4 px-5">
+                          <div className="flex items-center gap-3 min-w-0">
                             <div
-                              className={`w-8 h-8 rounded-lg flex items-center justify-center font-extrabold text-[11px] shrink-0 ${
+                              className={`w-10 h-10 rounded-xl flex items-center justify-center font-extrabold text-xs shrink-0 ${
                                 isBrokered
                                   ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-200/60 dark:border-amber-800/50'
                                   : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60'
@@ -460,14 +460,14 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                               {initials}
                             </div>
                             <div className="min-w-0">
-                              <div className="font-bold text-slate-900 dark:text-white text-xs truncate max-w-[180px] sm:max-w-[240px] group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                              <div className="font-bold text-slate-900 dark:text-white text-sm truncate max-w-[200px] sm:max-w-[280px] group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
                                 {contact.name}
                               </div>
                               {contact.phone ? (
-                                <div className="flex items-center gap-1 mt-0.5" onClick={(e) => e.stopPropagation()}>
+                                <div className="flex items-center gap-1.5 mt-0.5" onClick={(e) => e.stopPropagation()}>
                                   <a
                                     href={`tel:${contact.phone}`}
-                                    className="text-[10px] font-mono text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+                                    className="text-xs font-mono text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
                                   >
                                     {contact.phone}
                                   </a>
@@ -475,31 +475,31 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                                     type="button"
                                     onClick={() => handleCopyPhone(contact.phone!, contact.id)}
                                     title="Copy phone"
-                                    className="p-0.5 rounded text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                                    className="p-1 rounded text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
                                   >
                                     {copiedId === contact.id ? (
-                                      <Check className="w-2.5 h-2.5 text-emerald-500" />
+                                      <Check className="w-3 h-3 text-emerald-500" />
                                     ) : (
-                                      <Copy className="w-2.5 h-2.5" />
+                                      <Copy className="w-3 h-3" />
                                     )}
                                   </button>
                                 </div>
                               ) : (
-                                <span className="text-[10px] text-slate-400 italic">No phone</span>
+                                <span className="text-xs text-slate-400 italic">No phone</span>
                               )}
                             </div>
                           </div>
                         </td>
 
                         {/* Col 2: Roles */}
-                        <td className="py-2.5 px-3.5 whitespace-nowrap">
-                          <div className="flex flex-wrap gap-1">
+                        <td className="py-4 px-5 whitespace-nowrap">
+                          <div className="flex flex-wrap gap-1.5">
                             {contact.roles.map((r) => {
                               const badge = getRoleBadge(r);
                               return (
                                 <span
                                   key={r}
-                                  className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md leading-none ${badge.classes}`}
+                                  className={`text-[11px] font-semibold px-2 py-0.5 rounded-md leading-none ${badge.classes}`}
                                 >
                                   {badge.label}
                                 </span>
@@ -509,10 +509,10 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                         </td>
 
                         {/* Col 3: Balance */}
-                        <td className="py-2.5 px-3.5 text-right whitespace-nowrap">
+                        <td className="py-4 px-5 text-right whitespace-nowrap">
                           {typeof contact.net_balance === 'number' && contact.net_balance !== 0 ? (
                             <span
-                              className={`font-mono font-bold text-xs ${
+                              className={`font-mono font-bold text-sm tabular-nums ${
                                 contact.net_balance > 0
                                   ? 'text-emerald-600 dark:text-emerald-400'
                                   : 'text-rose-600 dark:text-rose-400'
@@ -523,35 +523,35 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                                 : `−${Math.abs(contact.net_balance).toLocaleString()} ETB`}
                             </span>
                           ) : (
-                            <span className="font-mono text-slate-400 text-xs">0.00 ETB</span>
+                            <span className="font-mono text-slate-400 text-sm">0.00 ETB</span>
                           )}
                         </td>
 
                         {/* Col 4: Actions (Edit, Delete) */}
-                        <td className="py-2.5 px-3.5 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex items-center justify-end gap-1">
+                        <td className="py-4 px-5 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-end gap-1.5">
                             <button
                               type="button"
                               onClick={() => handleOpenEditModal(contact)}
                               title="Edit"
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                              className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                             >
-                              <Pencil className="w-3.5 h-3.5" />
+                              <Pencil className="w-4 h-4" />
                             </button>
                             <button
                               type="button"
                               onClick={() => setDeletingContact(contact)}
                               title="Remove"
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                              className="p-2 rounded-xl text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
                         </td>
 
                         {/* Col 5: Chevron */}
-                        <td className="py-2.5 px-2 text-right">
-                          <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-700 dark:group-hover:text-slate-300 group-hover:translate-x-0.5 transition-all" />
+                        <td className="py-4 px-3 text-right">
+                          <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:text-slate-700 dark:group-hover:text-slate-300 group-hover:translate-x-0.5 transition-all" />
                         </td>
                       </tr>
                     );
@@ -562,7 +562,7 @@ export const PartnersView: React.FC<PartnersViewProps> = ({
                     <tr>
                       <td
                         colSpan={5}
-                        className="py-3 text-center text-[11px] text-slate-400 dark:text-slate-500 bg-slate-50/50 dark:bg-slate-900/30 font-medium"
+                        className="py-4 text-center text-xs text-slate-400 dark:text-slate-500 bg-slate-50/50 dark:bg-slate-900/30 font-medium"
                       >
                         <span className="inline-flex items-center gap-1.5">
                           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />

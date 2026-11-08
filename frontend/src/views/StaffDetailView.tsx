@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import type { StaffStatementData, FinancialAccount, User, StaffMember, Debt } from '../api/client';
 import { api } from '../api/client';
 import { toast } from 'sonner';
@@ -6,23 +7,27 @@ import {
   ArrowLeft,
   Copy,
   Check,
-  Printer,
+  ArrowDownToLine,
+  ChevronDown,
+  CheckCircle2,
   Phone,
   Pencil,
   Package,
   ArrowRightLeft,
   Receipt,
-  Search,
   CreditCard,
-  Send,
   Loader2,
-  ShieldCheck,
-  Sparkles,
+  Send,
+  UserX,
+  UserCheck,
+  KeyRound,
+  Trash2,
+  AlertTriangle,
 } from 'lucide-react';
-import { AnimatedNumber } from '../components/AnimatedNumber';
 import { CustomPageLoader } from '../components/loading/CustomPageLoader';
 import { formatLocalDate } from '../utils/dateUtils';
 import { SplitPaymentSelector, type PaymentSplitItem } from '../components/common/SplitPaymentSelector';
+import { EditStaffBottomSheet } from '../components/staff/EditStaffBottomSheet';
 
 interface StaffDetailViewProps {
   staffId: number;
@@ -34,6 +39,16 @@ interface StaffDetailViewProps {
 
 type DateRangeFilter = 'all' | 'this_month' | 'last_month' | 'last_30_days' | 'custom';
 type DashboardTab = 'statement' | 'sales' | 'handovers';
+
+const getLedgerBadgeClass = (type: string, isDebtOffset?: boolean) => {
+  if (type === 'bonus') {
+    return 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50';
+  }
+  if (isDebtOffset) {
+    return 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 border border-blue-200/50';
+  }
+  return 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50';
+};
 
 interface FlattenedLedgerRow {
   id: string;
@@ -65,9 +80,6 @@ export const StaffDetailView: React.FC<StaffDetailViewProps> = ({
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
 
-  // Search filter inside ledger
-  const [ledgerSearch, setLedgerSearch] = useState('');
-
   // Modals & Copy
   const [copiedPhone, setCopiedPhone] = useState(false);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
@@ -87,6 +99,19 @@ export const StaffDetailView: React.FC<StaffDetailViewProps> = ({
   const [notes, setNotes] = useState<string>('');
   const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
   const [isSubmittingSettle, setIsSubmittingSettle] = useState(false);
+
+  // Staff Edit & Account Management States
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+  const [isRemoveConfirmOpen, setIsRemoveConfirmOpen] = useState(false);
+  const [isRemoving, setIsRemoving] = useState(false);
+  const [shareCredentials, setShareCredentials] = useState<{
+    name: string;
+    login: string;
+    temporaryPassword: string;
+  } | null>(null);
+  const [copiedCredentials, setCopiedCredentials] = useState(false);
 
   const isOwner = _user?.role === 'owner';
 
@@ -453,19 +478,6 @@ export const StaffDetailView: React.FC<StaffDetailViewProps> = ({
     return rowsWithBalance;
   }, [statementData]);
 
-  // Filter ledger rows by search
-  const filteredLedger = useMemo(() => {
-    if (!ledgerSearch.trim()) return chronologicalLedger;
-    const term = ledgerSearch.toLowerCase();
-    return chronologicalLedger.filter((r) => {
-      return (
-        r.context.toLowerCase().includes(term) ||
-        r.type_label.toLowerCase().includes(term) ||
-        (r.order_number && r.order_number.toLowerCase().includes(term))
-      );
-    });
-  }, [chronologicalLedger, ledgerSearch]);
-
   if (loading && !statementData) {
     return <CustomPageLoader mode="app" fullScreen={false} />;
   }
@@ -487,39 +499,92 @@ export const StaffDetailView: React.FC<StaffDetailViewProps> = ({
   const { staff, summary, sales_orders, handovers } = statementData;
   const uncollectedBonus = summary.uncollected_bonus || 0;
   const hasUncollected = uncollectedBonus > 0;
+  const isSelf = _user?.id === staff.id;
 
-  const rangeLabel =
-    dateFilter === 'all'
-      ? 'All Historical Records'
-      : dateFilter === 'this_month'
-      ? 'This Month'
-      : dateFilter === 'last_month'
-      ? 'Last Month'
-      : dateFilter === 'last_30_days'
-      ? 'Last 30 Days'
-      : `${customStartDate || 'Start'} to ${customEndDate || 'End'}`;
+  const handleOpenEdit = () => {
+    setIsEditModalOpen(true);
+  };
+
+  const handleToggleStatus = async () => {
+    if (!statementData) return;
+    try {
+      await api.toggleStaffStatus(statementData.staff.id);
+      toast.success(
+        `${statementData.staff.name} has been ${statementData.staff.is_active ? 'suspended' : 'activated'}`
+      );
+      await loadStatement();
+      onStaffUpdated?.();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update staff status');
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!statementData) return;
+    try {
+      setIsResetting(true);
+      const res = await api.resetStaffPassword(statementData.staff.id);
+      toast.success(`Password reset for ${statementData.staff.name}`);
+      setIsResetConfirmOpen(false);
+      setShareCredentials({
+        name: statementData.staff.name,
+        login: statementData.staff.email || statementData.staff.phone || '',
+        temporaryPassword: res.temporary_password,
+      });
+      await loadStatement();
+      onStaffUpdated?.();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to reset password');
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
+  const handleConfirmRemove = async () => {
+    if (!statementData) return;
+    try {
+      setIsRemoving(true);
+      await api.deleteStaff(statementData.staff.id);
+      toast.success(`Staff account ${statementData.staff.name} removed successfully.`);
+      setIsRemoveConfirmOpen(false);
+      onStaffUpdated?.();
+      onBack();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to remove staff account');
+    } finally {
+      setIsRemoving(false);
+    }
+  };
+
+  const handleCopyCredentials = () => {
+    if (!shareCredentials) return;
+    const shareText = `👋 Welcome to Bole Tech Business OS!\n\nLogin: ${shareCredentials.login}\nPassword: ${shareCredentials.temporaryPassword}\nURL: ${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173'}\n\nPlease sign in and update your password.`;
+    navigator.clipboard.writeText(shareText);
+    setCopiedCredentials(true);
+    toast.success('Login credentials copied to clipboard');
+    setTimeout(() => setCopiedCredentials(false), 3000);
+  };
 
   return (
     <div className="space-y-5 animate-page-enter">
-      {/* ── Top Navigation Bar ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200/80 dark:border-slate-800">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onBack}
-            className="p-2 -ml-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
-            title="Back to Staff List"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
+      {/* ── Top Navigation & Header ── */}
+      <div className="space-y-3.5 pb-4 border-b border-slate-200/80 dark:border-slate-800">
+        {/* Row 1: Back Button + Name + Action Buttons */}
+        <div className="flex items-center justify-between gap-3 min-w-0">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <button
+              onClick={onBack}
+              className="p-1.5 -ml-1 rounded-xl text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0 cursor-pointer"
+              title="Back to Staff List"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
 
-          <div className="flex items-center gap-2.5 min-w-0">
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <h1 className="text-base sm:text-xl font-bold text-slate-900 dark:text-white tracking-tight truncate">
-                  {staff.name}
-                </h1>
-              </div>
-              <div className="hidden sm:flex items-center gap-2 text-xs text-slate-400 mt-0.5">
+              <h1 className="text-lg sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight truncate">
+                {staff.name}
+              </h1>
+              <div className="hidden sm:flex items-center gap-2 text-xs text-slate-400 mt-0.5 flex-wrap">
                 {staff.phone && (
                   <button
                     onClick={() => handleCopyPhone(staff.phone!)}
@@ -527,91 +592,246 @@ export const StaffDetailView: React.FC<StaffDetailViewProps> = ({
                   >
                     <Phone className="w-3 h-3 text-slate-400" />
                     <span>{staff.phone}</span>
-                    {copiedPhone ? (
-                      <Check className="w-2.5 h-2.5 text-emerald-500" />
-                    ) : (
-                      <Copy className="w-2.5 h-2.5" />
-                    )}
+                    {copiedPhone ? <Check className="w-2.5 h-2.5 text-emerald-500" /> : <Copy className="w-2.5 h-2.5" />}
                   </button>
                 )}
-                <span>·</span>
-                <span className="capitalize">{staff.role}</span>
+                <span className="inline-flex items-center gap-1.5">
+                  {staff.phone && <span>·</span>}
+                  <span className="capitalize">{staff.role}</span>
+                </span>
                 {staff.email && (
-                  <>
+                  <span className="inline-flex items-center gap-1.5">
                     <span>·</span>
                     <span className="text-slate-400">{staff.email}</span>
-                  </>
+                  </span>
                 )}
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {onEditStaff && (
-            <button
-              type="button"
-              onClick={() =>
-                onEditStaff({
-                  id: staff.id,
-                  name: staff.name,
-                  email: staff.email,
-                  phone: staff.phone,
-                  role: staff.role,
-                  is_active: staff.is_active,
-                  created_at: staff.created_at || '',
-                  stats: {
-                    sales_count_week: 0,
-                    sales_volume_week: 0,
-                    sales_count_month: summary.total_sales_count,
-                    sales_volume_month: summary.total_sales_volume,
-                    uncollected_bonus: summary.uncollected_bonus,
-                    collected_bonus: summary.collected_bonus,
-                    total_bonus_earned: summary.total_bonus_earned,
-                    last_sale_at: null,
-                  },
-                })
-              }
-              className="h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/80 text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95"
-              title="Edit Staff Member"
-            >
-              <Pencil className="w-3.5 h-3.5 text-slate-500" />
-              <span>Edit</span>
-            </button>
-          )}
-
-          {hasUncollected && isOwner && (
-            <button
-              type="button"
-              onClick={handleOpenSettleModal}
-              className="h-9 px-3.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-rose-600/20"
-              title="Disburse earned commission bonus"
-            >
-              <CreditCard className="w-3.5 h-3.5" />
-              <span>Settle Bonus</span>
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={handleDownloadPdf}
-            disabled={isDownloadingPdf}
-            className="h-9 px-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-800 text-emerald-400 dark:text-emerald-400 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-50"
-            title="Download corporate PDF statement"
-          >
-            {isDownloadingPdf ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
-            ) : (
-              <Printer className="w-3.5 h-3.5 text-emerald-400" />
+          {/* Action Buttons: Edit, Settle Bonus, PDF (Mobile only < sm) */}
+          <div className="sm:hidden flex items-center gap-1.5 shrink-0">
+            {isOwner && (
+              <button
+                type="button"
+                onClick={handleOpenEdit}
+                className="h-8 px-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/80 text-xs font-bold transition-all shadow-2xs flex items-center gap-1 cursor-pointer active:scale-95"
+                title="Edit Staff Member"
+              >
+                <Pencil className="w-3.5 h-3.5 text-slate-500" />
+                <span>Edit</span>
+              </button>
             )}
-            <span>Print Statement</span>
-          </button>
+
+            {hasUncollected && isOwner && (
+              <button
+                type="button"
+                onClick={handleOpenSettleModal}
+                className="h-8 px-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer active:scale-95"
+                title="Settle Bonus"
+              >
+                <CreditCard className="w-3.5 h-3.5" />
+                <span>Settle</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={handleDownloadPdf}
+              disabled={isDownloadingPdf}
+              className="h-8 px-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-800 text-emerald-400 dark:text-emerald-400 text-xs font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+              title="Download Statement as PDF"
+            >
+              {isDownloadingPdf ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+                  <span>Saving…</span>
+                </>
+              ) : (
+                <>
+                  <ArrowDownToLine className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>PDF</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Desktop Right Cluster (≥ sm): Balance + Divider + Actions */}
+          <div className="hidden sm:flex items-center gap-5 shrink-0">
+            <div className="text-right">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block leading-tight">
+                {hasUncollected ? 'We Owe Staff' : 'Settled In Full'}
+              </span>
+              <div
+                className={`text-2xl lg:text-3xl font-black font-mono tracking-tight tabular-nums flex items-baseline justify-end gap-1.5 ${
+                  hasUncollected
+                    ? 'text-rose-600 dark:text-rose-400'
+                    : 'text-slate-900 dark:text-white'
+                }`}
+              >
+                <span>
+                  {hasUncollected
+                    ? `−${uncollectedBonus.toLocaleString()}`
+                    : '0.00'}
+                </span>
+                <span className="text-xs font-sans font-bold text-slate-400 dark:text-slate-500">
+                  ETB
+                </span>
+              </div>
+            </div>
+
+            <div className="h-9 w-px bg-slate-200 dark:bg-slate-800 shrink-0" />
+
+            <div className="flex items-center gap-2">
+              {isOwner && (
+                <button
+                  type="button"
+                  onClick={handleOpenEdit}
+                  className="h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/80 text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95"
+                  title="Edit Staff Member"
+                >
+                  <Pencil className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Edit</span>
+                </button>
+              )}
+
+              {isOwner && !isSelf && (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleToggleStatus}
+                    className={`h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95 ${
+                      staff.is_active
+                        ? 'text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40'
+                        : 'text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40'
+                    }`}
+                    title={staff.is_active ? 'Suspend staff' : 'Activate staff'}
+                  >
+                    {staff.is_active ? <UserX className="w-3.5 h-3.5" /> : <UserCheck className="w-3.5 h-3.5" />}
+                    <span>{staff.is_active ? 'Suspend' : 'Activate'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsResetConfirmOpen(true)}
+                    className="h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/80 text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95"
+                    title="Reset Temporary Password"
+                  >
+                    <KeyRound className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Reset PW</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsRemoveConfirmOpen(true)}
+                    className="h-9 px-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95"
+                    title="Remove Staff Account"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </>
+              )}
+
+              {hasUncollected && isOwner && (
+                <button
+                  type="button"
+                  onClick={handleOpenSettleModal}
+                  className="h-9 px-3.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-rose-600/20"
+                  title="Disburse earned commission bonus"
+                >
+                  <CreditCard className="w-3.5 h-3.5" />
+                  <span>Settle Bonus</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={handleDownloadPdf}
+                disabled={isDownloadingPdf}
+                className="h-9 px-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-800 text-emerald-400 dark:text-emerald-400 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+                title="Download Statement as PDF"
+              >
+                {isDownloadingPdf ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+                    <span>Saving…</span>
+                  </>
+                ) : (
+                  <>
+                    <ArrowDownToLine className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>PDF Statement</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
+
+        {/* Row 2: Large Total Amount on Left + Minimal Period Dropdown on Right (Mobile only < sm) */}
+        <div className="sm:hidden flex items-end justify-between gap-3 pt-1">
+          <div>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block mb-0.5">
+              {hasUncollected ? 'We Owe Staff' : 'Settled In Full'}
+            </span>
+            <div
+              className={`text-2xl font-black font-mono tracking-tight tabular-nums flex items-baseline gap-1.5 ${
+                hasUncollected
+                  ? 'text-rose-600 dark:text-rose-400'
+                  : 'text-slate-900 dark:text-white'
+              }`}
+            >
+              <span>
+                {hasUncollected
+                  ? `−${uncollectedBonus.toLocaleString()}`
+                  : '0.00'}
+              </span>
+              <span className="text-xs font-sans font-bold text-slate-400 dark:text-slate-500">
+                ETB
+              </span>
+            </div>
+          </div>
+
+          {/* Right (Mobile only < sm): Minimal native Period dropdown without nested cards */}
+          <div className="flex items-center shrink-0 pb-0.5">
+            <div className="relative">
+              <select
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value as DateRangeFilter)}
+                className="h-8 pl-2.5 pr-6 rounded-lg border border-slate-200/90 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/80 text-xs font-semibold text-slate-700 dark:text-slate-300 focus:outline-none cursor-pointer appearance-none shadow-2xs"
+              >
+                <option value="all">All Time</option>
+                <option value="this_month">This Month</option>
+                <option value="last_month">Last Month</option>
+                <option value="last_30_days">Last 30 Days</option>
+                <option value="custom">Custom</option>
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400 pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2" />
+            </div>
+          </div>
+        </div>
+
+        {/* Custom Range Date Pickers on Mobile (< sm) */}
+        {dateFilter === 'custom' && (
+          <div className="sm:hidden flex items-center gap-2 text-xs pt-1">
+            <input
+              type="date"
+              value={customStartDate}
+              onChange={(e) => setCustomStartDate(e.target.value)}
+              className="h-7.5 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-mono font-medium text-slate-900 dark:text-white flex-1"
+            />
+            <span className="text-slate-400 text-xs">to</span>
+            <input
+              type="date"
+              value={customEndDate}
+              onChange={(e) => setCustomEndDate(e.target.value)}
+              className="h-7.5 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs font-mono font-medium text-slate-900 dark:text-white flex-1"
+            />
+          </div>
+        )}
       </div>
 
-      {/* ── Date Range Controls ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-2xl bg-white dark:bg-[#131926] border border-slate-100 dark:border-slate-800 shadow-2xs">
+      {/* ── Desktop Date Range Controls (≥ sm) ── */}
+      <div className="hidden sm:flex items-center justify-between gap-2.5 p-2 rounded-2xl bg-white dark:bg-[#131926] border border-slate-100 dark:border-slate-800 shadow-2xs">
         <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl text-xs font-semibold overflow-x-auto">
           <button
             onClick={() => setDateFilter('all')}
@@ -684,146 +904,6 @@ export const StaffDetailView: React.FC<StaffDetailViewProps> = ({
         )}
       </div>
 
-      {/* ── Financial Position: Matching Bilateral Net Balance Hero Card (Desktop >= sm) ── */}
-      <div
-        className={`hidden sm:block rounded-2xl border p-5 sm:p-6 shadow-xs transition-all ${
-          hasUncollected
-            ? 'bg-gradient-to-br from-rose-50/70 via-white to-rose-50/30 dark:from-rose-950/30 dark:via-[#131926] dark:to-[#131926] border-rose-200/90 dark:border-rose-900/60'
-            : 'bg-white dark:bg-[#131926] border-slate-200/80 dark:border-slate-800'
-        }`}
-      >
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
-          {/* Left Column: Focused Net Balance */}
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                Commission Bonus Position
-              </span>
-              <span
-                className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1.5 ${
-                  hasUncollected
-                    ? 'bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300 border border-rose-200/60 dark:border-rose-800/60'
-                    : 'bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/60'
-                }`}
-              >
-                <span
-                  className={`w-1.5 h-1.5 rounded-full ${
-                    hasUncollected ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500'
-                  }`}
-                />
-                {hasUncollected ? 'Store Owes Staff' : 'Settled In Full'}
-              </span>
-            </div>
-
-            <div
-              className={`text-3xl sm:text-4xl font-black font-mono tracking-tight tabular-nums flex items-baseline gap-1.5 ${
-                hasUncollected
-                  ? 'text-rose-600 dark:text-rose-400'
-                  : 'text-slate-900 dark:text-white'
-              }`}
-            >
-              <span>{hasUncollected ? '−' : ''}</span>
-              <AnimatedNumber value={uncollectedBonus} />
-              <span className="text-xs font-semibold font-sans text-slate-400 dark:text-slate-500">
-                ETB
-              </span>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium">
-              <span className={hasUncollected ? 'text-rose-600 dark:text-rose-400' : 'text-slate-500 dark:text-slate-400'}>
-                {hasUncollected
-                  ? `Your shop owes this commission bonus to ${staff.name}.`
-                  : `All earned bonuses with ${staff.name} are fully disbursed.`}
-              </span>
-              <span>·</span>
-              <span className="text-[11px] text-slate-400 font-normal">
-                {rangeLabel}
-              </span>
-            </div>
-
-            <div className="pt-1 flex items-center gap-1 text-[11px] font-bold text-slate-600 dark:text-slate-300">
-              <ShieldCheck className="size-3.5 text-emerald-500" />
-              <span>Autonomous Bonus Protection: Isolated from custody handovers & trade debts.</span>
-            </div>
-          </div>
-
-          {/* Right Column: Micro-Stats Boxes */}
-          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 pt-3 md:pt-0 border-t md:border-t-0 md:border-l border-slate-200/70 dark:border-slate-800/80 md:pl-5 shrink-0">
-            <div className="px-3 py-2 rounded-xl bg-white/80 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800/60 text-center min-w-[95px] shadow-2xs">
-              <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400 block">
-                Bonus Paid
-              </span>
-              <span className="text-sm font-mono font-bold text-slate-800 dark:text-slate-200 block mt-0.5">
-                {(summary.collected_bonus || 0).toLocaleString()} <span className="text-[10px] font-sans font-normal text-slate-400">ETB</span>
-              </span>
-            </div>
-
-            <div className="px-3 py-2 rounded-xl bg-white/80 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800/60 text-center min-w-[95px] shadow-2xs">
-              <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400 block">
-                Total Sales
-              </span>
-              <span className="text-sm font-mono font-bold text-slate-800 dark:text-slate-200 block mt-0.5">
-                {(summary.total_sales_volume || 0).toLocaleString()} <span className="text-[10px] font-sans font-normal text-slate-400">ETB</span>
-              </span>
-            </div>
-
-            <div className="px-3 py-2 rounded-xl bg-white/80 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800/60 text-center min-w-[95px] shadow-2xs">
-              <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400 block">
-                Held Handover
-              </span>
-              <span className="text-sm font-mono font-bold text-emerald-600 dark:text-emerald-400 block mt-0.5">
-                {(summary.active_handovers_value || 0).toLocaleString()} <span className="text-[10px] font-sans font-normal text-slate-400">ETB</span>
-              </span>
-              <span className="text-[9px] text-slate-400 block">
-                {summary.active_handovers_count || 0} {summary.active_handovers_count === 1 ? 'unit' : 'units'} in custody
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Mobile Minimal Amount on Top Strip (< sm) ── */}
-      <div className="sm:hidden flex items-center justify-between p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#131926] shadow-2xs">
-        <div>
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-            Bonus Payable
-          </span>
-          <div className="flex items-baseline gap-1 mt-0.5">
-            <span
-              className={`text-2xl font-black font-mono tracking-tight tabular-nums ${
-                hasUncollected
-                  ? 'text-rose-600 dark:text-rose-400'
-                  : 'text-slate-900 dark:text-white'
-              }`}
-            >
-              {hasUncollected ? '−' : ''}
-              <AnimatedNumber value={uncollectedBonus} />
-            </span>
-            <span className="text-[10px] font-semibold text-slate-400">ETB</span>
-          </div>
-        </div>
-
-        <div className="text-right flex flex-col items-end gap-1">
-          <span
-            className={`text-[10px] font-bold px-2 py-0.5 rounded-md inline-flex items-center gap-1.5 ${
-              hasUncollected
-                ? 'bg-black text-white border border-rose-500/40'
-                : 'bg-black text-white border border-emerald-500/40'
-            }`}
-          >
-            <span
-              className={`w-1.5 h-1.5 rounded-full ${
-                hasUncollected ? 'bg-rose-500 animate-pulse' : 'bg-emerald-400'
-              }`}
-            />
-            <span>{hasUncollected ? 'Store Owes Staff' : 'Settled In Full'}</span>
-          </span>
-          <span className="text-[10px] font-mono text-slate-400">
-            Paid: {(summary.collected_bonus || 0).toLocaleString()} ETB
-          </span>
-        </div>
-      </div>
-
       {/* ── Sub-Tabs Navigation Strip ── */}
       <div className="flex items-center gap-1 border-b border-slate-200 dark:border-slate-800 overflow-x-auto text-xs font-semibold">
         <button
@@ -856,7 +936,7 @@ export const StaffDetailView: React.FC<StaffDetailViewProps> = ({
           }`}
         >
           <Package className="w-3.5 h-3.5" />
-          <span>Sales Closed</span>
+          <span>Sales Orders</span>
           <span
             className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
               activeTab === 'sales'
@@ -890,63 +970,34 @@ export const StaffDetailView: React.FC<StaffDetailViewProps> = ({
         </button>
       </div>
 
-      {/* ── TAB 1: STATEMENT & LEDGER BREAKDOWN ── */}
+      {/* ── Tab Content ── */}
+
+      {/* TAB 1: STATEMENT & LEDGER BREAKDOWN */}
       {activeTab === 'statement' && (
         <div className="space-y-3">
-          {/* Quick Search */}
-          <div className="flex items-center justify-between gap-3">
-            <div className="relative max-w-sm w-full">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-              <input
-                type="text"
-                value={ledgerSearch}
-                onChange={(e) => setLedgerSearch(e.target.value)}
-                placeholder="Search transactions, reference..."
-                className="w-full h-9 pl-9 pr-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151b26] text-xs text-slate-900 dark:text-white focus:outline-hidden"
-              />
-            </div>
-
-            <span className="text-[11px] text-slate-400 font-mono">
-              Showing {filteredLedger.length} of {chronologicalLedger.length} entries
-            </span>
-          </div>
-
-          {/* Table View matching ReportsView (Desktop & Mobile) */}
-          <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-[#131926] shadow-2xs">
-            <div className="flex items-center justify-between px-3.5 py-2.5 sm:px-4 sm:py-3 bg-slate-50 dark:bg-slate-900/70 border-b border-slate-200 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                <Receipt className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
-                  Statement & Ledger Breakdown
-                </h2>
-              </div>
-              <span className="text-[11px] font-mono text-slate-400">
-                Showing {filteredLedger.length} of {chronologicalLedger.length} entries
-              </span>
-            </div>
-
-            <div className="h-[420px] overflow-y-auto overflow-x-hidden sm:overflow-x-auto">
-              {/* Desktop Table View (>= sm) */}
-              <table className="hidden sm:table w-full text-left text-xs border-collapse">
-                <thead className="sticky top-0 z-10 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-xs border-b border-slate-200 dark:border-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  <tr>
+          {/* Table View: Cardless & Horizontally Scrollable on Mobile, Carded on Desktop */}
+          <div className="bg-transparent sm:bg-white sm:dark:bg-[#131926] sm:rounded-2xl sm:border sm:border-slate-200/80 sm:dark:border-slate-800 sm:shadow-2xs overflow-hidden">
+            <div className="overflow-x-auto scrollbar-thin">
+              <table className="w-full text-left text-xs border-collapse min-w-[640px]">
+                <thead>
+                  <tr className="bg-slate-50/80 dark:bg-slate-900/60 border-b border-slate-200/80 dark:border-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                     <th className="py-2.5 px-3.5 whitespace-nowrap">Date</th>
                     <th className="py-2.5 px-3.5 whitespace-nowrap">Type</th>
-                    <th className="py-2.5 px-3.5 min-w-[200px]">Description</th>
+                    <th className="py-2.5 px-3.5 min-w-[220px]">Description</th>
                     <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Bonus Earned</th>
                     <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Disbursed / Offset</th>
-                    <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Balance</th>
+                    <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Running Balance</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 font-mono text-xs">
-                  {filteredLedger.length === 0 ? (
+                  {chronologicalLedger.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="py-12 text-center text-slate-400 font-sans italic">
                         No transactions found matching your criteria.
                       </td>
                     </tr>
                   ) : (
-                    filteredLedger.map((row) => (
+                    chronologicalLedger.map((row) => (
                       <tr
                         key={row.id}
                         className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors"
@@ -956,13 +1007,7 @@ export const StaffDetailView: React.FC<StaffDetailViewProps> = ({
                         </td>
                         <td className="py-2.5 px-3.5 whitespace-nowrap font-sans">
                           <span
-                            className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                              row.type === 'bonus'
-                                ? 'bg-black dark:bg-black text-white border border-emerald-500/40'
-                                : row.is_debt_offset
-                                ? 'bg-black dark:bg-black text-emerald-400 border border-emerald-500/40'
-                                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60'
-                            }`}
+                            className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${getLedgerBadgeClass(row.type, row.is_debt_offset)}`}
                           >
                             {row.type_label}
                           </span>
@@ -988,7 +1033,7 @@ export const StaffDetailView: React.FC<StaffDetailViewProps> = ({
                         </td>
                         <td className="py-2.5 px-3.5 text-right tabular-nums text-slate-700 dark:text-slate-300">
                           {row.receivable !== 0 ? (
-                            <span className="text-emerald-500 dark:text-emerald-400 font-bold">
+                            <span className="text-emerald-600 dark:text-emerald-400 font-bold">
                               -{Math.abs(row.receivable).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                             </span>
                           ) : (
@@ -996,110 +1041,56 @@ export const StaffDetailView: React.FC<StaffDetailViewProps> = ({
                           )}
                         </td>
                         <td className="py-2.5 px-3.5 text-right tabular-nums font-bold">
-                          <span className={row.running_balance > 0 ? 'text-slate-900 dark:text-white font-bold' : 'text-slate-400'}>
+                          <span
+                            className={
+                              row.running_balance > 0
+                                ? 'text-rose-600 dark:text-rose-400'
+                                : 'text-slate-400'
+                            }
+                          >
+                            {row.running_balance > 0 ? '−' : ''}
                             {row.running_balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                           </span>
                         </td>
                       </tr>
                     ))
                   )}
+                  {chronologicalLedger.length > 0 && (
+                    <tr>
+                      <td
+                        colSpan={6}
+                        className="py-3 text-center text-[11px] text-slate-400 dark:text-slate-500 bg-slate-50/50 dark:bg-slate-900/30 font-medium font-sans"
+                      >
+                        <span className="inline-flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                          <span>All {chronologicalLedger.length} transactions loaded</span>
+                        </span>
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
-
-              {/* Mobile List-Like Table View (< sm): 100% Width, Zero Horizontal Scroll */}
-              <div className="sm:hidden divide-y divide-slate-100 dark:divide-slate-800/80 text-xs">
-                {filteredLedger.length === 0 ? (
-                  <div className="py-12 text-center text-slate-400 italic">
-                    No transactions found matching your criteria.
-                  </div>
-                ) : (
-                  filteredLedger.map((row) => (
-                    <div
-                      key={row.id}
-                      className="py-2.5 px-3 flex items-start justify-between gap-2 hover:bg-slate-50/60 dark:hover:bg-slate-800/30"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-[10px] text-slate-400 font-mono">{row.formatted_date}</span>
-                          <span
-                            className={`px-1.5 py-0.2 rounded-md text-[9px] font-bold ${
-                              row.type === 'bonus'
-                                ? 'bg-black dark:bg-black text-white border border-emerald-500/40'
-                                : row.is_debt_offset
-                                ? 'bg-black dark:bg-black text-emerald-400 border border-emerald-500/40'
-                                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
-                            }`}
-                          >
-                            {row.type_label}
-                          </span>
-                        </div>
-                        <div className="text-xs font-semibold text-slate-900 dark:text-white mt-1 break-words">
-                          {row.context}
-                          {row.order_number && (
-                            <span className="text-[10px] font-mono text-slate-400 font-bold ml-1">
-                              #{row.order_number}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="text-right shrink-0 font-mono">
-                        {row.payable !== 0 ? (
-                          <div className="font-bold text-slate-900 dark:text-white">
-                            +{row.payable.toLocaleString()} ETB
-                          </div>
-                        ) : row.receivable !== 0 ? (
-                          <div className="font-bold text-emerald-500 dark:text-emerald-400">
-                            -{Math.abs(row.receivable).toLocaleString()} ETB
-                          </div>
-                        ) : (
-                          <div className="text-slate-400">—</div>
-                        )}
-                        <div
-                          className={`text-[10px] font-semibold mt-0.5 ${
-                            row.running_balance > 0 ? 'text-slate-900 dark:text-white font-bold' : 'text-slate-400'
-                          }`}
-                        >
-                          Bal: {row.running_balance.toLocaleString(undefined, { minimumFractionDigits: 2 })} ETB
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── TAB 2: CLOSED SALES ORDERS ── */}
+      {/* TAB 2: CLOSED SALES ORDERS */}
       {activeTab === 'sales' && (
-        <div className="space-y-3">
-          <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-[#131926] shadow-2xs">
-            <div className="flex items-center justify-between px-3.5 py-2.5 sm:px-4 sm:py-3 bg-slate-50 dark:bg-slate-900/70 border-b border-slate-200 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                <Package className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
-                  Sales Orders Closed
-                </h2>
-              </div>
-              <span className="text-[11px] font-mono text-slate-400">
-                {sales_orders.length} orders
-              </span>
-            </div>
-
-            <div className="h-[420px] overflow-y-auto overflow-x-hidden sm:overflow-x-auto">
-              {/* Desktop Table View (>= sm) */}
-              <table className="hidden sm:table w-full text-left text-xs border-collapse">
-                <thead className="sticky top-0 z-10 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-xs border-b border-slate-200 dark:border-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  <tr>
+        <div>
+          {/* Table View: Cardless & Horizontally Scrollable on Mobile, Carded on Desktop */}
+          <div className="bg-transparent sm:bg-white sm:dark:bg-[#131926] sm:rounded-2xl sm:border sm:border-slate-200/80 sm:dark:border-slate-800 sm:shadow-2xs overflow-hidden">
+            <div className="overflow-x-auto scrollbar-thin">
+              <table className="w-full text-left text-xs border-collapse min-w-[640px]">
+                <thead>
+                  <tr className="bg-slate-50/80 dark:bg-slate-900/60 border-b border-slate-200/80 dark:border-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                     <th className="py-2.5 px-3.5 whitespace-nowrap">Date</th>
                     <th className="py-2.5 px-3.5 whitespace-nowrap">Order #</th>
                     <th className="py-2.5 px-3.5 whitespace-nowrap">Customer</th>
                     <th className="py-2.5 px-3.5 min-w-[200px]">Items Sold</th>
                     <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Total Amount</th>
-                    <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Status</th>
-                    <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Bonus</th>
+                    <th className="py-2.5 px-3.5 text-center whitespace-nowrap">Payment</th>
+                    <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Bonus Earned</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 font-mono text-xs">
@@ -1134,236 +1125,121 @@ export const StaffDetailView: React.FC<StaffDetailViewProps> = ({
                         <td className="py-2.5 px-3.5 text-right font-bold text-slate-900 dark:text-white whitespace-nowrap">
                           {order.total_amount.toLocaleString()} ETB
                         </td>
-                        <td className="py-2.5 px-3.5 text-right whitespace-nowrap font-sans">
+                        <td className="py-2.5 px-3.5 text-center whitespace-nowrap font-sans">
                           <span
-                            className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                            className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${
                               order.payment_status === 'paid'
-                                ? 'bg-black dark:bg-black text-white border border-emerald-500/40'
-                                : 'bg-black dark:bg-black text-amber-400 border border-amber-500/40'
+                                ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50'
+                                : 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50'
                             }`}
                           >
                             {order.payment_status === 'paid' ? 'Paid' : 'Credit / Partial'}
                           </span>
                         </td>
-                        <td className="py-2.5 px-3.5 text-right font-bold text-emerald-500 dark:text-emerald-400 whitespace-nowrap">
+                        <td className="py-2.5 px-3.5 text-right font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
                           {order.bonus_amount > 0 ? (
-                            <div className="flex flex-col items-end gap-0.5">
-                              <span className="inline-flex items-center justify-end gap-1 px-2 py-0.5 rounded-md bg-black dark:bg-black text-white border border-emerald-500/40">
-                                <Sparkles className="size-2.5 text-emerald-400" />
-                                <span>+{order.bonus_amount.toLocaleString()} ETB</span>
-                              </span>
-                              {order.bonus_used_for_debt && (
-                                <span className="text-[9px] font-bold text-emerald-400 tracking-wider uppercase">
-                                  Used for Debt
-                                </span>
-                              )}
-                            </div>
+                            <span>+{order.bonus_amount.toLocaleString()} ETB</span>
                           ) : (
-                            '—'
+                            <span className="text-slate-400 font-normal">—</span>
                           )}
                         </td>
                       </tr>
                     ))
                   )}
+                  {sales_orders.length > 0 && (
+                    <tr>
+                      <td
+                        colSpan={7}
+                        className="py-3 text-center text-[11px] text-slate-400 dark:text-slate-500 bg-slate-50/50 dark:bg-slate-900/30 font-medium font-sans"
+                      >
+                        <span className="inline-flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                          <span>All {sales_orders.length} sales orders loaded</span>
+                        </span>
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
-
-              {/* Mobile View (< sm): 100% Width, Zero Horizontal Scroll */}
-              <div className="sm:hidden divide-y divide-slate-100 dark:divide-slate-800/80 text-xs">
-                {sales_orders.length === 0 ? (
-                  <div className="py-12 text-center text-slate-400 italic">
-                    No sales orders closed by this staff member yet.
-                  </div>
-                ) : (
-                  sales_orders.map((order) => (
-                    <div
-                      key={order.id}
-                      className="py-2.5 px-3 flex items-start justify-between gap-2 hover:bg-slate-50/60 dark:hover:bg-slate-800/30"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-bold text-slate-900 dark:text-white">#{order.order_number}</span>
-                          <span className="text-[10px] text-slate-400 font-mono">
-                            {order.order_date ? new Date(order.order_date).toLocaleDateString() : '—'}
-                          </span>
-                        </div>
-                        <div className="text-xs text-slate-700 dark:text-slate-300 font-medium truncate mt-0.5">
-                          {order.customer_name}
-                        </div>
-                        <div className="text-[10px] text-slate-400 truncate mt-0.5">
-                          {order.items.map((it) => it.name).join(', ')}
-                        </div>
-                      </div>
-
-                      <div className="text-right shrink-0">
-                        <div className="font-bold font-mono text-slate-900 dark:text-white">
-                          {order.total_amount.toLocaleString()} ETB
-                        </div>
-                        <div className="mt-1 flex items-center justify-end gap-1">
-                          <span
-                            className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
-                              order.payment_status === 'paid'
-                                ? 'bg-black text-white border border-emerald-500/40'
-                                : 'bg-black text-amber-400 border border-amber-500/40'
-                            }`}
-                          >
-                            {order.payment_status === 'paid' ? 'Paid' : 'Credit'}
-                          </span>
-                          {order.bonus_amount > 0 && (
-                            <span className="px-1.5 py-0.2 rounded text-[9px] font-bold font-mono bg-black text-white border border-emerald-500/40 inline-flex items-center gap-0.5">
-                              <Sparkles className="size-2 text-emerald-400" />
-                              <span>+{order.bonus_amount.toLocaleString()}</span>
-                              {order.bonus_used_for_debt && (
-                                <span className="text-[8px] text-emerald-300 font-sans ml-0.5">· Debt</span>
-                              )}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── TAB 3: HANDOVERS OUT ── */}
+      {/* TAB 3: HANDOVERS OUT */}
       {activeTab === 'handovers' && (
-        <div className="space-y-3">
-          <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 flex items-start gap-3 text-xs text-slate-700 dark:text-slate-300">
-            <ShieldCheck className="size-4 text-emerald-500 dark:text-emerald-400 shrink-0 mt-0.5" />
-            <div>
-              <span className="font-bold">Custody Separation: </span>
-              Devices handed out to {staff.name} for outside demonstration or sales are tracked here.
-              Handing over devices will <span className="underline font-bold">never reduce</span> their earned commission bonuses.
-            </div>
-          </div>
-
-          <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-[#131926] shadow-2xs">
-            <div className="flex items-center justify-between px-3.5 py-2.5 sm:px-4 sm:py-3 bg-slate-50 dark:bg-slate-900/70 border-b border-slate-200 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                <ArrowRightLeft className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
-                  Custody Handovers Out
-                </h2>
-              </div>
-              <span className="text-[11px] font-mono text-slate-400">
-                {handovers.length} units
-              </span>
-            </div>
-
-            <div className="h-[420px] overflow-y-auto overflow-x-hidden sm:overflow-x-auto">
-              {/* Desktop Table View (>= sm) */}
-              <table className="hidden sm:table w-full text-left text-xs border-collapse">
-                <thead className="sticky top-0 z-10 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-xs border-b border-slate-200 dark:border-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  <tr>
+        <div>
+          {/* Table View: Cardless & Horizontally Scrollable on Mobile, Carded on Desktop */}
+          <div className="bg-transparent sm:bg-white sm:dark:bg-[#131926] sm:rounded-2xl sm:border sm:border-slate-200/80 sm:dark:border-slate-800 sm:shadow-2xs overflow-hidden">
+            <div className="overflow-x-auto scrollbar-thin">
+              <table className="w-full text-left text-xs border-collapse min-w-[640px]">
+                <thead>
+                  <tr className="bg-slate-50/80 dark:bg-slate-900/60 border-b border-slate-200/80 dark:border-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    <th className="py-2.5 px-3.5">Device Model</th>
+                    <th className="py-2.5 px-3.5">Serial / IMEI</th>
+                    <th className="py-2.5 px-3.5 text-right">Agreed Value</th>
                     <th className="py-2.5 px-3.5 whitespace-nowrap">Handout Date</th>
-                    <th className="py-2.5 px-3.5 min-w-[200px]">Device & Model</th>
-                    <th className="py-2.5 px-3.5 whitespace-nowrap">Serial / IMEI</th>
-                    <th className="py-2.5 px-3.5 whitespace-nowrap">Status</th>
-                    <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Agreed Value</th>
-                    <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Return Deadline</th>
+                    <th className="py-2.5 px-3.5 text-center">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 font-mono text-xs">
                   {handovers.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="py-12 text-center text-slate-400 font-sans italic">
+                      <td colSpan={5} className="py-12 text-center text-slate-400 font-sans italic">
                         No devices currently handed out to {staff.name}.
                       </td>
                     </tr>
                   ) : (
                     handovers.map((unit) => (
                       <tr key={unit.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors">
-                        <td className="py-2.5 px-3.5 whitespace-nowrap text-slate-600 dark:text-slate-300">
-                          {unit.handed_out_at ? new Date(unit.handed_out_at).toLocaleDateString() : '—'}
-                        </td>
                         <td className="py-2.5 px-3.5 font-sans font-bold text-slate-900 dark:text-white">
                           {unit.device_name}
                         </td>
-                        <td className="py-2.5 px-3.5 text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                        <td className="py-2.5 px-3.5 text-slate-600 dark:text-slate-300">
                           {unit.imei_or_serial || '—'}
                         </td>
-                        <td className="py-2.5 px-3.5 whitespace-nowrap font-sans">
+                        <td className="py-2.5 px-3.5 text-right font-bold text-slate-900 dark:text-white">
+                          {unit.handover_payout > 0 ? `${unit.handover_payout.toLocaleString()} ETB` : '—'}
+                        </td>
+                        <td className="py-2.5 px-3.5 whitespace-nowrap font-sans text-slate-500 text-[11px]">
+                          {unit.handed_out_at ? new Date(unit.handed_out_at).toLocaleDateString() : '—'}
+                        </td>
+                        <td className="py-2.5 px-3.5 text-center font-sans">
                           <span
-                            className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                            className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${
                               unit.status === 'out'
-                                ? 'bg-black dark:bg-black text-amber-400 border border-amber-500/40'
+                                ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50'
                                 : unit.status === 'sold'
-                                ? 'bg-black dark:bg-black text-white border border-emerald-500/40'
+                                ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 border border-blue-200/50'
                                 : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
                             }`}
                           >
-                            {unit.status === 'out'
-                              ? 'In Custody'
-                              : unit.status === 'sold'
-                              ? 'Sold by Staff'
-                              : unit.status}
+                            {unit.status === 'out' ? 'In Custody' : unit.status === 'sold' ? 'Sold by Staff' : unit.status}
                           </span>
-                        </td>
-                        <td className="py-2.5 px-3.5 text-right font-bold text-slate-900 dark:text-white whitespace-nowrap">
-                          {unit.handover_payout > 0 ? `${unit.handover_payout.toLocaleString()} ETB` : '—'}
-                        </td>
-                        <td className="py-2.5 px-3.5 text-right text-slate-500 whitespace-nowrap">
-                          {unit.return_deadline || '—'}
                         </td>
                       </tr>
                     ))
                   )}
+                  {handovers.length > 0 && (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="py-3 text-center text-[11px] text-slate-400 dark:text-slate-500 bg-slate-50/50 dark:bg-slate-900/30 font-medium font-sans"
+                      >
+                        <span className="inline-flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                          <span>All {handovers.length} handover items loaded</span>
+                        </span>
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
-
-              {/* Mobile View (< sm): 100% Width, Zero Horizontal Scroll */}
-              <div className="sm:hidden divide-y divide-slate-100 dark:divide-slate-800/80 text-xs">
-                {handovers.length === 0 ? (
-                  <div className="py-12 text-center text-slate-400 italic">
-                    No devices currently handed out to {staff.name}.
-                  </div>
-                ) : (
-                  handovers.map((unit) => (
-                    <div
-                      key={unit.id}
-                      className="py-2.5 px-3 flex items-start justify-between gap-2 hover:bg-slate-50/60 dark:hover:bg-slate-800/30"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="font-bold text-slate-900 dark:text-white truncate">
-                          {unit.device_name}
-                        </div>
-                        <div className="text-[10px] text-slate-400 font-mono mt-0.5 flex items-center gap-1.5 flex-wrap">
-                          <span>SN: {unit.imei_or_serial || '—'}</span>
-                          <span>•</span>
-                          <span>{unit.handed_out_at ? new Date(unit.handed_out_at).toLocaleDateString() : '—'}</span>
-                        </div>
-                      </div>
-
-                      <div className="text-right shrink-0">
-                        <div className="font-bold font-mono text-slate-900 dark:text-white">
-                          {unit.handover_payout > 0 ? `${unit.handover_payout.toLocaleString()} ETB` : '—'}
-                        </div>
-                        <div className="mt-1">
-                          <span
-                            className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
-                              unit.status === 'out'
-                                ? 'bg-black text-amber-400 border border-amber-500/40'
-                                : unit.status === 'sold'
-                                ? 'bg-black text-white border border-emerald-500/40'
-                                : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
-                            }`}
-                          >
-                            {unit.status === 'out' ? 'In Custody' : unit.status === 'sold' ? 'Sold' : unit.status}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
             </div>
           </div>
         </div>
       )}
+
 
       {/* ── Settle Bonus Modal ── */}
       {isSettleModalOpen && (
@@ -1606,6 +1482,180 @@ export const StaffDetailView: React.FC<StaffDetailViewProps> = ({
             </form>
           </div>
         </div>
+      )}
+      {/* ── Edit Staff Bottom Sheet ── */}
+      {isEditModalOpen && statementData && (
+        <EditStaffBottomSheet
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          staff={statementData.staff}
+          onSuccess={async (updatedStaff) => {
+            await loadStatement();
+            onStaffUpdated?.();
+            if (onEditStaff) {
+              onEditStaff(updatedStaff);
+            }
+          }}
+        />
+      )}
+
+      {/* ── Confirm Reset Password ── */}
+      {isResetConfirmOpen && statementData && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+          <div
+            className="fixed inset-0 bg-slate-950/50 dark:bg-slate-950/75 backdrop-blur-xs transition-opacity"
+            onClick={() => setIsResetConfirmOpen(false)}
+          />
+
+          <div className="relative z-10 w-full max-w-sm bg-white dark:bg-[#131926] text-slate-900 dark:text-white rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-2xl overflow-hidden animate-modal-enter p-5 sm:p-6 text-center my-auto">
+            <div className="w-10 h-10 rounded-full bg-amber-50 dark:bg-amber-950/60 border border-amber-200/60 dark:border-amber-800/50 text-amber-600 dark:text-amber-400 mx-auto flex items-center justify-center mb-3">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white tracking-tight">
+              Reset Password for {statementData.staff.name}?
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 leading-relaxed">
+              A new temporary password will be generated for this worker. Their previous password will no longer work.
+            </p>
+
+            <div className="mt-5 flex gap-2.5">
+              <button
+                onClick={() => setIsResetConfirmOpen(false)}
+                className="flex-1 h-9 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleResetPassword}
+                disabled={isResetting}
+                className="flex-1 h-9 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-600/25 disabled:opacity-50 cursor-pointer"
+              >
+                {isResetting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <KeyRound className="w-3.5 h-3.5" />}
+                <span>Reset Now</span>
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ── Confirm Remove Staff ── */}
+      {isRemoveConfirmOpen && statementData && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+          <div
+            className="fixed inset-0 bg-slate-950/50 dark:bg-slate-950/75 backdrop-blur-xs transition-opacity"
+            onClick={() => !isRemoving && setIsRemoveConfirmOpen(false)}
+          />
+
+          <div className="relative z-10 w-full max-w-md bg-white dark:bg-[#131926] text-slate-900 dark:text-white rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-2xl overflow-hidden animate-modal-enter p-5 sm:p-6 my-auto">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200/60 dark:border-rose-800/50 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white tracking-tight">
+                  Remove Staff Account
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {statementData.staff.name} ({statementData.staff.email || statementData.staff.phone})
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 dark:bg-[#0c1017] p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300 space-y-2 mb-5 leading-relaxed">
+              <p>
+                Removing this staff account will revoke their login access and permanently remove them from your active staff list.
+              </p>
+              <div className="flex items-start gap-2 pt-2 border-t border-slate-200/60 dark:border-slate-800/80 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                <Check className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>All past sales orders, bonuses, and audit logs recorded by {statementData.staff.name} remain safely preserved for your financial records.</span>
+              </div>
+            </div>
+
+            <div className="flex gap-2.5">
+              <button
+                onClick={() => setIsRemoveConfirmOpen(false)}
+                disabled={isRemoving}
+                className="flex-1 h-10 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmRemove}
+                disabled={isRemoving}
+                className="flex-1 h-10 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm shadow-rose-600/25 disabled:opacity-50 cursor-pointer"
+              >
+                {isRemoving ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Removing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Remove Staff</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ── Shareable Temporary Credentials Card ── */}
+      {shareCredentials && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+          <div
+            className="fixed inset-0 bg-slate-950/50 dark:bg-slate-950/75 backdrop-blur-xs transition-opacity"
+            onClick={() => setShareCredentials(null)}
+          />
+
+          <div className="relative z-10 w-full max-w-md bg-white dark:bg-[#131926] text-slate-900 dark:text-white rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-2xl overflow-hidden animate-modal-enter p-5 sm:p-6 my-auto">
+            <div className="text-center pb-4">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800/50 mx-auto flex items-center justify-center mb-2.5">
+                <KeyRound className="w-6 h-6" />
+              </div>
+              <h2 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
+                New Credentials Ready
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Share with <span className="font-bold text-slate-900 dark:text-white">{shareCredentials.name}</span>
+              </p>
+            </div>
+
+            <div className="space-y-2 text-xs mb-4">
+              <div className="flex justify-between items-center py-2.5 border-b border-slate-100 dark:border-slate-800">
+                <span className="text-slate-400">Login</span>
+                <span className="font-mono font-bold text-slate-900 dark:text-white">{shareCredentials.login}</span>
+              </div>
+              <div className="flex justify-between items-center py-2.5">
+                <span className="text-slate-400">Password</span>
+                <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-sm tracking-wider">{shareCredentials.temporaryPassword}</span>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#0c1017] border border-slate-200/80 dark:border-slate-800/80 text-[11px] font-mono text-slate-700 dark:text-slate-300 whitespace-pre-line leading-relaxed mb-4">
+              {`👋 Welcome to Bole Tech Business OS!\n\nLogin: ${shareCredentials.login}\nPassword: ${shareCredentials.temporaryPassword}\nURL: ${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173'}\n\nPlease sign in and update your password.`}
+            </div>
+            <div className="flex gap-2.5">
+              <button
+                onClick={handleCopyCredentials}
+                className="flex-1 h-10 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm shadow-emerald-600/25 active:scale-[0.98] cursor-pointer"
+              >
+                {copiedCredentials ? <Check className="w-4 h-4 text-white" /> : <Copy className="w-4 h-4" />}
+                <span>{copiedCredentials ? 'Copied to Clipboard!' : 'Copy Credentials'}</span>
+              </button>
+              <button
+                onClick={() => setShareCredentials(null)}
+                className="h-10 px-4 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );
