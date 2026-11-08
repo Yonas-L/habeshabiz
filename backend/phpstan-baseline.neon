@@ -592,6 +592,18 @@ parameters:
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
 			identifier: property.notFound
 			count: 2
+			path: app/Actions/Undo/UndoAgreedPayoutAction.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Actions/Undo/UndoAgreedPayoutAction.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 2
 			path: app/Actions/Undo/UndoBlockedChecker.php
 
 		-
@@ -611,6 +623,18 @@ parameters:
 			identifier: nullsafe.neverNull
 			count: 3
 			path: app/Actions/Undo/UndoDebtPaymentAction.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Actions/Undo/UndoManualDebtAction.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 3
+			path: app/Actions/Undo/UndoManualDebtAction.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
@@ -733,6 +757,18 @@ parameters:
 			path: app/Http/Controllers/Api/ContactController.php
 
 		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$product\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/DashboardController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Http/Controllers/Api/DashboardController.php
+
+		-
 			message: '#^Comparison operation "\>" between int\<1, max\> and 0 is always true\.$#'
 			identifier: greater.alwaysTrue
 			count: 1
@@ -801,7 +837,7 @@ parameters:
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
 			identifier: property.notFound
-			count: 10
+			count: 11
 			path: app/Http/Controllers/Api/InventoryController.php
 
 		-
@@ -831,7 +867,7 @@ parameters:
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$product\.$#'
 			identifier: property.notFound
-			count: 15
+			count: 17
 			path: app/Http/Controllers/Api/InventoryController.php
 
 		-
@@ -880,12 +916,6 @@ parameters:
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$unit_price\.$#'
 			identifier: property.notFound
 			count: 5
-			path: app/Http/Controllers/Api/InventoryController.php
-
-		-
-			message: '#^Call to static method parse\(\) on an unknown class App\\Http\\Controllers\\Api\\Carbon\.$#'
-			identifier: class.notFound
-			count: 1
 			path: app/Http/Controllers/Api/InventoryController.php
 
 		-
@@ -963,7 +993,7 @@ parameters:
 		-
 			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
 			identifier: nullsafe.neverNull
-			count: 24
+			count: 27
 			path: app/Http/Controllers/Api/InventoryController.php
 
 		-

@@ -2235,7 +2235,7 @@ class InventoryController extends Controller
         $devName = $unit->variant?->product?->name ?? 'Device';
         $msg = "Agreed value for {$devName} updated successfully.";
         if ($isLoss) {
-            $msg .= " Recorded below cost basis (Loss: ".number_format($lossAmount, 2)." ETB).";
+            $msg .= ' Recorded below cost basis (Loss: '.number_format($lossAmount, 2).' ETB).';
         }
 
         return response()->json([
@@ -2522,7 +2522,7 @@ class InventoryController extends Controller
                     $holdingDebt->update([
                         'original_amount' => $finalPrice,
                         'remaining_amount' => $finalPrice,
-                        'notes' => ($holdingDebt->notes ? $holdingDebt->notes.' | ' : '')."Device confirmed SOLD by {$vendorName} for ".number_format($finalPrice, 2)." ETB. Awaiting payment collection.",
+                        'notes' => ($holdingDebt->notes ? $holdingDebt->notes.' | ' : '')."Device confirmed SOLD by {$vendorName} for ".number_format($finalPrice, 2).' ETB. Awaiting payment collection.',
                     ]);
                 } else {
                     $contact = Contact::where('tenant_id', $user->tenant_id)->where('name', '=', $vendorName)->first();

@@ -82,7 +82,7 @@ class UndoAgreedPayoutAction implements UndoActionInterface
         }
 
         if ($isCostAdj && abs($oldCost - $newCost) > 0.01) {
-            $impactSummary[] = "Unit cost basis will revert from ".number_format($newCost, 2).' ETB to '.number_format($oldCost, 2).' ETB';
+            $impactSummary[] = 'Unit cost basis will revert from '.number_format($newCost, 2).' ETB to '.number_format($oldCost, 2).' ETB';
             $impactNodes[] = [
                 'id' => "cost-revert-{$unit->id}",
                 'category' => 'inventory',

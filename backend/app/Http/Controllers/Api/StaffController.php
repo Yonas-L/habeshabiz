@@ -134,7 +134,7 @@ class StaffController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:100'],
-            'email' => ['required', 'email', 'max:100', 'unique:users,email'],
+            'email' => ['nullable', 'email', 'max:100', 'unique:users,email'],
             'phone' => ['nullable', 'string', 'max:25'],
             'can_discount' => ['nullable', 'boolean'],
             'can_handover' => ['nullable', 'boolean'],
@@ -171,7 +171,21 @@ class StaffController extends Controller
             }
         }
 
-        $email = strtolower(trim($validated['email']));
+        $email = ! empty($validated['email']) ? strtolower(trim($validated['email'])) : null;
+        if (! $email) {
+            $firstName = explode(' ', trim($validated['name']))[0];
+            $cleanName = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $firstName));
+            if (empty($cleanName)) {
+                $cleanName = 'staff';
+            }
+            $baseEmail = "{$cleanName}@mail.com";
+            $email = $baseEmail;
+            $counter = 1;
+            while (User::where('email', $email)->exists()) {
+                $email = "{$cleanName}{$counter}@mail.com";
+                $counter++;
+            }
+        }
 
         // Default password for salesperson staff registration
         $tempPassword = '434344#Pass';
@@ -296,7 +310,7 @@ class StaffController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:100'],
-            'email' => ['required', 'email', 'max:100', 'unique:users,email,'.$staff->id],
+            'email' => ['nullable', 'email', 'max:100', 'unique:users,email,'.$staff->id],
             'phone' => ['nullable', 'string', 'max:25'],
             'can_discount' => ['nullable', 'boolean'],
             'can_handover' => ['nullable', 'boolean'],
@@ -343,10 +357,13 @@ class StaffController extends Controller
 
         $updateData = [
             'name' => $validated['name'],
-            'email' => strtolower(trim($validated['email'])),
             'phone' => $phone,
             'permissions' => $newPermissions,
         ];
+
+        if (! empty($validated['email'])) {
+            $updateData['email'] = strtolower(trim($validated['email']));
+        }
 
         $staff->update($updateData);
 

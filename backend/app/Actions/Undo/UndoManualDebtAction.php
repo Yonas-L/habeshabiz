@@ -135,7 +135,7 @@ class UndoManualDebtAction implements UndoActionInterface
             'can_undo' => ! $isBlocked,
             'blocked' => $isBlocked,
             'blocked_reasons' => $blockedReasons,
-            'warning' => "This will permanently cancel this manual {$type} debt of ".number_format($amount, 2)." ETB and restore financial accounts.",
+            'warning' => "This will permanently cancel this manual {$type} debt of ".number_format($amount, 2).' ETB and restore financial accounts.',
             'impact_summary' => $impactSummary,
             'hierarchy_tree' => [
                 'current_state' => [
