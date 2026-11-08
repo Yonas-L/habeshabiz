@@ -5,7 +5,6 @@ import { api } from '../../api/client';
 import { SlideOverDrawer } from './SlideOverDrawer';
 import { toast } from 'sonner';
 import {
-  ArrowLeft,
   X,
   Download,
   Copy,
@@ -40,7 +39,7 @@ export const SalesOrderDrawer: React.FC<SalesOrderDrawerProps> = ({
   isOpen,
   onClose,
   user,
-  tenant,
+  tenant: _tenant,
   accounts,
   onPaymentCollected,
   onInitiateReturn,
@@ -444,7 +443,7 @@ Thank you for choosing Habeshabiz Electronics!
       ? `Split Accounts (${order.payment_splits.length})`
       : order.financial_account?.name || formatPaymentMethod(order.payment_method);
 
-  // Derive primary item / headline model
+  // Derive primary item / headline model for drawer title
   const firstItem = order.items?.[0];
   const firstUnit = firstItem?.inventory_unit;
   const firstVariant = firstUnit?.variant || firstItem?.variant;
@@ -457,106 +456,296 @@ Thank you for choosing Habeshabiz Electronics!
   const firstSpecs = [firstVariant?.storage, firstVariant?.color].filter(Boolean).join(' · ');
   const headlineModel = firstSpecs && !isFirstAcc ? `${firstModelName} (${firstSpecs})` : firstModelName;
   const extraItemsCount = order.items.length - 1;
+  const drawerTitle = extraItemsCount > 0 ? `${headlineModel} +${extraItemsCount} more` : headlineModel;
+
+  const totalQuantity = order.items.reduce((sum, i) => sum + i.quantity, 0);
+
+  const statusBadgeInfo = (() => {
+    if (isRefunded) {
+      return {
+        label: 'Refunded',
+        shortLabel: 'Refunded',
+        className: 'bg-rose-500/10 text-rose-600 dark:text-rose-400',
+      };
+    }
+    if (writeOffAmount > 0) {
+      return {
+        label: 'Concession Settled',
+        shortLabel: 'Concession',
+        className: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+      };
+    }
+    if (isPaid && isOffset) {
+      return {
+        label: 'Settled (Offset)',
+        shortLabel: 'Offset',
+        className: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+      };
+    }
+    if (isPaid) {
+      return {
+        label: 'Paid in Full',
+        shortLabel: 'Paid in Full',
+        className: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+      };
+    }
+    return {
+      label: 'Credit Due',
+      shortLabel: 'Credit Due',
+      className: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+    };
+  })();
 
   return (
     <>
       <SlideOverDrawer
         isOpen={isOpen}
         onClose={onClose}
-        widthClass="sm:max-w-2xl lg:max-w-[760px]"
-        contentClassName="px-4 sm:px-8 py-4 sm:py-5 space-y-5 sm:space-y-6 overflow-x-hidden"
+        widthClass="sm:max-w-md"
+        contentClassName="px-4 sm:px-6 py-4 sm:py-5 space-y-5"
         customHeader={
-          <div className="px-4 sm:px-8 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-[#111C2D]">
-            {/* Top Navigation Row: Back to orders + Close X */}
-            <div className="flex items-center justify-between mb-2.5 sm:mb-3.5">
-              <button
-                type="button"
-                onClick={onClose}
-                className="text-xs font-medium text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer group"
-              >
-                <ArrowLeft className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 group-hover:-translate-x-0.5 transition-transform" />
-                <span>Back to orders</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={onClose}
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                aria-label="Close drawer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Main Order Header Row: Device Model in bold (Primary) + Order # & Date/Status (Below) and Download PDF (Right) */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight truncate">
-                    {headlineModel}
+          <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-100 dark:border-slate-800/80 bg-white/80 dark:bg-[#131926]/80 backdrop-blur-sm shrink-0">
+            {/* Desktop Header (>= sm) - Identical to established desktop layout */}
+            <div className="hidden sm:flex items-center justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base font-bold text-slate-900 dark:text-white tracking-tight truncate">
+                    {drawerTitle}
                   </h2>
-                  {extraItemsCount > 0 && (
-                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-mono shrink-0">
-                      +{extraItemsCount} more
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-2 mt-1 text-xs text-slate-500 dark:text-slate-400 flex-wrap">
-                  <div className="flex items-center gap-1 font-mono font-semibold text-slate-700 dark:text-slate-300">
-                    <span>#{order.order_number}</span>
+                  <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       type="button"
                       onClick={handleCopyOrderNumber}
                       title="Copy Order Number"
-                      className="text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors p-0.5"
+                      className="text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors p-0.5 cursor-pointer"
                     >
                       {copiedId ? (
                         <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                       ) : (
-                        <Copy className="w-3.5 h-3.5 text-emerald-600/70 dark:text-emerald-400/70" />
+                        <Copy className="w-3.5 h-3.5 opacity-60" />
                       )}
                     </button>
+                    <span
+                      className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold whitespace-nowrap shrink-0 ${statusBadgeInfo.className}`}
+                    >
+                      {statusBadgeInfo.label}
+                    </span>
                   </div>
-                  <span>•</span>
-                  <span>
-                    {formattedDate} • {formattedTime}
-                  </span>
-                  <span>•</span>
-                  <span
-                    className={`font-semibold ${
-                      isRefunded
-                        ? 'text-rose-600 dark:text-rose-400'
-                        : remainingDebt > 0
-                        ? 'text-amber-600 dark:text-amber-400'
-                        : 'text-emerald-600 dark:text-emerald-400'
-                    }`}
-                  >
-                    {isRefunded
-                      ? 'Refunded'
-                      : writeOffAmount > 0
-                      ? 'Concession Settled'
-                      : isPaid && isOffset
-                      ? 'Settled (Offset)'
-                      : isPaid
-                      ? 'Paid in Full'
-                      : 'Credit Due'}
-                  </span>
                 </div>
+                <p className="text-xs text-slate-400 dark:text-slate-500 font-medium truncate mt-0.5">
+                  #{order.order_number} • Recorded on {formattedDate} • {formattedTime}
+                </p>
               </div>
 
-              {/* Top Primary Action: Download PDF (hidden on mobile since footer already provides it) */}
-              <div className="hidden sm:flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors active:scale-95 cursor-pointer"
+                  aria-label="Close drawer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Mobile Header (< sm) - Native feeling, spacious, perfectly styled */}
+            <div className="sm:hidden space-y-2">
+              {/* Native Sheet Top Drag Handle */}
+              <div className="w-9 h-1 rounded-full bg-slate-200 dark:bg-slate-700 mx-auto mb-1" />
+
+              <div className="flex items-start justify-between gap-2.5">
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-[17px] sm:text-base font-bold text-slate-900 dark:text-white tracking-tight leading-snug line-clamp-2">
+                    {drawerTitle}
+                  </h2>
+                  <div className="flex items-center flex-wrap gap-x-2 gap-y-1 mt-1 text-sm sm:text-xs">
+                    <span className="font-mono font-medium text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                      #{order.order_number}
+                      <button
+                        type="button"
+                        onClick={handleCopyOrderNumber}
+                        className="text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors p-0.5 cursor-pointer"
+                        title="Copy Order Number"
+                      >
+                        {copiedId ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5 opacity-60" />
+                        )}
+                      </button>
+                    </span>
+                    <span className="text-slate-300 dark:text-slate-600">•</span>
+                    <span className="text-slate-500 dark:text-slate-400 text-xs sm:text-[11px]">
+                      {formattedDate} {formattedTime ? `• ${formattedTime}` : ''}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
+                  <span
+                    className={`inline-flex items-center px-2.5 sm:px-2 py-1 sm:py-0.5 rounded-md text-xs sm:text-[11px] font-semibold whitespace-nowrap shrink-0 ${statusBadgeInfo.className}`}
+                  >
+                    {statusBadgeInfo.shortLabel}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors active:scale-95 cursor-pointer"
+                    aria-label="Close drawer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        }
+        footerActions={
+          <div className="w-full">
+            {/* Desktop Footer (>= sm) - Identical to established desktop layout */}
+            <div className="hidden sm:flex items-center justify-between w-full gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="h-9 px-4 rounded-xl border border-slate-200/80 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={handleCopyReceipt}
+                  className="h-9 px-3 rounded-xl border border-slate-200/80 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  {copiedReceipt ? (
+                    <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  ) : (
+                    <Share2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  )}
+                  <span>{copiedReceipt ? 'Copied' : 'Share'}</span>
+                </button>
+
+                {canManageInv && swappableUnits.length > 0 && onInitiateReturn && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (order) onInitiateReturn(order);
+                    }}
+                    className="h-9 px-3 rounded-xl border border-slate-200/80 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+                    title="Process customer return"
+                  >
+                    <Undo2 className="w-3.5 h-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                    <span>Return</span>
+                  </button>
+                )}
+
+                {canManageInv && swappableUnits.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onInitiateSwap && order) {
+                        onInitiateSwap(order);
+                      } else if (swappableUnits.length === 1) {
+                        setSwapUnitTarget(swappableUnits[0]);
+                      } else {
+                        setShowMultiSwapPicker(true);
+                      }
+                    }}
+                    className="h-9 px-3 rounded-xl border border-slate-200/80 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+                    title="Warranty Swap"
+                  >
+                    <ArrowLeftRight className="w-3.5 h-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                    <span>Swap</span>
+                  </button>
+                )}
+
                 <button
                   type="button"
                   onClick={handlePrint}
                   disabled={isDownloadingPdf}
-                  className="h-9 px-3.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/60 text-xs font-medium flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer disabled:opacity-50 active:scale-95 whitespace-nowrap"
+                  className="h-9 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-semibold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
                 >
                   {isDownloadingPdf ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-600 dark:text-emerald-400" />
+                    <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0 text-emerald-400" />
                   ) : (
-                    <Download className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                    <Download className="w-3.5 h-3.5 shrink-0 text-emerald-400 dark:text-emerald-600" />
+                  )}
+                  <span>PDF</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Mobile Footer (< sm) - Zero overflow, generous touch targets */}
+            <div className="flex flex-col w-full gap-2 sm:hidden">
+              {/* Management Action Row (Return / Swap) if units are swappable */}
+              {canManageInv && swappableUnits.length > 0 && (onInitiateReturn || onInitiateSwap) && (
+                <div className="grid grid-cols-2 gap-2 w-full">
+                  {onInitiateReturn && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (order) onInitiateReturn(order);
+                      }}
+                      className="h-10 px-3 rounded-xl border border-slate-200/90 dark:border-slate-700 bg-white dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 text-[13px] font-semibold transition-colors flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.98]"
+                    >
+                      <Undo2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      <span>Return Item</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onInitiateSwap && order) {
+                        onInitiateSwap(order);
+                      } else if (swappableUnits.length === 1) {
+                        setSwapUnitTarget(swappableUnits[0]);
+                      } else {
+                        setShowMultiSwapPicker(true);
+                      }
+                    }}
+                    className="h-10 px-3 rounded-xl border border-slate-200/90 dark:border-slate-700 bg-white dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 text-[13px] font-semibold transition-colors flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.98]"
+                  >
+                    <ArrowLeftRight className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <span>Warranty Swap</span>
+                  </button>
+                </div>
+              )}
+
+              {/* Main Action Row: Close + Share + Download PDF */}
+              <div className="flex items-center gap-2 w-full">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="h-10 px-3.5 rounded-xl border border-slate-200/90 dark:border-slate-700 bg-white dark:bg-slate-800/90 text-[13px] font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors cursor-pointer shrink-0 active:scale-[0.98]"
+                >
+                  Close
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleCopyReceipt}
+                  className="h-10 px-3 flex-1 rounded-xl border border-slate-200/90 dark:border-slate-700 bg-white dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 text-[13px] font-semibold hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.98]"
+                >
+                  {copiedReceipt ? (
+                    <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                  ) : (
+                    <Share2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  )}
+                  <span>{copiedReceipt ? 'Copied' : 'Share'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handlePrint}
+                  disabled={isDownloadingPdf}
+                  className="h-10 px-4 flex-1 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-[13px] font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60 active:scale-[0.98]"
+                >
+                  {isDownloadingPdf ? (
+                    <Loader2 className="w-4 h-4 animate-spin shrink-0 text-emerald-400" />
+                  ) : (
+                    <Download className="w-4 h-4 shrink-0 text-emerald-400 dark:text-emerald-600" />
                   )}
                   <span>Download PDF</span>
                 </button>
@@ -564,123 +753,14 @@ Thank you for choosing Habeshabiz Electronics!
             </div>
           </div>
         }
-        footerActions={
-          <div className="w-full flex items-center justify-between gap-2.5 flex-wrap">
-            {/* Left: Secondary actions (Close, Share) */}
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="h-9 px-3.5 sm:px-4 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-medium transition-colors cursor-pointer shrink-0 whitespace-nowrap"
-              >
-                Close
-              </button>
-              <button
-                type="button"
-                onClick={handleCopyReceipt}
-                className="h-9 px-3 sm:px-3.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 whitespace-nowrap"
-              >
-                {copiedReceipt ? (
-                  <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                ) : (
-                  <Share2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                )}
-                <span>{copiedReceipt ? 'Copied' : 'Share Receipt'}</span>
-              </button>
-            </div>
-
-            {/* Right: Contextual actions (Return, Swap) + Primary Download PDF */}
-            <div className="flex items-center gap-2">
-              {canManageInv && swappableUnits.length > 0 && onInitiateReturn && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (order) onInitiateReturn(order);
-                  }}
-                  className="h-9 px-2.5 sm:px-3 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer shrink-0 whitespace-nowrap"
-                  title="Process customer return"
-                >
-                  <Undo2 className="w-3.5 h-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
-                  <span>Return</span>
-                </button>
-              )}
-
-              {canManageInv && swappableUnits.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (onInitiateSwap && order) {
-                      onInitiateSwap(order);
-                    } else if (swappableUnits.length === 1) {
-                      setSwapUnitTarget(swappableUnits[0]);
-                    } else {
-                      setShowMultiSwapPicker(true);
-                    }
-                  }}
-                  className="h-9 px-2.5 sm:px-3 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer shrink-0 whitespace-nowrap"
-                  title="Warranty Swap"
-                >
-                  <ArrowLeftRight className="w-3.5 h-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
-                  <span className="hidden sm:inline">Warranty Swap</span>
-                  <span className="sm:hidden">Swap</span>
-                </button>
-              )}
-
-              <button
-                type="button"
-                onClick={handlePrint}
-                disabled={isDownloadingPdf}
-                className="h-9 px-3.5 sm:px-4 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-semibold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer shrink-0 disabled:opacity-60 whitespace-nowrap"
-              >
-                {isDownloadingPdf ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0 text-emerald-400" />
-                ) : (
-                  <Download className="w-3.5 h-3.5 shrink-0 text-emerald-400 dark:text-emerald-600" />
-                )}
-                <span>Download PDF</span>
-              </button>
-            </div>
-          </div>
-        }
       >
-        <div id="printable-invoice" className="space-y-6">
+        <div id="printable-invoice" className="space-y-5">
           {/* ═══════════════════════════════════════════════════════════════
-              MOBILE RECEIPT DESIGN (< sm)
-              Clean, receipt-style layout: bold numbers, total at bottom,
-              zero junk/redundant text.
+              SECTION 1: TRANSACTION DETAILS (Matches ExpenseDrawer structure)
              ═══════════════════════════════════════════════════════════════ */}
-          <div className="sm:hidden space-y-4">
-            {/* Customer & Attendant */}
-            <div className="flex items-start justify-between py-2 border-b border-dashed border-slate-200 dark:border-slate-800 text-xs">
-              <div>
-                <span className="text-[11px] text-slate-400 block font-medium">Customer</span>
-                <span className="font-semibold text-slate-900 dark:text-white text-sm">
-                  {order.customer?.name || (isB2B ? 'Trade Partner' : 'Walk-in Customer')}
-                </span>
-                {order.customer?.phone && (
-                  <span className="text-slate-400 font-mono text-xs block">{order.customer.phone}</span>
-                )}
-              </div>
-              <div className="text-right">
-                <span className="text-[11px] text-slate-400 block font-medium">Sales Attendant</span>
-                <span className="font-semibold text-slate-900 dark:text-white text-sm">
-                  {order.salesperson?.name || 'Sales Staff'}
-                </span>
-                {(order.vendor?.name || order.items.find((i) => i.vendor_contact)?.vendor_contact?.name) && (
-                  <span className="text-slate-400 text-xs block">
-                    Vendor: {order.vendor?.name || order.items.find((i) => i.vendor_contact)?.vendor_contact?.name}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Receipt Items List */}
-            <div className="space-y-3 py-1">
-              <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 pb-1 border-b border-slate-200 dark:border-slate-800 flex justify-between">
-                <span>Purchased Item</span>
-                <span>Amount</span>
-              </div>
-
+          <div className="space-y-4 sm:space-y-3.5 text-sm sm:text-xs">
+            {/* 1. What has been sold (with crisp divider below) */}
+            <div className="space-y-3 pb-3.5 border-b border-slate-200/90 dark:border-slate-800">
               {order.items.map((item, idx) => {
                 const unit = item.inventory_unit;
                 const variant = unit?.variant || item.variant;
@@ -696,492 +776,255 @@ Thank you for choosing Habeshabiz Electronics!
                     : isAccessory
                     ? 'Accessory'
                     : variant?.product?.name || item.variant?.product?.name || 'Device');
-                const lineUnitPrice =
-                  order.items.length === 1
-                    ? settledSaleValue / Math.max(1, Number(item.quantity || 1))
-                    : parseFloat(String(item.unit_price)) || 0;
-                const lineTotal = item.quantity * lineUnitPrice;
+                const conditionStr = formatCondition(unit?.condition);
+                const simStr = formatSimType(unit?.sim_type);
+
+                const specsList = [
+                  unit?.battery_health != null ? `${unit.battery_health}% Batt` : null,
+                  unit?.cycle_count != null && unit.cycle_count > 0 ? `${unit.cycle_count} cycles` : null,
+                  simStr,
+                  conditionStr,
+                ].filter(Boolean);
 
                 return (
-                  <div key={item.id || idx} className="py-2 border-b border-slate-100 dark:border-slate-800/60 last:border-b-0 space-y-1">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="font-semibold text-slate-900 dark:text-white text-sm leading-snug">
-                          {pName} {specString && !isAccessory && <span className="font-normal text-slate-500 dark:text-slate-400">({specString})</span>}
-                        </div>
-                        {!isAccessory && unit?.imei_or_serial && (
-                          <div className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">
+                  <div key={item.id || idx} className="flex items-start justify-between gap-4">
+                    <span className="text-slate-400 dark:text-slate-500 shrink-0">
+                      {order.items.length > 1 ? `Sold Item (${idx + 1})` : 'Sold Item'}
+                    </span>
+                    <div className="text-right">
+                      <div className="text-[15px] sm:text-xs font-semibold text-slate-900 dark:text-white leading-snug">
+                        {pName} {specString && !isAccessory ? `(${specString})` : ''}
+                        {isAccessory && <span className="text-xs sm:text-[10px] text-slate-400 font-normal ml-1">[Accessory]</span>}
+                      </div>
+                      {!isAccessory && (unit?.imei_or_serial || specsList.length > 0) && (
+                        <div className="text-xs sm:text-[11px] text-slate-500 dark:text-slate-400 font-mono flex items-center justify-end gap-1.5 mt-1 sm:mt-0.5 flex-wrap">
+                          {unit?.imei_or_serial && (
                             <button
                               type="button"
                               onClick={() => handleCopyImei(unit.imei_or_serial!)}
-                              className="inline-flex items-center gap-1 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
+                              className="inline-flex items-center gap-1 text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors cursor-pointer"
                               title="Click to copy serial number"
                             >
                               <span>SN: {unit.imei_or_serial}</span>
                               {copiedImei === unit.imei_or_serial ? (
-                                <Check className="w-2.5 h-2.5 text-emerald-600" />
+                                <Check className="w-2.5 h-2.5 text-emerald-600 shrink-0" />
                               ) : (
-                                <Copy className="w-2.5 h-2.5 opacity-50" />
+                                <Copy className="w-2.5 h-2.5 opacity-50 shrink-0" />
                               )}
                             </button>
-                          </div>
-                        )}
-                      </div>
-                      <div className="text-right shrink-0">
-                        <div className="font-mono font-bold text-slate-900 dark:text-white text-base">
-                          {lineTotal === 0 ? '0 ETB' : `${lineTotal.toLocaleString()} ETB`}
+                          )}
+                          {unit?.imei_or_serial && specsList.length > 0 && <span>•</span>}
+                          {specsList.length > 0 && <span>{specsList.join(' · ')}</span>}
                         </div>
-                        <div className="text-xs text-slate-500 dark:text-slate-400 font-mono">
-                          {item.quantity} × {lineUnitPrice === 0 ? 'Free Gift' : `${lineUnitPrice.toLocaleString()} ETB`}
+                      )}
+                      {Boolean(unit?.swapped_from_unit || unit?.swapped_from_unit_id) && (
+                        <div className="text-xs sm:text-[10.5px] text-slate-500 dark:text-slate-400 font-mono flex items-center justify-end gap-1 mt-1 sm:mt-0.5">
+                          <ArrowLeftRight className="w-3.5 h-3.5 sm:w-3 sm:h-3 text-slate-400" />
+                          <span>Warranty Replacement</span>
                         </div>
-                      </div>
+                      )}
+                      {unit?.returned_at && (
+                        <div className="text-xs sm:text-[10.5px] text-rose-600 dark:text-rose-400 flex items-center justify-end gap-1 mt-1 sm:mt-0.5">
+                          <Undo2 className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
+                          <span>Returned: {unit.return_reason || 'Defect reported'}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
               })}
             </div>
 
-            {/* Receipt Totals & Settlement Breakdown (At the bottom, like a real receipt) */}
-            <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-2">
-              {/* Gross & Deductions (only if trade-in or discount) */}
-              {(discountAmount > 0 || writeOffAmount > 0 || exchangeAllowance > 0) && (
-                <div className="space-y-1.5 text-xs text-slate-600 dark:text-slate-400 pb-2 border-b border-slate-100 dark:border-slate-800">
-                  <div className="flex justify-between items-center">
-                    <span>Gross Subtotal</span>
-                    <span className="font-mono font-semibold text-slate-800 dark:text-slate-200 text-sm">
-                      {grossAmount.toLocaleString()} ETB
-                    </span>
-                  </div>
-                  {exchangeAllowance > 0 && (
-                    <div className="flex justify-between items-center text-emerald-600 dark:text-emerald-400 font-medium">
-                      <span>Trade-in Allowance</span>
-                      <span className="font-mono font-semibold text-sm">−{exchangeAllowance.toLocaleString()} ETB</span>
-                    </div>
-                  )}
-                  {discountAmount > 0 && (
-                    <div className="flex justify-between items-center text-rose-600 dark:text-rose-400">
-                      <span>Discount</span>
-                      <span className="font-mono font-semibold text-sm">−{discountAmount.toLocaleString()} ETB</span>
-                    </div>
-                  )}
-                  {writeOffAmount > 0 && (
-                    <div className="flex justify-between items-center text-rose-600 dark:text-rose-400">
-                      <span>Price Concession</span>
-                      <span className="font-mono font-semibold text-sm">−{writeOffAmount.toLocaleString()} ETB</span>
-                    </div>
-                  )}
-                </div>
-              )}
+            {/* 2. Customer */}
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400 dark:text-slate-500">Customer</span>
+              <span className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
+                <span>{order.customer?.name || (isB2B ? 'Trade Partner' : 'Walk-in Customer')}</span>
+                {isB2B && (
+                  <span className="text-xs sm:text-[10px] font-bold px-1.5 py-0.5 sm:py-0.2 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400">
+                    B2B
+                  </span>
+                )}
+                {order.customer?.phone && (
+                  <span className="text-slate-400 font-mono text-xs sm:text-[11px]">({order.customer.phone})</span>
+                )}
+              </span>
+            </div>
 
-              {/* THE MAIN TOTAL IN BOLD AT THE BOTTOM */}
-              <div className="flex justify-between items-baseline py-2.5 border-b border-slate-200 dark:border-slate-800">
-                <span className="text-sm font-bold uppercase tracking-wider text-slate-900 dark:text-white">
-                  Total
-                </span>
-                <span className="text-2xl font-bold font-mono text-slate-900 dark:text-white">
-                  {settledSaleValue.toLocaleString()} ETB
+            {/* 3. Sold By */}
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400 dark:text-slate-500">Sold By</span>
+              <span className="font-semibold text-slate-900 dark:text-white">
+                {order.salesperson?.name || 'Sales Staff'}
+              </span>
+            </div>
+
+            {/* Vendor (if applicable) */}
+            {(order.vendor?.name || order.items.find((i) => i.vendor_contact)?.vendor_contact?.name) && (
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400 dark:text-slate-500">Vendor</span>
+                <span className="font-semibold text-slate-900 dark:text-white">
+                  {order.vendor?.name || order.items.find((i) => i.vendor_contact)?.vendor_contact?.name}
                 </span>
               </div>
+            )}
 
-              {/* Payment & Balance Details */}
-              <div className="space-y-1.5 text-xs pt-1">
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-500 dark:text-slate-400">Amount Paid</span>
-                  <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-sm">
-                    +{paidAmount.toLocaleString()} ETB
-                  </span>
-                </div>
+            {/* Paid Via */}
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400 dark:text-slate-500">Paid Via</span>
+              <span className="font-mono font-semibold text-slate-900 dark:text-white">
+                {settlementDestination}
+              </span>
+            </div>
 
-                {remainingDebt > 0 && (
-                  <div className="flex justify-between items-center pt-1 border-t border-amber-200 dark:border-amber-900/50">
-                    <span className="font-bold text-amber-600 dark:text-amber-400">Balance Due</span>
-                    <span className="font-mono font-bold text-amber-600 dark:text-amber-400 text-base">
-                      {remainingDebt.toLocaleString()} ETB
-                    </span>
-                  </div>
-                )}
-
-                <div className="flex justify-between items-center text-slate-500 dark:text-slate-400 pt-0.5">
-                  <span>Payment Method</span>
-                  <span className="font-medium text-slate-800 dark:text-slate-200">
-                    {settlementDestination}
-                  </span>
-                </div>
-
-                {exchangeAllowance > 0 && order.exchange_unit && (
-                  <div className="text-purple-700 dark:text-purple-300 font-medium text-xs pt-0.5">
-                    Trade-in: {order.exchange_unit.variant?.product?.name || 'Device'}
-                    {order.exchange_unit.imei_or_serial ? ` (${order.exchange_unit.imei_or_serial})` : ''}
-                  </div>
-                )}
-
-                {order.notes && (
-                  <div className="pt-1.5 text-slate-500 dark:text-slate-400 text-xs">
-                    <span className="font-medium text-slate-400 block text-[10px] uppercase">Notes</span>
-                    <span>{sanitizeOrderNotes(order.notes)}</span>
-                  </div>
-                )}
-
-                {remainingDebt > 0 && (
-                  <div className="pt-2">
-                    <button
-                      type="button"
-                      onClick={handleOpenCollect}
-                      className="w-full h-9 px-3 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-semibold hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors cursor-pointer"
-                    >
-                      Collect Balance ({remainingDebt.toLocaleString()} ETB)
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Receipt Footer Note */}
-              <div className="pt-3 text-center text-xs text-slate-400 border-t border-slate-100 dark:border-slate-800/60 mt-2">
-                {tenant?.settings?.footer_note || 'Thank you for your business!'}
-              </div>
+            {/* Date */}
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400 dark:text-slate-500">Date</span>
+              <span className="font-mono text-slate-700 dark:text-slate-300">
+                {formattedDate} • {formattedTime}
+              </span>
             </div>
           </div>
 
+          {/* Description / Notes (if any) */}
+          {order.notes && (
+            <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80">
+              <span className="text-xs sm:text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block mb-1.5 sm:mb-1">
+                Description / Notes
+              </span>
+              <p className="text-sm sm:text-xs text-slate-600 dark:text-slate-300 whitespace-pre-line leading-relaxed">
+                {sanitizeOrderNotes(order.notes)}
+              </p>
+            </div>
+          )}
+
           {/* ═══════════════════════════════════════════════════════════════
-              DESKTOP INVOICE VIEW (>= sm)
-              Preserved 100% exactly as it was.
+              SECTION 2: SEPARATE PRICE CALCULATION & PAYMENT SECTION
              ═══════════════════════════════════════════════════════════════ */}
-          <div className="hidden sm:block space-y-6">
-            {/* Customer & Attendant */}
-            <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800 text-xs">
-              <div>
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block">
-                  Customer
-                </span>
-                <div className="text-sm font-semibold text-slate-900 dark:text-white mt-0.5 flex items-center gap-2">
-                  <span>{order.customer?.name || (isB2B ? 'Trade Partner' : 'Walk-in Customer')}</span>
-                  {order.customer?.phone && (
-                    <span className="text-xs font-mono font-normal text-slate-500 dark:text-slate-400">
-                      {order.customer.phone}
-                    </span>
-                  )}
-                  {isB2B && (
-                    <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400">
-                      B2B
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="text-right">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block">
-                  Sales Attendant
-                </span>
-                <div className="text-sm font-semibold text-slate-900 dark:text-white mt-0.5">
-                  {order.salesperson?.name || 'Sales Staff'}
-                </div>
-                {(order.is_vendor_sourced ||
-                  order.vendor ||
-                  order.items.some((i) => i.sourcing_type === 'brokered_neighbour')) && (
-                  <div className="text-xs text-slate-400 mt-0.5">
-                    Vendor:{' '}
-                    <span className="font-medium text-slate-600 dark:text-slate-300">
-                      {order.vendor?.name ||
-                        order.items.find((i) => i.vendor_contact)?.vendor_contact?.name ||
-                        'Partner Vendor'}
-                    </span>
-                  </div>
-                )}
-              </div>
+          <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80 space-y-3.5 sm:space-y-3 text-sm sm:text-xs">
+            {/* Quantity inside numbers section */}
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400 dark:text-slate-500">Quantity</span>
+              <span className="font-mono font-semibold text-slate-900 dark:text-white">
+                {totalQuantity} {totalQuantity === 1 ? 'unit' : 'units'}
+              </span>
             </div>
 
-            {/* Desktop Items Table */}
-            <div className="space-y-2">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-200 dark:border-slate-800 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                      <th className="py-2 px-1 text-left">Item</th>
-                      <th className="py-2 px-3 text-center w-16">Qty</th>
-                      <th className="py-2 px-3 text-right whitespace-nowrap w-28">Unit Price</th>
-                      <th className="py-2 px-3 text-right whitespace-nowrap w-28">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                    {order.items.map((item, idx) => {
-                      const unit = item.inventory_unit;
-                      const variant = unit?.variant || item.variant;
-                      const isAccessory = item.is_accessory || Boolean(item.accessory_name);
-                      const isVendoredAcc =
-                        isAccessory &&
-                        (item.sourcing_type === 'brokered_neighbour' || Boolean(item.vendor_contact_id));
-                      const specString = [variant?.storage, variant?.color].filter(Boolean).join(' · ');
-                      const pName =
-                        item.accessory_name ||
-                        (isVendoredAcc
-                          ? 'Vendored Accessory'
-                          : isAccessory
-                          ? 'Accessory'
-                          : variant?.product?.name || item.variant?.product?.name || 'Device');
-                      const conditionStr = formatCondition(unit?.condition);
-                      const simStr = formatSimType(unit?.sim_type);
-                      const lineUnitPrice =
-                        order.items.length === 1
-                          ? settledSaleValue / Math.max(1, Number(item.quantity || 1))
-                          : parseFloat(String(item.unit_price)) || 0;
-                      const lineTotal = item.quantity * lineUnitPrice;
-
-                      // Clean hardware details in single line
-                      const hwDetails = [
-                        unit?.imei_or_serial ? `SN: ${unit.imei_or_serial}` : null,
-                        unit?.battery_health != null ? `${unit.battery_health}% Batt` : null,
-                        unit?.cycle_count != null && unit.cycle_count > 0 ? `${unit.cycle_count} cycles` : null,
-                        simStr,
-                        conditionStr,
-                      ].filter(Boolean).join(' · ');
-
-                      return (
-                        <tr key={item.id || idx} className="align-top">
-                          <td className="py-2.5 px-1 space-y-0.5">
-                            <div className="font-semibold text-slate-900 dark:text-white text-xs sm:text-sm">
-                              <span>{pName}</span>
-                              {specString && !isAccessory && (
-                                <span className="font-normal text-slate-500 dark:text-slate-400 ml-1.5">
-                                  ({specString})
-                                </span>
-                              )}
-                              {isAccessory && (
-                                <span className="ml-1.5 text-[10px] text-slate-400 font-normal">
-                                  [Accessory]
-                                </span>
-                              )}
-                            </div>
-
-                            {!isAccessory && hwDetails && (
-                              <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
-                                {unit?.imei_or_serial ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleCopyImei(unit.imei_or_serial!)}
-                                    className="inline-flex items-center gap-1 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
-                                    title="Click to copy serial number"
-                                  >
-                                    <span>{hwDetails}</span>
-                                    {copiedImei === unit.imei_or_serial ? (
-                                      <Check className="w-2.5 h-2.5 text-emerald-600" />
-                                    ) : (
-                                      <Copy className="w-2.5 h-2.5 opacity-50" />
-                                    )}
-                                  </button>
-                                ) : (
-                                  <span>{hwDetails}</span>
-                                )}
-                              </div>
-                            )}
-
-                            {Boolean(unit?.swapped_from_unit || unit?.swapped_from_unit_id) && (
-                              <div className="text-[10.5px] text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1">
-                                <ArrowLeftRight className="w-3 h-3 text-slate-400" />
-                                <span>Warranty Replacement</span>
-                              </div>
-                            )}
-                            {unit?.returned_at && (
-                              <div className="text-[10.5px] text-rose-600 dark:text-rose-400 flex items-center gap-1">
-                                <Undo2 className="w-3 h-3" />
-                                <span>Returned: {unit.return_reason || 'Defect reported'}</span>
-                              </div>
-                            )}
-                          </td>
-
-                          <td className="py-2.5 px-3 text-center font-mono text-slate-800 dark:text-slate-200 text-xs sm:text-sm">
-                            {item.quantity}
-                          </td>
-
-                          <td className="py-2.5 px-3 text-right text-xs sm:text-sm">
-                            {lineUnitPrice === 0 ? (
-                              <span className="text-slate-400">Free Gift</span>
-                            ) : (
-                              <span className="font-mono text-slate-700 dark:text-slate-300">
-                                {lineUnitPrice.toLocaleString()}{' '}
-                                <span className="text-[10px] text-slate-400 font-sans">ETB</span>
-                              </span>
-                            )}
-                          </td>
-
-                          <td className="py-2.5 px-3 text-right text-xs sm:text-sm">
-                            <span className="font-mono font-bold text-slate-900 dark:text-white">
-                              {lineTotal === 0 ? '0 ETB' : `${lineTotal.toLocaleString()} ETB`}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-              <div className="border-b border-slate-200 dark:border-slate-800" />
-            </div>
-
-            {/* Desktop Settlement & Totals */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 pt-1 pb-4 border-b border-slate-100 dark:border-slate-800">
-              {/* Left Column: Payment Method & Details */}
-              <div className="space-y-1.5 text-xs">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block">
-                  Payment Method
-                </span>
-                <div className="text-sm font-semibold text-slate-900 dark:text-white">
-                  {settlementDestination}
-                </div>
-                <div className="text-slate-500 dark:text-slate-400 space-y-1 pt-0.5">
-                  <div className="flex items-center gap-1.5">
-                    <span>Settlement:</span>
-                    <span className="font-semibold text-slate-800 dark:text-slate-200">
-                      {isRefunded
-                        ? 'Refunded'
-                        : writeOffAmount > 0
-                        ? 'Concession Settled'
-                        : isPaid && isOffset
-                        ? 'Settled (Offset)'
-                        : isPaid
-                        ? 'Paid in Full'
-                        : `Credit Due (${remainingDebt.toLocaleString()} ETB)`}
-                    </span>
-                  </div>
-                  {exchangeAllowance > 0 && order.exchange_unit && (
-                    <div className="text-purple-700 dark:text-purple-300 font-medium">
-                      Trade-in Unit: {order.exchange_unit.variant?.product?.name || 'Device'}
-                      {order.exchange_unit.imei_or_serial ? ` (${order.exchange_unit.imei_or_serial})` : ''}
-                    </div>
-                  )}
-                  {order.notes && (
-                    <div className="text-slate-600 dark:text-slate-300 pt-0.5">
-                      <span className="font-semibold text-slate-400 uppercase text-[10px] block">Order Notes:</span>
-                      <span className="whitespace-pre-line">{sanitizeOrderNotes(order.notes)}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Right Column: Breakdown & Total */}
-              <div className="sm:ml-auto w-full sm:max-w-[260px] space-y-1.5 text-xs">
-                {(discountAmount > 0 || writeOffAmount > 0 || exchangeAllowance > 0) && (
-                  <div className="space-y-1 text-slate-500 dark:text-slate-400 pb-2 border-b border-slate-100 dark:border-slate-800">
-                    <div className="flex justify-between items-center">
-                      <span>Gross Subtotal</span>
-                      <span className="font-mono font-medium text-slate-700 dark:text-slate-300">
-                        {grossAmount.toLocaleString()} ETB
-                      </span>
-                    </div>
-                    {exchangeAllowance > 0 && (
-                      <div className="flex justify-between items-center text-emerald-700 dark:text-emerald-400 font-medium">
-                        <span>Trade-in Allowance</span>
-                        <span className="font-mono font-semibold">−{exchangeAllowance.toLocaleString()} ETB</span>
-                      </div>
-                    )}
-                    {discountAmount > 0 && (
-                      <div className="flex justify-between items-center text-rose-600 dark:text-rose-400">
-                        <span>Discount</span>
-                        <span className="font-mono">−{discountAmount.toLocaleString()} ETB</span>
-                      </div>
-                    )}
-                    {writeOffAmount > 0 && (
-                      <div className="flex justify-between items-center text-rose-600 dark:text-rose-400">
-                        <span>Price Concession</span>
-                        <span className="font-mono">−{writeOffAmount.toLocaleString()} ETB</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Main Total */}
-                <div className="pt-1 flex justify-between items-baseline">
-                  <span className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-tight">
-                    Total
-                  </span>
-                  <div className="text-right">
-                    <span className="text-xl font-bold font-mono text-slate-900 dark:text-white">
-                      {settledSaleValue.toLocaleString()}
-                    </span>{' '}
-                    <span className="text-xs font-normal text-slate-400 font-sans">ETB</span>
-                  </div>
-                </div>
-
-                {/* Amount Paid */}
-                <div className="flex justify-between items-center text-slate-600 dark:text-slate-400">
-                  <span>Amount Paid</span>
-                  <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">
-                    +{paidAmount.toLocaleString()} ETB
+            {/* Price calculation lines (if any trade-in / discount / concession) */}
+            {(discountAmount > 0 || writeOffAmount > 0 || exchangeAllowance > 0) && (
+              <div className="space-y-2 pt-1 border-t border-dashed border-slate-100 dark:border-slate-800/60">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400 dark:text-slate-500">Gross Subtotal</span>
+                  <span className="font-mono text-slate-700 dark:text-slate-300">
+                    {grossAmount.toLocaleString()} ETB
                   </span>
                 </div>
-
-                {/* Remaining Debt if any */}
-                {remainingDebt > 0 && (
-                  <div className="pt-1.5 border-t border-amber-200 dark:border-amber-900/50 flex justify-between items-center">
-                    <span className="font-bold text-amber-600 dark:text-amber-400">Balance Due</span>
-                    <span className="font-mono font-bold text-amber-600 dark:text-amber-400 text-sm">
-                      {remainingDebt.toLocaleString()} ETB
-                    </span>
+                {exchangeAllowance > 0 && order.exchange_unit && (
+                  <div className="flex items-center justify-between text-purple-700 dark:text-purple-300">
+                    <span>Trade-in ({order.exchange_unit.variant?.product?.name || 'Device'})</span>
+                    <span className="font-mono font-medium">−{exchangeAllowance.toLocaleString()} ETB</span>
                   </div>
                 )}
-
-                {remainingDebt > 0 && (
-                  <div className="pt-1.5">
-                    <button
-                      type="button"
-                      onClick={handleOpenCollect}
-                      className="w-full h-8 px-3 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-semibold hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors cursor-pointer"
-                    >
-                      Collect Balance
-                    </button>
+                {discountAmount > 0 && (
+                  <div className="flex items-center justify-between text-rose-600 dark:text-rose-400">
+                    <span>Discount</span>
+                    <span className="font-mono font-medium">−{discountAmount.toLocaleString()} ETB</span>
+                  </div>
+                )}
+                {writeOffAmount > 0 && (
+                  <div className="flex items-center justify-between text-rose-600 dark:text-rose-400">
+                    <span>Price Concession</span>
+                    <span className="font-mono font-medium">−{writeOffAmount.toLocaleString()} ETB</span>
                   </div>
                 )}
               </div>
+            )}
+
+            {/* Total: Normal bold font */}
+            <div className="flex items-center justify-between text-base sm:text-sm pt-1">
+              <span className="font-bold text-slate-900 dark:text-white">
+                Total
+              </span>
+              <span className="font-bold font-mono text-slate-900 dark:text-white">
+                {settledSaleValue.toLocaleString()} ETB
+              </span>
             </div>
 
-            {/* Desktop Footer Note */}
-            <div className="pt-2 text-center text-xs text-slate-400">
-              {tenant?.settings?.footer_note ||
-                'Thank you for your business! 7-day testing warranty on internal hardware.'}
+            {/* Paid: Green and big size, right side under the total */}
+            <div className="pt-2 flex flex-col items-end">
+              <span className="text-xs sm:text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                Amount Paid
+              </span>
+              <div className="text-3xl font-extrabold text-emerald-600 dark:text-emerald-400 font-mono tracking-tight mt-0.5">
+                +{paidAmount.toLocaleString()}{' '}
+                <span className="text-base sm:text-sm font-semibold font-sans">ETB</span>
+              </div>
             </div>
+
+            {/* Remaining debt / Balance due if any */}
+            {remainingDebt > 0 && (
+              <div className="mt-3 pt-3 border-t border-amber-100 dark:border-amber-900/40 flex items-center justify-between">
+                <div>
+                  <span className="text-xs sm:text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 block">
+                    Balance Due
+                  </span>
+                  <span className="text-xl sm:text-lg font-bold font-mono text-amber-600 dark:text-amber-400">
+                    {remainingDebt.toLocaleString()} ETB
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleOpenCollect}
+                  className="h-9 sm:h-8 px-3.5 sm:px-3 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-semibold hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors cursor-pointer"
+                >
+                  Collect Balance
+                </button>
+              </div>
+            )}
           </div>
 
           {/* ═══════════════════════════════════════════════════════════════
               SECTION H: INTERNAL MARGIN AUDIT (Collapsible, Owner Only)
              ═══════════════════════════════════════════════════════════════ */}
           {canViewCost && (
-            <div className="no-print pt-3 border-t border-slate-100 dark:border-slate-800">
+            <div className="no-print pt-2.5 border-t border-slate-100 dark:border-slate-800">
               <button
                 type="button"
                 onClick={() => setShowInternalAudit(!showInternalAudit)}
-                className="w-full py-2 flex items-center justify-between text-xs font-semibold text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
+                className="w-full py-2 sm:py-1.5 flex items-center justify-between gap-2 text-sm sm:text-xs text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
               >
-                <span className="flex items-center gap-1.5">
-                  <Lock className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                  <span>Internal Margin & Cost Basis</span>
+                <span className="flex items-center gap-1.5 font-medium min-w-0">
+                  <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  <span className="truncate">Internal Margin & Cost Basis</span>
                 </span>
-                <span className="flex items-center gap-2 font-mono text-slate-700 dark:text-slate-300">
+                <span className="flex items-center gap-1.5 font-mono shrink-0 whitespace-nowrap">
                   <span
                     className={
                       totalProfit > 0
                         ? 'text-emerald-600 dark:text-emerald-400 font-semibold'
                         : totalProfit < 0
-                        ? 'text-rose-600 dark:text-rose-400 font-bold'
-                        : 'text-slate-500 font-semibold'
+                        ? 'text-rose-600 dark:text-rose-400 font-semibold'
+                        : 'text-slate-500 font-medium'
                     }
                   >
                     {totalProfit > 0 ? '+' : totalProfit < 0 ? '−' : ''}
                     {Math.abs(totalProfit).toLocaleString()} ETB Net
                     {totalProfit < 0 && (
-                      <span className="ml-1.5 text-[10px] font-sans font-bold px-1.5 py-0.5 rounded bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200/50 dark:border-rose-800/50">
+                      <span className="ml-1 text-[10px] sm:text-[9.5px] font-sans font-bold px-1.5 py-0.5 sm:py-0.2 rounded bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200/50 dark:border-rose-800/50 whitespace-nowrap">
                         Loss
                       </span>
                     )}
                   </span>
                   {showInternalAudit ? (
-                    <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
+                    <ChevronUp className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                   ) : (
-                    <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                    <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                   )}
                 </span>
               </button>
 
               {showInternalAudit && (
-                <div className="pt-3 pb-2 space-y-2 text-xs divide-y divide-slate-100 dark:divide-slate-800/60">
+                <div className="pt-2 pb-1 space-y-2 sm:space-y-1.5 text-sm sm:text-xs divide-y divide-slate-100 dark:divide-slate-800/60">
                   {order.items.map((item, idx) => {
                     const pName =
                       item.accessory_name ||
@@ -1193,7 +1036,7 @@ Thank you for choosing Habeshabiz Electronics!
                     return (
                       <div
                         key={idx}
-                        className="pt-2 first:pt-0 flex items-center justify-between text-xs"
+                        className="pt-2 sm:pt-1.5 first:pt-0 flex items-center justify-between text-sm sm:text-xs"
                       >
                         <div>
                           <div className="flex items-center gap-1.5">
@@ -1201,13 +1044,13 @@ Thank you for choosing Habeshabiz Electronics!
                               {pName}
                             </span>
                             {itemProfitVal < 0 && (
-                              <span className="text-[9px] font-sans font-bold px-1 py-0.2 rounded bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200/50 dark:border-rose-800/50">
+                              <span className="text-[10px] sm:text-[9px] font-sans font-bold px-1.5 sm:px-1 py-0.5 sm:py-0.2 rounded bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200/50 dark:border-rose-800/50">
                                 Loss
                               </span>
                             )}
                           </div>
                           {item.unit_cost != null && (
-                            <div className="text-[11px] text-slate-400 font-mono">
+                            <div className="text-xs sm:text-[11px] text-slate-400 font-mono">
                               Cost: {Number(item.unit_cost).toLocaleString()} ETB
                             </div>
                           )}
@@ -1216,9 +1059,9 @@ Thank you for choosing Habeshabiz Electronics!
                           <span
                             className={
                               itemProfitVal > 0
-                                ? 'text-emerald-600 dark:text-emerald-400 font-bold'
+                                ? 'text-emerald-600 dark:text-emerald-400 font-medium'
                                 : itemProfitVal < 0
-                                ? 'text-rose-600 dark:text-rose-400 font-bold'
+                                ? 'text-rose-600 dark:text-rose-400 font-medium'
                                 : 'text-slate-500'
                             }
                           >

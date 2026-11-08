@@ -405,13 +405,13 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
       {/* ── Desktop View (>= sm) ── */}
       <div className="hidden sm:block space-y-4 2xl:space-y-6">
-        {/* 1. Capital Strip — single clean white card with compact sizing for 13" laptops, scaling up dynamically for 15"/17" */}
+        {/* 1. Capital Strip — single clean white card with subtle breathing room */}
         <div className="bg-white dark:bg-[#131926] rounded-2xl shadow-xs overflow-hidden grid grid-cols-5 divide-x divide-slate-100 dark:divide-slate-800/60 animate-stagger-2">
           {capitalMetrics.map((m) => (
             <button
               key={m.key}
               onClick={m.onClick}
-              className="bg-white dark:bg-[#131926] px-3 py-2.5 2xl:px-5 2xl:py-4 text-left hover:bg-slate-50/80 dark:hover:bg-[#171e2e] transition-colors group focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-inset cursor-pointer"
+              className="bg-white dark:bg-[#131926] px-3.5 py-3 2xl:px-5 2xl:py-4 text-left hover:bg-slate-50/80 dark:hover:bg-[#171e2e] transition-colors group focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-inset cursor-pointer"
             >
               <div className="text-[10px] 2xl:text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-0.5 truncate">
                 {m.label}
@@ -426,12 +426,12 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
         {/* 2. Charts — Sales Performance (with embedded metrics) + Asset Allocation */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 2xl:gap-6 animate-stagger-3">
-          {/* Sales Performance Card (Clean, locked with comfortable breathing room) */}
-          <div className="lg:col-span-7 bg-white dark:bg-[#131926] rounded-2xl p-4 sm:p-5 2xl:p-6 shadow-xs flex flex-col justify-between h-[296px] 2xl:h-[350px] overflow-hidden">
+          {/* Sales Performance Card (Clean, locked with subtle breathing room) */}
+          <div className="lg:col-span-7 bg-white dark:bg-[#131926] rounded-2xl p-4 sm:p-5 2xl:p-6 shadow-xs flex flex-col justify-between h-[304px] 2xl:h-[350px] overflow-hidden">
             <div>
               {/* Header: Title on Left, Range selector pills on Right matching mockup */}
               <div className="flex items-center justify-between gap-3 shrink-0">
-                {/* Left: Title + Optional subtle Top Seller pill */}
+                {/* Left: Title + Most Sold Model pill */}
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
                     Sales Performance
@@ -472,7 +472,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               </div>
 
               {/* Headline Sales Number + Trend Indicator */}
-              <div className="mt-1.5 2xl:mt-2">
+              <div className="mt-2 2xl:mt-2.5">
                 <div className="text-xl sm:text-2xl 2xl:text-3xl font-bold font-mono tracking-tight text-slate-900 dark:text-white flex items-baseline gap-1.5">
                   {isBalancesHidden ? (
                     '******'
@@ -509,7 +509,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               </div>
 
               {/* Chart Canvas */}
-              <div className={`mt-1.5 transition-opacity duration-200 ${isLoadingRange ? 'opacity-60' : 'opacity-100'}`}>
+              <div className={`mt-2 transition-opacity duration-200 ${isLoadingRange ? 'opacity-60' : 'opacity-100'}`}>
                 <InteractiveSalesWaveChart
                   data={activeSalesChart}
                   totalRevenue={activeRevenue}
@@ -517,7 +517,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   canViewCost={canViewCost}
                   hideHeader={true}
                   hideGridLines={true}
-                  heightClass="h-[90px] sm:h-[95px] 2xl:h-[125px]"
+                  heightClass="h-[92px] sm:h-[95px] 2xl:h-[125px]"
                   onHoverPoint={(pt) => {
                     setHoveredPointVal(pt ? pt.val : null);
                   }}
@@ -525,13 +525,13 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               </div>
             </div>
 
-            {/* Embedded 4-Column Footer Bar (Divided by crisp vertical borders with ample breathing room) */}
-            <div className="border-t border-slate-100 dark:border-slate-800/80 pt-2.5 2xl:pt-3 pb-0.5 mt-auto shrink-0">
+            {/* Embedded 4-Column Footer Bar (Divided by crisp vertical borders) */}
+            <div className="border-t border-slate-100 dark:border-slate-800/80 pt-3 2xl:pt-3.5 pb-0.5 mt-auto shrink-0">
               <div className={`grid ${canViewCost ? 'grid-cols-4' : 'grid-cols-2'}`}>
                 {canViewCost && (
                   <>
                     {/* 1. Gross Profit */}
-                    <div className="pr-3.5 2xl:pr-5 border-r border-slate-100 dark:border-slate-800/80">
+                    <div className="pr-3.5 sm:pr-4 2xl:pr-5 border-r border-slate-100 dark:border-slate-800/80">
                       <div className="text-[10.5px] 2xl:text-xs font-semibold text-slate-500 dark:text-slate-400 truncate">
                         Gross Profit
                       </div>
@@ -558,7 +558,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                     </div>
 
                     {/* 2. Net Profit */}
-                    <div className="px-3.5 2xl:px-5 border-r border-slate-100 dark:border-slate-800/80">
+                    <div className="px-3.5 sm:px-4 2xl:px-5 border-r border-slate-100 dark:border-slate-800/80">
                       <div className="text-[10.5px] 2xl:text-xs font-semibold text-slate-500 dark:text-slate-400 truncate">
                         Net Profit
                       </div>
@@ -591,7 +591,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   type="button"
                   onClick={() => setIsExpenseModalOpen(true)}
                   title="Click to record an expense or personal draw"
-                  className={`px-3.5 2xl:px-5 text-left group cursor-pointer focus:outline-none transition-colors ${canViewCost ? 'border-r border-slate-100 dark:border-slate-800/80' : 'border-r-0'}`}
+                  className={`px-3.5 sm:px-4 2xl:px-5 text-left group cursor-pointer focus:outline-none transition-colors ${canViewCost ? 'border-r border-slate-100 dark:border-slate-800/80' : 'border-r-0'}`}
                 >
                   <div className="text-[10.5px] 2xl:text-xs font-semibold text-slate-500 dark:text-slate-400 group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors truncate">
                     Expenses
@@ -607,7 +607,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 </button>
 
                 {/* 4. Owner Draws (Neutral color like revenue, NOT purple!) */}
-                <div className="pl-3.5 2xl:pl-5">
+                <div className="pl-3.5 sm:pl-4 2xl:pl-5">
                   <div className="text-[10.5px] 2xl:text-xs font-semibold text-slate-500 dark:text-slate-400 truncate">
                     Owner Draws
                   </div>
@@ -625,8 +625,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           </div>
 
           {/* Asset Allocation Donut Card (Locked with matching height) */}
-          <div className="hidden lg:flex lg:col-span-5 bg-white dark:bg-[#131926] rounded-2xl p-4 sm:p-5 2xl:p-6 flex-col justify-between shadow-xs h-[296px] 2xl:h-[350px] overflow-hidden">
-            <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-slate-800/80 mb-2 shrink-0">
+          <div className="hidden lg:flex lg:col-span-5 bg-white dark:bg-[#131926] rounded-2xl p-4 sm:p-5 2xl:p-6 flex-col justify-between shadow-xs h-[304px] 2xl:h-[350px] overflow-hidden">
+            <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-slate-800/80 mb-2.5 shrink-0">
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 Asset Allocation
               </span>
