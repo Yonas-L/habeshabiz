@@ -21,7 +21,6 @@ import {
   AlertCircle,
   Copy,
   Check,
-  UserCheck,
   Undo2,
   Wrench,
   Clock,
@@ -584,7 +583,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
                         }}
                         className="h-9 px-3.5 rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50/60 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 shrink-0 whitespace-nowrap"
                       >
-                        <UserCheck className="w-3.5 h-3.5" />
+                        <Handshake className="w-3.5 h-3.5" />
                         <span>Handover</span>
                       </button>
                     )}
@@ -839,7 +838,7 @@ export const InventoryUnitDrawer: React.FC<InventoryUnitDrawerProps> = ({
                     }}
                     className="flex-1 h-9 px-3 rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50/60 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1 whitespace-nowrap cursor-pointer"
                   >
-                    <UserCheck className="w-3.5 h-3.5 shrink-0" />
+                    <Handshake className="w-3.5 h-3.5 shrink-0" />
                     <span>Handover</span>
                   </button>
                 )}

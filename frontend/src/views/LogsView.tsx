@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import type { User, AuditLogItem, AuditLogsResponse } from '../api/client';
 import { api } from '../api/client';
-import { CustomPageLoader } from '../components/loading/CustomPageLoader';
 import { SlideOverDrawer } from '../components/drawers/SlideOverDrawer';
 import { UndoActionModal } from '../components/UndoActionModal';
 import { humanizeAuditLog, getAuditQuickSummary } from '../utils/auditHumanizer';
@@ -11,23 +10,15 @@ import {
   SearchX,
   RefreshCw,
   Download,
-  Calendar,
-  Filter,
   Eye,
-  Check,
   X,
   ShieldAlert,
   ShieldCheck,
-  Activity,
-  Layers,
   Clock,
-  FileCode,
   RotateCcw,
   Undo2,
   Loader2,
-  ChevronDown,
   ArrowRight,
-  Copy,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -163,6 +154,51 @@ function getActionBadgeStyle(action: string): { bg: string; text: string; dot: s
   };
 }
 
+// Shimmer Skeleton Row for Desktop Table
+const AuditLogRowSkeleton: React.FC = () => (
+  <tr className="animate-pulse">
+    {/* Event & Description */}
+    <td className="py-3 px-4 align-middle">
+      <div className="flex items-center gap-2.5">
+        <div className="h-5 w-20 bg-slate-200 dark:bg-slate-800 rounded-full shrink-0" />
+        <div className="h-3.5 bg-slate-200 dark:bg-slate-800 rounded-md w-48" />
+      </div>
+    </td>
+    {/* Actor / Staff */}
+    <td className="py-3 px-4 align-middle">
+      <div className="flex items-center gap-2">
+        <div className="size-6.5 bg-slate-200 dark:bg-slate-800 rounded-lg shrink-0" />
+        <div className="h-3 bg-slate-200 dark:bg-slate-800 rounded-md w-24" />
+      </div>
+    </td>
+    {/* Time */}
+    <td className="py-3 px-4 align-middle whitespace-nowrap">
+      <div className="h-3 bg-slate-100 dark:bg-slate-800/60 rounded-md w-16" />
+    </td>
+    {/* Target Module */}
+    <td className="py-3 px-4 align-middle whitespace-nowrap">
+      <div className="h-4.5 bg-slate-100 dark:bg-slate-800/60 rounded-md w-16" />
+    </td>
+    {/* Actions */}
+    <td className="py-3 px-4 align-middle text-right whitespace-nowrap">
+      <div className="h-6.5 bg-slate-100 dark:bg-slate-800 rounded-lg w-28 ml-auto" />
+    </td>
+  </tr>
+);
+
+// Shimmer Skeleton Row for Mobile Cardless List
+const AuditLogMobileSkeleton: React.FC = () => (
+  <div className="flex items-center justify-between gap-3 px-2 py-3.5 animate-pulse">
+    <div className="space-y-1.5 flex-1 min-w-0">
+      <div className="h-3.5 bg-slate-200 dark:bg-slate-800 rounded-md w-3/5" />
+      <div className="h-2.5 bg-slate-100 dark:bg-slate-800/60 rounded-md w-2/5" />
+    </div>
+    <div className="h-7 w-14 bg-slate-100 dark:bg-slate-800 rounded-lg shrink-0" />
+  </div>
+);
+
+const PAGE_SIZE = 25;
+
 export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
   const isOwner = currentUser?.role === 'owner';
 
@@ -185,11 +221,14 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
 
   // Inspector Drawer State
   const [inspectItem, setInspectItem] = useState<AuditLogItem | null>(null);
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   // Undo Action Modal State
   const [selectedUndoLog, setSelectedUndoLog] = useState<AuditLogItem | null>(null);
   const [isUndoModalOpen, setIsUndoModalOpen] = useState(false);
+
+  // Scroll container refs for eager loading checks
+  const desktopScrollRef = useRef<HTMLDivElement>(null);
+  const mobileScrollRef = useRef<HTMLDivElement>(null);
 
   // Debounce search input
   useEffect(() => {
@@ -208,7 +247,7 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
       setLoading(true);
       const res = await api.getAuditLogs({
         page: 1,
-        per_page: 50,
+        per_page: PAGE_SIZE,
         search: debouncedSearch.trim() || undefined,
         action: selectedAction,
         entity_type: selectedEntity,
@@ -240,7 +279,7 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
       const nextPage = page + 1;
       const res = await api.getAuditLogs({
         page: nextPage,
-        per_page: 50,
+        per_page: PAGE_SIZE,
         search: debouncedSearch.trim() || undefined,
         action: selectedAction,
         entity_type: selectedEntity,
@@ -268,10 +307,20 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
     }
   };
 
-  // Scroll listener for fixed-height internal scrolling
+  // Eager progressive loading: If initial chunk renders but container has leftover viewport space, eagerly fetch page 2
+  useEffect(() => {
+    if (!loading && !loadingMore && hasMore && items.length > 0 && items.length <= PAGE_SIZE) {
+      const desktopEl = desktopScrollRef.current;
+      if (desktopEl && desktopEl.scrollHeight <= desktopEl.clientHeight + 120) {
+        loadMoreLogs();
+      }
+    }
+  }, [items.length, loading, loadingMore, hasMore]);
+
+  // Scroll listener for fixed-height internal scrolling with eager threshold
   const handleContainerScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const target = e.currentTarget;
-    const bottomThreshold = 180;
+    const bottomThreshold = 350; // Eagerly trigger loading before reaching the bottom
     if (target.scrollHeight - target.scrollTop - target.clientHeight < bottomThreshold) {
       if (hasMore && !loading && !loadingMore) {
         loadMoreLogs();
@@ -299,14 +348,6 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
       startDate ||
       endDate
   );
-
-  // Copy helper with feedback
-  const handleCopy = (text: string, key: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedKey(key);
-    toast.success('Copied to clipboard');
-    setTimeout(() => setCopiedKey(null), 1800);
-  };
 
   // Export current loaded view to CSV
   const handleExportCSV = () => {
@@ -357,7 +398,7 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
   const humanizedInspect = inspectItem ? humanizeAuditLog(inspectItem) : null;
 
   return (
-    <div className="flex flex-col gap-4 animate-page-enter">
+    <div className="space-y-4 animate-page-enter flex-1 flex flex-col min-h-0">
       {/* Top Header & Actions Strip */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
@@ -367,14 +408,14 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">Audit & System Logs</h1>
+                <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">User Activities</h1>
                 <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60">
                   <ShieldCheck className="size-3 text-emerald-500" />
                   Owner Access
                 </span>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Tamper-evident record of all system events, inventory intakes, user actions &amp; data changes
+                Audit trail of system events, inventory intakes, user actions &amp; data changes
               </p>
             </div>
           </div>
@@ -385,14 +426,14 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
             onClick={fetchInitialLogs}
             disabled={loading}
             title="Refresh logs"
-            className="size-9 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60 disabled:opacity-50"
+            className="size-8.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60 disabled:opacity-50 cursor-pointer"
           >
             <RefreshCw className={`size-3.5 ${loading ? 'animate-spin' : ''}`} />
           </button>
 
           <button
             onClick={handleExportCSV}
-            className="h-9 px-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800/60 text-xs font-semibold flex items-center gap-2 transition-colors shadow-xs"
+            className="h-8.5 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800/60 text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
           >
             <Download className="size-3.5 text-slate-400" />
             <span>Export CSV</span>
@@ -400,72 +441,24 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
         </div>
       </div>
 
-      {/* KPI Summary Strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="p-3.5 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/80 shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between text-slate-400 mb-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider">Total Recorded</span>
-            <ScrollText className="size-3.5 text-slate-400" />
-          </div>
-          <div className="text-2xl font-bold font-mono text-slate-900 dark:text-white">
-            {summary?.total_count?.toLocaleString() ?? '—'}
-          </div>
-          <div className="text-[11px] text-slate-400 mt-0.5">Immutable system events</div>
-        </div>
-
-        <div className="p-3.5 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/80 shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between text-slate-400 mb-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider">Today's Activity</span>
-            <Activity className="size-3.5 text-emerald-500" />
-          </div>
-          <div className="text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400">
-            {summary?.today_count?.toLocaleString() ?? 0}
-          </div>
-          <div className="text-[11px] text-emerald-600/80 dark:text-emerald-400/80 mt-0.5">Logged since midnight</div>
-        </div>
-
-        <div className="p-3.5 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/80 shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between text-slate-400 mb-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider">Action Types</span>
-            <Layers className="size-3.5 text-sky-500" />
-          </div>
-          <div className="text-2xl font-bold font-mono text-slate-900 dark:text-white">
-            {filterOptions?.actions?.length ?? '—'}
-          </div>
-          <div className="text-[11px] text-slate-400 mt-0.5">Distinct event categories</div>
-        </div>
-
-        <div className="p-3.5 rounded-xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/80 shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between text-slate-400 mb-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider">Filtered Matches</span>
-            <Filter className="size-3.5 text-purple-500" />
-          </div>
-          <div className="text-2xl font-bold font-mono text-purple-600 dark:text-purple-400">
-            {summary?.filtered_count?.toLocaleString() ?? '—'}
-          </div>
-          <div className="text-[11px] text-slate-400 mt-0.5">
-            {isFiltered ? 'Active search filters' : 'All records in view'}
-          </div>
-        </div>
-      </div>
-
-      {/* Filter Surface */}
-      <div className="p-3.5 rounded-2xl bg-white dark:bg-[#131926] border border-slate-200/80 dark:border-slate-800/80 shadow-xs flex flex-col gap-2.5">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2.5 items-center">
+      {/* Minimal Search & Filters Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-1 items-center gap-2 flex-wrap min-w-0">
           {/* Search Input */}
-          <div className="lg:col-span-5 relative">
-            <Search className="size-4 absolute left-3 top-2.5 text-slate-400" />
+          <div className="relative flex-1 min-w-[180px] sm:max-w-xs">
+            <Search className="size-3.5 absolute left-3 top-2.5 text-slate-400" />
             <input
               type="text"
-              placeholder="Search actions, items, staff, or notes..."
+              placeholder="Search user activities..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full h-9 pl-9 pr-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900 dark:focus:ring-white transition-colors"
+              className="w-full h-8.5 pl-8 pr-7 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900 dark:focus:ring-white transition-colors"
             />
             {searchTerm && (
               <button
+                type="button"
                 onClick={() => setSearchTerm('')}
-                className="size-5 absolute right-2.5 top-2 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                className="size-4 absolute right-2.5 top-2.5 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
               >
                 <X className="size-3" />
               </button>
@@ -473,127 +466,101 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
           </div>
 
           {/* Action Filter */}
-          <div className="lg:col-span-3">
-            <select
-              value={selectedAction}
-              onChange={(e) => {
-                setSelectedAction(e.target.value);
-                setPage(1);
-              }}
-              className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 text-xs font-medium text-slate-900 dark:text-white focus:outline-none transition-colors"
-            >
-              <option value="all">All Actions</option>
-              {filterOptions?.actions?.map((act) => (
-                <option key={act} value={act}>
-                  {formatActionLabel(act)}
-                </option>
-              ))}
-            </select>
-          </div>
+          <select
+            value={selectedAction}
+            onChange={(e) => {
+              setSelectedAction(e.target.value);
+              setPage(1);
+            }}
+            className="h-8.5 px-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none transition-colors cursor-pointer"
+          >
+            <option value="all">All Actions</option>
+            {filterOptions?.actions?.map((act) => (
+              <option key={act} value={act}>
+                {formatActionLabel(act)}
+              </option>
+            ))}
+          </select>
 
-          {/* Entity Filter */}
-          <div className="lg:col-span-2">
-            <select
-              value={selectedEntity}
-              onChange={(e) => {
-                setSelectedEntity(e.target.value);
-                setPage(1);
-              }}
-              className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 text-xs font-medium text-slate-900 dark:text-white focus:outline-none transition-colors"
-            >
-              <option value="all">All Modules</option>
-              {filterOptions?.entity_types?.map((entity) => (
-                <option key={entity} value={entity}>
-                  {entity}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Staff Filter */}
+          <select
+            value={selectedUser}
+            onChange={(e) => {
+              setSelectedUser(e.target.value);
+              setPage(1);
+            }}
+            className="h-8.5 px-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none transition-colors cursor-pointer"
+          >
+            <option value="all">All Staff</option>
+            {filterOptions?.users?.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.name}
+              </option>
+            ))}
+          </select>
 
-          {/* User Filter */}
-          <div className="lg:col-span-2">
-            <select
-              value={selectedUser}
-              onChange={(e) => {
-                setSelectedUser(e.target.value);
-                setPage(1);
-              }}
-              className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 text-xs font-medium text-slate-900 dark:text-white focus:outline-none transition-colors"
-            >
-              <option value="all">All Staff</option>
-              {filterOptions?.users?.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name} ({u.role})
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
+          {/* Module Filter */}
+          <select
+            value={selectedEntity}
+            onChange={(e) => {
+              setSelectedEntity(e.target.value);
+              setPage(1);
+            }}
+            className="h-8.5 px-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131926] text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none transition-colors cursor-pointer"
+          >
+            <option value="all">All Modules</option>
+            {filterOptions?.entity_types?.map((entity) => (
+              <option key={entity} value={entity}>
+                {entity}
+              </option>
+            ))}
+          </select>
 
-        {/* Date Filter Strip & Reset Action */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100 dark:border-slate-800/80">
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            <div className="flex items-center gap-1.5 text-slate-400">
-              <Calendar className="size-3.5" />
-              <span className="text-[11px] font-medium">Date:</span>
-            </div>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => {
-                setStartDate(e.target.value);
-                setPage(1);
-              }}
-              className="h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 text-[11px] font-medium text-slate-900 dark:text-white focus:outline-none"
-            />
-            <span className="text-slate-400 text-xs">to</span>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => {
-                setEndDate(e.target.value);
-                setPage(1);
-              }}
-              className="h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 text-[11px] font-medium text-slate-900 dark:text-white focus:outline-none"
-            />
-          </div>
-
+          {/* Reset Filters */}
           {isFiltered && (
             <button
+              type="button"
               onClick={handleResetFilters}
-              className="text-[11px] font-semibold text-rose-500 hover:text-rose-600 dark:text-rose-400 dark:hover:text-rose-300 flex items-center gap-1 px-2.5 py-1 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+              className="h-8.5 px-2.5 text-xs font-semibold text-rose-500 hover:text-rose-600 dark:text-rose-400 flex items-center gap-1 rounded-xl hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
             >
               <X className="size-3" />
-              Reset Filters
+              <span>Reset</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* Fixed Height Container with Internal Scrolling (No Horizontal Scroll) */}
-      <div className="bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-xs overflow-hidden flex flex-col h-[calc(100vh-290px)] min-h-[500px]">
-        {/* Desktop View: Sticky Header + Internal Scrollable Table */}
+      {/* Desktop View (≥ md): Sticky Header + Table in Clean Card Container */}
+      <div className="hidden md:block bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-xs overflow-hidden">
         <div
+          ref={desktopScrollRef}
           onScroll={handleContainerScroll}
-          className="hidden md:flex flex-col flex-1 overflow-y-auto overscroll-contain"
+          className="overflow-x-auto overflow-y-auto h-[calc(100vh-190px)] min-h-[500px] scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800 relative"
         >
-          <table className="w-full text-left text-xs border-collapse table-fixed">
+          <table className="w-full text-left text-xs border-collapse table-fixed min-w-[960px]">
+            <colgroup>
+              <col className="w-auto min-w-[280px]" />
+              <col className="w-[180px]" />
+              <col className="w-[130px]" />
+              <col className="w-[130px]" />
+              <col className="w-[190px]" />
+            </colgroup>
             <thead className="sticky top-0 z-10 bg-slate-50/95 dark:bg-[#161d2d]/95 backdrop-blur-xs border-b border-slate-100 dark:border-slate-800/80 shadow-xs">
               <tr className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                <th className="py-3 px-4 w-[36%]">Event &amp; Description</th>
-                <th className="py-3 px-4 w-[22%]">Actor / Staff</th>
-                <th className="py-3 px-4 w-[16%]">Time</th>
-                <th className="py-3 px-4 w-[14%]">Target Module</th>
-                <th className="py-3 px-4 w-[12%] text-right">Actions</th>
+                <th className="py-3 px-4">Event &amp; Description</th>
+                <th className="py-3 px-4">Actor / Staff</th>
+                <th className="py-3 px-4 whitespace-nowrap">Time</th>
+                <th className="py-3 px-4 whitespace-nowrap">Target Module</th>
+                <th className="py-3 px-4 text-right whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
               {loading && items.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="py-16 text-center">
-                    <CustomPageLoader mode="app" fullScreen={false} />
-                  </td>
-                </tr>
+                <>
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <AuditLogRowSkeleton key={`skel-row-${i}`} />
+                  ))}
+                </>
               ) : items.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="py-16 text-center">
@@ -633,7 +600,7 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
                       className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors cursor-pointer group"
                     >
                       {/* Event & Description */}
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-4 align-middle">
                         <div className="flex flex-col gap-1 min-w-0 pr-2">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span
@@ -645,7 +612,7 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
                             {log.is_reverted && (
                               <span
                                 title={
-                                  log.reverted_by_name && log.reverted_at
+                                   log.reverted_by_name && log.reverted_at
                                     ? `Reverted by ${log.reverted_by_name} at ${formatExactTime(log.reverted_at)}`
                                     : 'Action was reverted'
                                 }
@@ -662,7 +629,7 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
                       </td>
 
                       {/* Actor */}
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-4 align-middle">
                         <div className="flex items-center gap-2 min-w-0">
                           <div className="size-7 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[10px] font-bold text-slate-700 dark:text-slate-200 uppercase shrink-0">
                             {isSystem ? 'SY' : log.user?.name.slice(0, 2) || 'US'}
@@ -684,7 +651,7 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
                       </td>
 
                       {/* Time */}
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-4 align-middle whitespace-nowrap">
                         <div className="flex flex-col leading-tight">
                           <span className="font-semibold text-slate-900 dark:text-white">
                             {formatRelativeTime(log.created_at)}
@@ -696,15 +663,15 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
                       </td>
 
                       {/* Target Module */}
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-4 align-middle whitespace-nowrap">
                         <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60">
                           {log.entity_type}
                         </span>
                       </td>
 
                       {/* Actions */}
-                      <td className="py-3 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
+                      <td className="py-3 px-4 align-middle text-right whitespace-nowrap">
+                        <div className="inline-flex items-center justify-end gap-1.5 shrink-0">
                           {log.is_reverted ? (
                             <span
                               title={
@@ -749,16 +716,23 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
                   );
                 })
               )}
+              {loadingMore && (
+                <>
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <AuditLogRowSkeleton key={`skel-more-row-${i}`} />
+                  ))}
+                </>
+              )}
             </tbody>
           </table>
 
           {/* Bottom Infinite Scroll Sentinel & Loader */}
           {items.length > 0 && (
-            <div className="p-4 text-center border-t border-slate-100 dark:border-slate-800/60 text-xs text-slate-400">
+            <div className="p-3 text-center border-t border-slate-100 dark:border-slate-800/60 text-xs text-slate-400">
               {loadingMore ? (
                 <div className="flex items-center justify-center gap-2 font-medium text-slate-600 dark:text-slate-300">
-                  <Loader2 className="size-4 animate-spin text-emerald-500" />
-                  <span>Loading older records...</span>
+                  <Loader2 className="size-3.5 animate-spin text-emerald-500" />
+                  <span>Loading older activities...</span>
                 </div>
               ) : hasMore ? (
                 <button
@@ -775,159 +749,120 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
             </div>
           )}
         </div>
+      </div>
 
-        {/* Mobile View: Fixed Height Scrollable Card Stream */}
-        <div
-          onScroll={handleContainerScroll}
-          className="md:hidden flex-1 overflow-y-auto overscroll-contain p-3.5 space-y-3"
-        >
-          {loading && items.length === 0 ? (
-            <div className="py-12 text-center">
-              <CustomPageLoader mode="app" fullScreen={false} />
-            </div>
-          ) : items.length === 0 ? (
-            <div className="py-16 text-center px-4">
-              <div className="flex flex-col items-center justify-center gap-2">
-                <SearchX className="size-8 text-slate-300 dark:text-slate-600" />
-                <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
-                  No audit events match your filters
-                </span>
-                <p className="text-[11px] text-slate-400 max-w-xs mt-0.5">
-                  Try changing selected filters or clearing text search.
-                </p>
+      {/* Mobile View (< md): Cardless Table List (Minimal Text + Undo Button Only) */}
+      <div
+        ref={mobileScrollRef}
+        onScroll={handleContainerScroll}
+        className="md:hidden overflow-y-auto h-[calc(100dvh-185px)] min-h-[440px] scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800 overscroll-contain pb-28 px-0.5"
+      >
+        {loading && items.length === 0 ? (
+          <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <AuditLogMobileSkeleton key={`skel-mob-${i}`} />
+            ))}
+          </div>
+        ) : items.length === 0 ? (
+          <div className="py-16 text-center px-4">
+            <div className="flex flex-col items-center justify-center gap-2">
+              <SearchX className="size-8 text-slate-300 dark:text-slate-600" />
+              <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                No user activities match your filters
+              </span>
+              <p className="text-[11px] text-slate-400 max-w-xs mt-0.5">
+                Try changing selected filters or clearing search.
+              </p>
+              {isFiltered && (
                 <button
                   onClick={handleResetFilters}
-                  className="mt-3 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                  className="mt-3 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer"
                 >
                   Clear Filters
                 </button>
-              </div>
+              )}
             </div>
-          ) : (
-            items.map((log: AuditLogItem) => {
-              const badgeStyle = getActionBadgeStyle(log.action);
-              const isSystem = !log.user;
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
+            {items.map((log: AuditLogItem) => {
               const quickSummary = getAuditQuickSummary(log);
 
               return (
                 <div
                   key={log.id}
                   onClick={() => setInspectItem(log)}
-                  className="p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-slate-50/40 dark:bg-slate-900/40 hover:bg-slate-50 dark:hover:bg-slate-900/70 transition-all cursor-pointer space-y-2.5 active:scale-[0.99]"
+                  className="flex items-center justify-between gap-3 px-2 py-3 hover:bg-slate-50/60 dark:hover:bg-slate-800/30 active:bg-slate-100/80 dark:active:bg-slate-800/50 transition-colors cursor-pointer select-none"
                 >
-                  {/* Card Header: Actor Profile + Action Badge */}
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="size-7 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 flex items-center justify-center font-bold text-[11px] uppercase shrink-0">
-                        {isSystem ? 'SY' : log.user?.name.slice(0, 2) || 'US'}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-xs font-bold text-slate-900 dark:text-white truncate">
-                            {isSystem ? 'System Engine' : log.user?.name}
-                          </span>
-                          {log.user?.role === 'owner' && (
-                            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-400 border border-purple-200/50 dark:border-purple-800/50 shrink-0">
-                              Owner
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <span
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${badgeStyle.bg} ${badgeStyle.text} ${log.is_reverted ? 'opacity-70 line-through' : ''}`}
-                      >
-                        <span className={`size-1.5 rounded-full ${badgeStyle.dot}`} />
-                        {formatActionLabel(log.action)}
+                  {/* Minimal Text: Summary + Actor · Time */}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-semibold text-slate-900 dark:text-white truncate">
+                        {quickSummary}
                       </span>
                       {log.is_reverted && (
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200/60 dark:border-rose-900/40 shrink-0">
+                        <span className="text-[9px] font-bold text-rose-500 dark:text-rose-400 shrink-0 uppercase tracking-tight">
                           Reverted
                         </span>
                       )}
                     </div>
-                  </div>
-
-                  {/* Card Body: Clean Business Summary */}
-                  <div className="p-2.5 rounded-lg bg-white dark:bg-[#131926] border border-slate-100 dark:border-slate-800/70 text-xs">
-                    <div className="font-semibold text-slate-800 dark:text-slate-200">
-                      {quickSummary}
-                    </div>
-                    <div className="text-[10px] text-slate-400 mt-0.5">
-                      Module: <span className="font-medium text-slate-600 dark:text-slate-300">{log.entity_type}</span>
-                    </div>
-                  </div>
-
-                  {/* Card Footer: Relative Time + Actions */}
-                  <div className="flex items-center justify-between pt-0.5">
-                    <span className="text-[10px] text-slate-400 flex items-center gap-1 font-medium">
-                      <Clock className="size-3 text-slate-400" />
+                    <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 truncate">
+                      <span>{log.user?.name || 'System'}</span>
+                      <span className="mx-1.5">·</span>
                       <span>{formatRelativeTime(log.created_at)}</span>
-                    </span>
-
-                    <div className="flex items-center gap-1.5">
-                      {log.is_reverted ? (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200/60 dark:border-slate-700/60 line-through">
-                          Reverted
-                        </span>
-                      ) : log.can_undo && isOwner ? (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedUndoLog(log);
-                            setIsUndoModalOpen(true);
-                          }}
-                          className="px-2.5 py-1 rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 text-[11px] font-bold inline-flex items-center gap-1 shadow-xs"
-                        >
-                          <RotateCcw className="size-3" />
-                          <span>Undo</span>
-                        </button>
-                      ) : null}
-
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setInspectItem(log);
-                        }}
-                        className="px-2.5 py-1 rounded-lg border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#131926] text-slate-600 dark:text-slate-400 text-[11px] font-semibold inline-flex items-center gap-1"
-                      >
-                        <Eye className="size-3" />
-                        <span>Inspect</span>
-                      </button>
                     </div>
                   </div>
+
+                  {/* Undo Button ONLY (Rendered strictly when eligible) */}
+                  {log.can_undo && isOwner && !log.is_reverted ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedUndoLog(log);
+                        setIsUndoModalOpen(true);
+                      }}
+                      className="h-7.5 px-3 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 text-xs font-bold inline-flex items-center gap-1 shadow-2xs active:scale-95 shrink-0 cursor-pointer"
+                    >
+                      <RotateCcw className="size-3" />
+                      <span>Undo</span>
+                    </button>
+                  ) : null}
                 </div>
               );
-            })
-          )}
+            })}
+            {loadingMore && (
+              <>
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <AuditLogMobileSkeleton key={`skel-more-mob-${i}`} />
+                ))}
+              </>
+            )}
+          </div>
+        )}
 
-          {/* Bottom Infinite Scroll Sentinel & Loader on Mobile */}
-          {items.length > 0 && (
-            <div className="p-3 text-center text-xs text-slate-400">
-              {loadingMore ? (
-                <div className="flex items-center justify-center gap-2 font-medium text-slate-600 dark:text-slate-300">
-                  <Loader2 className="size-4 animate-spin text-emerald-500" />
-                  <span>Loading older records...</span>
-                </div>
-              ) : hasMore ? (
-                <button
-                  onClick={loadMoreLogs}
-                  className="px-4 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors"
-                >
-                  Load older records
-                </button>
-              ) : (
-                <span className="text-[11px] text-slate-400">
-                  ✓ All {summary?.filtered_count || items.length} audit records loaded
-                </span>
-              )}
-            </div>
-          )}
-        </div>
+        {/* Bottom Infinite Scroll Sentinel & Loader on Mobile */}
+        {items.length > 0 && (
+          <div className="p-3 text-center text-xs text-slate-400">
+            {loadingMore ? (
+              <div className="flex items-center justify-center gap-2 font-medium text-slate-600 dark:text-slate-300">
+                <Loader2 className="size-3.5 animate-spin text-emerald-500" />
+                <span>Loading older activities...</span>
+              </div>
+            ) : hasMore ? (
+              <button
+                onClick={loadMoreLogs}
+                className="px-4 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors cursor-pointer"
+              >
+                Load older records
+              </button>
+            ) : (
+              <span className="text-[11px] text-slate-400">
+                ✓ All {summary?.filtered_count || items.length} audit records loaded
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Human-Readable Inspect Item SlideOver Drawer */}
@@ -1113,57 +1048,6 @@ export const LogsView: React.FC<LogsViewProps> = ({ currentUser }) => {
                 </div>
               </div>
             )}
-
-            {/* Technical & Developer Data (Collapsed by default) */}
-            <details className="group border border-slate-200/80 dark:border-slate-800 rounded-xl overflow-hidden bg-slate-50/50 dark:bg-slate-900/30">
-              <summary className="px-3.5 py-2.5 flex items-center justify-between cursor-pointer text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
-                <div className="flex items-center gap-2">
-                  <FileCode className="size-3.5 text-slate-400" />
-                  <span>Technical &amp; Developer Details (Raw JSON &amp; IP)</span>
-                </div>
-                <ChevronDown className="size-3.5 text-slate-400 group-open:rotate-180 transition-transform" />
-              </summary>
-
-              <div className="p-3.5 pt-1 space-y-3 border-t border-slate-200/60 dark:border-slate-800/60">
-                <div className="grid grid-cols-2 gap-2 text-[11px]">
-                  <div className="p-2 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 font-mono">
-                    <span className="text-[10px] text-slate-400 block font-sans">IP Address</span>
-                    {inspectItem.ip_address || '127.0.0.1'}
-                  </div>
-                  <div className="p-2 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 font-mono truncate">
-                    <span className="text-[10px] text-slate-400 block font-sans">Event UUID</span>
-                    #{inspectItem.id}
-                  </div>
-                </div>
-
-                {inspectItem.new_values && (
-                  <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-950 overflow-hidden">
-                    <div className="px-3 py-1.5 bg-slate-900 border-b border-slate-800 flex items-center justify-between text-[10px] font-mono text-slate-400">
-                      <span>raw_new_values.json</span>
-                      <button
-                        onClick={() => handleCopy(JSON.stringify(inspectItem.new_values, null, 2), 'raw-json')}
-                        className="hover:text-white flex items-center gap-1"
-                      >
-                        {copiedKey === 'raw-json' ? (
-                          <>
-                            <Check className="size-3 text-emerald-500" />
-                            <span>Copied</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="size-3" />
-                            <span>Copy JSON</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                    <pre className="p-3 text-[10px] font-mono text-emerald-400 overflow-x-auto max-h-48 leading-relaxed">
-                      {JSON.stringify(inspectItem.new_values, null, 2)}
-                    </pre>
-                  </div>
-                )}
-              </div>
-            </details>
           </div>
         )}
       </SlideOverDrawer>

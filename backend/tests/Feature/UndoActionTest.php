@@ -460,3 +460,63 @@ test('successfully previews and undoes a staff bonus payout, then unblocks sale 
     // Payment deleted
     expect(DebtPayment::find($createdPayments->id))->toBeNull();
 });
+
+test('owner can undo a deleted inventory unit and restore it to stock', function () {
+    $variant = ProductVariant::create([
+        'tenant_id' => $this->tenant->id,
+        'product_id' => $this->product->id,
+        'color' => 'Space Black',
+        'storage' => '256GB',
+    ]);
+
+    $unit = InventoryUnit::create([
+        'tenant_id' => $this->tenant->id,
+        'variant_id' => $variant->id,
+        'imei_or_serial' => 'SN-DELETE-UNDO-TEST',
+        'status' => 'in_stock',
+        'cost_basis' => 45000.0,
+    ]);
+
+    // 1. Delete unit as owner
+    $deleteRes = $this->actingAs($this->owner)
+        ->deleteJson("/api/v1/inventory/units/{$unit->id}", [
+            'refund_account' => false,
+            'reason' => 'Mistakenly removed',
+        ]);
+
+    $deleteRes->assertStatus(200);
+
+    // Verify unit is trashed
+    expect(InventoryUnit::find($unit->id))->toBeNull()
+        ->and(InventoryUnit::withTrashed()->find($unit->id)->trashed())->toBeTrue();
+
+    // 2. Find audit log
+    $log = AuditLog::where('action', 'deleted_unit')
+        ->where('entity_id', $unit->id)
+        ->latest()
+        ->first();
+
+    expect($log)->not->toBeNull();
+    expect($log->can_undo)->toBeTrue();
+
+    // 3. Preview undo
+    $previewRes = $this->actingAs($this->owner)
+        ->getJson("/api/v1/audit-logs/{$log->id}/undo-preview")
+        ->assertStatus(200);
+
+    expect($previewRes->json('data.can_undo'))->toBeTrue()
+        ->and($previewRes->json('data.blocked'))->toBeFalse();
+
+    // 4. Execute undo
+    $undoRes = $this->actingAs($this->owner)
+        ->postJson("/api/v1/audit-logs/{$log->id}/undo")
+        ->assertStatus(200);
+
+    expect($undoRes->json('success'))->toBeTrue();
+
+    // Unit restored and in stock
+    $restored = InventoryUnit::find($unit->id);
+    expect($restored)->not->toBeNull()
+        ->and($restored->trashed())->toBeFalse()
+        ->and($restored->status)->toBe('in_stock');
+});

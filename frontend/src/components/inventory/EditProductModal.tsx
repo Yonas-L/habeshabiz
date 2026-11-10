@@ -363,15 +363,15 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
   };
 
   const modalContent = (
-    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 md:p-8 pt-0 sm:pt-24 pb-0 sm:pb-8 overflow-y-auto">
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 md:p-6 overflow-y-auto">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-slate-950/40 dark:bg-black/60 backdrop-blur-xs animate-backdrop-enter"
+        className="fixed inset-0 bg-slate-950/60 dark:bg-black/75 backdrop-blur-sm"
         onClick={onClose}
       />
 
       {/* Modal / Bottom Sheet Surface */}
-      <div className="relative z-10 w-full max-w-xl bg-white dark:bg-[#131926] rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-slate-200/80 dark:border-slate-800 overflow-hidden animate-bottom-sheet sm:animate-modal-enter flex flex-col max-h-[88vh] sm:max-h-[calc(100vh-7rem)] my-0 sm:my-auto">
+      <div className="relative z-10 w-full max-w-xl bg-white dark:bg-[#131926] rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-slate-200/80 dark:border-slate-800 overflow-hidden animate-bottom-sheet sm:animate-modal-enter flex flex-col max-h-[88vh] sm:max-h-[min(88vh,820px)] my-0 sm:my-auto">
         {/* Mobile Drag Indicator */}
         <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mt-2.5 mb-1 sm:hidden shrink-0" />
 

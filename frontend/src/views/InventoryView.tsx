@@ -11,7 +11,6 @@ import {
   X,
   RotateCcw,
   ChevronRight,
-  UserCheck,
   Undo2,
   Wrench,
   FolderCog,
@@ -1448,7 +1447,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                                                       className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-amber-950/50 text-slate-700 dark:text-slate-300 hover:text-amber-700 dark:hover:text-amber-400 transition-colors shadow-2xs active:scale-95 cursor-pointer shrink-0"
                                                       title="Handover device to staff or broker"
                                                     >
-                                                      <UserCheck className="w-3 h-3 shrink-0" />
+                                                      <Handshake className="w-3 h-3 shrink-0" />
                                                       <span>Handover</span>
                                                     </button>
                                                   )}
@@ -1929,7 +1928,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                                   className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-amber-950/50 text-slate-700 dark:text-slate-300 hover:text-amber-700 dark:hover:text-amber-400 transition-colors shadow-2xs active:scale-95 cursor-pointer"
                                   title="Handover this device to a staff member or broker to sell"
                                 >
-                                  <UserCheck className="w-3 h-3" />
+                                  <Handshake className="w-3 h-3" />
                                   <span>Handover</span>
                                 </button>
                               )}
@@ -2267,7 +2266,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                                         className="p-1.5 rounded-lg text-slate-500 hover:text-amber-600 dark:hover:text-amber-400 bg-slate-50 dark:bg-slate-800/60 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors cursor-pointer"
                                         title="Handover device"
                                       >
-                                        <UserCheck className="w-3.5 h-3.5" />
+                                        <Handshake className="w-3.5 h-3.5" />
                                       </button>
                                     )}
                                     {(isOwner || canManageInv) && unit.source_type === 'consignment' && (
@@ -2572,18 +2571,21 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       </div>
 
       {/* Handover Modal (Mark In-Stock Device as Out for Sale) */}
-      {handoverTargetUnit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 md:p-8 pt-20 sm:pt-24 pb-8 overflow-y-auto">
+      {handoverTargetUnit && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-6 overflow-y-auto">
           <div
-            className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs animate-backdrop-enter"
+            className="fixed inset-0 bg-slate-950/60 dark:bg-black/75 backdrop-blur-sm"
             onClick={() => setHandoverTargetUnit(null)}
           />
 
-          <div className="relative z-10 bg-white dark:bg-[#131926] rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xl max-w-md w-full p-6 space-y-4 animate-modal-enter max-h-[calc(100vh-7rem)] my-auto overflow-y-auto">
+          <div className="relative z-10 bg-white dark:bg-[#131926] rounded-t-3xl sm:rounded-2xl border-t sm:border border-slate-200/80 dark:border-slate-800 shadow-2xl max-w-md w-full p-5 sm:p-6 space-y-4 max-sm:animate-bottom-sheet sm:animate-modal-enter max-h-[88vh] sm:max-h-[calc(100vh-4rem)] my-0 sm:my-auto overflow-y-auto pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] sm:pb-6">
+            {/* Mobile Drag Handle */}
+            <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto -mt-1 mb-1 sm:hidden shrink-0" />
+
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-                  <UserCheck className="w-4 h-4" />
+                  <Handshake className="w-4 h-4" />
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-900 dark:text-white text-sm">
@@ -2634,7 +2636,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   }`}
                 >
                   <div className="flex items-center gap-1.5">
-                    <UserCheck className="w-3.5 h-3.5" />
+                    <Handshake className="w-3.5 h-3.5" />
                     <span>Handout to Others</span>
                   </div>
                   <span className="text-[10px] text-slate-400 font-normal mt-0.5">Staff & partners to sell</span>
@@ -2997,11 +2999,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => setHandoverTargetUnit(null)}
-                  className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
+                  className="h-10 sm:h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -3018,7 +3020,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     <button
                       type="submit"
                       disabled={handoverSubmitting || !handoverTo.trim() || isBlockedOffset}
-                      className={`h-9 px-5 rounded-xl text-white text-xs font-bold transition-all shadow-xs disabled:opacity-50 flex items-center gap-1.5 cursor-pointer ${
+                      className={`h-10 sm:h-9 px-5 rounded-xl text-white text-xs font-bold transition-all shadow-xs disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer ${
                         handoverMode === 'offset'
                           ? 'bg-emerald-600 hover:bg-emerald-700'
                           : 'bg-amber-600 hover:bg-amber-700'
@@ -3029,7 +3031,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                       ) : handoverMode === 'offset' ? (
                         <ArrowLeftRight className="w-3.5 h-3.5" />
                       ) : (
-                        <UserCheck className="w-3.5 h-3.5" />
+                        <Handshake className="w-3.5 h-3.5" />
                       )}
                       <span>{handoverMode === 'offset' ? 'Confirm & Deduct Debt' : 'Confirm Handover Out'}</span>
                     </button>
@@ -3038,18 +3040,19 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Mark Handover Device Sold Modal (For OUT units sold by partner/vendor) */}
-      {markSoldUnit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {markSoldUnit && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 overflow-y-auto">
           <div
-            className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs animate-backdrop-enter"
+            className="fixed inset-0 bg-slate-950/60 dark:bg-black/75 backdrop-blur-sm"
             onClick={() => setMarkSoldUnit(null)}
           />
 
-          <div className="relative z-10 bg-white dark:bg-[#131926] rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-2xl max-w-lg w-full p-6 space-y-4 animate-modal-enter max-h-[90vh] overflow-y-auto">
+          <div className="relative z-10 bg-white dark:bg-[#131926] rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-2xl max-w-lg w-full p-6 space-y-4 animate-modal-enter max-h-[90vh] my-auto overflow-y-auto">
             {/* Header */}
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2.5">
@@ -3360,14 +3363,15 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Customer Return Modal (Responsive Bottom Sheet on Mobile, Centered Modal on Desktop) */}
       {returnTargetUnit && typeof document !== 'undefined' && createPortal(
         <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 select-none">
           <div
-            className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs animate-backdrop-enter"
+            className="fixed inset-0 bg-slate-950/60 dark:bg-black/75 backdrop-blur-sm"
             onClick={() => setReturnTargetUnit(null)}
           />
 
@@ -3601,14 +3605,14 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       )}
 
       {/* Repaired Restock Modal (For RETURNED units after repair) */}
-      {repairedTargetUnit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {repairedTargetUnit && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 overflow-y-auto">
           <div
-            className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs animate-backdrop-enter"
+            className="fixed inset-0 bg-slate-950/60 dark:bg-black/75 backdrop-blur-sm"
             onClick={() => setRepairedTargetUnit(null)}
           />
 
-          <div className="relative z-10 bg-white dark:bg-[#131926] rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-2xl max-w-md w-full p-6 space-y-4 animate-modal-enter">
+          <div className="relative z-10 bg-white dark:bg-[#131926] rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-2xl max-w-md w-full p-6 space-y-4 animate-modal-enter my-auto overflow-y-auto max-h-[90vh]">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center">
@@ -3841,18 +3845,19 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Return to Vendor Modal (Consignment unit returned to broker/partner) */}
-      {returnToVendorUnit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {returnToVendorUnit && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 overflow-y-auto">
           <div
-            className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs animate-backdrop-enter"
+            className="fixed inset-0 bg-slate-950/60 dark:bg-black/75 backdrop-blur-sm"
             onClick={() => setReturnToVendorUnit(null)}
           />
 
-          <div className="relative z-10 bg-white dark:bg-[#131926] rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-2xl max-w-md w-full p-6 space-y-4 animate-modal-enter">
+          <div className="relative z-10 bg-white dark:bg-[#131926] rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-2xl max-w-md w-full p-6 space-y-4 animate-modal-enter my-auto overflow-y-auto max-h-[90vh]">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center">
@@ -3942,18 +3947,19 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Receive Fixed Device from Vendor Modal */}
-      {receiveFixedUnit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {receiveFixedUnit && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 overflow-y-auto">
           <div
-            className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs animate-backdrop-enter"
+            className="fixed inset-0 bg-slate-950/60 dark:bg-black/75 backdrop-blur-sm"
             onClick={() => setReceiveFixedUnit(null)}
           />
 
-          <div className="relative z-10 bg-white dark:bg-[#131926] rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-2xl max-w-md w-full p-6 space-y-4 animate-modal-enter">
+          <div className="relative z-10 bg-white dark:bg-[#131926] rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-2xl max-w-md w-full p-6 space-y-4 animate-modal-enter my-auto overflow-y-auto max-h-[90vh]">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-xl bg-teal-50 dark:bg-teal-950/60 text-teal-600 dark:text-teal-400 flex items-center justify-center">
@@ -4140,18 +4146,19 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Vendor Replacement Swap Modal */}
-      {vendorSwapUnit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {vendorSwapUnit && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 overflow-y-auto">
           <div
-            className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs animate-backdrop-enter"
+            className="fixed inset-0 bg-slate-950/60 dark:bg-black/75 backdrop-blur-sm"
             onClick={() => setVendorSwapUnit(null)}
           />
 
-          <div className="relative z-10 bg-white dark:bg-[#131926] rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-2xl max-w-md w-full p-6 space-y-4 animate-modal-enter">
+          <div className="relative z-10 bg-white dark:bg-[#131926] rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-2xl max-w-md w-full p-6 space-y-4 animate-modal-enter my-auto overflow-y-auto max-h-[90vh]">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
@@ -4353,7 +4360,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Scalable Stock Intake Modal, Category Management & Edit Product Modal */}
@@ -4507,9 +4515,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       />
 
       {/* Unit Row Deletion Modal */}
-      {unitToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="w-full max-w-md rounded-2xl bg-white dark:bg-[#131926] border border-slate-200 dark:border-slate-800 p-5 shadow-2xl space-y-4">
+      {unitToDelete && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/60 dark:bg-black/75 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl bg-white dark:bg-[#131926] border border-slate-200 dark:border-slate-800 p-5 shadow-2xl space-y-4 my-auto overflow-y-auto max-h-[90vh]">
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
                 <Trash2 className="w-5 h-5" />
@@ -4610,7 +4618,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

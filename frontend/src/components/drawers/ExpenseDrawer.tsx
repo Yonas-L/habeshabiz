@@ -90,7 +90,7 @@ export const ExpenseDrawer: React.FC<ExpenseDrawerProps> = ({
           <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
             Amount
           </span>
-          <div className="text-3xl font-extrabold text-slate-900 dark:text-white font-mono tabular-nums tracking-tight mt-1">
+          <div className="text-3xl font-extrabold text-rose-600 dark:text-rose-400 font-mono tabular-nums tracking-tight mt-1">
             −<AnimatedNumber value={parseFloat(String(expense.amount))} decimals={2} />{' '}
             <span className="text-sm font-semibold text-slate-400 font-sans">ETB</span>
           </div>
@@ -161,8 +161,8 @@ export const ExpenseDrawer: React.FC<ExpenseDrawerProps> = ({
                   <span className="text-slate-700 dark:text-slate-300 font-medium">
                     {s.account_name || 'Account'}
                   </span>
-                  <div className="text-right font-mono font-bold text-slate-900 dark:text-white">
-                    {Number(s.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} ETB
+                  <div className="text-right font-mono font-bold text-rose-600 dark:text-rose-400">
+                    −{Number(s.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} ETB
                     {Number(s.fee || 0) > 0 && (
                       <span className="text-[10px] text-amber-600 dark:text-amber-400 block font-normal">
                         +{Number(s.fee).toLocaleString()} fee

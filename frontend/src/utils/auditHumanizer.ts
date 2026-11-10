@@ -26,6 +26,7 @@ export interface HumanizedAuditData {
 const TECHNICAL_KEYS = new Set([
   'id',
   'uuid',
+  'pk',
   'tenant_id',
   'revert_group_id',
   'financial_account_id',
@@ -34,6 +35,7 @@ const TECHNICAL_KEYS = new Set([
   'contact_id',
   'variant_id',
   'product_id',
+  'category_id',
   'exchange_unit_id',
   'swapped_sales_order_id',
   'swapped_from_unit_id',
@@ -47,7 +49,66 @@ const TECHNICAL_KEYS = new Set([
   'updated_at',
   'deleted_at',
   'unit_ids',
+  'ip_address',
+  'ip',
+  'user_agent',
 ]);
+
+/**
+ * Filter out database IDs, raw UUIDs, technical timestamps, internal flags, and complex JSON structures
+ */
+export function isTechnicalOrPrivateField(key: string, val?: any): boolean {
+  const lower = key.toLowerCase();
+  if (TECHNICAL_KEYS.has(lower)) return true;
+  if (lower === 'id' || lower === 'uuid' || lower === 'pk') return true;
+  if (lower.endsWith('_id') || lower.endsWith('_ids')) return true;
+  if (
+    lower.endsWith('id') &&
+    lower.length > 2 &&
+    (lower.includes('order') ||
+      lower.includes('account') ||
+      lower.includes('contact') ||
+      lower.includes('user') ||
+      lower.includes('item') ||
+      lower.includes('unit') ||
+      lower.includes('product') ||
+      lower.includes('tenant') ||
+      lower.includes('partner') ||
+      lower.includes('vendor') ||
+      lower.includes('supplier') ||
+      lower.includes('category') ||
+      lower.includes('invoice') ||
+      lower.includes('batch'))
+  ) {
+    return true;
+  }
+  if (
+    lower.includes('token') ||
+    lower.includes('hash') ||
+    lower.includes('password') ||
+    lower.includes('secret') ||
+    lower.includes('ip_address') ||
+    lower === 'ip' ||
+    lower.includes('auth_')
+  ) {
+    return true;
+  }
+  if (lower.includes('deleted_at') || lower.includes('created_at') || lower.includes('updated_at')) return true;
+  if (
+    lower === 'new_values' ||
+    lower === 'old_values' ||
+    lower === 'raw_values' ||
+    lower === 'metadata' ||
+    lower === 'payload'
+  ) {
+    return true;
+  }
+  // Exclude raw nested objects so JSON doesn't leak into human details
+  if (val !== undefined && typeof val === 'object' && val !== null && !Array.isArray(val)) {
+    return true;
+  }
+  return false;
+}
 
 // Money-related keys that should be formatted as currency
 const MONEY_KEYS = new Set([
@@ -172,7 +233,23 @@ function formatHumanValue(key: string, val: any): string {
 
   // Objects
   if (typeof val === 'object') {
-    return JSON.stringify(val);
+    if (val === null) return '—';
+    if (Array.isArray(val)) {
+      if (key === 'payment_splits') {
+        const splitSummaries = val
+          .map((s: any) => {
+            const amt = s.amount ? `${Number(s.amount).toLocaleString()} ETB` : '';
+            return amt;
+          })
+          .filter(Boolean);
+        return splitSummaries.length > 0 ? splitSummaries.join(', ') : `${val.length} accounts`;
+      }
+      return `${val.length} items`;
+    }
+    if (val.name) return String(val.name);
+    if (val.title) return String(val.title);
+    if (val.label) return String(val.label);
+    return '—';
   }
 
   const str = String(val);
@@ -260,6 +337,16 @@ export function humanizeAuditLog(log: AuditLogItem): HumanizedAuditData {
   } else if (action.includes('undo') || action.includes('revert')) {
     eventTitle = 'Business Action Reversal (Undo)';
     eventSubtitle = 'Ledger and inventory rolled back safely';
+  } else if (action === 'deleted_unit') {
+    const prod = oldVals?.product_name || newVals?.product_name || 'Device';
+    const sn = oldVals?.imei_or_serial || newVals?.imei_or_serial;
+    eventTitle = `Deleted ${prod}`;
+    eventSubtitle = sn ? `SN: ${sn} · Removed from inventory` : 'Removed from inventory';
+  } else if (action === 'undo_deleted_unit') {
+    const prod = newVals?.product_name || oldVals?.product_name || 'Device';
+    const sn = newVals?.imei_or_serial || oldVals?.imei_or_serial;
+    eventTitle = `Restored ${prod} to Stock`;
+    eventSubtitle = sn ? `SN: ${sn} · Reversal of deletion` : 'Reversal of deletion';
   } else if (action.includes('update')) {
     eventTitle = `${log.entity_type} Updated`;
     eventSubtitle = 'Field attributes modified';
@@ -337,7 +424,7 @@ export function humanizeAuditLog(log: AuditLogItem): HumanizedAuditData {
 
   for (const [key, rawVal] of Object.entries(sourceObj)) {
     // Skip technical internal noise or boolean false flags
-    if (TECHNICAL_KEYS.has(key)) continue;
+    if (isTechnicalOrPrivateField(key, rawVal)) continue;
     if (typeof rawVal === 'boolean' && !rawVal) continue;
     if (rawVal === null || rawVal === undefined || rawVal === '') continue;
 
@@ -364,7 +451,7 @@ export function humanizeAuditLog(log: AuditLogItem): HumanizedAuditData {
   if (oldVals && newVals) {
     const allKeys = new Set([...Object.keys(oldVals), ...Object.keys(newVals)]);
     for (const key of allKeys) {
-      if (TECHNICAL_KEYS.has(key)) continue;
+      if (isTechnicalOrPrivateField(key, newVals[key] ?? oldVals[key])) continue;
       const vOld = oldVals[key];
       const vNew = newVals[key];
 
@@ -488,6 +575,20 @@ export function getAuditQuickSummary(log: AuditLogItem): string {
     if (src.partner_name || src.handover_to) parts.push(`With ${src.partner_name || src.handover_to}`);
     if (src.price || src.final_price) parts.push(`${Number(src.price || src.final_price).toLocaleString()} ETB`);
     return parts.join(' · ') || 'Handover custody updated';
+  }
+
+  // Deletion of inventory unit
+  if (log.action === 'deleted_unit') {
+    const prod = oldVals?.product_name || newVals?.product_name || 'Device';
+    const sn = oldVals?.imei_or_serial || newVals?.imei_or_serial;
+    return `Deleted ${prod}${sn ? ` (SN: ${sn})` : ''}`;
+  }
+
+  // Undo deletion of inventory unit
+  if (log.action === 'undo_deleted_unit') {
+    const prod = newVals?.product_name || oldVals?.product_name || 'Device';
+    const sn = newVals?.imei_or_serial || oldVals?.imei_or_serial;
+    return `Restored ${prod}${sn ? ` (SN: ${sn})` : ''} to stock`;
   }
 
   // Default fallback to notes, description, or model

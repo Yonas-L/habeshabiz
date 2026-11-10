@@ -185,12 +185,12 @@ export const CategoryManagementModal: React.FC<CategoryManagementModalProps> = (
     <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-slate-950/50 backdrop-blur-xs animate-backdrop-enter"
+        className="fixed inset-0 bg-slate-950/60 dark:bg-black/75 backdrop-blur-sm"
         onClick={onClose}
       />
 
       {/* Modal / Bottom Sheet Surface */}
-      <div className="relative z-10 w-full max-w-2xl bg-white dark:bg-[#131926] rounded-t-3xl sm:rounded-2xl border-t sm:border border-slate-200/80 dark:border-slate-800 shadow-2xl overflow-hidden animate-bottom-sheet sm:animate-modal-enter flex flex-col max-h-[88vh] sm:max-h-[85vh]">
+      <div className="relative z-10 w-full max-w-2xl bg-white dark:bg-[#131926] rounded-t-3xl sm:rounded-2xl border-t sm:border border-slate-200/80 dark:border-slate-800 shadow-2xl overflow-hidden animate-bottom-sheet sm:animate-modal-enter flex flex-col max-h-[88vh] sm:max-h-[85vh] my-0 sm:my-auto">
         {/* Mobile Drag Indicator */}
         <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mt-2.5 mb-1 sm:hidden shrink-0" />
 

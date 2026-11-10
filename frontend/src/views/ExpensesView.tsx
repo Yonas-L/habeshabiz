@@ -328,8 +328,8 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
                       </span>
                     </td>
 
-                    <td className="py-3.5 px-5 text-right font-mono tabular-nums font-bold text-slate-900 dark:text-white text-xs">
-                      {item.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })} ETB
+                    <td className="py-3.5 px-5 text-right font-mono tabular-nums font-bold text-rose-600 dark:text-rose-400 text-xs">
+                      −{item.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })} ETB
                     </td>
 
                     <td className="py-3.5 px-3 text-right">

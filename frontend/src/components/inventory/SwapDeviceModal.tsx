@@ -182,8 +182,11 @@ export const SwapDeviceModal: React.FC<SwapDeviceModalProps> = ({
   };
 
   const modalContent = (
-    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 dark:bg-black/80 backdrop-blur-xs select-none animate-fade-in">
-      <div className="fixed inset-0" onClick={onClose} />
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 select-none">
+      <div
+        className="fixed inset-0 bg-slate-950/60 dark:bg-black/75 backdrop-blur-sm"
+        onClick={onClose}
+      />
 
       <div className="relative z-10 bg-white dark:bg-[#131926] rounded-t-3xl sm:rounded-2xl border-t sm:border border-slate-200 dark:border-slate-800 sm:border-slate-100 sm:dark:border-slate-800 w-full sm:max-w-lg p-5 sm:p-5 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] sm:pb-5 space-y-4 max-h-[92vh] sm:max-h-[85vh] flex flex-col animate-bottom-sheet sm:animate-modal-enter shadow-2xl sm:shadow-xl">
         {/* Mobile Grab Handle */}

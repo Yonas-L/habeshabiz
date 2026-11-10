@@ -28,6 +28,7 @@ class UndoActionFactory
         'bonus_used_for_debt' => UndoBonusDebtOffsetAction::class,
         'unit_agreed_payout_adjusted' => UndoAgreedPayoutAction::class,
         'manual_debt_created' => UndoManualDebtAction::class,
+        'deleted_unit' => UndoDeleteUnitAction::class,
     ];
 
     /**
