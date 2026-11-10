@@ -319,7 +319,8 @@ export const PartnerDetailView: React.FC<PartnerDetailViewProps> = ({
   }
 
   const { contact, kpis, ledger, supplied_units, handed_out_units, vendor_return_units } = statementData;
-  const netBalance = kpis.range_closing_balance;
+  const isDateFiltered = dateFilter !== 'all' || Boolean(customStartDate || customEndDate);
+  const netBalance = isDateFiltered ? kpis.range_closing_balance : kpis.current_net_balance;
 
   const filteredLedger = ledger;
 

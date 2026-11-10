@@ -55,6 +55,7 @@ class GeneratePartnerStatementAction
 
         // Fetch all debts and payments linked to this contact
         $debts = Debt::where('contact_id', $contact->id)
+            ->where('status', '!=', 'cancelled')
             ->with(['payments.financialAccount'])
             ->orderBy('created_at')
             ->get();
@@ -506,12 +507,29 @@ class GeneratePartnerStatementAction
                 }
 
                 if ($payment->reference_number === 'MUTUAL-OFFSET'
-                    || $payment->reference_number === 'OFFSET-INTAKE'
-                    || str_starts_with($payment->reference_number ?? '', 'OFFSET-')
                     || str_contains(strtolower($payment->notes ?? ''), 'mutual credit offset')
                 ) {
                     // Internal mutual clearing offset; both underlying debts/items are already listed as distinct entries in the ledger
                     continue;
+                }
+
+                if ($payment->reference_number === 'OFFSET-INTAKE' || str_starts_with($payment->reference_number ?? '', 'OFFSET-')) {
+                    // If contact is the supplier of this offset unit, the device intake already includes the offset
+                    $isSupplierOfOffset = $offsetUnits->contains(function ($u) use ($payment, $contact) {
+                        if ($u->supplier_contact_id !== $contact->id) {
+                            return false;
+                        }
+                        $payDateObj = Carbon::parse($payment->payment_date ?? $payment->created_at);
+                        $unitDate = Carbon::parse($u->created_at);
+                        $amountMatches = abs((float) $u->receivable_offset_amount - (float) $payment->amount) < 0.01
+                            || abs((float) $u->cost_basis - (float) $payment->amount) < 0.01;
+
+                        return $amountMatches && abs($unitDate->diffInHours($payDateObj)) <= 48;
+                    });
+
+                    if ($isSupplierOfOffset) {
+                        continue;
+                    }
                 }
 
                 $createdAt = $payment->created_at ? Carbon::parse($payment->created_at) : null;
@@ -676,6 +694,18 @@ class GeneratePartnerStatementAction
                         'receivable' => (float) $payment->amount,
                         'balance_effect' => (float) $payment->amount,
                         'reference_number' => 'DEVICE-OFFSET',
+                    ];
+                } elseif ($payment->reference_number === 'OFFSET-INTAKE' || (empty($payment->financial_account_id) && str_contains(strtolower($payment->notes ?? ''), 'paid by device'))) {
+                    $rawEntries[] = [
+                        'id' => "pay-{$payment->id}",
+                        'date' => $payDate,
+                        'type' => 'paid_by_device',
+                        'type_label' => 'Paid by Device',
+                        'context' => $payment->notes ? $this->sanitizeContext($payment->notes) : 'Paid by device',
+                        'payable' => $debt->type === 'payable' ? -(float) $payment->amount : 0.0,
+                        'receivable' => $debt->type === 'receivable' ? -(float) $payment->amount : 0.0,
+                        'balance_effect' => $debt->type === 'payable' ? (float) $payment->amount : -(float) $payment->amount,
+                        'reference_number' => 'PAID-BY-DEVICE',
                     ];
                 } elseif (in_array($payment->reference_number, ['REPAIR-REDELIVERY', 'VENDOR-SWAP-DELIVERY', 'WARRANTY-SWAP'], true)) {
                     $context = $payment->notes ? $this->sanitizeContext($payment->notes) : 'Device redelivered / swapped';
@@ -889,6 +919,9 @@ class GeneratePartnerStatementAction
 
         // Emit any offset-funded units that did not have an open stock intake debt (e.g. 100% offset)
         foreach ($offsetUnits as $unit) {
+            if ($unit->supplier_contact_id !== $contact->id) {
+                continue;
+            }
             if (isset($handledIntakeUnitIds[$unit->id])) {
                 continue;
             }
