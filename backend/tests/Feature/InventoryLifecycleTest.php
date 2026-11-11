@@ -854,6 +854,52 @@ test('cannot delete a unit with partially or fully paid intake debt', function (
     expect(InventoryUnit::find($this->unit->id))->not->toBeNull();
 });
 
+test('can delete a unit that was previously handed out on consignment and returned unsold to shelf', function () {
+    $vendor = Contact::create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Broker Abebe',
+        'type' => 'vendor',
+        'roles' => ['vendor'],
+    ]);
+
+    // 1. Hand out unit to vendor
+    $this->actingAs($this->user)
+        ->postJson("/api/v1/inventory/units/{$this->unit->id}/handover", [
+            'handover_to' => $vendor->name,
+            'handover_payout' => 180000.00,
+        ])
+        ->assertStatus(200);
+
+    expect($this->unit->fresh()->status)->toBe('out');
+
+    // 2. Return unit unsold to shelf
+    $this->actingAs($this->user)
+        ->postJson("/api/v1/inventory/units/{$this->unit->id}/restock")
+        ->assertStatus(200);
+
+    expect($this->unit->fresh()->status)->toBe('in_stock');
+
+    // 3. Deleting the unit must succeed without being blocked by the returned handover record
+    $response = $this->actingAs($this->user)
+        ->deleteJson("/api/v1/inventory/units/{$this->unit->id}");
+
+    $response->assertStatus(200)
+        ->assertJsonPath('success', true);
+
+    // Unit is soft-deleted
+    expect(InventoryUnit::find($this->unit->id))->toBeNull();
+    expect(InventoryUnit::withTrashed()->find($this->unit->id))->not->toBeNull();
+
+    // Handover holding debt remains settled with original notes intact
+    $handoverDebt = Debt::where('reference_id', $this->unit->id)
+        ->where('reference_type', 'handover_holding')
+        ->first();
+
+    expect($handoverDebt)->not->toBeNull();
+    expect($handoverDebt->status)->toBe('settled');
+    expect((float) $handoverDebt->remaining_amount)->toBe(0.0);
+});
+
 test('deleting a unit funded via shop bank account automatically refunds the bank balance and logs audit trail with deleted_by info', function () {
     $account = FinancialAccount::create([
         'tenant_id' => $this->tenant->id,

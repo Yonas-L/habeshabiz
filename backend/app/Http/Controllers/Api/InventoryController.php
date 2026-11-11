@@ -1663,13 +1663,19 @@ class InventoryController extends Controller
             ], 422);
         }
 
-        // 4. Linked Debts / Payables check
+        // 4. Linked Debts / Payables check:
+        // Only block deletion if an actual supplier intake payable has payments recorded.
+        // Handover holding debts (receivables) that were cleared upon unsold return do not block deletion.
         $linkedDebts = Debt::where('tenant_id', $user->tenant_id)
             ->where('reference_id', $unit->id)
             ->get();
 
-        $paidDebt = $linkedDebts->first(fn ($d) => (float) $d->paid_amount > 0.01);
-        if ($paidDebt) {
+        $paidIntakeDebt = $linkedDebts->first(fn ($d) => $d->type === 'payable'
+            && $d->reference_type === 'stock_intake'
+            && (float) $d->paid_amount > 0.01
+        );
+
+        if ($paidIntakeDebt) {
             return response()->json([
                 'success' => false,
                 'message' => 'Cannot delete this unit because payments or financial settlements have already been recorded on its intake payable.',
@@ -1751,12 +1757,14 @@ class InventoryController extends Controller
             // 2. Cancel any unpaid linked debts so no orphan debts remain
             $cancelledDebtsCount = 0;
             foreach ($linkedDebts as $debt) {
-                $debt->update([
-                    'status' => 'cancelled',
-                    'remaining_amount' => 0,
-                    'notes' => trim(($debt->notes ?? '')." [Voided upon deletion of unit {$unit->imei_or_serial}]"),
-                ]);
-                $cancelledDebtsCount++;
+                if ($debt->status !== 'settled' && (float) $debt->remaining_amount > 0) {
+                    $debt->update([
+                        'status' => 'cancelled',
+                        'remaining_amount' => 0,
+                        'notes' => trim(($debt->notes ?? '')." [Voided upon deletion of unit {$unit->imei_or_serial}]"),
+                    ]);
+                    $cancelledDebtsCount++;
+                }
             }
 
             // 3. If supplier was involved, reconcile mutual debts
