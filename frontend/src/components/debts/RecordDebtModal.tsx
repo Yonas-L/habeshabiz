@@ -199,10 +199,10 @@ export const RecordDebtModal: React.FC<RecordDebtModalProps> = ({
   if (!isOpen) return null;
 
   const modalContent = (
-    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto" style={{ isolation: 'isolate' }}>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-slate-950/50 dark:bg-black/70 backdrop-blur-xs animate-backdrop-enter"
+        className="fixed inset-0 bg-slate-950/50 dark:bg-black/70 animate-backdrop-enter"
         onClick={onClose}
       />
 

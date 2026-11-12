@@ -50,7 +50,7 @@ export const SlideOverDrawer: React.FC<SlideOverDrawerProps> = ({
         setRendered(false);
         setIsClosing(false);
         document.body.style.overflow = '';
-      }, 150);
+      }, 180);
       return () => clearTimeout(timer);
     }
     return () => {
@@ -72,20 +72,30 @@ export const SlideOverDrawer: React.FC<SlideOverDrawerProps> = ({
   if (!rendered) return null;
 
   const content = (
-    <div className="fixed inset-0 z-[80] overflow-hidden printable-modal-backdrop" role="dialog" aria-modal="true">
+    <div
+      className="fixed inset-0 z-[80] overflow-hidden printable-modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      style={{ isolation: 'isolate' }}
+    >
       {/* Dimmed subtle backdrop allowing dashboard visibility */}
       <div
         onClick={onClose}
-        className={`fixed inset-0 bg-slate-950/45 dark:bg-black/65 transition-opacity duration-150 no-print ${
+        className={`fixed inset-0 bg-slate-950/45 dark:bg-black/65 transition-opacity duration-200 no-print ${
           isClosing ? 'opacity-0' : 'opacity-100'
         }`}
       />
 
       <div className="fixed inset-y-0 right-0 max-w-full flex pl-0 sm:pl-10 pointer-events-none printable-modal-card">
         <aside
-          className={`pointer-events-auto w-screen ${widthClass} bg-white dark:bg-[#131926] border-l border-slate-200/80 dark:border-slate-800/90 shadow-2xl flex flex-col justify-between overflow-hidden transform-gpu will-change-transform ${
+          className={`pointer-events-auto w-screen ${widthClass} bg-white dark:bg-[#131926] border-l border-slate-200/80 dark:border-slate-800/90 shadow-2xl flex flex-col justify-between overflow-hidden ${
             isClosing ? 'animate-drawer-exit' : 'animate-drawer-enter'
           }`}
+          style={{
+            contain: 'layout paint',
+            WebkitBackfaceVisibility: 'hidden',
+            backfaceVisibility: 'hidden',
+          }}
         >
           {/* Header */}
           {customHeader ? (
@@ -121,7 +131,7 @@ export const SlideOverDrawer: React.FC<SlideOverDrawerProps> = ({
           )}
 
           {/* Scrollable Progressive Disclosure Body */}
-          <div className={`flex-1 overflow-y-auto ${contentClassName || 'px-6 py-5 space-y-6'}`}>
+          <div className={`flex-1 overflow-y-auto overscroll-contain ${contentClassName || 'px-6 py-5 space-y-6'}`}>
             {children}
           </div>
 

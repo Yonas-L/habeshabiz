@@ -2042,9 +2042,16 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
 
       {/* Delete Confirmation Modal */}
       {deletingAccount && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs animate-backdrop-enter" onClick={() => setDeletingAccount(null)} />
-          <div className="relative z-10 w-full max-w-sm mx-4 bg-white dark:bg-[#0f1522] rounded-2xl shadow-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden animate-page-enter p-6 space-y-4">
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4" style={{ isolation: 'isolate' }}>
+          <div className="fixed inset-0 bg-black/60 animate-backdrop-enter" onClick={() => setDeletingAccount(null)} />
+          <div
+            className="relative z-10 w-full max-w-sm mx-4 bg-white dark:bg-[#0f1522] rounded-2xl shadow-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden animate-page-enter p-6 space-y-4"
+            style={{
+              contain: 'layout paint',
+              WebkitBackfaceVisibility: 'hidden',
+              backfaceVisibility: 'hidden',
+            }}
+          >
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/40 flex items-center justify-center">
                 <Trash2 className="w-5 h-5 text-rose-600 dark:text-rose-400" />
@@ -2082,13 +2089,20 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
 
       {/* Tactile Elevated Transfer Modal */}
       {showTransferModal && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto" style={{ isolation: 'isolate' }}>
           <div
             className="fixed inset-0 bg-black/60 animate-backdrop-enter"
             onClick={() => setShowTransferModal(false)}
           />
 
-          <div className="relative z-10 bg-white dark:bg-[#131926] rounded-t-3xl sm:rounded-2xl border-t sm:border border-slate-200/80 dark:border-slate-800 shadow-2xl max-w-lg w-full p-5 sm:p-6 space-y-4 max-sm:animate-bottom-sheet sm:animate-modal-enter my-0 sm:my-auto max-h-[92vh] overflow-y-auto transform-gpu will-change-transform">
+          <div
+            className="relative z-10 bg-white dark:bg-[#131926] rounded-t-3xl sm:rounded-2xl border-t sm:border border-slate-200/80 dark:border-slate-800 shadow-2xl max-w-lg w-full p-5 sm:p-6 space-y-4 max-sm:animate-bottom-sheet sm:animate-modal-enter my-0 sm:my-auto max-h-[92vh] overflow-y-auto overscroll-contain"
+            style={{
+              contain: 'layout paint',
+              WebkitBackfaceVisibility: 'hidden',
+              backfaceVisibility: 'hidden',
+            }}
+          >
             {/* Mobile Drag Handle */}
             <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto -mt-1.5 mb-1 sm:hidden shrink-0" />
 

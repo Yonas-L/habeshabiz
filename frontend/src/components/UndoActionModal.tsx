@@ -155,15 +155,22 @@ export const UndoActionModal: React.FC<UndoActionModalProps> = ({
   const hierarchy = preview?.hierarchy_tree;
 
   const modalContent = (
-    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center sm:p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center sm:p-4 overflow-y-auto" style={{ isolation: 'isolate' }}>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-slate-950/60 dark:bg-black/75 backdrop-blur-xs animate-backdrop-enter"
+        className="fixed inset-0 bg-slate-950/60 dark:bg-black/75 animate-backdrop-enter"
         onClick={!submitting ? onClose : undefined}
       />
 
       {/* Modal Dialog Box */}
-      <div className="relative z-10 bg-white dark:bg-[#131926] rounded-t-3xl sm:rounded-2xl border-t sm:border border-slate-100 dark:border-slate-800 shadow-2xl ring-1 ring-black/5 max-w-xl w-full max-h-[92vh] sm:max-h-[88vh] flex flex-col p-5 sm:p-6 space-y-4 animate-bottom-sheet sm:animate-modal-enter my-0 sm:my-auto">
+      <div
+        className="relative z-10 bg-white dark:bg-[#131926] rounded-t-3xl sm:rounded-2xl border-t sm:border border-slate-100 dark:border-slate-800 shadow-2xl ring-1 ring-black/5 max-w-xl w-full max-h-[92vh] sm:max-h-[88vh] flex flex-col p-5 sm:p-6 space-y-4 animate-bottom-sheet sm:animate-modal-enter my-0 sm:my-auto overscroll-contain"
+        style={{
+          contain: 'layout paint',
+          WebkitBackfaceVisibility: 'hidden',
+          backfaceVisibility: 'hidden',
+        }}
+      >
         {/* Mobile Drag Indicator */}
         <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto -mt-1 mb-1 sm:hidden shrink-0" />
 

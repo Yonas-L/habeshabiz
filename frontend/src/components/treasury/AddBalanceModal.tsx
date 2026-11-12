@@ -282,10 +282,17 @@ export const AddBalanceModal: React.FC<AddBalanceModalProps> = ({
   };
 
   const modalContent = (
-    <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto" style={{ isolation: 'isolate' }}>
       <div className="fixed inset-0 bg-slate-950/45 dark:bg-black/70 animate-backdrop-enter" onClick={onClose} />
 
-      <div className="relative z-10 w-full max-w-lg bg-white dark:bg-[#131926] rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-slate-100 dark:border-slate-800 overflow-hidden animate-modal-smooth flex flex-col max-h-[88vh] sm:max-h-[85vh] my-0 sm:my-auto transform-gpu will-change-transform">
+      <div
+        className="relative z-10 w-full max-w-lg bg-white dark:bg-[#131926] rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-slate-100 dark:border-slate-800 overflow-hidden animate-modal-smooth flex flex-col max-h-[88vh] sm:max-h-[85vh] my-0 sm:my-auto"
+        style={{
+          contain: 'layout paint',
+          WebkitBackfaceVisibility: 'hidden',
+          backfaceVisibility: 'hidden',
+        }}
+      >
         {/* Mobile Drag Handle */}
         <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mt-2.5 mb-1 sm:hidden shrink-0" />
 
@@ -316,7 +323,7 @@ export const AddBalanceModal: React.FC<AddBalanceModalProps> = ({
         </div>
 
         {/* Modal Form */}
-        <form id="add-balance-form" onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto flex-1">
+        <form id="add-balance-form" onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto overscroll-contain flex-1">
           {/* Account Identity & Current Balance Banner */}
           <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">

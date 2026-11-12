@@ -481,11 +481,11 @@ export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto p-3 sm:p-6 md:p-20 flex justify-center items-start pt-14 sm:pt-20">
+    <div className="fixed inset-0 z-50 overflow-y-auto p-3 sm:p-6 md:p-20 flex justify-center items-start pt-14 sm:pt-20" style={{ isolation: 'isolate' }}>
       {/* Backdrop */}
       <div
         onClick={onClose}
-        className="fixed inset-0 bg-slate-950/40 dark:bg-black/70 backdrop-blur-xs transition-opacity animate-backdrop-enter"
+        className="fixed inset-0 bg-slate-950/40 dark:bg-black/70 transition-opacity animate-backdrop-enter"
       />
 
       {/* Spotlight Dialog */}

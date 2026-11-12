@@ -427,10 +427,17 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
     'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-white dark:bg-slate-900/60';
 
   const modalContent = (
-    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto" style={{ isolation: 'isolate' }}>
       <div className="fixed inset-0 bg-slate-950/45 dark:bg-black/70 animate-backdrop-enter" onClick={onClose} />
 
-      <div className="relative z-10 w-full max-w-xl bg-white dark:bg-[#131926] rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-slate-100 dark:border-slate-800 overflow-hidden animate-modal-smooth max-h-[88vh] sm:max-h-[85vh] flex flex-col my-0 sm:my-auto transform-gpu will-change-transform">
+      <div
+        className="relative z-10 w-full max-w-xl bg-white dark:bg-[#131926] rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-slate-100 dark:border-slate-800 overflow-hidden animate-modal-smooth max-h-[88vh] sm:max-h-[85vh] flex flex-col my-0 sm:my-auto"
+        style={{
+          contain: 'layout paint',
+          WebkitBackfaceVisibility: 'hidden',
+          backfaceVisibility: 'hidden',
+        }}
+      >
         {/* Mobile Drag Indicator */}
         <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mt-2.5 mb-1 sm:hidden shrink-0" />
 
@@ -466,7 +473,7 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
           </button>
         </div>
 
-        <form id="manage-account-form" onSubmit={handleSubmit} className="p-5 space-y-4 flex-1 overflow-y-auto">
+        <form id="manage-account-form" onSubmit={handleSubmit} className="p-5 space-y-4 flex-1 overflow-y-auto overscroll-contain">
           {/* Account Category Selector */}
           {!isEditing && (
             <div>

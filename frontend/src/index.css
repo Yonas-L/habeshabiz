@@ -267,18 +267,30 @@ html.dark ::-webkit-scrollbar-thumb:hover {
 }
 
 .animate-drawer-enter {
-  animation: drawerSlideIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: drawerSlideIn 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
   will-change: transform;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  contain: layout paint;
+  isolation: isolate;
 }
 
 .animate-sidebar-slide-in {
-  animation: sidebarSlideInLeft 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: sidebarSlideInLeft 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
   will-change: transform;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  contain: layout paint;
+  isolation: isolate;
 }
 
 .animate-drawer-exit {
-  animation: drawerSlideOut 0.14s ease-in forwards;
+  animation: drawerSlideOut 0.18s cubic-bezier(0.4, 0, 1, 1) forwards;
   will-change: transform;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  contain: layout paint;
+  isolation: isolate;
 }
 
 .animate-collapse-open {
@@ -301,18 +313,18 @@ html.dark ::-webkit-scrollbar-thumb:hover {
 @keyframes modalSmoothDesktop {
   0% {
     opacity: 0;
-    transform: scale3d(0.98, 0.98, 1);
+    transform: translate3d(0, 12px, 0) scale3d(0.99, 0.99, 1);
   }
   100% {
     opacity: 1;
-    transform: scale3d(1, 1, 1);
+    transform: translate3d(0, 0, 0) scale3d(1, 1, 1);
   }
 }
 
 @keyframes modalSmoothMobile {
   0% {
-    opacity: 0.6;
-    transform: translate3d(0, 10px, 0);
+    opacity: 0.7;
+    transform: translate3d(0, 16px, 0);
   }
   100% {
     opacity: 1;
@@ -321,24 +333,48 @@ html.dark ::-webkit-scrollbar-thumb:hover {
 }
 
 .animate-modal-smooth {
-  animation: modalSmoothMobile 0.14s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: modalSmoothMobile 0.20s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   will-change: transform, opacity;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  contain: layout paint;
+  isolation: isolate;
 }
 
 @media (min-width: 640px) {
   .animate-modal-smooth {
-    animation: modalSmoothDesktop 0.10s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation: modalSmoothDesktop 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     will-change: transform, opacity;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    contain: layout paint;
+    isolation: isolate;
   }
 }
 
 .animate-modal-enter {
-  animation: modalSmoothDesktop 0.10s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: modalSmoothDesktop 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   will-change: transform, opacity;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  contain: layout paint;
+  isolation: isolate;
+}
+
+@keyframes backdropFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .animate-backdrop-enter {
-  animation: none !important;
+  animation: backdropFadeIn 0.18s ease-out forwards;
+  will-change: opacity;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
 }
 
 .animate-skeleton {
@@ -565,9 +601,13 @@ html.dark ::-webkit-scrollbar-thumb:hover {
 }
 
 .animate-bottom-sheet {
-  animation: bottomSheetSlideUp 0.16s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: bottomSheetSlideUp 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
   will-change: transform;
-  transform: translateZ(0);
+  transform: translate3d(0, 0, 0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  contain: layout paint;
+  isolation: isolate;
 }
 
 @keyframes speedDialOpen {
@@ -777,7 +817,14 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   .animate-eq-2,
   .animate-eq-3,
   .animate-eq-4,
-  .animate-eq-5 {
+  .animate-eq-5,
+  .animate-drawer-enter,
+  .animate-drawer-exit,
+  .animate-modal-smooth,
+  .animate-modal-enter,
+  .animate-bottom-sheet,
+  .animate-sidebar-slide-in,
+  .animate-backdrop-enter {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
