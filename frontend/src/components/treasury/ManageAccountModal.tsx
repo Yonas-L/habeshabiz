@@ -12,11 +12,11 @@ import {
   DollarSign,
   Plus,
   Globe,
-  ImagePlus,
   Trash2,
   Loader2,
+  Check,
 } from 'lucide-react';
-import { PRESET_BANK_LOGOS, PRESET_RESERVE_LOGOS } from '../../utils/bankLogos';
+import { useBankLogos } from '../../utils/bankLogos';
 import { formatCurrencyInput, parseFormattedNumber } from '../../utils/numberUtils';
 
 interface ManageAccountModalProps {
@@ -71,8 +71,8 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
   const [isCustomCurrency, setIsCustomCurrency] = useState(false);
   const [customCurrencyCode, setCustomCurrencyCode] = useState('');
   const [logo, setLogo] = useState<string | null>(null);
+  const { bankLogos, refresh } = useBankLogos();
   const [submitting, setSubmitting] = useState(false);
-  const logoInputRef = useRef<HTMLInputElement>(null);
 
   // Bank / Cash specific state
   const [openingBalance, setOpeningBalance] = useState('');
@@ -87,17 +87,12 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
   const rowInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const pendingFocusIdRef = useRef<string | null>(null);
 
-  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 200 * 1024) {
-      toast.error('Logo too large', { description: 'Please use an image under 200KB.' });
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => setLogo(reader.result as string);
-    reader.readAsDataURL(file);
-  };
+  // Filter logos by active account category
+  const categoryLogos = React.useMemo(() => {
+    return bankLogos.filter((b) => b.category === accountType);
+  }, [bankLogos, accountType]);
+
+  const currentCategoryMeta = ACCOUNT_TYPES.find((t) => t.value === accountType);
 
   // Determine if this is a Reserve Asset
   const isAssetType = isEditing
@@ -109,6 +104,7 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      refresh();
       if (editAccount) {
         setName(editAccount.name || '');
         setAccountType(editAccount.type || 'bank');
@@ -203,9 +199,7 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
         if (isAsset) {
           const initCurr = initialType === 'asset_gold' ? 'GOLD' : 'USD';
           setCurrency(initCurr);
-          // Set matching preset reserve logo
-          const matchingPreset = PRESET_RESERVE_LOGOS.find((p) => p.currency === initCurr) || PRESET_RESERVE_LOGOS[0];
-          setLogo(matchingPreset.dataUri);
+          setLogo(null);
           setHoldings([{ id: '1', name: '', amount: '', rate: '' }]);
         } else {
           setCurrency('ETB');
@@ -282,15 +276,6 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
 
     setIsCustomCurrency(false);
     setCurrency(code);
-
-    // If logo is null or matches one of the preset reserve logos, auto-switch to corresponding preset logo
-    const isPresetCurrentLogo = !logo || PRESET_RESERVE_LOGOS.some((p) => p.dataUri === logo);
-    if (isPresetCurrentLogo) {
-      const match = PRESET_RESERVE_LOGOS.find((p) => p.currency === code);
-      if (match) {
-        setLogo(match.dataUri);
-      }
-    }
   };
 
   // Live totals calculation for reserve assets
@@ -500,8 +485,7 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
                           const newCurr = t.value === 'asset_gold' ? 'GOLD' : 'USD';
                           setCurrency(newCurr);
                           setIsCustomCurrency(false);
-                          const match = PRESET_RESERVE_LOGOS.find((p) => p.currency === newCurr);
-                          if (match) setLogo(match.dataUri);
+                          setLogo(null);
                         } else {
                           setCurrency('ETB');
                           setIsCustomCurrency(false);
@@ -540,75 +524,82 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
           {/* ========================================================================= */}
           {isAssetType ? (
             <div className="space-y-4">
-              {/* 1. CHOOSE ICON */}
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                  Icon
-                </label>
+              {/* 1. ASSET LOGO PICKER (OPTIONAL) */}
+              {categoryLogos.length > 0 && (
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 flex items-center justify-between">
+                    <span>Choose {currentCategoryMeta?.label || 'Asset'} Logo (Optional)</span>
+                    {logo && (
+                      <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 normal-case">
+                        Logo selected
+                      </span>
+                    )}
+                  </label>
 
-                {/* Preset Reserve Icon Grid */}
-                <div className="grid grid-cols-4 sm:grid-cols-7 gap-2 mb-2">
-                  {PRESET_RESERVE_LOGOS.map((preset) => {
-                    const isSelected = logo === preset.dataUri;
-                    return (
-                      <button
-                        key={preset.id}
-                        type="button"
-                        onClick={() => setLogo(preset.dataUri)}
-                        className={`flex flex-col items-center gap-1 p-1.5 rounded-xl border transition-all cursor-pointer ${
-                          isSelected
-                            ? 'border-emerald-500 ring-2 ring-emerald-500/20 bg-emerald-950/20 shadow-xs'
-                            : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40'
-                        }`}
-                        title={preset.name}
-                      >
-                        <img
-                          src={preset.dataUri}
-                          alt={preset.shortCode}
-                          className="w-7 h-7 rounded-lg object-cover"
-                        />
-                        <span
-                          className={`text-[9px] font-bold leading-tight ${
-                            isSelected
-                              ? 'text-emerald-500 dark:text-emerald-400'
-                              : 'text-slate-500 dark:text-slate-400'
-                          }`}
+                  {/* Scrollable logo grid without borders or card backgrounds */}
+                  <div className="grid grid-cols-4 sm:grid-cols-6 gap-3 max-h-48 overflow-y-auto py-2 custom-scrollbar">
+                    {categoryLogos.map((item) => {
+                      const isSelected = logo === item.logo_url;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => setLogo(item.logo_url)}
+                          className="relative group p-1 flex items-center justify-center cursor-pointer transition-transform hover:scale-110"
+                          title={item.name || 'Logo'}
                         >
-                          {preset.shortCode}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
+                          <div className="relative w-12 h-12 flex items-center justify-center">
+                            <img
+                              src={item.logo_url}
+                              alt={item.name || 'Logo'}
+                              className={`w-full h-full object-contain transition-opacity ${
+                                isSelected ? 'opacity-100' : 'opacity-80 group-hover:opacity-100'
+                              }`}
+                            />
+                            {isSelected && (
+                              <div className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center shadow-xs">
+                                <Check className="w-2.5 h-2.5 text-white stroke-[3]" />
+                              </div>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
 
-                {/* Minimal Custom File Button */}
-                <div className="flex items-center gap-2">
-                  <input
-                    ref={logoInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleLogoChange}
-                    className="hidden"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => logoInputRef.current?.click()}
-                    className="h-6 px-2 rounded-lg border border-slate-200 dark:border-slate-800 text-[10px] font-semibold text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer flex items-center gap-1"
-                  >
-                    <ImagePlus className="w-3 h-3 text-slate-400" />
-                    <span>Upload Custom</span>
-                  </button>
                   {logo && (
-                    <button
-                      type="button"
-                      onClick={() => setLogo(null)}
-                      className="text-[10px] text-rose-500 hover:text-rose-600 font-semibold cursor-pointer"
-                    >
-                      Clear
-                    </button>
+                    <div className="flex items-center gap-2 pt-1">
+                      <div className="flex items-center gap-1.5">
+                        <img src={logo} alt="Active Logo" className="w-5 h-5 object-contain" />
+                        <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">Selected</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setLogo(null)}
+                        className="text-[11px] text-rose-500 hover:text-rose-600 font-semibold cursor-pointer"
+                      >
+                        Clear
+                      </button>
+                    </div>
                   )}
                 </div>
-              </div>
+              )}
+
+              {categoryLogos.length === 0 && logo && (
+                <div className="flex items-center gap-2 pt-1">
+                  <div className="flex items-center gap-1.5">
+                    <img src={logo} alt="Active Logo" className="w-5 h-5 object-contain" />
+                    <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">Current Logo</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setLogo(null)}
+                    className="text-[11px] text-rose-500 hover:text-rose-600 font-semibold cursor-pointer"
+                  >
+                    Clear
+                  </button>
+                </div>
+              )}
 
               {/* 2. RESERVE NAME */}
               <div>
@@ -851,6 +842,83 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
             /* STANDARD LIQUID ACCOUNT FLOW: Bank, Mobile Money, Cash Drawer            */
             /* ========================================================================= */
             <div className="space-y-4">
+              {/* Category Logo Picker: Shown whenever logos are available for the selected category */}
+              {categoryLogos.length > 0 && (
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1 flex items-center justify-between">
+                    <span>Choose {currentCategoryMeta?.label || 'Account'} Logo</span>
+                    {logo && (
+                      <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 normal-case">
+                        Logo selected
+                      </span>
+                    )}
+                  </label>
+
+                  {/* Scrollable logo grid without borders or card backgrounds */}
+                  <div className="grid grid-cols-4 sm:grid-cols-6 gap-3 max-h-48 overflow-y-auto py-2 custom-scrollbar">
+                    {categoryLogos.map((item) => {
+                      const isSelected = logo === item.logo_url;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => setLogo(item.logo_url)}
+                          className="relative group p-1 flex items-center justify-center cursor-pointer transition-transform hover:scale-110"
+                          title={item.name || 'Logo'}
+                        >
+                          <div className="relative w-12 h-12 flex items-center justify-center">
+                            <img
+                              src={item.logo_url}
+                              alt={item.name || 'Logo'}
+                              className={`w-full h-full object-contain transition-opacity ${
+                                isSelected ? 'opacity-100' : 'opacity-80 group-hover:opacity-100'
+                              }`}
+                            />
+                            {isSelected && (
+                              <div className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center shadow-xs">
+                                <Check className="w-2.5 h-2.5 text-white stroke-[3]" />
+                              </div>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {logo && (
+                    <div className="flex items-center gap-2 pt-1">
+                      <div className="flex items-center gap-1.5">
+                        <img src={logo} alt="Active Logo" className="w-5 h-5 object-contain" />
+                        <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">Selected</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setLogo(null)}
+                        className="text-xs text-rose-500 hover:text-rose-700 font-semibold cursor-pointer"
+                      >
+                        Clear Selection
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {categoryLogos.length === 0 && logo && (
+                <div className="flex items-center gap-2 pt-1">
+                  <div className="flex items-center gap-1.5">
+                    <img src={logo} alt="Active Logo" className="w-5 h-5 object-contain" />
+                    <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">Current Logo</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setLogo(null)}
+                    className="text-xs text-rose-500 hover:text-rose-700 font-semibold cursor-pointer"
+                  >
+                    Clear
+                  </button>
+                </div>
+              )}
+
               {/* Account Name & Number */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -887,73 +955,6 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
                 </div>
               </div>
 
-              {/* Bank Logo Presets */}
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                  Bank / Account Logo (optional)
-                </label>
-
-                <div className="grid grid-cols-5 gap-1.5 mb-2">
-                  {PRESET_BANK_LOGOS.map((preset) => {
-                    const isSelected = logo === preset.dataUri;
-                    return (
-                      <button
-                        key={preset.id}
-                        type="button"
-                        onClick={() => setLogo(preset.dataUri)}
-                        className={`flex flex-col items-center gap-1 p-1.5 rounded-lg border transition-all cursor-pointer ${
-                          isSelected
-                            ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/30 shadow-xs'
-                            : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60'
-                        }`}
-                        title={preset.name}
-                      >
-                        <img
-                          src={preset.dataUri}
-                          alt={preset.shortCode}
-                          className="w-7 h-7 rounded-md object-cover"
-                        />
-                        <span
-                          className={`text-[9px] font-bold leading-tight ${
-                            isSelected
-                              ? 'text-emerald-600 dark:text-emerald-400'
-                              : 'text-slate-400'
-                          }`}
-                        >
-                          {preset.shortCode}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <input
-                    ref={logoInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleLogoChange}
-                    className="hidden"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => logoInputRef.current?.click()}
-                    className="h-7 px-2.5 rounded-lg border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer flex items-center gap-1.5"
-                  >
-                    <ImagePlus className="w-3.5 h-3.5 text-slate-400" />
-                    <span>Upload Custom</span>
-                  </button>
-                  {logo && (
-                    <button
-                      type="button"
-                      onClick={() => setLogo(null)}
-                      className="text-xs text-rose-500 hover:text-rose-700 font-semibold cursor-pointer"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-              </div>
 
               {/* Currency & Opening Balance / Balance Adjustment */}
               <div className="grid grid-cols-2 gap-3">

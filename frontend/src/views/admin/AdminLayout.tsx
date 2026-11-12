@@ -9,11 +9,13 @@ import { AdminTenantsView } from './AdminTenantsView';
 import { AdminWhitelistView } from './AdminWhitelistView';
 import { AdminWaitlistView } from './AdminWaitlistView';
 import { AdminSignupAttemptsView } from './AdminSignupAttemptsView';
+import { AdminBankLogosView } from './AdminBankLogosView';
 import {
   Building2,
   ShieldCheck,
   Users,
   Activity,
+  Landmark,
   LogOut,
   Sun,
   Moon,
@@ -26,7 +28,7 @@ import { CustomPageLoader } from '../../components/loading/CustomPageLoader';
 import { TopProgressBar } from '../../components/loading/TopProgressBar';
 import { toast } from 'sonner';
 
-export type AdminTab = 'tenants' | 'whitelist' | 'waitlist' | 'signup-attempts';
+export type AdminTab = 'tenants' | 'whitelist' | 'waitlist' | 'signup-attempts' | 'bank-logos';
 
 interface AdminLayoutProps {
   theme: 'light' | 'dark';
@@ -74,6 +76,14 @@ const NAV_ITEMS: {
     accent: 'text-amber-400',
     accentBg: 'bg-amber-500/10',
   },
+  {
+    id: 'bank-logos',
+    label: 'Bank Logos',
+    description: 'Bank & account logos',
+    icon: Landmark,
+    accent: 'text-violet-400',
+    accentBg: 'bg-violet-500/10',
+  },
 ];
 
 const PAGE_TITLES: Record<AdminTab, string> = {
@@ -81,6 +91,7 @@ const PAGE_TITLES: Record<AdminTab, string> = {
   whitelist: 'Whitelist Management',
   waitlist: 'Waitlist Submissions',
   'signup-attempts': 'Signup Attempts',
+  'bank-logos': 'Bank Logos Library',
 };
 
 export const AdminLayout: React.FC<AdminLayoutProps> = ({
@@ -99,6 +110,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
     if (path.includes('/admin/whitelist')) return 'whitelist';
     if (path.includes('/admin/waitlist')) return 'waitlist';
     if (path.includes('/admin/signup-attempts')) return 'signup-attempts';
+    if (path.includes('/admin/bank-logos')) return 'bank-logos';
     return 'tenants';
   };
 
@@ -406,6 +418,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
               {activeTab === 'whitelist' && <AdminWhitelistView />}
               {activeTab === 'waitlist' && <AdminWaitlistView />}
               {activeTab === 'signup-attempts' && <AdminSignupAttemptsView />}
+              {activeTab === 'bank-logos' && <AdminBankLogosView />}
             </>
           )}
         </main>

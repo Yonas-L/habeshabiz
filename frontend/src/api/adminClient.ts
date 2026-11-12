@@ -229,6 +229,16 @@ export interface PaginatedResponse<T> {
   pagination: AdminPagination;
 }
 
+export interface AdminBankLogoItem {
+  id: string;
+  category: string;
+  name: string | null;
+  logo_url: string;
+  sort_order: number;
+  created_at: string;
+  updated_at?: string;
+}
+
 const RAW_API_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 const ADMIN_API_BASE = RAW_API_URL ? `${RAW_API_URL}/api/v1/admin` : '/api/v1/admin';
 
@@ -378,6 +388,37 @@ export const adminApi = {
     adminRequest<{ message: string; key: string; value: string }>('/settings', {
       method: 'PATCH',
       body: JSON.stringify({ key, value }),
+    }),
+
+  // Bank Logos Library
+  getBankLogos: (category?: string) => {
+    const params = new URLSearchParams();
+    if (category && category !== 'all') params.set('category', category);
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    return adminRequest<{ success: boolean; data: AdminBankLogoItem[] }>(`/bank-logos${qs}`);
+  },
+
+  uploadBankLogos: (files: File[], category: string = 'bank') => {
+    const formData = new FormData();
+    formData.append('category', category);
+    files.forEach((file) => {
+      formData.append('files[]', file);
+    });
+    return adminRequest<{ success: boolean; message: string; data: AdminBankLogoItem[] }>('/bank-logos', {
+      method: 'POST',
+      body: formData,
+    });
+  },
+
+  updateBankLogo: (id: string, data: { name?: string; category?: string; sort_order?: number }) =>
+    adminRequest<{ success: boolean; message: string; data: AdminBankLogoItem }>(`/bank-logos/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deleteBankLogo: (id: string) =>
+    adminRequest<{ success: boolean; message: string }>(`/bank-logos/${id}`, {
+      method: 'DELETE',
     }),
 };
 

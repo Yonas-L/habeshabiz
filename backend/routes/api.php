@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AccountController;
 use App\Http\Controllers\Api\Admin\AdminAuthController;
+use App\Http\Controllers\Api\Admin\AdminBankLogoController;
 use App\Http\Controllers\Api\Admin\AdminSettingController;
 use App\Http\Controllers\Api\Admin\AdminSignupAttemptController;
 use App\Http\Controllers\Api\Admin\AdminTenantController;
@@ -9,6 +10,7 @@ use App\Http\Controllers\Api\Admin\AdminWaitlistController;
 use App\Http\Controllers\Api\Admin\AdminWhitelistController;
 use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\BankLogoController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\ContactController;
 use App\Http\Controllers\Api\DashboardController;
@@ -69,6 +71,12 @@ Route::prefix('v1')->group(function () {
             // Platform Settings
             Route::get('/settings', [AdminSettingController::class, 'index']);
             Route::patch('/settings', [AdminSettingController::class, 'update']);
+
+            // Platform Bank Logos
+            Route::get('/bank-logos', [AdminBankLogoController::class, 'index']);
+            Route::post('/bank-logos', [AdminBankLogoController::class, 'store']);
+            Route::patch('/bank-logos/{id}', [AdminBankLogoController::class, 'update']);
+            Route::delete('/bank-logos/{id}', [AdminBankLogoController::class, 'destroy']);
         });
     });
 
@@ -191,6 +199,7 @@ Route::prefix('v1')->group(function () {
         Route::put('/accounts/{id}', [AccountController::class, 'update']);
         Route::delete('/accounts/{id}', [AccountController::class, 'destroy']);
         Route::post('/accounts/transfer', [AccountController::class, 'transfer']);
+        Route::get('/bank-logos', [BankLogoController::class, 'index']);
 
         // Contacts & People Directory (Partners, Brokers, Suppliers, Customers)
         Route::get('/contacts', [ContactController::class, 'index']);

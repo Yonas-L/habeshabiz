@@ -1,4 +1,6 @@
 import React from 'react';
+import { api, type BankLogoItem } from '../api/client';
+import { Landmark, Smartphone, Wallet, DollarSign, Coins, Globe } from 'lucide-react';
 
 export interface BankPreset {
   id: string;
@@ -430,57 +432,9 @@ export const PRESET_BANK_LOGOS: BankPreset[] = [
 
 /**
  * Detect matching bank preset by name, account type, or explicit logo
+ * (Disabled: only official uploaded logos are displayed)
  */
-export function matchBankPreset(name?: string, type?: string, logo?: string | null): BankPreset | undefined {
-  const query = (name || '').toLowerCase();
-  const typeQuery = (type || '').toLowerCase();
-
-  // 1. Direct match by explicit logo if preset SVG dataUri was stored
-  if (logo && typeof logo === 'string' && logo.trim().length > 0) {
-    const directLogoMatch = PRESET_BANK_LOGOS.find((p) => p.dataUri === logo);
-    if (directLogoMatch) return directLogoMatch;
-
-    // Only inspect decoded SVG content; avoid searching raw base64 binary strings where random characters match
-    if (logo.startsWith('data:image/svg+xml')) {
-      let decoded = logo;
-      try {
-        decoded = decodeURIComponent(logo).toLowerCase();
-      } catch {
-        decoded = logo.toLowerCase();
-      }
-      for (const preset of PRESET_BANK_LOGOS) {
-        if (
-          decoded.includes(`id="${preset.id}`) ||
-          decoded.includes(`>${preset.id}<`) ||
-          preset.keywords.some((kw) => decoded.includes(kw.toLowerCase()))
-        ) {
-          return preset;
-        }
-      }
-    }
-  }
-
-  // 2. Direct type matching first for special types
-  if (typeQuery === 'asset_gold') {
-    return PRESET_BANK_LOGOS.find((p) => p.id === 'gold');
-  }
-  if (typeQuery === 'asset_fx') {
-    return PRESET_BANK_LOGOS.find((p) => p.id === 'forex');
-  }
-  if (typeQuery === 'cash') {
-    return PRESET_BANK_LOGOS.find((p) => p.id === 'cash');
-  }
-  if (typeQuery === 'mobile_money' && (query.includes('tele') || !query)) {
-    return PRESET_BANK_LOGOS.find((p) => p.id === 'telebirr');
-  }
-
-  // 3. Keyword matching on name
-  for (const preset of PRESET_BANK_LOGOS) {
-    if (preset.keywords.some((kw) => query.includes(kw))) {
-      return preset;
-    }
-  }
-
+export function matchBankPreset(_name?: string, _type?: string, _logo?: string | null): BankPreset | undefined {
   return undefined;
 }
 
@@ -492,7 +446,7 @@ export interface AccountLogoInfo {
 }
 
 /**
- * Returns the effective logo src (uploaded custom logo OR authentic bank preset logo)
+ * Returns the effective logo src (only returns a src if an official logo is set on the account)
  */
 export function getAccountLogoInfo(account: {
   name?: string;
@@ -500,37 +454,20 @@ export function getAccountLogoInfo(account: {
   logo?: string | null;
   asset_details?: Record<string, any> | null;
 }): AccountLogoInfo {
-  // Check if account already has an uploaded or configured logo
   const explicitLogo = account.logo || (account.asset_details?.logo as string | undefined);
   if (explicitLogo && explicitLogo.trim().length > 0) {
-    const matchedPreset = PRESET_BANK_LOGOS.find((p) => p.dataUri === explicitLogo) ||
-      PRESET_RESERVE_LOGOS.find((p) => p.dataUri === explicitLogo);
     return {
       src: explicitLogo,
-      isCustom: !explicitLogo.startsWith('data:image/svg+xml'),
-      preset: matchedPreset,
-      shortCode: matchedPreset ? matchedPreset.shortCode : (account.name || 'ACC').slice(0, 3).toUpperCase(),
+      isCustom: true,
+      shortCode: (account.name || 'ACC').slice(0, 3).toUpperCase(),
     };
   }
 
-  // Auto-detect based on name, type, and logo
-  const matched = matchBankPreset(account.name, account.type, explicitLogo);
-  if (matched) {
-    return {
-      src: matched.dataUri,
-      isCustom: false,
-      preset: matched,
-      shortCode: matched.shortCode,
-    };
-  }
-
-  // Default to CBE for bank, Cash for cash, or generic
-  const fallback = PRESET_BANK_LOGOS[0];
+  // No default fake bank logos
   return {
-    src: fallback.dataUri,
+    src: '',
     isCustom: false,
-    preset: fallback,
-    shortCode: fallback.shortCode,
+    shortCode: (account.name || 'ACC').slice(0, 3).toUpperCase(),
   };
 }
 
@@ -546,11 +483,11 @@ export interface AccountLogoProps {
 }
 
 const SIZE_MAP = {
-  xs: 'w-6 h-6 rounded-md',
-  sm: 'w-7 h-7 rounded-lg',
-  md: 'w-8 h-8 rounded-lg',
-  lg: 'w-10 h-10 rounded-xl',
-  xl: 'w-12 h-12 rounded-xl',
+  xs: 'w-6 h-6',
+  sm: 'w-7 h-7',
+  md: 'w-8 h-8',
+  lg: 'w-10 h-10',
+  xl: 'w-12 h-12',
 };
 
 export const AccountLogo: React.FC<AccountLogoProps> = ({
@@ -558,20 +495,131 @@ export const AccountLogo: React.FC<AccountLogoProps> = ({
   size = 'md',
   className = '',
 }) => {
-  const info = getAccountLogoInfo(account);
   const sizeClasses = SIZE_MAP[size] || SIZE_MAP.md;
+  const explicitLogo = account.logo || (account.asset_details?.logo as string | undefined);
+
+  if (explicitLogo && explicitLogo.trim().length > 0) {
+    return (
+      <div
+        className={`relative inline-flex items-center justify-center shrink-0 ${sizeClasses} ${className}`}
+        title={account.name}
+      >
+        <img
+          src={explicitLogo}
+          alt={account.name || 'Account Logo'}
+          className="w-full h-full object-contain"
+          loading="lazy"
+        />
+      </div>
+    );
+  }
+
+  // Clean category icon fallback when no logo is set (no background card or border)
+  const type = account.type || 'bank';
+  let Icon = Landmark;
+
+  if (type === 'mobile_money') {
+    Icon = Smartphone;
+  } else if (type === 'cash') {
+    Icon = Wallet;
+  } else if (type === 'asset_fx') {
+    Icon = DollarSign;
+  } else if (type === 'asset_gold') {
+    Icon = Coins;
+  } else if (type === 'custom') {
+    Icon = Globe;
+  }
 
   return (
     <div
-      className={`relative inline-flex items-center justify-center shrink-0 overflow-hidden bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 shadow-xs ${sizeClasses} ${className}`}
+      className={`relative inline-flex items-center justify-center shrink-0 text-slate-400 dark:text-slate-500 ${sizeClasses} ${className}`}
       title={account.name}
     >
-      <img
-        src={info.src}
-        alt={account.name || 'Account Logo'}
-        className="w-full h-full object-cover"
-        loading="lazy"
-      />
+      <Icon className="w-4/5 h-4/5 stroke-[1.8]" />
     </div>
   );
 };
+
+export const LOGO_CATEGORIES = [
+  { value: 'bank', label: 'Bank Account', description: 'Commercial banks & savings institutions' },
+  { value: 'mobile_money', label: 'Mobile Money', description: 'Telebirr, CBE Birr, M-Pesa, digital wallets' },
+  { value: 'cash', label: 'Cash Drawer', description: 'Physical cash drawers & petty cash' },
+  { value: 'asset_fx', label: 'Foreign Currency', description: 'USD, EUR, GBP, AED, USDT holdings' },
+  { value: 'asset_gold', label: 'Gold Reserve', description: 'Physical gold bars, ingots & precious metals' },
+  { value: 'custom', label: 'Custom Asset', description: 'Other reserves & specialty financial assets' },
+] as const;
+
+export type LogoCategoryValue = (typeof LOGO_CATEGORIES)[number]['value'];
+
+let bankLogosCache: BankLogoItem[] | null = null;
+let bankLogosPromise: Promise<BankLogoItem[]> | null = null;
+const bankLogosListeners = new Set<(logos: BankLogoItem[]) => void>();
+
+export async function fetchPlatformBankLogos(forceRefresh = false): Promise<BankLogoItem[]> {
+  if (forceRefresh) {
+    bankLogosCache = null;
+    bankLogosPromise = null;
+  } else {
+    if (bankLogosCache) return bankLogosCache;
+    if (bankLogosPromise) return bankLogosPromise;
+  }
+
+  bankLogosPromise = (async () => {
+    try {
+      const res = await api.getBankLogos();
+      // Handle array directly (when api unmarshals response.data) or { data: [...] }
+      const items: BankLogoItem[] = Array.isArray(res)
+        ? res
+        : Array.isArray((res as any)?.data)
+        ? (res as any).data
+        : [];
+      bankLogosCache = items;
+      bankLogosListeners.forEach((fn) => fn(bankLogosCache!));
+      return bankLogosCache;
+    } catch {
+      return bankLogosCache || [];
+    } finally {
+      bankLogosPromise = null;
+    }
+  })();
+
+  return bankLogosPromise;
+}
+
+export function useBankLogos() {
+  const [bankLogos, setBankLogos] = React.useState<BankLogoItem[]>(bankLogosCache || []);
+  const [loading, setLoading] = React.useState(!bankLogosCache);
+
+  const refresh = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const logos = await fetchPlatformBankLogos(true);
+      setBankLogos(logos);
+      return logos;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    let mounted = true;
+    const listener = (newLogos: BankLogoItem[]) => {
+      if (mounted) setBankLogos(newLogos);
+    };
+    bankLogosListeners.add(listener);
+
+    fetchPlatformBankLogos().then((logos) => {
+      if (mounted) {
+        setBankLogos(logos);
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      bankLogosListeners.delete(listener);
+    };
+  }, []);
+
+  return { bankLogos, loading, refresh };
+}

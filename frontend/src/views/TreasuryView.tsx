@@ -13,6 +13,8 @@ import {
   Plus,
   Trash2,
   Landmark,
+  Smartphone,
+  Wallet,
   DollarSign,
   Home,
   Car,
@@ -29,18 +31,13 @@ import { useBalancePrivacy } from '../context/BalancePrivacyContext';
 import { ManageAccountModal } from '../components/treasury/ManageAccountModal';
 import { AddBalanceModal } from '../components/treasury/AddBalanceModal';
 import { AccountLedgerDrawer } from '../components/drawers/AccountLedgerDrawer';
-import { AccountLogo, matchBankPreset, getAccountLogoInfo } from '../utils/bankLogos';
+import { AccountLogo } from '../utils/bankLogos';
 import { CustomPageLoader } from '../components/loading/CustomPageLoader';
 // Pagination import removed — desktop uses carousel slider, not pagination
 
 // Helpers for Bank Clean Name and Cash Account Detection (No Amharic script)
 const getBankCleanName = (acc: FinancialAccount): string => {
   if (isCashAccount(acc)) return 'Cash on Hand';
-
-  const explicitLogo = acc.logo || (acc.asset_details?.logo as string | undefined);
-  const matched = matchBankPreset(acc.name, acc.type, explicitLogo);
-  if (matched) return matched.name;
-
   if (acc.account_number) return acc.account_number;
   if (acc.type === 'bank') return 'Bank Account';
   if (acc.type === 'mobile_money') return 'Mobile Wallet';
@@ -297,24 +294,37 @@ const FramelessCardLogo: React.FC<{ account: FinancialAccount; className?: strin
   account,
   className = 'w-13 h-13',
 }) => {
-  const isCash = isCashAccount(account);
-  if (isCash) {
+  if (account.logo) {
     return (
-      <div className={`${className} shrink-0 flex items-center justify-center text-emerald-600 dark:text-emerald-400 drop-shadow-sm`}>
-        <Landmark className="w-10 h-10 stroke-[2.2]" />
+      <div className={`${className} shrink-0 flex items-center justify-center`}>
+        <img
+          src={account.logo}
+          alt={account.name}
+          className="w-full h-full object-contain"
+        />
       </div>
     );
   }
 
-  const info = getAccountLogoInfo(account);
+  // Clean category icon fallback when no logo has been uploaded (no card, no border)
+  const type = account.type || 'bank';
+  let Icon = Landmark;
+
+  if (type === 'mobile_money') {
+    Icon = Smartphone;
+  } else if (type === 'cash' || isCashAccount(account)) {
+    Icon = Wallet;
+  } else if (type === 'asset_fx') {
+    Icon = DollarSign;
+  } else if (type === 'asset_gold') {
+    Icon = Coins;
+  } else if (type === 'custom') {
+    Icon = Globe;
+  }
 
   return (
-    <div className={`${className} shrink-0 flex items-center justify-center drop-shadow-sm`}>
-      <img
-        src={info.src}
-        alt={account.name}
-        className="w-full h-full object-contain drop-shadow-sm"
-      />
+    <div className={`${className} shrink-0 flex items-center justify-center text-slate-400 dark:text-slate-500`}>
+      <Icon className="w-9 h-9 stroke-[1.8]" />
     </div>
   );
 };
@@ -469,6 +479,14 @@ const ReserveAssetIcon: React.FC<{ acc: FinancialAccount; size?: 'sm' | 'md' | '
   const isSm = size === 'sm';
   const isLg = size === 'lg';
   const sizeClasses = isLg ? 'w-20 h-20 rounded-3xl' : isSm ? 'w-10 h-10 rounded-xl' : 'w-18 h-18 rounded-2xl';
+
+  if (acc.logo) {
+    return (
+      <div className={`${sizeClasses} flex items-center justify-center overflow-hidden shrink-0`}>
+        <img src={acc.logo} alt={acc.name} className="w-full h-full object-contain" />
+      </div>
+    );
+  }
 
   if (category === 'gold') {
     return (
@@ -1176,7 +1194,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                         <div className="relative z-10">
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex items-center gap-3 min-w-0">
-                              <AccountLogo account={acc} size="md" className="w-10 h-10 rounded-xl shrink-0 shadow-xs" />
+                              <AccountLogo account={acc} size="md" className="w-10 h-10 shrink-0" />
                               <div className="min-w-0">
                                 <div className="font-bold text-slate-800 dark:text-slate-100 text-sm leading-tight truncate">
                                   {acc.name}

@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { FinancialAccount, AccountActivitiesResponse } from '../../api/client';
 import { api } from '../../api/client';
 import { SlideOverDrawer } from './SlideOverDrawer';
-import { AccountLogo, PRESET_BANK_LOGOS, PRESET_RESERVE_LOGOS } from '../../utils/bankLogos';
+import { AccountLogo, useBankLogos } from '../../utils/bankLogos';
 import { AnimatedNumber } from '../AnimatedNumber';
 import { toast } from 'sonner';
 import { formatLocalDate } from '../../utils/dateUtils';
@@ -24,7 +24,6 @@ import {
   TrendingUp,
   Pencil,
   Plus,
-  ImagePlus,
 } from 'lucide-react';
 import { LdrsSpinner } from '../loading/LdrsSpinner';
 
@@ -72,11 +71,15 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
   const [editType, setEditType] = useState('bank');
   const [editCurrency, setEditCurrency] = useState('ETB');
   const [editLogo, setEditLogo] = useState<string | null>(null);
+  const { bankLogos } = useBankLogos();
+  const categoryLogos = useMemo(
+    () => bankLogos.filter((b) => b.category === editType),
+    [bankLogos, editType]
+  );
   const [editFeeType, setEditFeeType] = useState<'none' | 'percentage' | 'fixed'>('none');
   const [editFeeAmount, setEditFeeAmount] = useState('');
   const [editIsActive, setEditIsActive] = useState(true);
   const [savingDetails, setSavingDetails] = useState(false);
-  const logoInputRef = useRef<HTMLInputElement>(null);
 
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<AccountActivitiesResponse | null>(null);
@@ -143,17 +146,6 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
     setIsEditingDetails(true);
   };
 
-  const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 200 * 1024) {
-      toast.error('Logo too large', { description: 'Please use an image under 200KB.' });
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => setEditLogo(reader.result as string);
-    reader.readAsDataURL(file);
-  };
 
   const handleSaveDetails = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -574,49 +566,46 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
               {/* Logo Selection Section */}
               <div className="sm:col-span-2 space-y-2">
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  Account Logo / Badge Preset
+                  Account Logo (Optional)
                 </label>
-                <div className="flex flex-wrap items-center gap-1.5 max-h-32 overflow-y-auto p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/60 custom-scrollbar">
-                  {(isAsset ? PRESET_RESERVE_LOGOS : PRESET_BANK_LOGOS).map((p) => {
-                    const isSelected = editLogo === p.dataUri;
-                    return (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => setEditLogo(p.dataUri)}
-                        className={`p-1.5 rounded-xl border flex items-center gap-1.5 transition-all cursor-pointer ${
-                          isSelected
-                            ? 'border-emerald-500 bg-emerald-50/80 dark:bg-emerald-950/60 ring-2 ring-emerald-500/30'
-                            : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-white dark:bg-slate-800'
-                        }`}
-                        title={p.name}
-                      >
-                        <img src={p.dataUri} alt={p.shortCode} className="w-5 h-5 rounded-md object-cover" />
-                        <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300">
-                          {p.shortCode}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
+                {categoryLogos.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-3 max-h-36 overflow-y-auto py-1 custom-scrollbar">
+                    {categoryLogos.map((item) => {
+                      const isSelected = editLogo === item.logo_url;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => setEditLogo(item.logo_url)}
+                          className="relative group p-1 flex items-center justify-center cursor-pointer transition-transform hover:scale-110"
+                          title={item.name || 'Logo'}
+                        >
+                          <div className="relative w-10 h-10 flex items-center justify-center">
+                            <img
+                              src={item.logo_url}
+                              alt={item.name || 'Logo'}
+                              className={`w-full h-full object-contain transition-opacity ${
+                                isSelected ? 'opacity-100' : 'opacity-80 group-hover:opacity-100'
+                              }`}
+                            />
+                            {isSelected && (
+                              <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-emerald-500 rounded-full flex items-center justify-center shadow-xs">
+                                <Check className="w-2 h-2 text-white stroke-[3]" />
+                              </div>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
 
-                <div className="flex items-center gap-2 pt-1">
-                  <input
-                    ref={logoInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleLogoFileChange}
-                    className="hidden"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => logoInputRef.current?.click()}
-                    className="h-7 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 text-[11px] font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center gap-1 cursor-pointer"
-                  >
-                    <ImagePlus className="w-3.5 h-3.5 text-slate-400" />
-                    <span>Upload Custom Logo</span>
-                  </button>
-                  {editLogo && (
+                {editLogo && (
+                  <div className="flex items-center gap-2 pt-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <img src={editLogo} alt="Selected" className="w-5 h-5 object-contain" />
+                      <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">Selected</span>
+                    </div>
                     <button
                       type="button"
                       onClick={() => setEditLogo(null)}
@@ -624,8 +613,8 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
                     >
                       Clear Logo
                     </button>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
 
               {/* Active Status */}
@@ -927,7 +916,7 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
         <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-gradient-to-br from-white via-slate-50/50 to-slate-100/50 dark:from-[#131926] dark:via-[#111723] dark:to-[#0d121c] p-5 shadow-xs">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3.5">
-              <AccountLogo account={currentAccount} size="xl" className="shadow-md ring-2 ring-white dark:ring-slate-700" />
+              <AccountLogo account={currentAccount} size="xl" />
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">{currentAccount.name}</h3>

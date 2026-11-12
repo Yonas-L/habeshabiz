@@ -501,6 +501,13 @@ export interface FinancialAccount {
   logo?: string | null;
 }
 
+export interface BankLogoItem {
+  id: string;
+  category: string;
+  name: string | null;
+  logo_url: string;
+}
+
 export interface AccountActivity {
   id: string;
   transaction_number: string;
@@ -1896,6 +1903,11 @@ export const api = {
     if (params?.end_date) query.set('end_date', params.end_date);
     const qs = query.toString();
     return request<AccountActivitiesResponse>(`/accounts/${id}/activities${qs ? `?${qs}` : ''}`);
+  },
+
+  getBankLogos: (category?: string) => {
+    const qs = category && category !== 'all' ? `?category=${encodeURIComponent(category)}` : '';
+    return request<{ success: boolean; data: BankLogoItem[] }>(`/bank-logos${qs}`);
   },
 
   getContacts: (params?: { role?: string; search?: string; is_active?: boolean }) => {

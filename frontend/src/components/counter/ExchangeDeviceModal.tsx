@@ -70,7 +70,7 @@ export const ExchangeDeviceModal: React.FC<ExchangeDeviceModalProps> = ({
   // Device inspection details
   const [imei, setImei] = useState<string>('');
   const [condition, setCondition] = useState<string>('used_clean');
-  const [batteryHealth, setBatteryHealth] = useState<string>('85');
+  const [batteryHealth, setBatteryHealth] = useState<string>('');
   const [cycleCount, setCycleCount] = useState<string>('');
   const [simType, setSimType] = useState<'physical' | 'esim' | 'dual' | 'na'>('physical');
   const [notes, setNotes] = useState<string>('');
@@ -102,7 +102,7 @@ export const ExchangeDeviceModal: React.FC<ExchangeDeviceModalProps> = ({
       setIsCustomValue(true);
       setImei(initialExchange.imei_or_serial || '');
       setCondition(initialExchange.condition || 'used_clean');
-      setBatteryHealth(initialExchange.battery_health ? String(initialExchange.battery_health) : '');
+      setBatteryHealth(initialExchange.battery_health !== null && initialExchange.battery_health !== undefined ? String(initialExchange.battery_health) : '');
       setCycleCount(initialExchange.cycle_count !== null && initialExchange.cycle_count !== undefined ? String(initialExchange.cycle_count) : '');
       setSimType(initialExchange.sim_type || 'physical');
       setNotes(initialExchange.notes || '');
@@ -120,7 +120,7 @@ export const ExchangeDeviceModal: React.FC<ExchangeDeviceModalProps> = ({
       setIsCustomValue(false);
       setImei('');
       setCondition('used_clean');
-      setBatteryHealth('85');
+      setBatteryHealth('');
       setCycleCount('');
       setSimType('physical');
       setNotes('');
