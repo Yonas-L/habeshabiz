@@ -1,5 +1,6 @@
 import React from 'react';
 import { api, type BankLogoItem } from '../api/client';
+export type { BankLogoItem };
 import { Landmark, Smartphone, Wallet, DollarSign, Coins, Globe } from 'lucide-react';
 
 export interface BankPreset {
@@ -490,13 +491,73 @@ const SIZE_MAP = {
   xl: 'w-12 h-12',
 };
 
+export function getAssetEffectiveLogo(
+  acc: {
+    logo?: string | null;
+    type?: string;
+    currency?: string;
+    asset_details?: any;
+    name?: string;
+  },
+  bankLogosList: BankLogoItem[] = bankLogosCache || []
+): string | null {
+  // 1. Direct logo on account
+  if (acc.logo && acc.logo.trim().length > 0) return acc.logo;
+
+  // 2. Direct logo in asset_details
+  const detailLogo = acc.asset_details?.logo;
+  if (typeof detailLogo === 'string' && detailLogo.trim().length > 0) return detailLogo;
+
+  if (!bankLogosList || bankLogosList.length === 0) return null;
+
+  const type = acc.type || '';
+  const curr = (acc.currency || '').toLowerCase();
+  const name = (acc.name || '').toLowerCase();
+
+  // 3. Match by currency for foreign currency / gold
+  if (curr) {
+    const matchByCurr = bankLogosList.find(
+      (b) =>
+        (b.category === type || b.category.startsWith('asset_') || b.category === 'custom') &&
+        (b.name?.toLowerCase().includes(curr) || b.logo_url?.toLowerCase().includes(curr))
+    );
+    if (matchByCurr) return matchByCurr.logo_url;
+  }
+
+  // 4. Match by name keyword
+  if (name) {
+    const matchByName = bankLogosList.find(
+      (b) =>
+        (b.category === type || b.category.startsWith('asset_') || b.category === 'custom') &&
+        b.name &&
+        name.includes(b.name.toLowerCase())
+    );
+    if (matchByName) return matchByName.logo_url;
+  }
+
+  // 5. Match by category
+  const targetCategory =
+    type === 'asset_gold' || curr === 'gold' || curr === 'xau' || name.includes('gold')
+      ? 'asset_gold'
+      : type === 'asset_fx' || ['usd', 'eur', 'gbp', 'usdt'].includes(curr) || name.includes('forex') || name.includes('usd')
+      ? 'asset_fx'
+      : type === 'custom' || type.startsWith('asset_')
+      ? 'custom'
+      : type;
+
+  const catMatch = bankLogosList.find((b) => b.category === targetCategory);
+  if (catMatch) return catMatch.logo_url;
+
+  return null;
+}
+
 export const AccountLogo: React.FC<AccountLogoProps> = ({
   account,
   size = 'md',
   className = '',
 }) => {
   const sizeClasses = SIZE_MAP[size] || SIZE_MAP.md;
-  const explicitLogo = account.logo || (account.asset_details?.logo as string | undefined);
+  const explicitLogo = getAssetEffectiveLogo(account, bankLogosCache || []);
 
   if (explicitLogo && explicitLogo.trim().length > 0) {
     return (
@@ -590,10 +651,12 @@ export function useBankLogos() {
   const [bankLogos, setBankLogos] = React.useState<BankLogoItem[]>(bankLogosCache || []);
   const [loading, setLoading] = React.useState(!bankLogosCache);
 
-  const refresh = React.useCallback(async () => {
-    setLoading(true);
+  const refresh = React.useCallback(async (force = false) => {
+    if (!bankLogosCache || force) {
+      setLoading(true);
+    }
     try {
-      const logos = await fetchPlatformBankLogos(true);
+      const logos = await fetchPlatformBankLogos(force);
       setBankLogos(logos);
       return logos;
     } finally {

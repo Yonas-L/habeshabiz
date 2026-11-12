@@ -29,7 +29,8 @@ class AuditLogController extends Controller
             ], 403);
         }
 
-        $query = AuditLog::with(['user:id,name,email,role', 'revertedByUser:id,name,email']);
+        $query = AuditLog::with(['user:id,name,email,role', 'revertedByUser:id,name,email'])
+            ->where('entity_type', '!=', 'FinancialAccount');
 
         // Search filter (action, entity_type, entity_id, user name, ip_address, description in new_values)
         if ($request->filled('search')) {
@@ -81,13 +82,14 @@ class AuditLogController extends Controller
         $paginated = $query->paginate($perPage);
 
         // Quick aggregate metadata
+        $baseQuery = AuditLog::where('entity_type', '!=', 'FinancialAccount');
         $todayStart = now()->startOfDay();
-        $todayCount = AuditLog::where('created_at', '>=', $todayStart)->count();
-        $totalCount = AuditLog::count();
+        $todayCount = (clone $baseQuery)->where('created_at', '>=', $todayStart)->count();
+        $totalCount = (clone $baseQuery)->count();
 
         // Distinct actions and entity types for quick filter pills
-        $distinctActions = AuditLog::distinct()->pluck('action')->filter()->values();
-        $distinctEntities = AuditLog::distinct()->pluck('entity_type')->filter()->values();
+        $distinctActions = (clone $baseQuery)->distinct()->pluck('action')->filter()->values();
+        $distinctEntities = (clone $baseQuery)->distinct()->pluck('entity_type')->filter()->values();
         $distinctUsers = User::where('tenant_id', $currentUser->tenant_id)->select('id', 'name', 'role')->get();
 
         return response()->json([

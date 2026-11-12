@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import type { FinancialAccount, AccountActivitiesResponse } from '../../api/client';
+import type { FinancialAccount, AccountActivitiesResponse, AccountActivity } from '../../api/client';
 import { api } from '../../api/client';
 import { SlideOverDrawer } from './SlideOverDrawer';
 import { AccountLogo, useBankLogos } from '../../utils/bankLogos';
 import { AnimatedNumber } from '../AnimatedNumber';
 import { toast } from 'sonner';
 import { formatLocalDate } from '../../utils/dateUtils';
+import { UndoActionModal } from '../UndoActionModal';
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -24,6 +25,7 @@ import {
   TrendingUp,
   Pencil,
   Plus,
+  RotateCcw,
 } from 'lucide-react';
 import { LdrsSpinner } from '../loading/LdrsSpinner';
 
@@ -33,7 +35,8 @@ interface AccountLedgerDrawerProps {
   onClose: () => void;
   onOpenTransfer?: (accountId: string) => void;
   onOpenAddBalance?: (account: FinancialAccount) => void;
-  onAccountUpdated?: (account: FinancialAccount) => void;
+  onAccountUpdated?: (account?: FinancialAccount) => void;
+  isOwner?: boolean;
 }
 
 type DatePreset = 'all' | 'today' | 'this_month' | 'last_30_days' | 'custom';
@@ -61,8 +64,25 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
   onOpenTransfer,
   onOpenAddBalance,
   onAccountUpdated,
+  isOwner = true,
 }) => {
   const [currentAccount, setCurrentAccount] = useState<FinancialAccount | null>(account);
+
+  // Undo Reversal State
+  const [selectedUndoLog, setSelectedUndoLog] = useState<{ id: string; action?: string } | null>(null);
+  const [isUndoModalOpen, setIsUndoModalOpen] = useState(false);
+
+  const handleTriggerUndo = (act: AccountActivity) => {
+    if (!act.audit_log_id) {
+      toast.error('This transaction cannot be undone.');
+      return;
+    }
+    setSelectedUndoLog({
+      id: act.audit_log_id,
+      action: act.type === 'transfer' ? 'account_transfer' : 'bank_balance_adjustment',
+    });
+    setIsUndoModalOpen(true);
+  };
 
   // Inline Account Editing State inside Drawer
   const [isEditingDetails, setIsEditingDetails] = useState(false);
@@ -864,6 +884,29 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
                           >
                             {isInflow ? '+ ' : '- '}ETB {Math.abs(Number(amountValue)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </span>
+                          {act.can_undo && isOwner && (
+                            <div className="mt-1">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleTriggerUndo(act);
+                                }}
+                                className="px-2 py-0.5 rounded-md border border-amber-300/80 dark:border-amber-800/80 bg-amber-50/80 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/60 text-[10px] font-semibold inline-flex items-center gap-1 transition-colors shadow-xs cursor-pointer"
+                                title="Undo this bank movement within 24 hours"
+                              >
+                                <RotateCcw className="size-2.5" />
+                                <span>Undo</span>
+                              </button>
+                            </div>
+                          )}
+                          {act.is_reverted && (
+                            <div className="mt-1">
+                              <span className="inline-block px-1.5 py-0.2 rounded text-[9px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200/60 dark:border-slate-700/60 line-through">
+                                Reverted
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -898,6 +941,24 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
                             <div className="col-span-2 pt-1">
                               <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold block">Description</span>
                               <p className="text-slate-700 dark:text-slate-300 text-xs mt-0.5">{act.description}</p>
+                            </div>
+                          )}
+                          {act.can_undo && isOwner && (
+                            <div className="col-span-2 pt-2 border-t border-slate-200/50 dark:border-slate-800/50 flex items-center justify-between">
+                              <span className="text-[10px] text-slate-400">
+                                Undoable within 24h
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleTriggerUndo(act);
+                                }}
+                                className="px-2.5 py-1 rounded-lg border border-amber-300/80 dark:border-amber-800/80 bg-amber-50/80 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/60 text-xs font-semibold inline-flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer active:scale-95"
+                              >
+                                <RotateCcw className="size-3" />
+                                <span>Undo Movement</span>
+                              </button>
                             </div>
                           )}
                         </div>
@@ -1443,6 +1504,25 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
                         <span className="font-mono font-bold text-slate-900 dark:text-white text-xs">
                           {act.balance_after.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
+                        {act.can_undo && isOwner && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleTriggerUndo(act);
+                            }}
+                            className="px-2 py-0.5 rounded-md border border-amber-300/80 dark:border-amber-800/80 bg-amber-50/80 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/60 text-[10px] font-semibold inline-flex items-center gap-1 transition-colors shadow-xs cursor-pointer"
+                            title="Undo this bank movement within 24 hours"
+                          >
+                            <RotateCcw className="size-2.5" />
+                            <span>Undo</span>
+                          </button>
+                        )}
+                        {act.is_reverted && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200/60 dark:border-slate-700/60 line-through">
+                            Reverted
+                          </span>
+                        )}
                         <div className="text-slate-400 p-0.5">
                           {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                         </div>
@@ -1500,6 +1580,25 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
                             </p>
                           </div>
                         )}
+
+                        {act.can_undo && isOwner && (
+                          <div className="pt-2.5 border-t border-slate-200/50 dark:border-slate-800/50 flex items-center justify-between">
+                            <span className="text-[10px] text-slate-400">
+                              This bank movement was executed within the 24-hour undo window.
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleTriggerUndo(act);
+                              }}
+                              className="px-3 py-1.5 rounded-lg border border-amber-300/80 dark:border-amber-800/80 bg-amber-50/80 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/60 text-xs font-semibold inline-flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer active:scale-95"
+                            >
+                              <RotateCcw className="size-3" />
+                              <span>Undo Movement</span>
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1510,6 +1609,28 @@ export const AccountLedgerDrawer: React.FC<AccountLedgerDrawerProps> = ({
         </div>
         </div>
       </div>
+
+      {/* Undo Action Reversal Modal */}
+      <UndoActionModal
+        isOpen={isUndoModalOpen}
+        onClose={() => {
+          setIsUndoModalOpen(false);
+          setSelectedUndoLog(null);
+        }}
+        log={selectedUndoLog as any}
+        onSuccess={async () => {
+          fetchActivities();
+          try {
+            const res = await api.getAccounts();
+            const accounts = (res as any)?.data || (res as any) || [];
+            const updated = accounts.find((a: FinancialAccount) => a.id === currentAccount.id);
+            if (updated) {
+              setCurrentAccount(updated);
+            }
+          } catch (_) {}
+          if (onAccountUpdated) onAccountUpdated();
+        }}
+      />
     </SlideOverDrawer>
   );
 };

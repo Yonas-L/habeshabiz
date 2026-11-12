@@ -261,7 +261,9 @@ class AccountController extends Controller
             'current_balance' => ['nullable', 'numeric', 'min:0'],
         ]);
 
-        $oldValues = $account->only(['name', 'type', 'account_number', 'currency', 'logo', 'default_fee_type', 'default_fee_amount', 'is_custom_asset', 'asset_details', 'is_active', 'current_balance']);
+        $oldBalance = (float) $account->current_balance;
+        $balanceChanged = false;
+        $delta = 0.0;
 
         if (array_key_exists('name', $validated)) {
             $account->name = $validated['name'];
@@ -295,20 +297,60 @@ class AccountController extends Controller
         }
 
         if (array_key_exists('current_balance', $validated) && $validated['current_balance'] !== null) {
-            $account->current_balance = (float) $validated['current_balance'];
+            $targetBalance = (float) $validated['current_balance'];
+            $delta = $targetBalance - $oldBalance;
+            if (abs($delta) > 0.001) {
+                $account->current_balance = $targetBalance;
+                $balanceChanged = true;
+            }
         } elseif (isset($validated['balance_adjustment'])) {
-            $account->current_balance += (float) $validated['balance_adjustment'];
+            $delta = (float) $validated['balance_adjustment'];
+            if (abs($delta) > 0.001) {
+                $account->current_balance += $delta;
+                $balanceChanged = true;
+            }
         }
 
         $account->save();
 
-        AuditLog::record(
-            action: 'account_updated',
-            entityType: 'FinancialAccount',
-            entityId: $account->id,
-            oldValues: $oldValues,
-            newValues: $account->only(['name', 'type', 'account_number', 'currency', 'logo', 'is_custom_asset', 'asset_details', 'is_active', 'current_balance'])
-        );
+        if ($balanceChanged) {
+            $revertGroupId = (string) Str::uuid();
+            $txn = FinancialTransaction::create([
+                'tenant_id' => TenantScope::getActiveTenantId(),
+                'transaction_number' => ($delta > 0 ? 'DEP-' : 'ADJ-').strtoupper(Str::random(8)),
+                'source_account_id' => $delta < 0 ? $account->id : null,
+                'destination_account_id' => $delta > 0 ? $account->id : null,
+                'type' => 'balance_adjustment',
+                'amount' => abs($delta),
+                'fee' => 0,
+                'description' => $delta > 0
+                    ? "Balance deposit to {$account->name}"
+                    : "Balance deduction from {$account->name}",
+                'date' => now(),
+                'created_by' => auth()->id(),
+            ]);
+
+            AuditLog::record(
+                action: 'bank_balance_adjustment',
+                entityType: 'FinancialTransaction',
+                entityId: (string) $txn->id,
+                oldValues: [
+                    'account_id' => $account->id,
+                    'account_name' => $account->name,
+                    'previous_balance' => $oldBalance,
+                ],
+                newValues: [
+                    'account_id' => $account->id,
+                    'account_name' => $account->name,
+                    'new_balance' => (float) $account->current_balance,
+                    'amount' => abs($delta),
+                    'direction' => $delta > 0 ? 'inflow' : 'outflow',
+                    'transaction_number' => $txn->transaction_number,
+                ],
+                userId: auth()->id(),
+                revertGroupId: $revertGroupId
+            );
+        }
 
         return response()->json([
             'success' => true,
@@ -384,6 +426,14 @@ class AccountController extends Controller
         $currentBalance = (float) $account->current_balance;
         $runningBalance = $currentBalance;
 
+        // Preload audit logs for undo capability checks
+        $txnIds = $allTxns->pluck('id')->all();
+        $auditLogs = AuditLog::where('tenant_id', $account->tenant_id)
+            ->where('entity_type', 'FinancialTransaction')
+            ->whereIn('entity_id', $txnIds)
+            ->get()
+            ->keyBy('entity_id');
+
         $processedDescending = [];
         $reversed = $allTxns->reverse();
 
@@ -416,6 +466,7 @@ class AccountController extends Controller
                 'expense' => 'Operating Expense',
                 'owner_draw' => 'Owner Draw',
                 'transfer' => $isDestination ? 'Transfer In' : 'Transfer Out',
+                'balance_adjustment' => $isDestination ? 'Balance Deposit / Addition' : 'Balance Deduction',
                 'income' => 'Direct Income',
                 'loan_disbursement' => 'Loan Disbursement',
                 'borrowed_funds' => 'Capital Deposit',
@@ -432,6 +483,8 @@ class AccountController extends Controller
             } elseif ($txn->type === 'owner_draw') {
                 $counterparty = $txn->creator?->name ?? 'Owner';
             }
+
+            $log = $auditLogs->get($txn->id);
 
             $processedDescending[] = [
                 'id' => (string) $txn->id,
@@ -451,6 +504,9 @@ class AccountController extends Controller
                 'counterparty' => $counterparty,
                 'description' => $txn->description,
                 'created_by' => $txn->creator?->name,
+                'can_undo' => $log ? $log->canBeUndone() : false,
+                'is_reverted' => $log ? $log->isReverted() : false,
+                'audit_log_id' => $log ? $log->id : null,
             ];
         }
 

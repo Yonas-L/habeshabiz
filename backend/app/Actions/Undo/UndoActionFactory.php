@@ -22,6 +22,8 @@ class UndoActionFactory
         'handover_marked_sold' => UndoHandoverSoldAction::class,
         'expense_created' => UndoExpenseAction::class,
         'account_transfer' => UndoAccountTransferAction::class,
+        'bank_balance_adjustment' => UndoBankMovementAction::class,
+        'bank_movement' => UndoBankMovementAction::class,
         'proforma_invoice_created' => UndoProformaInvoiceAction::class,
         'staff_bonus_paid' => UndoDebtPaymentAction::class,
         'debt_payment_settled' => UndoDebtPaymentAction::class,

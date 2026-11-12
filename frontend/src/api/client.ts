@@ -526,6 +526,9 @@ export interface AccountActivity {
   counterparty: string | null;
   description: string | null;
   created_by: string | null;
+  can_undo?: boolean;
+  is_reverted?: boolean;
+  audit_log_id?: string | null;
 }
 
 export interface AccountActivitiesResponse {

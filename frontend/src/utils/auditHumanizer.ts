@@ -52,6 +52,11 @@ const TECHNICAL_KEYS = new Set([
   'ip_address',
   'ip',
   'user_agent',
+  'logo',
+  'image',
+  'avatar',
+  'icon',
+  'photo',
 ]);
 
 /**
@@ -89,8 +94,16 @@ export function isTechnicalOrPrivateField(key: string, val?: any): boolean {
     lower.includes('secret') ||
     lower.includes('ip_address') ||
     lower === 'ip' ||
-    lower.includes('auth_')
+    lower.includes('auth_') ||
+    lower.includes('logo') ||
+    lower.includes('avatar') ||
+    lower.includes('image') ||
+    lower.includes('photo') ||
+    lower.includes('icon')
   ) {
+    return true;
+  }
+  if (typeof val === 'string' && (val.startsWith('data:') || val.length > 200)) {
     return true;
   }
   if (lower.includes('deleted_at') || lower.includes('created_at') || lower.includes('updated_at')) return true;
@@ -317,9 +330,18 @@ export function humanizeAuditLog(log: AuditLogItem): HumanizedAuditData {
   } else if (action.includes('expense')) {
     eventTitle = 'Expense Logged';
     eventSubtitle = newVals?.category ? humanizeKey(newVals.category) : 'Operational cash outflow';
+  } else if (action === 'bank_balance_adjustment' || action === 'bank_movement') {
+    const isDeposit = newVals?.direction === 'inflow';
+    eventTitle = isDeposit ? 'Bank Balance Deposit' : 'Bank Balance Adjustment';
+    eventSubtitle = newVals?.account_name
+      ? `${isDeposit ? 'Deposited into' : 'Deducted from'} ${newVals.account_name}`
+      : 'Treasury balance adjustment';
   } else if (action.includes('transfer')) {
     eventTitle = 'Account Fund Transfer';
-    eventSubtitle = 'Internal treasury balance movement';
+    eventSubtitle =
+      newVals?.source_account_name && newVals?.destination_account_name
+        ? `${newVals.source_account_name} ➔ ${newVals.destination_account_name}`
+        : 'Internal treasury balance movement';
   } else if (action === 'unit_agreed_payout_adjusted') {
     eventTitle = 'Agreed Handover Payout Adjusted';
     const partner = newVals?.partner_name || newVals?.handover_to || 'Partner';
@@ -548,9 +570,19 @@ export function getAuditQuickSummary(log: AuditLogItem): string {
     return parts.join(' · ') || 'Expense logged';
   }
 
+  // Bank Balance Adjustment summary
+  if (log.action === 'bank_balance_adjustment' || log.action === 'bank_movement') {
+    if (src.amount) parts.push(`${src.direction === 'inflow' ? 'Deposited' : 'Deducted'} ${Number(src.amount).toLocaleString()} ETB`);
+    if (src.account_name) parts.push(src.account_name);
+    return parts.join(' · ') || 'Bank balance adjustment';
+  }
+
   // Transfer summary
   if (log.action.includes('transfer')) {
     if (src.amount) parts.push(`Transferred ${Number(src.amount).toLocaleString()} ETB`);
+    if (src.source_account_name && src.destination_account_name) {
+      parts.push(`${src.source_account_name} ➔ ${src.destination_account_name}`);
+    }
     return parts.join(' · ') || 'Fund transfer executed';
   }
 

@@ -104,7 +104,9 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      refresh();
+      if (!bankLogos.length) {
+        refresh();
+      }
       if (editAccount) {
         setName(editAccount.name || '');
         setAccountType(editAccount.type || 'bank');
@@ -426,9 +428,9 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({
 
   const modalContent = (
     <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
-      <div className="fixed inset-0 bg-slate-950/50 dark:bg-black/70 backdrop-blur-xs animate-backdrop-enter" onClick={onClose} />
+      <div className="fixed inset-0 bg-slate-950/45 dark:bg-black/70 animate-backdrop-enter" onClick={onClose} />
 
-      <div className="relative z-10 w-full max-w-xl bg-white dark:bg-[#131926] rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-slate-100 dark:border-slate-800 overflow-hidden animate-modal-smooth max-h-[88vh] sm:max-h-[85vh] flex flex-col my-0 sm:my-auto">
+      <div className="relative z-10 w-full max-w-xl bg-white dark:bg-[#131926] rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-slate-100 dark:border-slate-800 overflow-hidden animate-modal-smooth max-h-[88vh] sm:max-h-[85vh] flex flex-col my-0 sm:my-auto transform-gpu will-change-transform">
         {/* Mobile Drag Indicator */}
         <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mt-2.5 mb-1 sm:hidden shrink-0" />
 

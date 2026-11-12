@@ -31,7 +31,7 @@ import { useBalancePrivacy } from '../context/BalancePrivacyContext';
 import { ManageAccountModal } from '../components/treasury/ManageAccountModal';
 import { AddBalanceModal } from '../components/treasury/AddBalanceModal';
 import { AccountLedgerDrawer } from '../components/drawers/AccountLedgerDrawer';
-import { AccountLogo } from '../utils/bankLogos';
+import { AccountLogo, useBankLogos, getAssetEffectiveLogo, type BankLogoItem } from '../utils/bankLogos';
 import { CustomPageLoader } from '../components/loading/CustomPageLoader';
 // Pagination import removed — desktop uses carousel slider, not pagination
 
@@ -474,16 +474,21 @@ const detectAssetCategory = (acc: FinancialAccount): AssetCategory => {
   return 'custom';
 };
 
-const ReserveAssetIcon: React.FC<{ acc: FinancialAccount; size?: 'sm' | 'md' | 'lg' }> = ({ acc, size = 'md' }) => {
+const ReserveAssetIcon: React.FC<{ acc: FinancialAccount; size?: 'sm' | 'md' | 'lg'; bankLogos?: BankLogoItem[] }> = ({
+  acc,
+  size = 'md',
+  bankLogos,
+}) => {
   const category = detectAssetCategory(acc);
   const isSm = size === 'sm';
   const isLg = size === 'lg';
-  const sizeClasses = isLg ? 'w-20 h-20 rounded-3xl' : isSm ? 'w-10 h-10 rounded-xl' : 'w-18 h-18 rounded-2xl';
+  const sizeClasses = isLg ? 'w-20 h-20' : isSm ? 'w-10 h-10' : 'w-18 h-18';
 
-  if (acc.logo) {
+  const effectiveLogo = getAssetEffectiveLogo(acc, bankLogos);
+  if (effectiveLogo) {
     return (
-      <div className={`${sizeClasses} flex items-center justify-center overflow-hidden shrink-0`}>
-        <img src={acc.logo} alt={acc.name} className="w-full h-full object-contain" />
+      <div className={`${sizeClasses} flex items-center justify-center shrink-0`}>
+        <img src={effectiveLogo} alt={acc.name} className="w-full h-full object-contain" />
       </div>
     );
   }
@@ -665,8 +670,32 @@ const getAssetCardTheme = (acc: FinancialAccount) => {
 };
 
 // Compact table row metadata for Reserves & Assets list
-const getAssetRowInfo = (acc: FinancialAccount) => {
+const getAssetRowInfo = (acc: FinancialAccount, bankLogos: BankLogoItem[] = []) => {
   const cat = detectAssetCategory(acc);
+  const effectiveLogo = getAssetEffectiveLogo(acc, bankLogos);
+
+  if (effectiveLogo) {
+    let typeLabel = 'Asset';
+    let badgeClass = 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60';
+    if (cat === 'gold') {
+      typeLabel = 'Gold';
+      badgeClass = 'bg-amber-100/80 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/50 dark:border-amber-900/40';
+    } else if (cat.startsWith('fx')) {
+      typeLabel = 'FX';
+      badgeClass = 'bg-sky-100/80 dark:bg-sky-950/60 text-sky-700 dark:text-sky-400 border border-sky-200/50 dark:border-sky-900/40';
+    }
+
+    return {
+      typeLabel,
+      badgeClass,
+      icon: (
+        <div className="w-8 h-8 flex items-center justify-center shrink-0">
+          <img src={effectiveLogo} alt={acc.name} className="w-full h-full object-contain" />
+        </div>
+      ),
+    };
+  }
+
   if (cat === 'gold') {
     return {
       typeLabel: 'Gold',
@@ -763,6 +792,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
     initialAssets.reduce((sum, a) => sum + Number(a.current_balance), 0)
   );
   const [loading, setLoading] = useState(!accounts || accounts.length === 0);
+  const { bankLogos } = useBankLogos();
 
   // Sync state when accounts prop updates
   useEffect(() => {
@@ -1355,7 +1385,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                   </div>
                 ) : (
                   filteredAssets.map((acc) => {
-                    const rowInfo = getAssetRowInfo(acc);
+                    const rowInfo = getAssetRowInfo(acc, bankLogos);
                     return (
                       <div
                         key={acc.id}
@@ -1419,12 +1449,12 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
       {/* MOBILE VIEW (< sm): ATM-sized cards, touch-slidable, cardless reserves   */}
       {/* ========================================================================= */}
       <div className="sm:hidden space-y-0">
-        {/* Centered Tab Switcher: Banks vs Reserves */}
-        <div className="flex items-center justify-center py-0">
-          <div className="flex items-center p-1 bg-[#e9eef5] dark:bg-slate-800 rounded-full">
+        {/* Tab Switcher & Minimal Action: Banks vs Reserves */}
+        <div className="flex items-center justify-between py-1 px-0.5 gap-2">
+          <div className="flex items-center p-1 bg-[#e9eef5] dark:bg-slate-800 rounded-full shrink-0">
             <button
               onClick={() => handleSwitchMobileCategory('banks')}
-              className={`py-1.5 px-5.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+              className={`py-1.5 px-4 rounded-full text-xs font-bold transition-all cursor-pointer ${
                 mobileCategory === 'banks'
                   ? 'bg-gradient-to-b from-[#094838] to-[#042d23] text-white shadow-sm border border-emerald-500/25'
                   : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
@@ -1434,7 +1464,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
             </button>
             <button
               onClick={() => handleSwitchMobileCategory('reserves')}
-              className={`py-1.5 px-5.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+              className={`py-1.5 px-4 rounded-full text-xs font-bold transition-all cursor-pointer ${
                 mobileCategory === 'reserves'
                   ? 'bg-gradient-to-b from-[#094838] to-[#042d23] text-white shadow-sm border border-emerald-500/25'
                   : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
@@ -1443,12 +1473,35 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
               Reserves ({assetAccounts.length})
             </button>
           </div>
+
+          {/* Minimal Add Action Pill for Active Tab */}
+          <button
+            type="button"
+            onClick={() => handleOpenCreate(mobileCategory === 'reserves' ? 'asset_fx' : 'bank')}
+            className="h-8 px-2.5 rounded-full border border-slate-200/90 dark:border-slate-700 bg-white dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 transition-all flex items-center gap-1.5 active:scale-95 shadow-xs cursor-pointer shrink-0"
+            title={mobileCategory === 'reserves' ? 'Add Reserve' : 'Add Bank Account'}
+          >
+            <div className="w-4 h-4 rounded-full bg-emerald-50 dark:bg-emerald-950/60 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+              <Plus className="w-3 h-3 stroke-[3]" />
+            </div>
+            <span className="font-bold tracking-tight">
+              {mobileCategory === 'reserves' ? 'Add Reserve' : 'Add Account'}
+            </span>
+          </button>
         </div>
 
         {/* 3D Carousel Display — Full Bleed (-mx-4), Frosted Blurry Soft Cards, No Edge Cutoff */}
         {mobileAccounts.length === 0 ? (
           <div className="bg-white dark:bg-[#131926] rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 p-8 text-center my-4">
-            <p className="text-xs text-slate-400">No accounts in this category yet</p>
+            <p className="text-xs text-slate-400 mb-3">No {mobileCategory === 'reserves' ? 'reserves' : 'accounts'} in this category yet</p>
+            <button
+              type="button"
+              onClick={() => handleOpenCreate(mobileCategory === 'reserves' ? 'asset_fx' : 'bank')}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-b from-[#094838] to-[#042d23] text-white text-xs font-bold shadow-sm active:scale-95 transition-all cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>{mobileCategory === 'reserves' ? 'Add Reserve' : 'Add Account'}</span>
+            </button>
           </div>
         ) : (
           <>
@@ -1544,7 +1597,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
                               />
                             )}
                             <div className="relative z-10 transition-transform duration-300 hover:scale-105 active:scale-95">
-                              <ReserveAssetIcon acc={acc} size={isCenter ? 'lg' : 'md'} />
+                              <ReserveAssetIcon acc={acc} size={isCenter ? 'lg' : 'md'} bankLogos={bankLogos} />
                             </div>
                           </div>
                           {isCenter ? (
@@ -1976,6 +2029,7 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
         onAccountUpdated={() => {
           loadAccounts();
         }}
+        isOwner={true}
       />
 
       {/* Dedicated Add Balance Modal */}
@@ -2030,11 +2084,11 @@ export const TreasuryView: React.FC<TreasuryViewProps> = ({
       {showTransferModal && typeof document !== 'undefined' && createPortal(
         <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
           <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-xs animate-backdrop-enter"
+            className="fixed inset-0 bg-black/60 animate-backdrop-enter"
             onClick={() => setShowTransferModal(false)}
           />
 
-          <div className="relative z-10 bg-white dark:bg-[#131926] rounded-t-3xl sm:rounded-2xl border-t sm:border border-slate-200/80 dark:border-slate-800 shadow-2xl max-w-lg w-full p-5 sm:p-6 space-y-4 max-sm:animate-bottom-sheet sm:animate-modal-enter my-0 sm:my-auto max-h-[92vh] overflow-y-auto">
+          <div className="relative z-10 bg-white dark:bg-[#131926] rounded-t-3xl sm:rounded-2xl border-t sm:border border-slate-200/80 dark:border-slate-800 shadow-2xl max-w-lg w-full p-5 sm:p-6 space-y-4 max-sm:animate-bottom-sheet sm:animate-modal-enter my-0 sm:my-auto max-h-[92vh] overflow-y-auto transform-gpu will-change-transform">
             {/* Mobile Drag Handle */}
             <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto -mt-1.5 mb-1 sm:hidden shrink-0" />
 
