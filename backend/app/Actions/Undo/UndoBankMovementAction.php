@@ -72,8 +72,12 @@ class UndoBankMovementAction implements UndoActionInterface
             $title = 'Balance Deduction';
             $badge = 'DEDUCTED';
         } else {
-            $fromName = $txn->sourceAccount?->name ?? 'Source Account';
-            $toName = $txn->destinationAccount?->name ?? 'Destination Account';
+            /** @var FinancialAccount|null $sourceAcc */
+            $sourceAcc = $txn->sourceAccount;
+            /** @var FinancialAccount|null $destAcc */
+            $destAcc = $txn->destinationAccount;
+            $fromName = $sourceAcc ? $sourceAcc->name : 'Source Account';
+            $toName = $destAcc ? $destAcc->name : 'Destination Account';
             $impactSummary = [
                 "Source account '{$fromName}' will be refunded +".($amount + $fee).' ETB (transfer + fee)',
                 "Destination account '{$toName}' balance will decrease by -{$amount} ETB",
