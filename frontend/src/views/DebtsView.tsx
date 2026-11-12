@@ -16,7 +16,6 @@ import { AnimatedNumber } from '../components/AnimatedNumber';
 import { DebtDrawer } from '../components/drawers/DebtDrawer';
 import { RecordDebtModal } from '../components/debts/RecordDebtModal';
 import { PartySettleModal } from '../components/debts/PartySettleModal';
-import { Pagination } from '../components/Pagination';
 import { CustomPageLoader } from '../components/loading/CustomPageLoader';
 
 interface DebtsViewProps {
@@ -65,8 +64,6 @@ const getOriginLabel = (refType?: string) => {
 
 export const DebtsView: React.FC<DebtsViewProps> = ({ accounts, initialDebtType, onClearInitialContext }) => {
   const [debts, setDebts] = useState<Debt[]>([]);
-  const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 10;
   const [debtType, setDebtType] = useState<'receivable' | 'payable'>(() => {
     if (initialDebtType) return initialDebtType;
     if (typeof window !== 'undefined') {
@@ -101,7 +98,6 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts, initialDebtType,
   useEffect(() => {
     if (initialDebtType && (initialDebtType === 'receivable' || initialDebtType === 'payable')) {
       setDebtType(initialDebtType);
-      setCurrentPage(1);
       onClearInitialContext?.();
     }
   }, [initialDebtType, onClearInitialContext]);
@@ -329,8 +325,6 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts, initialDebtType,
     return <CustomPageLoader mode="app" fullScreen={false} />;
   }
 
-  const paginatedParties = partyGroups.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-
   return (
     <div className="space-y-6 animate-page-enter">
       {/* Top Header & Switcher */}
@@ -338,10 +332,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts, initialDebtType,
         {/* Type Switcher */}
         <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl text-xs font-semibold">
           <button
-            onClick={() => {
-              setDebtType('receivable');
-              setCurrentPage(1);
-            }}
+            onClick={() => setDebtType('receivable')}
             className={`px-4 py-2 rounded-lg transition-all ${
               debtType === 'receivable'
                 ? 'bg-white dark:bg-[#131926] text-slate-900 dark:text-white shadow-xs'
@@ -351,10 +342,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts, initialDebtType,
             Receivables
           </button>
           <button
-            onClick={() => {
-              setDebtType('payable');
-              setCurrentPage(1);
-            }}
+            onClick={() => setDebtType('payable')}
             className={`px-4 py-2 rounded-lg transition-all ${
               debtType === 'payable'
                 ? 'bg-white dark:bg-[#131926] text-slate-900 dark:text-white shadow-xs'
@@ -369,10 +357,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts, initialDebtType,
         <div className="flex items-center gap-2 flex-wrap">
           <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl text-[11px] font-semibold">
             <button
-              onClick={() => {
-                setStatusFilter('active');
-                setCurrentPage(1);
-              }}
+              onClick={() => setStatusFilter('active')}
               className={`px-3 py-1.5 rounded-lg transition-all ${
                 statusFilter === 'active'
                   ? 'bg-white dark:bg-[#131926] text-slate-900 dark:text-white shadow-xs'
@@ -382,10 +367,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts, initialDebtType,
               Active
             </button>
             <button
-              onClick={() => {
-                setStatusFilter('all');
-                setCurrentPage(1);
-              }}
+              onClick={() => setStatusFilter('all')}
               className={`px-3 py-1.5 rounded-lg transition-all ${
                 statusFilter === 'all'
                   ? 'bg-white dark:bg-[#131926] text-slate-900 dark:text-white shadow-xs'
@@ -395,10 +377,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts, initialDebtType,
               All
             </button>
             <button
-              onClick={() => {
-                setStatusFilter('settled');
-                setCurrentPage(1);
-              }}
+              onClick={() => setStatusFilter('settled')}
               className={`px-3 py-1.5 rounded-lg transition-all ${
                 statusFilter === 'settled'
                   ? 'bg-white dark:bg-[#131926] text-slate-900 dark:text-white shadow-xs'
@@ -462,18 +441,18 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts, initialDebtType,
 
       {/* Main Single Card Container */}
       <div className="bg-transparent md:bg-white md:dark:bg-[#131926] md:rounded-2xl md:border md:border-slate-100 md:dark:border-slate-800/80 md:overflow-hidden md:shadow-2xs space-y-3 md:space-y-0">
-        {/* Desktop Table (md and up) */}
-        <div className="hidden md:block overflow-x-auto">
+        {/* Desktop Table (md and up) with Internal Sticky Header & Fixed Height Scroll */}
+        <div className="hidden md:block overflow-x-auto overflow-y-auto h-[calc(100dvh-310px)] min-h-[460px] overscroll-contain">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50/70 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+            <thead className="sticky top-0 z-10 bg-slate-50 dark:bg-[#0f1522] border-b border-slate-200/80 dark:border-slate-800 text-slate-400 font-bold uppercase tracking-wider text-[10px] shadow-2xs">
               <tr>
-                <th className="py-2.5 px-3.5 whitespace-nowrap">Contact</th>
-                <th className="py-2.5 px-3.5 whitespace-nowrap font-mono">Obligations</th>
-                <th className="py-2.5 px-3.5 text-right whitespace-nowrap font-mono">Original ETB</th>
-                <th className="py-2.5 px-3.5 text-right whitespace-nowrap font-mono">Paid ETB</th>
-                <th className="py-2.5 px-3.5 text-right whitespace-nowrap font-mono">Remaining ETB</th>
-                <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Action</th>
-                <th className="py-2.5 px-2"></th>
+                <th className="py-2.5 px-3.5 whitespace-nowrap bg-slate-50 dark:bg-[#0f1522]">Contact</th>
+                <th className="py-2.5 px-3.5 whitespace-nowrap font-mono bg-slate-50 dark:bg-[#0f1522]">Obligations</th>
+                <th className="py-2.5 px-3.5 text-right whitespace-nowrap font-mono bg-slate-50 dark:bg-[#0f1522]">Original ETB</th>
+                <th className="py-2.5 px-3.5 text-right whitespace-nowrap font-mono bg-slate-50 dark:bg-[#0f1522]">Paid ETB</th>
+                <th className="py-2.5 px-3.5 text-right whitespace-nowrap font-mono bg-slate-50 dark:bg-[#0f1522]">Remaining ETB</th>
+                <th className="py-2.5 px-3.5 text-right whitespace-nowrap bg-slate-50 dark:bg-[#0f1522]">Action</th>
+                <th className="py-2.5 px-2 bg-slate-50 dark:bg-[#0f1522]"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-slate-700 dark:text-slate-300">
@@ -483,7 +462,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts, initialDebtType,
                     <CustomPageLoader mode="app" fullScreen={false} />
                   </td>
                 </tr>
-              ) : paginatedParties.length === 0 ? (
+              ) : partyGroups.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-16 text-center text-slate-400">
                     <Users className="w-8 h-8 mx-auto mb-2 text-slate-300 dark:text-slate-600" />
@@ -492,7 +471,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts, initialDebtType,
                   </td>
                 </tr>
               ) : (
-                paginatedParties.map((group) => {
+                partyGroups.map((group) => {
                   const isExpanded = expandedPartyIds.has(group.contactId);
                   const displayRemaining = group.netRemaining ?? group.totalRemaining;
                   const isSettled = displayRemaining <= 0.001;
@@ -796,18 +775,18 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts, initialDebtType,
         </div>
 
         {/* Mobile Native Cards (< md) */}
-        <div className="md:hidden space-y-3">
+        <div className="md:hidden overflow-y-auto h-[calc(100dvh-360px)] min-h-[420px] space-y-3 pr-1 overscroll-contain pb-24">
           {loading ? (
             <div className="py-6 text-center">
               <CustomPageLoader mode="app" fullScreen={false} />
             </div>
-          ) : paginatedParties.length === 0 ? (
+          ) : partyGroups.length === 0 ? (
             <div className="py-12 text-center text-slate-400 text-xs">
               <Users className="w-8 h-8 mx-auto mb-2 text-slate-300 dark:text-slate-600" />
               <p className="font-semibold text-slate-600 dark:text-slate-400">No {debtType} records found</p>
             </div>
           ) : (
-            paginatedParties.map((group) => {
+            partyGroups.map((group) => {
               const isExpanded = expandedPartyIds.has(group.contactId);
               const displayRemaining = group.netRemaining ?? group.totalRemaining;
               const isSettled = displayRemaining <= 0.001;
@@ -1035,18 +1014,6 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ accounts, initialDebtType,
             })
           )}
         </div>
-
-        {/* Pagination */}
-        {partyGroups.length > pageSize && (
-          <div className="px-1 py-2 md:px-4 md:py-3 md:border-t md:border-slate-100 md:dark:border-slate-800/80">
-            <Pagination
-              currentPage={currentPage}
-              totalItems={partyGroups.length}
-              pageSize={pageSize}
-              onPageChange={setCurrentPage}
-            />
-          </div>
-        )}
       </div>
 
       {/* Debt Detail Workspace Drawer */}
