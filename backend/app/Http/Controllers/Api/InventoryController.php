@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Actions\SettleDebtPaymentAction;
 use App\Actions\SynchronizeInventoryStockAction;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\InventoryUnitResource;
 use App\Models\AuditLog;
 use App\Models\Contact;
 use App\Models\Debt;
@@ -127,23 +128,9 @@ class InventoryController extends Controller
             'all' => InventoryUnit::count() + $nonSerializedInStock,
         ];
 
-        // Check if user is allowed to view cost basis
-        /** @var User|null $user */
-        $user = $request->user();
-        $canViewCost = $user ? $user->canViewCosts() : false;
-
-        $mapped = $units->map(function ($unit) use ($canViewCost) {
-            $data = $unit->toArray();
-            if (! $canViewCost) {
-                unset($data['cost_basis']);
-            }
-
-            return $data;
-        });
-
         return response()->json([
             'success' => true,
-            'data' => $mapped,
+            'data' => InventoryUnitResource::collection($units),
             'counts' => $counts,
         ]);
     }
@@ -168,13 +155,7 @@ class InventoryController extends Controller
             ->where('tenant_id', $user->tenant_id)
             ->findOrFail($id);
 
-        $canViewCost = $user->isOwner() || $user->canViewCosts();
-        $data = $unit->toArray();
-        if (! $canViewCost) {
-            unset($data['cost_basis']);
-        }
-
-        return response()->json($data);
+        return response()->json(new InventoryUnitResource($unit));
     }
 
     public function intakeUnit(Request $request): JsonResponse
@@ -1084,7 +1065,7 @@ class InventoryController extends Controller
         return response()->json([
             'success' => true,
             'message' => $message,
-            'data' => $createdUnits[0]->fresh()->load('variant.product'),
+            'data' => new InventoryUnitResource($createdUnits[0]->fresh()->load('variant.product')),
             'units_created' => $count,
         ], 201);
     }
@@ -1619,7 +1600,7 @@ class InventoryController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Device details updated successfully.',
-            'data' => $freshUnit,
+            'data' => new InventoryUnitResource($freshUnit),
         ]);
     }
 

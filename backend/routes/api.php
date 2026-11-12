@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\ContactController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DebtController;
 use App\Http\Controllers\Api\ExpenseController;
+use App\Http\Controllers\Api\ForgotPasswordController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\OnboardingController;
 use App\Http\Controllers\Api\ProductController;
@@ -30,16 +31,18 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
     // Public Endpoints
-    Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
-    Route::post('/onboard', [OnboardingController::class, 'onboard']);
+    Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:login');
+    Route::post('/auth/forgot-password', [ForgotPasswordController::class, 'sendResetLink'])->middleware('throttle:password-reset');
+    Route::post('/auth/reset-password', [ForgotPasswordController::class, 'resetPassword'])->middleware('throttle:password-reset');
+    Route::post('/onboard', [OnboardingController::class, 'onboard'])->middleware('throttle:login');
     Route::get('/onboard/business-types', [OnboardingController::class, 'businessTypes']);
-    Route::post('/waitlist', [WaitlistController::class, 'store']);
-    Route::get('/public/statement/{token}', [ContactController::class, 'publicStatement']);
-    Route::get('/public/statement/{token}/pdf', [ContactController::class, 'publicStatementPdf']);
+    Route::post('/waitlist', [WaitlistController::class, 'store'])->middleware('throttle:10,1');
+    Route::get('/public/statement/{token}', [ContactController::class, 'publicStatement'])->middleware('throttle:60,1');
+    Route::get('/public/statement/{token}/pdf', [ContactController::class, 'publicStatementPdf'])->middleware('throttle:30,1');
 
     // Platform Superadmin Routes
     Route::prefix('admin')->group(function () {
-        Route::post('/auth/login', [AdminAuthController::class, 'login'])->middleware('throttle:10,1');
+        Route::post('/auth/login', [AdminAuthController::class, 'login'])->middleware('throttle:login');
 
         Route::middleware('auth.platform_admin')->group(function () {
             Route::post('/auth/logout', [AdminAuthController::class, 'logout']);
@@ -81,7 +84,7 @@ Route::prefix('v1')->group(function () {
     });
 
     // Protected Routes
-    Route::middleware(['auth:sanctum', 'tenant.not_locked'])->group(function () {
+    Route::middleware(['auth:sanctum', 'tenant.not_locked', 'throttle:api'])->group(function () {
         // Business Settings & Profile (Owner Only)
         Route::get('/settings/profile', [SettingsController::class, 'getProfile']);
         Route::put('/settings/profile', [SettingsController::class, 'updateProfile']);

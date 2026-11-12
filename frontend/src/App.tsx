@@ -16,34 +16,36 @@ import {
 } from './api/client';
 import { Sidebar, type NavTab } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
-import { OverviewView } from './views/OverviewView';
-import { CounterView } from './views/CounterView';
-import { InventoryView } from './views/InventoryView';
-import { SalesHistoryView } from './views/SalesHistoryView';
-import { ProformaInvoiceView } from './views/ProformaInvoiceView';
-import { DebtsView } from './views/DebtsView';
-import { TreasuryView } from './views/TreasuryView';
-import { ExpensesView } from './views/ExpensesView';
-import { ReportsView } from './views/ReportsView';
-import { StaffView } from './views/StaffView';
-import { StaffOverviewView } from './views/StaffOverviewView';
-import { PartnersView } from './views/PartnersView';
-import { LogsView } from './views/LogsView';
-import { SettingsView } from './views/SettingsView';
-import { OnboardingView } from './views/OnboardingView';
-import { PublicStatementView } from './views/PublicStatementView';
-import { SuspendedView } from './views/SuspendedView';
-import { AdminLoginView } from './views/admin/AdminLoginView';
-import { AdminLayout } from './views/admin/AdminLayout';
 import { getAdminToken } from './api/adminClient';
-import { ProfileSettingsModal } from './components/ProfileSettingsModal';
-import { QuickSearchModal, type NavigationPayload } from './components/QuickSearchModal';
+import type { NavigationPayload } from './components/QuickSearchModal';
+
+const OverviewView = React.lazy(() => import('./views/OverviewView').then((m) => ({ default: m.OverviewView })));
+const CounterView = React.lazy(() => import('./views/CounterView').then((m) => ({ default: m.CounterView })));
+const InventoryView = React.lazy(() => import('./views/InventoryView').then((m) => ({ default: m.InventoryView })));
+const SalesHistoryView = React.lazy(() => import('./views/SalesHistoryView').then((m) => ({ default: m.SalesHistoryView })));
+const ProformaInvoiceView = React.lazy(() => import('./views/ProformaInvoiceView').then((m) => ({ default: m.ProformaInvoiceView })));
+const DebtsView = React.lazy(() => import('./views/DebtsView').then((m) => ({ default: m.DebtsView })));
+const TreasuryView = React.lazy(() => import('./views/TreasuryView').then((m) => ({ default: m.TreasuryView })));
+const ExpensesView = React.lazy(() => import('./views/ExpensesView').then((m) => ({ default: m.ExpensesView })));
+const ReportsView = React.lazy(() => import('./views/ReportsView').then((m) => ({ default: m.ReportsView })));
+const StaffView = React.lazy(() => import('./views/StaffView').then((m) => ({ default: m.StaffView })));
+const StaffOverviewView = React.lazy(() => import('./views/StaffOverviewView').then((m) => ({ default: m.StaffOverviewView })));
+const PartnersView = React.lazy(() => import('./views/PartnersView').then((m) => ({ default: m.PartnersView })));
+const LogsView = React.lazy(() => import('./views/LogsView').then((m) => ({ default: m.LogsView })));
+const SettingsView = React.lazy(() => import('./views/SettingsView').then((m) => ({ default: m.SettingsView })));
+const OnboardingView = React.lazy(() => import('./views/OnboardingView').then((m) => ({ default: m.OnboardingView })));
+const PublicStatementView = React.lazy(() => import('./views/PublicStatementView').then((m) => ({ default: m.PublicStatementView })));
+const SuspendedView = React.lazy(() => import('./views/SuspendedView').then((m) => ({ default: m.SuspendedView })));
+const AdminLoginView = React.lazy(() => import('./views/admin/AdminLoginView').then((m) => ({ default: m.AdminLoginView })));
+const AdminLayout = React.lazy(() => import('./views/admin/AdminLayout').then((m) => ({ default: m.AdminLayout })));
+const ProfileSettingsModal = React.lazy(() => import('./components/ProfileSettingsModal').then((m) => ({ default: m.ProfileSettingsModal })));
+const QuickSearchModal = React.lazy(() => import('./components/QuickSearchModal').then((m) => ({ default: m.QuickSearchModal })));
 import { MobileBottomNav } from './components/navigation/MobileBottomNav';
 import { CustomPageLoader } from './components/loading/CustomPageLoader';
 import { LdrsSpinner } from './components/loading/LdrsSpinner';
 import { TopProgressBar } from './components/loading/TopProgressBar';
 import { Toaster, toast } from 'sonner';
-import { ArrowRight } from 'lucide-react';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { BalancePrivacyProvider } from './context/BalancePrivacyContext';
 
 export const getCurrentMonth = (): string => {
@@ -242,6 +244,15 @@ export default function App() {
       setCurrentPath(p);
       setIsOnboarding(p === '/onboard');
 
+      const params = new URLSearchParams(window.location.search);
+      const urlToken = params.get('token');
+      const urlEmail = params.get('email');
+      if (urlToken && urlEmail) {
+        setResetToken(urlToken);
+        setResetEmail(urlEmail);
+        setAuthMode('reset_password');
+      }
+
       if (p !== '/admin' && p !== '/onboard' && p !== '/suspended' && !p.startsWith('/statement/')) {
         const tabFromUrl = getTabFromUrl();
         setActiveTab((prev) => {
@@ -302,10 +313,36 @@ export default function App() {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   };
 
-  // Login form state
+  // Login & Password Reset form state
+  const [authMode, setAuthMode] = useState<'login' | 'forgot_password' | 'reset_password'>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('token') && params.get('email')) {
+        return 'reset_password';
+      }
+    }
+    return 'login';
+  });
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [resetEmail, setResetEmail] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('email') || '';
+    }
+    return '';
+  });
+  const [resetToken, setResetToken] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('token') || '';
+    }
+    return '';
+  });
+  const [newPassword, setNewPassword] = useState('');
+  const [newPasswordConfirmation, setNewPasswordConfirmation] = useState('');
   const [authError, setAuthError] = useState<string | null>(null);
+  const [authSuccessMessage, setAuthSuccessMessage] = useState<string | null>(null);
   const [isSubmittingAuth, setIsSubmittingAuth] = useState<boolean>(false);
 
   // Load app data when user is authenticated
@@ -460,6 +497,60 @@ export default function App() {
     }
   };
 
+  const handleForgotPassword = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setAuthError(null);
+    setAuthSuccessMessage(null);
+    setIsSubmittingAuth(true);
+
+    try {
+      const res = await api.forgotPassword(email);
+      setAuthSuccessMessage(res.message || 'If your email is registered, you will receive a reset link shortly.');
+      toast.success('Recovery link sent');
+    } catch (err: any) {
+      setAuthError(err.message || 'Unable to send recovery link. Please try again.');
+    } finally {
+      setIsSubmittingAuth(false);
+    }
+  };
+
+  const handleResetPassword = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setAuthError(null);
+
+    if (newPassword.length < 8) {
+      setAuthError('Password must be at least 8 characters long.');
+      return;
+    }
+    if (newPassword !== newPasswordConfirmation) {
+      setAuthError('Password confirmation does not match.');
+      return;
+    }
+
+    setIsSubmittingAuth(true);
+
+    try {
+      await api.resetPassword({
+        token: resetToken,
+        email: resetEmail,
+        password: newPassword,
+        password_confirmation: newPasswordConfirmation,
+      });
+      toast.success('Password updated successfully');
+      setAuthSuccessMessage('Password updated successfully. Please sign in with your new password.');
+      setAuthMode('login');
+      setPassword('');
+      if (typeof window !== 'undefined' && window.history.replaceState) {
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    } catch (err: any) {
+      setAuthError(err.message || 'Password reset failed. The link may be invalid or expired.');
+      toast.error('Reset failed', { description: err.message });
+    } finally {
+      setIsSubmittingAuth(false);
+    }
+  };
+
   const handleLogout = async () => {
     try {
       await api.logout();
@@ -492,7 +583,9 @@ export default function App() {
   if (publicStatementToken) {
     return (
       <div className={theme === 'dark' ? 'dark' : ''}>
-        <PublicStatementView token={publicStatementToken} />
+        <React.Suspense fallback={<CustomPageLoader mode="app" fullScreen={true} />}>
+          <PublicStatementView token={publicStatementToken} />
+        </React.Suspense>
         <Toaster position="bottom-right" richColors closeButton theme={theme} />
       </div>
     );
@@ -503,14 +596,16 @@ export default function App() {
     return (
       <div className={theme === 'dark' ? 'dark' : ''}>
         <Toaster position="bottom-right" richColors closeButton theme={theme} />
-        <SuspendedView
-          onBackToLogin={() => {
-            setCurrentPath('/');
-            if (typeof window !== 'undefined' && window.history.pushState) {
-              window.history.pushState({}, '', '/');
-            }
-          }}
-        />
+        <React.Suspense fallback={<CustomPageLoader mode="app" fullScreen={true} />}>
+          <SuspendedView
+            onBackToLogin={() => {
+              setCurrentPath('/');
+              if (typeof window !== 'undefined' && window.history.pushState) {
+                window.history.pushState({}, '', '/');
+              }
+            }}
+          />
+        </React.Suspense>
       </div>
     );
   }
@@ -522,20 +617,22 @@ export default function App() {
       return (
         <div className={theme === 'dark' ? 'dark' : ''}>
           <Toaster position="bottom-right" richColors closeButton theme={theme} />
-          <AdminLoginView
-            onSuccess={() => {
-              setCurrentPath('/admin');
-              if (typeof window !== 'undefined' && window.history.pushState) {
-                window.history.pushState({}, '', '/admin');
-              }
-            }}
-            onBackToStore={() => {
-              setCurrentPath('/');
-              if (typeof window !== 'undefined' && window.history.pushState) {
-                window.history.pushState({}, '', '/');
-              }
-            }}
-          />
+          <React.Suspense fallback={<CustomPageLoader mode="app" fullScreen={true} />}>
+            <AdminLoginView
+              onSuccess={() => {
+                setCurrentPath('/admin');
+                if (typeof window !== 'undefined' && window.history.pushState) {
+                  window.history.pushState({}, '', '/admin');
+                }
+              }}
+              onBackToStore={() => {
+                setCurrentPath('/');
+                if (typeof window !== 'undefined' && window.history.pushState) {
+                  window.history.pushState({}, '', '/');
+                }
+              }}
+            />
+          </React.Suspense>
         </div>
       );
     }
@@ -543,16 +640,18 @@ export default function App() {
     return (
       <div className={theme === 'dark' ? 'dark' : ''}>
         <Toaster position="bottom-right" richColors closeButton theme={theme} />
-        <AdminLayout
-          theme={theme}
-          onToggleTheme={handleToggleTheme}
-          onLogoutSuccess={() => {
-            setCurrentPath('/admin/login');
-            if (typeof window !== 'undefined' && window.history.pushState) {
-              window.history.pushState({}, '', '/admin/login');
-            }
-          }}
-        />
+        <React.Suspense fallback={<CustomPageLoader mode="app" fullScreen={true} />}>
+          <AdminLayout
+            theme={theme}
+            onToggleTheme={handleToggleTheme}
+            onLogoutSuccess={() => {
+              setCurrentPath('/admin/login');
+              if (typeof window !== 'undefined' && window.history.pushState) {
+                window.history.pushState({}, '', '/admin/login');
+              }
+            }}
+          />
+        </React.Suspense>
       </div>
     );
   }
@@ -571,8 +670,9 @@ export default function App() {
       return (
         <div className={theme === 'dark' ? 'dark' : ''}>
           <Toaster position="bottom-right" richColors closeButton theme={theme} />
-          <OnboardingView
-            onSuccess={async (token, newUser, newTenant) => {
+          <React.Suspense fallback={<CustomPageLoader mode="app" fullScreen={true} />}>
+            <OnboardingView
+              onSuccess={async (token, newUser, newTenant) => {
               setAuthToken(token);
               await refreshData();
               setUser(newUser);
@@ -591,6 +691,7 @@ export default function App() {
               }
             }}
           />
+          </React.Suspense>
         </div>
       );
     }
@@ -603,11 +704,27 @@ export default function App() {
             <div className="w-10 h-10 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 mx-auto flex items-center justify-center font-bold text-xs mb-3 shadow-xs tracking-tight">
               HB
             </div>
-            <h1 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">HabeshaBiz</h1>
+            <h1 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
+              {authMode === 'forgot_password'
+                ? 'Reset Password'
+                : authMode === 'reset_password'
+                ? 'New Password'
+                : 'HabeshaBiz'}
+            </h1>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              Store & Inventory Management
+              {authMode === 'forgot_password'
+                ? 'Enter your account email to receive a recovery link'
+                : authMode === 'reset_password'
+                ? `Set a secure password for ${resetEmail || 'your account'}`
+                : 'Store & Inventory Management'}
             </p>
           </div>
+
+          {authSuccessMessage && (
+            <div className="mb-4 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/50 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+              {authSuccessMessage}
+            </div>
+          )}
 
           {authError && (
             <div className="mb-4 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-xs font-medium text-rose-700 dark:text-rose-400">
@@ -615,62 +732,168 @@ export default function App() {
             </div>
           )}
 
-          <form onSubmit={handleLogin} className="space-y-3.5">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Email Address</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                placeholder="name@company.com"
-                className="w-full h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder:text-slate-400"
-              />
-            </div>
+          {authMode === 'login' && (
+            <form onSubmit={handleLogin} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Email Address</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  placeholder="name@company.com"
+                  className="w-full h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder:text-slate-400"
+                />
+              </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                placeholder="••••••••"
-                className="w-full h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder:text-slate-400"
-              />
-            </div>
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Password</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthError(null);
+                      setAuthSuccessMessage(null);
+                      setAuthMode('forgot_password');
+                    }}
+                    className="text-[11px] font-medium text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  placeholder="••••••••"
+                  className="w-full h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder:text-slate-400"
+                />
+              </div>
 
-            <button
-              type="submit"
-              disabled={isSubmittingAuth}
-              className="w-full h-10 px-4 rounded-xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:hover:bg-emerald-950/80 border border-emerald-200 dark:border-emerald-800/70 text-emerald-700 dark:text-emerald-300 text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-xs disabled:opacity-50 active:scale-[0.98] cursor-pointer"
-            >
-              {isSubmittingAuth ? (
-                <LdrsSpinner size={16} color="#059669" stroke={2.5} />
-              ) : (
-                <>
-                  <span>Sign In</span>
-                  <ArrowRight className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                </>
-              )}
-            </button>
-          </form>
+              <button
+                type="submit"
+                disabled={isSubmittingAuth}
+                className="w-full h-10 px-4 rounded-xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:hover:bg-emerald-950/80 border border-emerald-200 dark:border-emerald-800/70 text-emerald-700 dark:text-emerald-300 text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-xs disabled:opacity-50 active:scale-[0.98] cursor-pointer"
+              >
+                {isSubmittingAuth ? (
+                  <LdrsSpinner size={16} color="#059669" stroke={2.5} />
+                ) : (
+                  <>
+                    <span>Sign In</span>
+                    <ArrowRight className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  </>
+                )}
+              </button>
+            </form>
+          )}
+
+          {authMode === 'forgot_password' && (
+            <form onSubmit={handleForgotPassword} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Email Address</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  placeholder="name@company.com"
+                  className="w-full h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder:text-slate-400"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSubmittingAuth}
+                className="w-full h-10 px-4 rounded-xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:hover:bg-emerald-950/80 border border-emerald-200 dark:border-emerald-800/70 text-emerald-700 dark:text-emerald-300 text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-xs disabled:opacity-50 active:scale-[0.98] cursor-pointer"
+              >
+                {isSubmittingAuth ? (
+                  <LdrsSpinner size={16} color="#059669" stroke={2.5} />
+                ) : (
+                  <>
+                    <span>Send Recovery Link</span>
+                    <ArrowRight className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  </>
+                )}
+              </button>
+            </form>
+          )}
+
+          {authMode === 'reset_password' && (
+            <form onSubmit={handleResetPassword} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">New Password</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                  minLength={8}
+                  placeholder="At least 8 characters"
+                  className="w-full h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder:text-slate-400"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Confirm Password</label>
+                <input
+                  type="password"
+                  value={newPasswordConfirmation}
+                  onChange={(e) => setNewPasswordConfirmation(e.target.value)}
+                  required
+                  minLength={8}
+                  placeholder="Confirm new password"
+                  className="w-full h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder:text-slate-400"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSubmittingAuth}
+                className="w-full h-10 px-4 rounded-xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:hover:bg-emerald-950/80 border border-emerald-200 dark:border-emerald-800/70 text-emerald-700 dark:text-emerald-300 text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-xs disabled:opacity-50 active:scale-[0.98] cursor-pointer"
+              >
+                {isSubmittingAuth ? (
+                  <LdrsSpinner size={16} color="#059669" stroke={2.5} />
+                ) : (
+                  <>
+                    <span>Save New Password</span>
+                    <ArrowRight className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  </>
+                )}
+              </button>
+            </form>
+          )}
 
           <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-col items-center gap-2.5">
-            <button
-              type="button"
-              onClick={() => {
-                setIsOnboarding(true);
-                setCurrentPath('/onboard');
-                if (typeof window !== 'undefined' && window.history.pushState) {
-                  window.history.pushState({}, '', '/onboard');
-                }
-              }}
-              className="text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors inline-flex items-center gap-1.5 cursor-pointer"
-            >
-              <span>New business? Set up your workspace</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
+            {authMode !== 'login' ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthError(null);
+                  setAuthSuccessMessage(null);
+                  setAuthMode('login');
+                }}
+                className="text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Back to Sign In</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsOnboarding(true);
+                  setCurrentPath('/onboard');
+                  if (typeof window !== 'undefined' && window.history.pushState) {
+                    window.history.pushState({}, '', '/onboard');
+                  }
+                }}
+                className="text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <span>New business? Set up your workspace</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -723,7 +946,7 @@ export default function App() {
           {isPageLoading ? (
             <CustomPageLoader mode="app" fullScreen={false} />
           ) : (
-            <>
+            <React.Suspense fallback={<CustomPageLoader mode="app" fullScreen={false} />}>
               {activeTab === 'overview' && (
                 user?.role === 'owner' ? (
                   <OverviewView
@@ -836,29 +1059,31 @@ export default function App() {
                   }}
                 />
               )}
-            </>
+            </React.Suspense>
           )}
         </main>
       </div>
 
-      {/* Profile & Password Management Modal */}
-      <ProfileSettingsModal
-        isOpen={isProfileModalOpen}
-        onClose={handleCloseProfileModal}
-        user={user}
-        onUserUpdated={(updatedUser) => {
-          setUser((prev) => (prev ? { ...prev, ...updatedUser } : updatedUser));
-        }}
-      />
+      <React.Suspense fallback={null}>
+        {/* Profile & Password Management Modal */}
+        <ProfileSettingsModal
+          isOpen={isProfileModalOpen}
+          onClose={handleCloseProfileModal}
+          user={user}
+          onUserUpdated={(updatedUser) => {
+            setUser((prev) => (prev ? { ...prev, ...updatedUser } : updatedUser));
+          }}
+        />
 
-      {/* Global Quick Search & Command Palette (⌘K) */}
-      <QuickSearchModal
-        isOpen={isQuickSearchOpen}
-        onClose={handleCloseQuickSearch}
-        user={user}
-        accounts={accounts}
-        onNavigate={handleQuickSearchNavigate}
-      />
+        {/* Global Quick Search & Command Palette (⌘K) */}
+        <QuickSearchModal
+          isOpen={isQuickSearchOpen}
+          onClose={handleCloseQuickSearch}
+          user={user}
+          accounts={accounts}
+          onNavigate={handleQuickSearchNavigate}
+        />
+      </React.Suspense>
 
       {/* Mobile Native Bottom Navigation Bar with Central Elevated Action Hub */}
       <MobileBottomNav

@@ -1199,6 +1199,16 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(credentials),
     }),
+  forgotPassword: (email: string) =>
+    request<{ success: boolean; message: string }>('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+  resetPassword: (payload: { token: string; email: string; password: string; password_confirmation: string }) =>
+    request<{ success: boolean; message: string }>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
   onboard: (data: OnboardingPayload) => {
     if (data.logo instanceof File) {
       const formData = new FormData();

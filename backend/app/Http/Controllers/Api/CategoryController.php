@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\CategoryResource;
 use App\Models\AuditLog;
 use App\Models\Category;
 use App\Models\InventoryStock;
@@ -44,7 +45,7 @@ class CategoryController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $categories,
+            'data' => CategoryResource::collection($categories),
         ]);
     }
 
@@ -102,7 +103,7 @@ class CategoryController extends Controller
         return response()->json([
             'success' => true,
             'message' => "Category '{$category->name}' created successfully.",
-            'data' => $category->loadCount('products'),
+            'data' => new CategoryResource($category->loadCount('products')),
         ], 201);
     }
 
@@ -141,7 +142,7 @@ class CategoryController extends Controller
         return response()->json([
             'success' => true,
             'message' => "Category '{$category->name}' updated successfully.",
-            'data' => $category->loadCount('products'),
+            'data' => new CategoryResource($category->loadCount('products')),
         ]);
     }
 

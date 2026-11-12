@@ -1,5 +1,10 @@
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+async function loadPdfEngines() {
+  const [{ default: jsPDF }, { default: html2canvas }] = await Promise.all([
+    import('jspdf'),
+    import('html2canvas'),
+  ]);
+  return { jsPDF, html2canvas };
+}
 
 /**
  * Captures a DOM element and downloads it as a properly paginated A4 PDF.
@@ -45,6 +50,8 @@ export async function downloadPdf(
     const PAGE_H_MM = 297;
     const MARGIN_MM = 10;
     const CONTENT_W_MM = PAGE_W_MM - MARGIN_MM * 2;
+
+    const { jsPDF, html2canvas } = await loadPdfEngines();
 
     const pdf = new jsPDF({
       orientation: 'portrait',
@@ -279,6 +286,7 @@ async function downloadStructuredPdf(
   filename: string,
   options: { paginateSections?: boolean },
 ): Promise<void> {
+  const { jsPDF } = await loadPdfEngines();
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageWidth = 210;
   const pageHeight = 297;

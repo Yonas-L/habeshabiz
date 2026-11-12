@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Actions\OffsetStaffBonusDebtAction;
 use App\Actions\SettleDebtPaymentAction;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\DebtPaymentResource;
+use App\Http\Resources\DebtResource;
 use App\Models\AuditLog;
 use App\Models\Contact;
 use App\Models\Debt;
@@ -61,7 +63,7 @@ class DebtController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $debts,
+            'data' => DebtResource::collection($debts),
         ]);
     }
 
@@ -517,7 +519,7 @@ class DebtController extends Controller
             'message' => $debt->type === 'receivable'
                 ? "Receivable obligation for {$debt->original_amount} ETB recorded."
                 : "Payable obligation for {$debt->original_amount} ETB recorded.",
-            'data' => $debt->load(['contact.debts', 'payments.financialAccount']),
+            'data' => new DebtResource($debt->load(['contact.debts', 'payments.financialAccount'])),
         ], 201);
     }
 
@@ -576,7 +578,7 @@ class DebtController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Debt record updated successfully.',
-            'data' => $debt->fresh(['contact.debts', 'payments.financialAccount']),
+            'data' => new DebtResource($debt->fresh(['contact.debts', 'payments.financialAccount'])),
         ]);
     }
 
@@ -666,8 +668,8 @@ class DebtController extends Controller
             'success' => true,
             'message' => 'Payment settled and financial accounts updated.',
             'data' => [
-                'debt' => $debt->fresh(['contact', 'payments.financialAccount']),
-                'payment' => $payment->load('financialAccount'),
+                'debt' => new DebtResource($debt->fresh(['contact', 'payments.financialAccount'])),
+                'payment' => new DebtPaymentResource($payment->load('financialAccount')),
             ],
         ]);
     }
@@ -695,8 +697,8 @@ class DebtController extends Controller
             'success' => true,
             'message' => 'Payment settled across party obligations using waterfall allocation.',
             'data' => [
-                'debts' => $result['debts'],
-                'payments' => $result['payments'],
+                'debts' => DebtResource::collection($result['debts']),
+                'payments' => DebtPaymentResource::collection($result['payments']),
             ],
         ]);
     }

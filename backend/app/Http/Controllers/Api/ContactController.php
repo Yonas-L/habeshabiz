@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Actions\GeneratePartnerStatementAction;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\ContactResource;
 use App\Models\Contact;
 use App\Scopes\TenantScope;
 use App\Services\PdfGeneratorService;
@@ -46,7 +47,7 @@ class ContactController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $contacts,
+            'data' => ContactResource::collection($contacts),
         ]);
     }
 
@@ -61,7 +62,7 @@ class ContactController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $contact,
+            'data' => new ContactResource($contact),
         ]);
     }
 
@@ -92,7 +93,7 @@ class ContactController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Partner / contact added successfully.',
-            'data' => $contact->loadCount(['debts', 'salesOrders', 'brokeredItems', 'suppliedUnits']),
+            'data' => new ContactResource($contact->loadCount(['debts', 'salesOrders', 'brokeredItems', 'suppliedUnits'])),
         ], 201);
     }
 
@@ -123,7 +124,7 @@ class ContactController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Partner / contact updated successfully.',
-            'data' => $contact->fresh()->loadCount(['debts', 'salesOrders', 'brokeredItems', 'suppliedUnits']),
+            'data' => new ContactResource($contact->fresh()->loadCount(['debts', 'salesOrders', 'brokeredItems', 'suppliedUnits'])),
         ]);
     }
 

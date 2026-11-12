@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Actions\RecordSaleAction;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\SalesOrderResource;
 use App\Models\AuditLog;
 use App\Models\Contact;
 use App\Models\Debt;
@@ -181,7 +182,7 @@ class SaleController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $items,
+            'data' => SalesOrderResource::collection($items),
             'counts' => $counts,
             'summary' => $summary,
             'pagination' => $pagination,
@@ -255,7 +256,7 @@ class SaleController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Sale recorded successfully.',
-            'data' => $order,
+            'data' => new SalesOrderResource($order),
         ], 201);
     }
 
@@ -441,7 +442,7 @@ class SaleController extends Controller
         return response()->json([
             'success' => true,
             'message' => "Successfully collected {$amount} ETB for Order #{$order->order_number}.",
-            'data' => $updatedOrder,
+            'data' => new SalesOrderResource($updatedOrder),
         ]);
     }
 
@@ -933,7 +934,7 @@ class SaleController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Vendor direct sale completed successfully.',
-            'data' => $order,
+            'data' => new SalesOrderResource($order),
         ], 201);
     }
 
@@ -973,7 +974,7 @@ class SaleController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Sales invoice signature and stamp layout updated.',
-            'data' => $order,
+            'data' => new SalesOrderResource($order),
         ]);
     }
 }

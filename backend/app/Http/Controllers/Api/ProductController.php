@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\ProductResource;
+use App\Http\Resources\ProductVariantResource;
 use App\Models\Category;
 use App\Models\InventoryStock;
 use App\Models\InventoryUnit;
@@ -52,7 +54,7 @@ class ProductController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $products,
+            'data' => ProductResource::collection($products),
         ]);
     }
 
@@ -110,7 +112,7 @@ class ProductController extends Controller
         return response()->json([
             'success' => true,
             'message' => "Product '{$product->name}' updated successfully.",
-            'data' => $product->fresh(['categoryRel', 'variants.stock', 'variants.inventoryUnits' => fn ($q) => $q->where('status', 'in_stock')]),
+            'data' => new ProductResource($product->fresh(['categoryRel', 'variants.stock', 'variants.inventoryUnits' => fn ($q) => $q->where('status', 'in_stock')])),
         ]);
     }
 
@@ -134,7 +136,7 @@ class ProductController extends Controller
         return response()->json([
             'success' => true,
             'message' => "Product '{$product->name}' moved to archive.",
-            'data' => $product,
+            'data' => new ProductResource($product),
         ]);
     }
 
@@ -158,7 +160,7 @@ class ProductController extends Controller
         return response()->json([
             'success' => true,
             'message' => "Product '{$product->name}' restored from archive.",
-            'data' => $product,
+            'data' => new ProductResource($product),
         ]);
     }
 
@@ -239,7 +241,7 @@ class ProductController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Variant updated successfully.',
-            'data' => $variant->fresh(['product']),
+            'data' => new ProductVariantResource($variant->fresh(['product'])),
         ]);
     }
 
@@ -359,7 +361,7 @@ class ProductController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Product created successfully.',
-            'data' => $product,
+            'data' => new ProductResource($product),
         ], 201);
     }
 
@@ -392,7 +394,7 @@ class ProductController extends Controller
         return response()->json([
             'success' => true,
             'message' => "Variant '{$variant->display_name}' added to {$product->name}.",
-            'data' => $variant->load('product'),
+            'data' => new ProductVariantResource($variant->load('product')),
         ], 201);
     }
 }

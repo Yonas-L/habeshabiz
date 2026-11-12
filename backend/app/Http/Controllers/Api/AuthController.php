@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\TenantResource;
+use App\Http\Resources\UserResource;
 use App\Models\AuditLog;
 use App\Models\User;
 use App\Support\DeviceDetector;
@@ -52,28 +54,8 @@ class AuthController extends Controller
             'message' => 'Authenticated successfully.',
             'data' => [
                 'token' => $token,
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'phone' => $user->phone,
-                    'role' => $user->role,
-                    'permissions' => $user->permissions ?? [],
-                    'can_view_costs' => $user->canViewCosts(),
-                    'can_discount' => $user->canDiscount(),
-                    'can_handover' => $user->canHandover(),
-                    'can_intake_stock' => $user->canIntakeStock(),
-                    'can_manage_inventory' => $user->canManageInventory(),
-                ],
-                'tenant' => $user->tenant ? [
-                    'id' => $user->tenant->id,
-                    'name' => $user->tenant->name,
-                    'slug' => $user->tenant->slug,
-                    'phone' => $user->tenant->phone,
-                    'currency' => $user->tenant->currency_code,
-                    'business_type' => $user->tenant->business_type,
-                    'settings' => $user->tenant->settings,
-                ] : null,
+                'user' => new UserResource($user),
+                'tenant' => $user->tenant ? new TenantResource($user->tenant) : null,
             ],
         ]);
     }
@@ -86,28 +68,8 @@ class AuthController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'phone' => $user->phone,
-                    'role' => $user->role,
-                    'permissions' => $user->permissions ?? [],
-                    'can_view_costs' => $user->canViewCosts(),
-                    'can_discount' => $user->canDiscount(),
-                    'can_handover' => $user->canHandover(),
-                    'can_intake_stock' => $user->canIntakeStock(),
-                    'can_manage_inventory' => $user->canManageInventory(),
-                ],
-                'tenant' => $user->tenant ? [
-                    'id' => $user->tenant->id,
-                    'name' => $user->tenant->name,
-                    'slug' => $user->tenant->slug,
-                    'phone' => $user->tenant->phone,
-                    'currency' => $user->tenant->currency_code,
-                    'business_type' => $user->tenant->business_type,
-                    'settings' => $user->tenant->settings,
-                ] : null,
+                'user' => new UserResource($user),
+                'tenant' => $user->tenant ? new TenantResource($user->tenant) : null,
             ],
         ]);
     }
@@ -179,19 +141,7 @@ class AuthController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Profile details updated.',
-            'data' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'phone' => $user->phone,
-                'role' => $user->role,
-                'permissions' => $user->permissions ?? [],
-                'can_view_costs' => $user->canViewCosts(),
-                'can_discount' => $user->canDiscount(),
-                'can_handover' => $user->canHandover(),
-                'can_intake_stock' => $user->canIntakeStock(),
-                'can_manage_inventory' => $user->canManageInventory(),
-            ],
+            'data' => new UserResource($user),
         ]);
     }
 }

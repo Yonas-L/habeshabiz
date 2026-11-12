@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\FinancialAccountResource;
 use App\Models\AuditLog;
 use App\Models\FinancialAccount;
 use App\Models\FinancialTransaction;
@@ -73,8 +74,8 @@ class AccountController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
-                'treasury_accounts' => $bankAndCash,
-                'asset_accounts' => $customAssets,
+                'treasury_accounts' => FinancialAccountResource::collection($bankAndCash),
+                'asset_accounts' => FinancialAccountResource::collection($customAssets),
                 'total_treasury' => $bankAndCash->sum('current_balance'),
                 'total_assets' => $customAssets->sum('current_balance'),
                 'grand_total' => $accounts->sum('current_balance'),
@@ -229,7 +230,7 @@ class AccountController extends Controller
         return response()->json([
             'success' => true,
             'message' => "Account {$account->name} created successfully.",
-            'data' => $account,
+            'data' => new FinancialAccountResource($account),
         ], 201);
     }
 
@@ -355,7 +356,7 @@ class AccountController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Account updated successfully.',
-            'data' => $account->fresh(),
+            'data' => new FinancialAccountResource($account->fresh()),
         ]);
     }
 
@@ -565,7 +566,7 @@ class AccountController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
-                'account' => $account,
+                'account' => new FinancialAccountResource($account),
                 'summary' => [
                     'current_balance' => $currentBalance,
                     'total_inflow' => round($totalInflow, 2),
